@@ -1,0 +1,26 @@
+{
+  "rule": [
+    {
+      "action": {
+        "type": "Delete"
+      },
+      "condition": {
+        "age": 2,
+        "matchesPrefix": [
+          "ocr_debug/"
+        ]
+      }
+    },
+    {
+      "action": {
+        "type": "Delete"
+      },
+      "condition": {
+        "age": 5,
+        "matchesPrefix": [
+          "ocr_jobs/"
+        ]
+      }
+    }
+  ]
+}

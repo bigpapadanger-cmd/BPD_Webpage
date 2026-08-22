@@ -1,0 +1,31 @@
+.ad-slot {
+    width: 100%;
+    position: relative;
+}
+.ad-slot-top {
+    width: min(100% - 40px, 1100px);
+    min-height: 90px;
+    margin: 20px auto 0;
+}
+.ad-slot-middle {
+    width: 100%;
+    min-height: 90px;
+    margin: 24px 0;
+}
+.ad-slot-sidebar {
+    width: calc(100% - 24px);
+    min-height: 90px;
+    margin: 0 12px 12px;
+}
+@media (max-width: 768px) {
+    .ad-slot-top {
+        width: calc(100% - 24px);
+        min-height: 70px;
+    }
+    .ad-slot-middle {
+        min-height: 70px;
+    }
+    .ad-slot-sidebar {
+        display: none;
+    }
+}

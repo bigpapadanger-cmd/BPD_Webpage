@@ -1,0 +1,166 @@
+/* 
+========================================================= 
+BPD GAMING NETWORK 
+SIDEBAR HOVER TOOLTIP 
+========================================================= 
+*/
+
+.sidebar-tooltip {
+    position: fixed;
+    display: block;
+    padding: 10px 15px;
+    border: 1px solid rgba(77, 163, 255, 0.35);
+    border-radius: 10px;
+    background: linear-gradient(
+        135deg,
+        rgba(9, 13, 21, 0.98),
+        rgba(14, 22, 35, 0.96)
+    );
+    color: #f2f4f8;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    line-height: 1.2;
+    white-space: nowrap;
+    box-shadow:
+        0 8px 25px rgba(0, 0, 0, 0.45),
+        0 0 12px rgba(77, 163, 255, 0.18),
+        inset 0 0 12px rgba(77, 163, 255, 0.04);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    transform: translateY(-50%) translateX(-25px);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition:
+        opacity 0.18s ease,
+        transform 0.18s ease,
+        visibility 0.18s ease,
+        box-shadow 0.18s ease;
+    z-index: 999999;
+}
+
+/* 
+========================================================= 
+VISIBLE TOOLTIP 
+========================================================= 
+*/
+
+.sidebar-tooltip.visible {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(-50%) translateX(0);
+    box-shadow:
+        0 8px 28px rgba(0, 0, 0, 0.5),
+        0 0 18px rgba(77, 163, 255, 0.28),
+        0 0 35px rgba(77, 163, 255, 0.08),
+        inset 0 0 14px rgba(77, 163, 255, 0.05);
+}
+
+/* 
+========================================================= 
+TOOLTIP TEXT 
+========================================================= 
+*/
+
+#sidebarHoverText {
+    position: relative;
+    display: inline-block;
+    text-shadow:
+        0 0 5px rgba(242, 244, 248, 0.35),
+        0 0 10px rgba(77, 163, 255, 0.25);
+}
+
+/* 
+========================================================= 
+FLASHING TEXT EFFECT 
+========================================================= 
+*/
+
+.sidebar-tooltip.visible #sidebarHoverText {
+    animation: sidebarTooltipTextGlow 2s ease-in-out infinite;
+}
+
+@keyframes sidebarTooltipTextGlow {
+    0%,
+    100% {
+        text-shadow:
+            0 0 4px rgba(242, 244, 248, 0.3),
+            0 0 8px rgba(77, 163, 255, 0.18);
+    }
+
+    50% {
+        text-shadow:
+            0 0 6px rgba(242, 244, 248, 0.55),
+            0 0 14px rgba(77, 163, 255, 0.45),
+            0 0 22px rgba(77, 163, 255, 0.18);
+    }
+}
+
+/* 
+========================================================= 
+TOOLTIP ARROW 
+========================================================= 
+*/
+
+.sidebar-tooltip::before {
+    content: "";
+    position: absolute;
+    left: -5px;
+    top: 50%;
+    width: 9px;
+    height: 9px;
+    background: rgba(9, 13, 21, 0.98);
+    border-left: 1px solid rgba(77, 163, 255, 0.35);
+    border-bottom: 1px solid rgba(77, 163, 255, 0.35);
+    transform: translateY(-50%) rotate(45deg);
+}
+
+/* 
+========================================================= 
+ANIMATED BORDER GLOW 
+========================================================= 
+*/
+
+.sidebar-tooltip::after {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    border-radius: 10px;
+    pointer-events: none;
+    opacity: 0;
+    box-shadow:
+        0 0 8px rgba(77, 163, 255, 0.2),
+        inset 0 0 8px rgba(77, 163, 255, 0.08);
+    transition: opacity 0.2s ease;
+}
+
+.sidebar-tooltip.visible::after {
+    opacity: 1;
+}
+
+/* 
+========================================================= 
+ANIMATIONS OFF 
+========================================================= 
+*/
+
+body.animations-off .sidebar-tooltip,
+body.animations-off .sidebar-tooltip #sidebarHoverText {
+    animation: none !important;
+    transition: none !important;
+}
+
+/* 
+========================================================= 
+REDUCED MOTION 
+========================================================= 
+*/
+
+@media (prefers-reduced-motion: reduce) {
+    .sidebar-tooltip,
+    .sidebar-tooltip #sidebarHoverText {
+        animation: none !important;
+        transition: none !important;
+    }
+}

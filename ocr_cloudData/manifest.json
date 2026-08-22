@@ -1,0 +1,270 @@
+{
+  "package": "bpd_ocr_v16_coordinate_pipeline",
+  "architecture": "foundation -> frozen coordinate references -> pass1 -> pass2 -> pass3a -> pass3b -> isolated paddle -> final validation",
+  "debugModes": {
+    "1": "quick summary",
+    "2": "medium structural summary",
+    "3": "full structural JSON",
+    "4": "full JSON plus coordinate/stage image snippets"
+  },
+  "versions": {
+    "ocr.py": {
+      "OCR_VERSION": "main-v16.0-foundation-pass1-pass2-pass3-paddle"
+    },
+    "ocr_confidence.py": {
+      "CONFIDENCE_VERSION": "confidence-v1.3-report-fields-progressive-locks-hardened"
+    },
+    "ocr_config.py": {
+      "CONFIG_VERSION": "config-v3.0-debug-modes-1-4"
+    },
+    "ocr_debug.py": {
+      "DEBUG_VISUAL_VERSION": "debug-visual-v2.0-coordinate-stage-snips"
+    },
+    "ocr_diagnostics.py": {
+      "DIAGNOSTICS_VERSION": "diagnostics-v2.1-central-debug-level"
+    },
+    "ocr_evidence.py": {
+      "EVIDENCE_VERSION": "evidence-v2.0-foundation-coordinate-map"
+    },
+    "ocr_field_state.py": {
+      "FIELD_STATE_VERSION": "field-state-v2.0-pass1-pass2-pass3-paddle"
+    },
+    "ocr_identity.py": {
+      "IDENTITY_VERSION": "identity-v1.1-shared-roster-contract"
+    },
+    "ocr_layout.py": {
+      "LAYOUT_VERSION": "layout-v2.0-foundation-coordinate-pipeline"
+    },
+    "ocr_pass1.py": {
+      "PASS1_VERSION": "pass1-v1.0-coordinate-reference-baseline"
+    },
+    "ocr_pass2.py": {
+      "PASS2_VERSION": "pass2-v5.0-same-coordinate-validation"
+    },
+    "ocr_pass3.py": {
+      "PASS3_VERSION": "pass3-v15.0-targeted-a-b-coordinate-sweeps"
+    },
+    "ocr_results.py": {
+      "RESULTS_VERSION": "results-v1.0-concise-detail-usage-split"
+    },
+    "ocr_store.py": {
+      "STORE_VERSION": "store-v1.1-budgeted-debug-artifacts"
+    },
+    "ocr_text.py": {
+      "TEXT_VERSION": "text-v1.0-shared"
+    },
+    "ocr_utils.py": {
+      "UTILS_VERSION": "utils-v1.0-shared"
+    },
+    "paddle_runtime.py": {
+      "PADDLE_RUNTIME_VERSION": "paddle-runtime-v1.2-eager-warm-single-flight"
+    },
+    "paddleocr_validation.py": {
+      "PADDLE_VALIDATION_VERSION": "paddle-v13.0-isolated-coordinate-best-fit"
+    },
+    "preparation.py": {
+      "PREPARATION_VERSION": "preparation-v11.0-foundation-only-before-ocr1"
+    },
+    "server.py": {
+      "SERVER_VERSION": "server-v3.3-shared-roster-contract"
+    },
+    "zero_seven.py": {
+      "ZERO_SEVEN_VERSION": "zero-seven-v3.0-progressive-topology-lock"
+    }
+  },
+  "files": [
+    {
+      "name": "debug_localize_test.py",
+      "sizeBytes": 6289,
+      "sha256": "44c7dca5ab7e5c58b154d3c4f44eda607eb0c2e4c47cf8d41c8d2ba43795f522"
+    },
+    {
+      "name": "ocr.py",
+      "sizeBytes": 29295,
+      "sha256": "88f9bd23ad1e63369b8b031b853cfe00e808846b05e748d99f061198e35a2784",
+      "versions": {
+        "OCR_VERSION": "main-v16.0-foundation-pass1-pass2-pass3-paddle"
+      }
+    },
+    {
+      "name": "ocr_confidence.py",
+      "sizeBytes": 13516,
+      "sha256": "fa92e4bd25a20014ccd3d0e435e00a702338883352e34b5bf61edc6aad52fe02",
+      "versions": {
+        "CONFIDENCE_VERSION": "confidence-v1.3-report-fields-progressive-locks-hardened"
+      }
+    },
+    {
+      "name": "ocr_config.py",
+      "sizeBytes": 6394,
+      "sha256": "5cef8b91fe2e18c8364cb93ff6917abaaf004810613b974d8ab773072c60f256",
+      "versions": {
+        "CONFIG_VERSION": "config-v3.0-debug-modes-1-4"
+      }
+    },
+    {
+      "name": "ocr_debug.py",
+      "sizeBytes": 17504,
+      "sha256": "1ceb49ba063d1d3575a45f4aefcd6aa7949d637e08b704bdf75e0bc659324f6a",
+      "versions": {
+        "DEBUG_VISUAL_VERSION": "debug-visual-v2.0-coordinate-stage-snips"
+      }
+    },
+    {
+      "name": "ocr_diagnostics.py",
+      "sizeBytes": 24214,
+      "sha256": "a7b7f69ccb7d43d11dd298ddd510acf93ca975a511e1e9759805d49842568d0d",
+      "versions": {
+        "DIAGNOSTICS_VERSION": "diagnostics-v2.1-central-debug-level"
+      }
+    },
+    {
+      "name": "ocr_evidence.py",
+      "sizeBytes": 2767,
+      "sha256": "a899520d4a840ba8af94d4cd9b493172208d7154759695c486ed7c7a08777402",
+      "versions": {
+        "EVIDENCE_VERSION": "evidence-v2.0-foundation-coordinate-map"
+      }
+    },
+    {
+      "name": "ocr_field_state.py",
+      "sizeBytes": 13194,
+      "sha256": "c90a80a1361270b1fcbb5236ec8f1550db89c776ab93777d20a81f8d32d8614b",
+      "versions": {
+        "FIELD_STATE_VERSION": "field-state-v2.0-pass1-pass2-pass3-paddle"
+      }
+    },
+    {
+      "name": "ocr_identity.py",
+      "sizeBytes": 6878,
+      "sha256": "ce0906963accc67adacdd1769838008143d07b9e8b41fc1a733d1cc9fa1074dc",
+      "versions": {
+        "IDENTITY_VERSION": "identity-v1.1-shared-roster-contract"
+      }
+    },
+    {
+      "name": "ocr_layout.py",
+      "sizeBytes": 1805,
+      "sha256": "69a277082bd6461536f821ba119b0fb167a7ae06fd41b339bd352f934d602cf8",
+      "versions": {
+        "LAYOUT_VERSION": "layout-v2.0-foundation-coordinate-pipeline"
+      }
+    },
+    {
+      "name": "ocr_manual_test.py",
+      "sizeBytes": 2027,
+      "sha256": "a6a6dc3d7b000a980c81f208900b81e42f343813650c72e90974ba79bc03421e"
+    },
+    {
+      "name": "ocr_pass1.py",
+      "sizeBytes": 12675,
+      "sha256": "ec8b5a4739ea876dbe5fe9226d6971d631b3ea05fccc34e15094d49a0de9fb0c",
+      "versions": {
+        "PASS1_VERSION": "pass1-v1.0-coordinate-reference-baseline"
+      }
+    },
+    {
+      "name": "ocr_pass2.py",
+      "sizeBytes": 9266,
+      "sha256": "e16461365a5c9f0b1d87d69516b67706f337e8d142814cb80fe8c0e356bec547",
+      "versions": {
+        "PASS2_VERSION": "pass2-v5.0-same-coordinate-validation"
+      }
+    },
+    {
+      "name": "ocr_pass3.py",
+      "sizeBytes": 18464,
+      "sha256": "3f4d069dc50e2c4372d9f1efe6f3d3681f52b22c0d9ddf9e53757a6193b2d447",
+      "versions": {
+        "PASS3_VERSION": "pass3-v15.0-targeted-a-b-coordinate-sweeps"
+      }
+    },
+    {
+      "name": "ocr_results.py",
+      "sizeBytes": 8053,
+      "sha256": "ec96d8b711ac837b377723f1cdd6a0959d2136cebb6ca655b159bb27e34be7f8",
+      "versions": {
+        "RESULTS_VERSION": "results-v1.0-concise-detail-usage-split"
+      }
+    },
+    {
+      "name": "ocr_store.py",
+      "sizeBytes": 15358,
+      "sha256": "cf35c3cd83dbefb2810bb6c855b980331c9f559c6e271756e25b5c4184671b92",
+      "versions": {
+        "STORE_VERSION": "store-v1.1-budgeted-debug-artifacts"
+      }
+    },
+    {
+      "name": "ocr_text.py",
+      "sizeBytes": 2219,
+      "sha256": "b603b22c1a5ec6b5e0323c108919c2e05969b8ffbd6906457794d2446c7c96d8",
+      "versions": {
+        "TEXT_VERSION": "text-v1.0-shared"
+      }
+    },
+    {
+      "name": "ocr_utils.py",
+      "sizeBytes": 451,
+      "sha256": "cf844646c446640cf740e60f02afe28830593a11c933f1439a552370d434ab2f",
+      "versions": {
+        "UTILS_VERSION": "utils-v1.0-shared"
+      }
+    },
+    {
+      "name": "paddle_prefetch.py",
+      "sizeBytes": 563,
+      "sha256": "61fe6285569b622d631084fcf02a5d2bb1b719e32cfd64cc7347d0c18ed1cf9d"
+    },
+    {
+      "name": "paddle_runtime.py",
+      "sizeBytes": 7549,
+      "sha256": "5eadc81983c6dee62cfba071b148681c79addcd23b7cc91b50cfe7327bcc5b26",
+      "versions": {
+        "PADDLE_RUNTIME_VERSION": "paddle-runtime-v1.2-eager-warm-single-flight"
+      }
+    },
+    {
+      "name": "paddleocr_validation.py",
+      "sizeBytes": 10905,
+      "sha256": "9e12c1557d2c03ddd55417ba83c13a460562f03ec11b522a49b0cc5fe669a686",
+      "versions": {
+        "PADDLE_VALIDATION_VERSION": "paddle-v13.0-isolated-coordinate-best-fit"
+      }
+    },
+    {
+      "name": "preparation.py",
+      "sizeBytes": 162174,
+      "sha256": "42aedc58a6d659f69e248cedd738c54b131f893ea98fdc09ef6ca296876c3030",
+      "versions": {
+        "PREPARATION_VERSION": "preparation-v11.0-foundation-only-before-ocr1"
+      }
+    },
+    {
+      "name": "server.py",
+      "sizeBytes": 42397,
+      "sha256": "e7759b3d1a4a2f8248aa74e0e3384f86a8efccc31f26429e3b767441979f3e7f",
+      "versions": {
+        "SERVER_VERSION": "server-v3.3-shared-roster-contract"
+      }
+    },
+    {
+      "name": "zero_seven.py",
+      "sizeBytes": 19502,
+      "sha256": "338112e5651c1e03b5f63320f320ea332144e556d4285dabc9aa344208d854ed",
+      "versions": {
+        "ZERO_SEVEN_VERSION": "zero-seven-v3.0-progressive-topology-lock"
+      }
+    },
+    {
+      "name": "refactor_notes.md",
+      "sizeBytes": 3049,
+      "sha256": "02643a61e81cb5fe038ddf03bfe460ca45b6ef9d407e5bda86478c5c0b73502e"
+    },
+    {
+      "name": "orientation_refactor_notes.md",
+      "sizeBytes": 3049,
+      "sha256": "02643a61e81cb5fe038ddf03bfe460ca45b6ef9d407e5bda86478c5c0b73502e"
+    }
+  ]
+}

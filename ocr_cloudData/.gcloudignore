@@ -1,0 +1,15 @@
+.gcloudignore
+.git
+.gitignore
+__pycache__/
+*.py[cod]
+*.log
+output/
+.env
+.env.*
+.dev.vars
+.dev.vars.*
+secrets.json
+*.pem
+*.key
+V12/

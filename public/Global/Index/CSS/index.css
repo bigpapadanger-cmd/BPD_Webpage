@@ -1,0 +1,389 @@
+
+/* =========================================================
+   BPD GAMING NETWORK
+   HOMEPAGE STYLES
+   File:
+   /public/Global/Index/CSS/index.css
+   ========================================================= */
+
+/* =========================================================
+   GLOBAL RESET
+   ========================================================= */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+/* =========================================================
+   THEME VARIABLES
+   ========================================================= */
+:root {
+    --sidebar-width: 250px;
+    --sidebar-collapsed-width: 76px;
+    --background: #080b12;
+    --background-secondary: #0d111a;
+    --panel: rgba(18, 23, 34, 0.82);
+    --border: rgba(255, 255, 255, 0.08);
+    --text: #f2f4f8;
+    --text-muted: #8d96a8;
+    --accent: #4da3ff;
+    --accent-soft: rgba(77, 163, 255, 0.15);
+}
+
+/* =========================================================
+   PAGE BASE
+   ========================================================= */
+html,
+body {
+    width: 100%;
+    min-height: 100%;
+}
+
+body {
+    background: var(--background);
+    color: var(--text);
+    font-family: Arial, Helvetica, sans-serif;
+    overflow-x: hidden;
+}
+
+/* =========================================================
+   BACKGROUND
+   ========================================================= */
+.background-waves {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    overflow: hidden;
+    background:
+        radial-gradient(circle at 50% 50%, rgba(77, 163, 255, 0.07), transparent 45%),
+        linear-gradient(135deg, #080b12 0%, #0b1019 50%, #080b12 100%);
+}
+
+.background-waves::before,
+.background-waves::after {
+    content: "";
+    position: absolute;
+    left: -10%;
+    width: 120%;
+    height: 45%;
+    border: 1px solid rgba(77, 163, 255, 0.08);
+    border-radius: 50%;
+    animation: wavePulse 8s ease-in-out infinite;
+}
+
+.background-waves::before {
+    top: 12%;
+    box-shadow:
+        0 0 80px rgba(77, 163, 255, 0.04),
+        0 0 160px rgba(77, 163, 255, 0.03);
+}
+
+.background-waves::after {
+    top: 38%;
+    animation-delay: -4s;
+}
+
+@keyframes wavePulse {
+    0%,
+    100% {
+        transform: scale(0.92) translateY(0);
+        opacity: 0.35;
+    }
+    50% {
+        transform: scale(1.08) translateY(-12px);
+        opacity: 0.8;
+    }
+}
+
+/* =========================================================
+   MAIN CONTENT
+   The global sidebar controls its own width.
+   The homepage only needs to account for it.
+   ========================================================= */
+.main-content {
+    min-height: 100vh;
+    margin-left: var(--sidebar-width);
+    transition: margin-left 0.3s ease;
+}
+
+/* When the global sidebar is collapsed */
+.sidebar.collapsed + .main-content {
+    margin-left: var(--sidebar-collapsed-width);
+}
+
+/* =========================================================
+   HERO
+   ========================================================= */
+.hero-header {
+    min-height: 430px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 80px 40px;
+    text-align: center;
+}
+
+.hero-content {
+    position: relative;
+    max-width: 1000px;
+}
+
+.hero-eyebrow {
+    margin-bottom: 18px;
+    color: var(--accent);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 5px;
+}
+
+.hero-header h1 {
+    font-size: clamp(42px, 6vw, 86px);
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -3px;
+    text-shadow: 0 0 50px rgba(77, 163, 255, 0.15);
+}
+
+.hero-subtitle {
+    margin-top: 22px;
+    color: var(--text-muted);
+    font-size: 18px;
+    letter-spacing: 3px;
+}
+
+/* =========================================================
+   CONTENT AREA
+   ========================================================= */
+.content-area {
+    width: min(1200px, calc(100% - 60px));
+    margin: 0 auto;
+    padding-bottom: 40px;
+}
+
+/* =========================================================
+   CONTENT CARD
+   ========================================================= */
+.content-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 34px;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+}
+
+.card-label {
+    color: var(--accent);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 3px;
+}
+
+.content-card h2 {
+    margin-top: 10px;
+    font-size: 30px;
+}
+
+.content-card p {
+    max-width: 650px;
+    margin-top: 10px;
+    color: var(--text-muted);
+    line-height: 1.7;
+}
+
+/* =========================================================
+   CATEGORY / NETWORK GRID
+   ========================================================= */
+.content-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 18px;
+    margin-top: 18px;
+}
+
+/* =========================================================
+   CATEGORY CARDS
+   ========================================================= */
+.info-card {
+    display: block;
+    padding: 28px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    color: inherit;
+    text-decoration: none;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    transition:
+        transform 0.25s ease,
+        border-color 0.25s ease,
+        background 0.25s ease;
+}
+
+.info-card:hover {
+    transform: translateY(-4px);
+    border-color: rgba(77, 163, 255, 0.25);
+    background: rgba(18, 23, 34, 0.9);
+}
+
+.info-card-icon {
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 20px;
+    border-radius: 10px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-size: 20px;
+}
+
+.info-card h3 {
+    margin-bottom: 8px;
+    font-size: 18px;
+}
+
+.info-card p {
+    color: var(--text-muted);
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+/* =========================================================
+   DISABLED / FUTURE CARDS
+   ========================================================= */
+.info-card.disabled {
+    cursor: default;
+    opacity: 0.55;
+}
+
+.info-card.disabled:hover {
+    transform: none;
+    border-color: var(--border);
+    background: var(--panel);
+}
+
+/* =========================================================
+   AD CONTAINERS
+   The actual advertisement behavior is handled by:
+   /Global/Ads/JS/ads.js
+   ========================================================= */
+.ad-slot {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+/* =========================================================
+   TOP AD
+   ========================================================= */
+.ad-slot-top {
+    width: min(1200px, calc(100% - 60px));
+    min-height: 90px;
+    margin: 0 auto 24px;
+}
+
+/* =========================================================
+   MIDDLE AD
+   ========================================================= */
+.ad-slot-middle {
+    min-height: 90px;
+    margin: 24px 0;
+}
+
+/* =========================================================
+   BOTTOM AD
+   ========================================================= */
+.ad-slot-bottom {
+    width: min(1200px, calc(100% - 60px));
+    min-height: 90px;
+    margin: 24px auto 40px;
+}
+
+/* =========================================================
+   ANIMATION CONTROL
+   Controlled globally through data-animations.
+   ========================================================= */
+body[data-animations="off"] *,
+body.animations-off * {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+    transition-duration: 0s !important;
+}
+
+/* =========================================================
+   RESPONSIVE
+   ========================================================= */
+@media (max-width: 1000px) {
+    .content-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 800px) {
+    /* The global sidebar becomes collapsed */
+    .main-content {
+        margin-left: var(--sidebar-collapsed-width);
+    }
+
+    .sidebar.collapsed + .main-content {
+        margin-left: var(--sidebar-collapsed-width);
+    }
+
+    .content-area {
+        width: min(100% - 30px, 1200px);
+    }
+
+    .ad-slot-top,
+    .ad-slot-bottom {
+        width: calc(100% - 30px);
+    }
+
+    .content-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .hero-header {
+        min-height: 350px;
+        padding: 70px 25px;
+    }
+
+    .hero-header h1 {
+        letter-spacing: -2px;
+    }
+}
+
+@media (max-width: 500px) {
+    .hero-header {
+        min-height: 320px;
+        padding: 60px 20px;
+    }
+
+    .hero-eyebrow {
+        font-size: 11px;
+        letter-spacing: 3px;
+    }
+
+    .hero-subtitle {
+        font-size: 15px;
+        letter-spacing: 2px;
+    }
+
+    .content-area {
+        width: calc(100% - 20px);
+    }
+
+    .content-card {
+        padding: 24px;
+    }
+
+    .ad-slot-top,
+    .ad-slot-bottom {
+        width: calc(100% - 20px);
+    }
+}
+

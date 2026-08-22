@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Submit Scoreboard Image</title> 
+    <link rel="stylesheet" href="../CSS/submitimg.css"> 
+    <link rel="stylesheet" href="../CSS/submit_testing.css"> 
+</head>
+<body>
+    <main class="page">
+        <section class="panel">
+            <h1 class="page-title">
+                Rocket League Scoreboard OCR
+            </h1>
+            <p class="page-subtitle">
+                Upload a scoreboard screenshot, choose the match size, enter the expected player names, position the crop area, then read the scoreboard.
+            </p>
+            <div class="controls">
+                <div class="field">
+                    <label for="matchSize">
+                        Match Size
+                    </label>
+                    <select id="matchSize">
+                        <option value="1">
+                            1v1
+                        </option>
+                        <option value="2">
+                            2v2
+                        </option>
+                        <option value="3" selected>
+                            3v3
+                        </option>
+                        <option value="4">
+                            4v4
+                        </option>
+                    </select>
+                </div>
+                <div class="field player-names-field">
+                    <label>
+                        Expected Player Names
+                    </label>
+                    <div class="player-names-help">
+                        Enter every player expected in the match. These names will be used to fuzzy match OCR usernames.
+                    </div>
+                    <div
+                        class="player-names-grid"
+                        id="playerNamesContainer">
+                    </div>
+                </div>
+                <div class="example-section">
+                    <button
+                        class="example-toggle"
+                        id="exampleToggle"
+                        type="button"
+                        aria-expanded="true"
+                        aria-controls="exampleContent">
+                        <span class="example-toggle-label">
+                            Example Scoreboard
+                        </span>
+                        <span
+                            class="example-toggle-arrow-box"
+                            id="exampleToggleIcon">
+                            ▲
+                        </span>
+                    </button>
+                    <div
+                        class="example-content"
+                        id="exampleContent">
+                        <img
+                            class="example-image"
+                            src="../../Assets/images/submit_img_samples/imgsample1.png"
+                            alt="Example Rocket League scoreboard screenshot">
+                        <div class="example-help">
+                            Your screenshot should show the full scoreboard with all player rows, stats, and ping values visible. It should contain just the scoreboard section, as the total match score is not needed to calculate the results.
+                        </div>
+                    </div>
+                </div>
+                <div class="field">
+                    <label for="imageInput">
+                        Scoreboard Image
+                    </label>
+                    <input
+                        id="imageInput"
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp">
+                </div>
+                <div class="field">
+                    <button
+                        id="resetCropBtn"
+                        type="button"
+                        disabled>
+                        Reset Crop
+                    </button>
+                </div>
+            </div>
+            <div
+                class="canvas-wrap"
+                id="canvasWrap">
+                <div
+                    class="empty-state"
+                    id="emptyState">
+                    Upload a screenshot to begin.
+                </div>
+                <canvas
+                    id="scoreboardCanvas"
+                    hidden>
+                </canvas>
+            </div>
+            <div class="crop-help">
+                Move the green box over the full scoreboard. Drag the edges or corners to resize it.
+            </div>
+            <div class="actions">
+                <button
+                    id="submitBtn"
+                    type="button"
+                    disabled>
+                    Read Scoreboard
+                </button>
+            </div>
+            <div
+                class="loading-wrap"
+                id="loadingWrap"
+                hidden>
+                <div class="loading-header">
+                    <span id="loadingText">
+                        Reading scoreboard...
+                    </span>
+                    <span id="loadingPercent">
+                        0%
+                    </span>
+                </div>
+                <div class="loading-bar">
+                    <div
+                        class="loading-fill"
+                        id="loadingFill">
+                    </div>
+                </div>
+            </div>
+            <div
+                class="status"
+                id="status">
+                Waiting for image.
+            </div>
+            <dialog
+                class="results-modal"
+                id="results"
+                aria-labelledby="resultsTitle">
+                <div class="results-modal-card">
+                    <div class="results-modal-header">
+                        <div>
+                            <div class="results-modal-label">
+                                OCR REPORT
+                            </div>
+                            <h2 id="resultsTitle">
+                                Scoreboard Results
+                            </h2>
+                        </div>
+                        <button
+                            class="results-modal-close"
+                            id="resultsCloseBtn"
+                            type="button"
+                            aria-label="Close results">
+                            ×
+                        </button>
+                    </div>
+                    <div
+                        class="results-summary"
+                        id="resultsSummary">
+                    </div>
+                    <details class="results-details">
+                        <summary>
+                            View full OCR report
+                        </summary>
+                        <pre id="resultsOutput"></pre>
+                    </details>
+                    <section
+                        class="ocr-testing-panel"
+                        id="ocrTestingPanel"
+                        aria-labelledby="ocrTestingTitle"
+                        hidden>
+                        <div class="ocr-testing-label">
+                            TESTING ONLY
+                        </div>
+                        <h3 id="ocrTestingTitle">
+                            Verify OCR Accuracy
+                        </h3>
+                        <p>
+                            Compare these results with the submitted scoreboard, then record whether the complete report is accurate.
+                        </p>
+                        <div class="ocr-testing-actions">
+                            <button
+                                id="ocrTestingAccurateBtn"
+                                type="button">
+                                Results Are Accurate
+                            </button>
+                            <button
+                                id="ocrTestingIncorrectBtn"
+                                type="button">
+                                Results Need Correction
+                            </button>
+                        </div>
+                        <div
+                            class="ocr-testing-status"
+                            id="ocrTestingStatus"
+                            role="status">
+                        </div>
+                    </section>
+                </div>
+            </dialog>
+        </section>
+    </main>
+    <script src="../JS/submit_core.js"></script>
+    <script src="../JS/submit_img.js"></script>
+    <script src="../JS/submit_testing.js"></script>
+    <script src="../JS/submit_onpage_items.js"></script>
+</body>
+</html>

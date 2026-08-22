@@ -1,0 +1,12 @@
+.env
+.env.*
+.dev.vars
+.dev.vars.*
+secrets.json
+*.pem
+*.key
+**/.git
+**/.wrangler
+**/node_modules
+**/__pycache__
+**/Notes

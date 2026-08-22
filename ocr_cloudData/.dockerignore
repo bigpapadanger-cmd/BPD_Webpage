@@ -1,0 +1,10 @@
+venv
+.venv
+__pycache__
+*.pyc
+input
+output
+temp
+api.py
+.git
+.gitignore

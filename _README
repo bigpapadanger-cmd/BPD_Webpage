@@ -1,0 +1,36 @@
+DOWNLOAD THE FOLLOWING EXTENSIONS:
+    - LIVE SHARE (Microsoft)
+    - GitHub Repositories (GitHub)
+    - GitHub Pull Requests (GitHub)
+    - GitHub Actions (GitHub)
+
+
+INSTALL OPTIONS:
+Git
+Line Endings: Checkout Windows‑style, commit Unix‑style
+
+Pull Behavior: Rebase
+
+Credential Manager: Git Credential Manager Core
+
+Default Branch: master
+
+Terminal
+Terminal Emulator: Windows Terminal
+
+Shell: PowerShell
+
+SSL/TLS
+TLS Library: Windows Secure Channel (Schannel)
+
+VS Code
+Default Editor: VS Code
+
+VS Code Terminal: Windows Terminal (PowerShell)
+
+Cloudflare Pages
+Production Branch: master
+
+Preview Builds: Enable for all non‑default branches
+
+Access Protection:

@@ -1,0 +1,105 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings - BPD Gaming Network</title>
+    <link rel="stylesheet" href="../CSS/settings.css">
+    
+    <!-- Global sidebar styling -->
+    <link rel="stylesheet" href="../../Sidebar/CSS/sidebar.css">
+   <!-- Global sidebar hovering styling -->
+    <link rel="stylesheet" href="../../Sidebar/CSS/hover.css">
+</head>
+<body data-theme="blue" data-animations="on">
+    <div class="background-waves"></div>
+    <div id="global-sidebar"></div>
+    <main class="main-content">
+        <header class="hero-header">
+            <div class="hero-content">
+                <p class="hero-eyebrow">BPD GAMING NETWORK</p>
+                <h1>Settings</h1>
+                <p class="hero-subtitle">Customize your experience.</p>
+            </div>
+        </header>
+        <section class="content-area">
+            <div class="content-card">
+                <span class="card-label">GENERAL</span>
+                <h2>Site Settings</h2>
+                <p>
+                    Manage preferences that apply across the BPD Gaming Network.
+                </p>
+            </div>
+            <div class="settings-section">
+                <div class="settings-section-header">
+                    <span class="section-label">APPEARANCE</span>
+                    <h2>Interface</h2>
+                </div>
+                <div class="settings-list">
+                    <div class="setting-card">
+                        <div class="setting-icon">◐</div>
+                        <div class="setting-info">
+                            <h3>Theme</h3>
+                            <p>Choose the accent style used throughout the network.</p>
+                        </div>
+                        <select id="themeSetting" class="setting-select">
+                            <option value="blue">Blue</option>
+                            <option value="orange">Orange</option>
+                            <option value="purple">Purple</option>
+                            <option value="green">Green</option>
+                        </select>
+                    </div>
+                    <div class="setting-card">
+                        <div class="setting-icon">✦</div>
+                        <div class="setting-info">
+                            <h3>Animations</h3>
+                            <p>Enable or disable background and interface animations.</p>
+                        </div>
+                        <button class="setting-toggle" id="animationSetting" type="button">
+                            <span class="toggle-track">
+                                <span class="toggle-knob"></span>
+                            </span>
+                            <span class="toggle-text">On</span>
+                        </button>
+                    </div>
+                    <div class="setting-card">
+                        <div class="setting-icon">☰</div>
+                        <div class="setting-info">
+                            <h3>Sidebar</h3>
+                            <p>Choose whether the navigation sidebar starts open or collapsed.</p>
+                        </div>
+                        <button class="setting-toggle" id="sidebarSetting" type="button">
+                            <span class="toggle-track">
+                                <span class="toggle-knob"></span>
+                            </span>
+                            <span class="toggle-text">Open</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="settings-section">
+                <div class="settings-section-header">
+                    <span class="section-label">SYSTEM</span>
+                    <h2>Preferences</h2>
+                </div>
+                <div class="settings-list">
+                    <div class="setting-card">
+                        <div class="setting-icon">↻</div>
+                        <div class="setting-info">
+                            <h3>Reset Settings</h3>
+                            <p>Return all BPD Gaming Network settings to their defaults.</p>
+                        </div>
+                        <button class="reset-button" id="resetSettings" type="button">
+                            Reset
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+    <script src="../../Sidebar/JS/sidebar.js"></script>
+    <script src="../JS/settings.js"></script>
+</body>
+</html>
+
