@@ -4,47 +4,72 @@ DOWNLOAD THE FOLLOWING EXTENSIONS:
     - GitHub Pull Requests (GitHub)
     - GitHub Actions (GitHub)
 
-
 INSTALL OPTIONS FOR GIT:
     Git
-        -Line Endings: Checkout Windows‑style, commit Unix‑style
-        -Pull Behavior: Rebase
-        -Credential Manager: Git Credential Manager Core
-        -Default Branch: master
+        - Line Endings: Checkout Windows‑style, commit Unix‑style
+        - Pull Behavior: Rebase
+        - Credential Manager: Git Credential Manager Core
+        - Default Branch: main
+        - Auto‑setup remote tracking: Enabled
+            (This ensures new branches automatically push to origin/<branch>)
 
     Terminal
-        -Terminal Emulator: Windows Terminal
-        -Shell: PowerShell
+        - Terminal Emulator: Windows Terminal
+        - Shell: PowerShell
+
     SSL/TLS
-        -TLS Library: Windows Secure Channel (Schannel)
+        - TLS Library: Windows Secure Channel (Schannel)
+
     VS Code
-        -Default Editor: VS Code
-        -VS Code Terminal: Windows Terminal (PowerShell)
+        - Default Editor: VS Code
+        - VS Code Terminal: Windows Terminal (PowerShell)
 
-    Cloudflare Pages
-        -Production Branch: master
-        -Preview Builds: Enable for all non‑default branches
+CLOUDFLARE PAGES:
+    - Production Branch: main
+    - Preview Builds: Enable for all non‑default branches
 
-    Access Protection:
+ACCESS PROTECTION:
+    - Configure Cloudflare Access as needed
+
 /////////////////////
-******IMPORTANT******
+****** IMPORTANT ******
 /////////////////////
+
 ✔ Auto-fetch from GitHub
-It checks for updates automatically every few minutes.
-    To enable:
-        Open VS Code
-        Press Ctrl + , (settings)
-        Search: git -> autofetch
-        Turn it ON
-        (Try git pull optionally)
-        
-FOR UPLOADING GIT CHANGES:
-How to manage your .gitignore going forward
-    git add .gitignore
-    git commit -m "Update .gitignore"
-    git push
+    It checks for updates automatically every few minutes.
+        To enable:
+            Open VS Code
+            Press Ctrl + ,
+            Search: git autofetch
+            Turn it ON
+            (Optional) Run: git pull
 
-How to manage ALL git changes:
-    git add .
-    git commit -m "{ADD CHANGE DETAILS - INITALS}"
-    git push
+✔ How collaborators push to the repository
+    After cloning:
+        git clone <repo-url>
+        cd <repo-folder>
+
+    Ensure they are on main:
+        git checkout main
+
+    If main does not exist locally:
+        git checkout -b main origin/main
+
+    Set upstream (only needed once per machine):
+        git push --set-upstream origin main
+
+    After this, pushing changes is simply:
+        git add .
+        git commit -m "{CHANGE DETAILS - INITIALS}"
+        git push
+
+FOR UPLOADING GIT CHANGES:
+    How to manage your .gitignore going forward:
+        git add .gitignore
+        git commit -m "Update .gitignore"
+        git push
+
+    How to manage ALL git changes:
+        git add .
+        git commit -m "{ADD CHANGE DETAILS - INITIALS}"
+        git push
