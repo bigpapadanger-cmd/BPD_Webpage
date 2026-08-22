@@ -34,6 +34,29 @@ Production Branch: master
 Preview Builds: Enable for all non‑default branches
 
 Access Protection:
+/////////////////////
+******IMPORTANT******
+/////////////////////
+✔ Auto-fetch from GitHub
+It checks for updates automatically every few minutes.
 
+    To enable:
+
+    Open VS Code
+
+    Press Ctrl + , (settings)
+
+    Search: git -> autofetch
+
+    Turn it ON
 
 FOR UPLOADING GIT CHANGES:
+How to manage your .gitignore going forward
+    git add .gitignore
+    git commit -m "Update .gitignore"
+    git push
+
+How to manage ALL git changes:
+    git add .
+    git commit -m "{ADD CHANGE DETAILS - INITALS}"
+    git push
