@@ -5,51 +5,39 @@ DOWNLOAD THE FOLLOWING EXTENSIONS:
     - GitHub Actions (GitHub)
 
 
-INSTALL OPTIONS:
-Git
-Line Endings: Checkout Windows‑style, commit Unix‑style
+INSTALL OPTIONS FOR GIT:
+    Git
+        -Line Endings: Checkout Windows‑style, commit Unix‑style
+        -Pull Behavior: Rebase
+        -Credential Manager: Git Credential Manager Core
+        -Default Branch: master
 
-Pull Behavior: Rebase
+    Terminal
+        -Terminal Emulator: Windows Terminal
+        -Shell: PowerShell
+    SSL/TLS
+        -TLS Library: Windows Secure Channel (Schannel)
+    VS Code
+        -Default Editor: VS Code
+        -VS Code Terminal: Windows Terminal (PowerShell)
 
-Credential Manager: Git Credential Manager Core
+    Cloudflare Pages
+        -Production Branch: master
+        -Preview Builds: Enable for all non‑default branches
 
-Default Branch: master
-
-Terminal
-Terminal Emulator: Windows Terminal
-
-Shell: PowerShell
-
-SSL/TLS
-TLS Library: Windows Secure Channel (Schannel)
-
-VS Code
-Default Editor: VS Code
-
-VS Code Terminal: Windows Terminal (PowerShell)
-
-Cloudflare Pages
-Production Branch: master
-
-Preview Builds: Enable for all non‑default branches
-
-Access Protection:
+    Access Protection:
 /////////////////////
 ******IMPORTANT******
 /////////////////////
 ✔ Auto-fetch from GitHub
 It checks for updates automatically every few minutes.
-
     To enable:
-
-    Open VS Code
-
-    Press Ctrl + , (settings)
-
-    Search: git -> autofetch
-
-    Turn it ON
-    (Try git pull optionally)
+        Open VS Code
+        Press Ctrl + , (settings)
+        Search: git -> autofetch
+        Turn it ON
+        (Try git pull optionally)
+        
 FOR UPLOADING GIT CHANGES:
 How to manage your .gitignore going forward
     git add .gitignore

@@ -1,0 +1,21 @@
+# ===========================================
+# Database Configuration
+# ===========================================
+DATABASE_URL=XXXXXXXX
+DB_POOL_MIN=XXXXX
+DB_POOL_MAX=XXXXX
+# ===========================================
+# ORC Call Configuration
+# ===========================================
+OCR_SERVICE_URL=XXXXXXXX
+OCR_API_KEY=XXXXXXX
+# ===========================================
+# Epic Configuration
+# ===========================================
+EPIC_CLIENT_SECRET=XXXXXXX
+AUTH_SESSION_SECRET=XXXXXXX
+AUTH_LOGIN_DEBUG=XXXXXXXX
+# ===========================================
+# Cloud Configuration
+# ===========================================
+CLOUD_MONITORING_API=XXXXXX

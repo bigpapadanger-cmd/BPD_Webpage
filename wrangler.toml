@@ -1,0 +1,3 @@
+kv_namespaces = [
+  { binding = "AUTH_SESSIONS", id = "941c19ab958e498a9846b80cfd3f6525" }
+]
