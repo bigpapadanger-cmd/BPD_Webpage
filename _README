@@ -49,7 +49,7 @@ It checks for updates automatically every few minutes.
     Search: git -> autofetch
 
     Turn it ON
-
+    (Try git pull optionally)
 FOR UPLOADING GIT CHANGES:
 How to manage your .gitignore going forward
     git add .gitignore
