@@ -62,7 +62,8 @@ window.BPDAuth = { getSession: getBpdAuthSession };
    ========================================================= */
 
 async function initializeSidebar() {
-    const authSession = await BPDAuth.getSession();
+    const authSession = await BPDAuth.getSession(true); // force refresh
+
 
     applyGlobalSettings();
     setupSidebarToggle();

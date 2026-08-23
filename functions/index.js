@@ -1,6 +1,6 @@
 
-import { handleEpicLogin } from "./auth/epic_login.js";
-import { handleEpicCallback } from "./auth/epic_callback.js";
+import { handleEpicLogin } from "./auth/epic/login.js";
+import { handleEpicCallback } from "./auth/epic/epic_callback.js";
 import { handleAuthSession, handleAuthLogout } from "./auth/session.js";
 import { handleRocketLeagueProfile } from "./rocketleague/profile.js";
 
