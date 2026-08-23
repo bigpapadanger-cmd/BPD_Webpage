@@ -7,22 +7,6 @@ GLOBAL SIDEBAR
 The sidebar is shared across the website, but each major 
 section has its own sidebar HTML file. 
  
-Sidebar files: 
- 
-../HTML/mainmenu.html 
-../HTML/rocketleague.html 
-../HTML/settings.html 
-../HTML/hover.html 
- 
-Examples: 
- 
-/                           -> mainmenu.html 
-/RocketLeague               -> rocketleague.html 
-/RocketLeague/WeeklyMatches -> rocketleague.html 
-/RocketLeague/FindPlayers   -> rocketleague.html 
-/RocketLeague/PrivateMatches -> rocketleague.html 
-/Settings                   -> settings.html 
- 
 The sidebar HTML paths are resolved relative to this 
 JavaScript file. 
  

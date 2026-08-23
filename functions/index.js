@@ -1,4 +1,4 @@
-import { ROUTES } from "./routes/routes.js";
+
 import { handleEpicLogin } from "./auth/epic_login.js";
 import { handleEpicCallback } from "./auth/epic_callback.js";
 import { handleAuthSession, handleAuthLogout } from "./auth/session.js";
@@ -15,14 +15,4 @@ export async function onRequest(context) {
     if (path === "/api/auth/session") return handleAuthSession(request, env);
     if (path === "/api/auth/logout") return handleAuthLogout(request, env);
     if (path === "/api/rl/profile") return handleRocketLeagueProfile(request, env);
-
-    // Page routing
-    const file = ROUTES[path];
-    if (file) {
-        const html = await context.env.ASSETS.fetch(file);
-        return html;
-    }
-
-    // Default: serve shell.html
-    return context.env.ASSETS.fetch("/shell/shell.html");
 }

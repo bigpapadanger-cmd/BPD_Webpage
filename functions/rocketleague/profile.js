@@ -5,41 +5,30 @@ import { fetchProfile, fetchSessions } from "trn-rocket-league";
 export async function handleRocketLeagueProfile(request, env) {
     const storedSession = await getStoredSession(request, env);
     if (!storedSession) {
-        return json({
-            success: false,
-            authenticated: false,
-            message: "Login is required to load Rocket League ranks."
-        }, 401);
+        return json({ success: false, authenticated: false, message: "Login is required to load Rocket League ranks." }, 401);
     }
-
     const sessionData = storedSession.sessionData;
-
-    const username = String(
-        sessionData.rocketLeagueLookup?.username ||
-        sessionData.displayName ||
-        ""
-    ).trim();
-
-    const platform = "epic"; // always epic for your login flow
-
+    const username = String(sessionData.rocketLeagueLookup?.username || sessionData.displayName || "").trim();
+    if (!username || username.length < 2) {
+        return json({ success: false, authenticated: true, message: "Invalid Rocket League username in session." }, 400);
+    }
+    const platform = String(sessionData.rocketLeagueLookup?.platform || "epic").trim().toLowerCase();
+    const allowedPlatforms = ["psn", "xbl", "steam", "epic", "switch"];
+    if (!allowedPlatforms.includes(platform)) {
+        return json({ success: false, authenticated: true, message: "Invalid Rocket League platform in session." }, 400);
+    }
     try {
-        // Fetch profile using the library
-        const profile = await fetchProfile(username, platform);
-
-        // Fetch recent sessions (optional)
-        const sessions = await fetchSessions(username, platform);
-
-        return json({
-            success: true,
-            profile,
-            sessions
-        });
-
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 8000);
+        const profile = await fetchProfile(username, platform, { signal: controller.signal });
+        const sessions = await fetchSessions(username, platform, { signal: controller.signal });
+        clearTimeout(timeout);
+        if (!profile || typeof profile !== "object") {
+            return json({ success: false, authenticated: true, message: "Profile data missing or malformed." }, 502);
+        }
+        return json({ success: true, profile, sessions: sessions || [] });
     } catch (err) {
-        return json({
-            success: false,
-            message: "Rocket League profile lookup failed.",
-            error: err.message
-        }, 500);
+        const safeMessage = err.name === "AbortError" ? "Rocket League API timed out." : "Rocket League profile lookup failed.";
+        return json({ success: false, authenticated: true, message: safeMessage, error: err.message.slice(0, 200) }, 500);
     }
 }

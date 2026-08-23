@@ -2,23 +2,30 @@ import { json } from "../responses.js";
 
 export function getCookie(request, name) {
     const header = request.headers.get("cookie") || "";
+    if (!header.includes("=")) return "";
     const cookies = header.split(";");
-
     for (const cookie of cookies) {
         const [n, v] = cookie.split("=").map(x => x.trim());
-        if (n === name) return decodeURIComponent(v);
+        if (n === name && typeof v === "string") {
+            try { return decodeURIComponent(v); }
+            catch { return ""; }
+        }
     }
     return "";
 }
 
 export function createCookie(request, name, value, maxAge) {
+    const safeName = typeof name === "string" ? name.trim() : "";
+    const safeValue = typeof value === "string" ? value.trim() : "";
+    const safeMaxAge = Number.isInteger(maxAge) ? maxAge : 0;
+    if (!safeName) return "";
     const url = new URL(request.url);
     const parts = [
-        `${name}=${encodeURIComponent(value)}`,
+        `${safeName}=${encodeURIComponent(safeValue)}`,
         "Path=/",
         "HttpOnly",
         "SameSite=Lax",
-        `Max-Age=${maxAge}`
+        `Max-Age=${safeMaxAge}`
     ];
     if (url.protocol === "https:") parts.push("Secure");
     return parts.join("; ");
@@ -30,10 +37,11 @@ export function clearCookie(request, name) {
 
 export async function getStoredSession(request, env) {
     const sessionId = getCookie(request, "bpd_session");
-    if (!sessionId) return null;
-
-    const data = await env.AUTH_SESSIONS.get(`session:${sessionId}`, "json");
-    if (!data || data.expiresAt <= Date.now()) return null;
-
+    if (!sessionId || sessionId.length < 5) return null;
+    const key = `session:${sessionId}`;
+    const data = await env.AUTH_SESSIONS.get(key, "json");
+    if (!data || typeof data !== "object") return null;
+    if (typeof data.expiresAt !== "number") return null;
+    if (data.expiresAt <= Date.now()) return null;
     return { sessionId, sessionData: data };
 }

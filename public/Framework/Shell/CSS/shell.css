@@ -1,0 +1,109 @@
+/* ==========================================================
+   BASE LAYOUT (your original)
+   ========================================================== */
+
+html, body {
+    margin: 0;
+    min-height: 100%;
+}
+
+body {
+    min-height: 100vh;
+}
+
+/* Grid shell */
+.site-shell {
+    display: grid;
+    grid-template-columns: 260px minmax(0, 1fr);
+    min-height: 100vh;
+}
+
+/* Sidebar */
+.site-sidebar {
+    min-height: 100vh;
+}
+
+/* Page area */
+.site-page {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 100vh;
+}
+
+/* Header */
+.site-header {
+    flex: none;
+}
+
+/* Main content */
+.site-content {
+    flex: 1;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* Footer */
+.site-footer {
+    flex: none;
+}
+
+.footer-links {
+    display: flex;
+    gap: 20px;
+}
+
+/* ==========================================================
+   DARK HIGH-CONTRAST STYLING (new)
+   ========================================================== */
+
+body {
+    background: #0d0f13;
+    color: #fff;
+    font-family: 'Inter', 'Segoe UI', sans-serif;
+}
+
+.site-sidebar {
+    background: #16181d;
+    border-right: 1px solid #22252b;
+}
+
+.site-page {
+    background: #0d0f13;
+}
+
+.site-header {
+    background: #16181d;
+    border-bottom: 1px solid #22252b;
+    padding: 12px 20px;
+
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.site-footer {
+    background: #16181d;
+    border-top: 1px solid #22252b;
+    padding: 12px 20px;
+}
+
+/* ==========================================================
+   GLOWING BUTTONS (new)
+   ========================================================== */
+
+.header-tab {
+    padding: 10px 16px;
+    background: #1f2228;
+    border-radius: 6px;
+    color: #fff;
+    text-decoration: none;
+    font-weight: 500;
+    transition: all 0.25s ease;
+}
+
+.header-tab:hover {
+    background: #00aaff;
+    box-shadow: 0 0 12px rgba(0,170,255,0.7);
+    transform: translateY(-2px);
+}
