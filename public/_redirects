@@ -1,1 +1,12 @@
-/*    /index.html   200
+/RocketLeague                   /Tabs/RocketLeague/Index/HTML/index.html
+/RocketLeague/WeeklyMatches     /Tabs/RocketLeague/WeeklyMatches/HTML/index.html
+/RocketLeague/FindPlayers       /Tabs/RocketLeague/FindPlayers/HTML/index.html
+/RocketLeague/PrivateMatches    /Tabs/RocketLeague/PrivateMatches/HTML/index.html
+/RocketLeague/MatchResults      /Tabs/RocketLeague/MatchResults/HTML/index.html
+
+/Settings                       /Global/Settings/HTML/settings.html
+/About                          /Global/Required/About/HTML/index.html
+/Privacy                        /Global/Required/PrivacyPolicy/HTML/index.html
+/Terms                          /Global/Required/TOS/HTML/index.html
+
+/*                              /index.html    200
