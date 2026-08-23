@@ -27,6 +27,7 @@
     "youch-core": "^0.3.3"
   },
   "scripts": {
+    "build": "echo \"No build step required\"",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
