@@ -26,9 +26,6 @@
     "youch": "^4.1.0-beta.10",
     "youch-core": "^0.3.3"
   },
-  "devDependencies": {
-    "wrangler": "^4.124.0"
-  },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
