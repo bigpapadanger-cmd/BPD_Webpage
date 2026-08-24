@@ -1,4 +1,4 @@
-import { json, redirect } from "../responses.js";
+import { json, redirect } from "../../responses/responses.js";
 import { createCookie } from "../session.js";
 import {
     EPIC_AUTHORIZE_URL,

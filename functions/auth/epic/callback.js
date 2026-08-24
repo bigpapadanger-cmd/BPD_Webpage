@@ -1,4 +1,4 @@
-import { json, redirect } from "../../responses.js";
+import { json, redirect } from "../../responses/responses.js";
 import {
     EPIC_TOKEN_URL,
     EPIC_USER_INFO_URL,
@@ -6,7 +6,7 @@ import {
     AUTH_SESSION_COOKIE,
     EPIC_REDIRECT_URI
 } from "../../api.js";
-import { getCookie, createCookie, SESSION_TTL } from "../../session.js";
+import { getCookie, createCookie, SESSION_TTL } from "../session.js";
 
 export async function handleEpicCallback(request, env) {
     const url = new URL(request.url);
