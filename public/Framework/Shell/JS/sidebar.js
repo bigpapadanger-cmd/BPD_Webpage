@@ -58,12 +58,11 @@ function getBpdAuthSession(forceRefresh = false) {
 window.BPDAuth = { getSession: getBpdAuthSession };
 
 /* =========================================================
-   SPA INITIALIZER — CALL AFTER SIDEBAR HTML IS INSERTED
+   INITIALIZE SIDEBAR (call after HTML + hover loaded)
    ========================================================= */
 
-async function initializeSidebar() {
-    const authSession = await BPDAuth.getSession(true); // force refresh
-
+export async function initializeSidebar() {
+    const authSession = await BPDAuth.getSession(true);
 
     applyGlobalSettings();
     setupSidebarToggle();
@@ -74,7 +73,7 @@ async function initializeSidebar() {
 }
 
 /* =========================================================
-   LOAD HOVER TOOLTIP HTML (SPA VERSION)
+   LOAD HOVER TOOLTIP HTML
    ========================================================= */
 
 export async function loadSidebarHover() {
@@ -91,7 +90,7 @@ export async function loadSidebarHover() {
 
         const container = document.createElement("div");
         container.innerHTML = hoverHTML;
-        initializeSidebar();
+
         while (container.firstElementChild) {
             document.body.appendChild(container.firstElementChild);
         }

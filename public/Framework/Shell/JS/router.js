@@ -1,5 +1,6 @@
 import { ROUTES, HEADER_MAP, SIDEBAR_MAP } from "./routes.js";
-import { loadSidebarHover } from "./sidebar.js";
+import { loadSidebarHover, initializeSidebar } from "./sidebar.js";
+
 
 /* -------------------------------------------
    INTERCEPT ALL INTERNAL <a> CLICKS
@@ -38,10 +39,12 @@ window.addEventListener("popstate", () => {
 /* -------------------------------------------
    LOAD SHELL
 -------------------------------------------- */
+/* -------------------------------------------
+   LOAD SHELL
+-------------------------------------------- */
 async function loadShell() {
     let path = window.location.pathname;
 
-    // If path is empty (rare but possible), treat as homepage
     if (!path || path === "") {
         path = "/";
     }
@@ -81,10 +84,16 @@ async function loadShell() {
     await loadSidebarHover();
 
     /* -----------------------------
+       Initialize sidebar (IMPORTANT)
+    ----------------------------- */
+    await initializeSidebar();   // ← THIS WAS MISSING
+
+    /* -----------------------------
        Load page content
     ----------------------------- */
     await loadPage();
 }
+
 
 /* -------------------------------------------
    LOAD PAGE CONTENT
