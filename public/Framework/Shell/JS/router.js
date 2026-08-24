@@ -1,7 +1,7 @@
 import { ROUTES, HEADER_MAP, SIDEBAR_MAP } from "./routes.js";
 import { loadSidebarHover, initializeSidebar } from "./sidebar.js";
 
-
+//reload
 /* -------------------------------------------
    INTERCEPT ALL INTERNAL <a> CLICKS
 -------------------------------------------- */
