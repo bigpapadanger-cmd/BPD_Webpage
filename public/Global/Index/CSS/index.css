@@ -387,3 +387,112 @@ body.animations-off * {
     }
 }
 
+:root {
+  --bg: #05060a;
+  --sidebar-width: 260px;
+  --header-height: 64px;
+  --accent: #4b9fff;
+  --accent-glow: rgba(75, 159, 255, 0.6);
+  --text: #e5e9f0;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.app-shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+/* Sidebar */
+.sidebar {
+  width: var(--sidebar-width);
+  background: #080a10;
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* Main area */
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Header */
+.shell-header {
+  height: var(--header-height);
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(90deg, #080a10, #0b1018);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+}
+
+.header-left .logo {
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+/* Icon buttons */
+.header-right {
+  display: flex;
+  gap: 12px;
+}
+
+.icon-btn {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: radial-gradient(circle at 0% 0%, #0b1018, #05060a);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text);
+  cursor: pointer;
+  padding: 0;
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.12s ease,
+    color 0.18s ease,
+    background 0.18s ease;
+}
+
+.icon-btn i {
+  font-size: 16px;
+}
+
+/* Glow on hover */
+.icon-btn:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  box-shadow:
+    0 0 12px var(--accent-glow),
+    0 0 32px rgba(75, 159, 255, 0.35);
+  transform: translateY(-1px);
+  background: radial-gradient(circle at 30% 0%, #0f1725, #05060a);
+}
+
+/* Optional subtle active state */
+.icon-btn:active {
+  transform: translateY(0);
+  box-shadow:
+    0 0 6px var(--accent-glow),
+    0 0 18px rgba(75, 159, 255, 0.25);
+}
+
+/* Content area */
+.content {
+  flex: 1;
+  padding: 24px;
+}

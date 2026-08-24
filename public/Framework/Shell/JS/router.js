@@ -1,5 +1,33 @@
 import { ROUTES, HEADER_MAP, SIDEBAR_MAP } from "./routes.js";
 
+/* -------------------------------------------
+   INTERCEPT ALL INTERNAL <a> CLICKS
+-------------------------------------------- */
+document.addEventListener("click", (e) => {
+    const link = e.target.closest("a");
+    if (!link) return;
+
+    const url = new URL(link.href);
+
+    // Only intercept internal links
+    if (url.origin !== window.location.origin) return;
+
+    e.preventDefault();
+    navigate(url.pathname);
+});
+
+/* -------------------------------------------
+   HISTORY API NAVIGATION
+-------------------------------------------- */
+async function navigate(path) {
+    window.history.pushState({}, "", path);
+    await loadShell();
+}
+
+window.addEventListener("popstate", () => {
+    loadShell();
+});
+
 async function loadShell() {
     const path = window.location.pathname;
 
@@ -47,3 +75,4 @@ async function loadPage() {
 }
 
 loadShell();
+
