@@ -5,7 +5,7 @@ import {
     AUTH_STATE_COOKIE,
     AUTH_SESSION_COOKIE,
     EPIC_REDIRECT_URI
-} from "../../api.js";
+} from "../api.js";
 import { getCookie, createCookie, SESSION_TTL } from "../session.js";
 
 export async function handleEpicCallback(request, env) {
