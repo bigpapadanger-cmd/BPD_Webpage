@@ -7,7 +7,6 @@
    ========================================================= */
 const OCR_API_URL="/api/ocr";
 const OCR_LOCALIZE_URL="/api/ocr/localize";
-const OCR_TRACKING_URL="https://script.google.com/macros/s/AKfycbwzQfdzJbtPN8H_-ATQ0quZvda2_bQfXw6oXLgOyIZPAfHnhWxdLojMOLuM3FE57gEa/exec";
 
 let OCR_LOADING_TIMER=null;
 let OCR_LOADING_PROGRESS=0;
