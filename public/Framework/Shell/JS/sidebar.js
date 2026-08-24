@@ -77,7 +77,7 @@ async function initializeSidebar() {
    LOAD HOVER TOOLTIP HTML (SPA VERSION)
    ========================================================= */
 
-async function loadSidebarHover() {
+export async function loadSidebarHover() {
     const hoverFile = "/Framework/Shell/HTML/Sidebar/hover.html";
 
     try {
@@ -91,7 +91,7 @@ async function loadSidebarHover() {
 
         const container = document.createElement("div");
         container.innerHTML = hoverHTML;
-
+        initializeSidebar();
         while (container.firstElementChild) {
             document.body.appendChild(container.firstElementChild);
         }
