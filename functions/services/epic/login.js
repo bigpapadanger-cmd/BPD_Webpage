@@ -1,11 +1,11 @@
-import { json, redirect } from "../../responses/responses.js";
-import { createCookie } from "../reload/reload_sessions.js";
+import { json, redirect } from "../common_helpers/responses.js";
+import { createCookie } from "../common_helpers/reload_sessions.js";
 import {
     EPIC_AUTHORIZE_URL,
     AUTH_STATE_COOKIE,
     AUTH_STATE_MAX_AGE_SECONDS
-} from "../../../api_vars.js"; // your constants module
-import { createRandomState, getMissingAuthConfiguration } from "../../../utils.js";
+} from "../../api_vars.js"; // your constants module
+import { createRandomState, getMissingAuthConfiguration } from "../common_helpers/utils.js";
 
 export async function handleEpicLogin(request, env) {
     const missing = getMissingAuthConfiguration(env);

@@ -1,6 +1,6 @@
-import { json } from "../../responses/responses.js";
+import { json } from "../common_helpers/responses.js";
 
-import { getStoredSession } from "../reload/reload_sessions.js";
+import { getStoredSession } from "../common_helpers/reload_sessions.js";
 
 /*
 =========================================================

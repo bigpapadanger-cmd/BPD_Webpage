@@ -1,12 +1,12 @@
-import { json, redirect } from "../../responses/responses.js";
+import { json, redirect } from "../common_helpers/responses.js";
 import {
     EPIC_TOKEN_URL,
     EPIC_USER_INFO_URL,
     AUTH_STATE_COOKIE,
     AUTH_SESSION_COOKIE,
     EPIC_REDIRECT_URI
-} from "../../../api_vars.js";
-import { getCookie, createCookie, SESSION_TTL } from "../reload/reload_sessions.js";
+} from "../../api_vars.js";
+import { getCookie, createCookie, SESSION_TTL } from "../common_helpers/reload_sessions.js";
 
 export async function handleEpicCallback(request, env) {
     const url = new URL(request.url);

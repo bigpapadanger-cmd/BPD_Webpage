@@ -3,7 +3,7 @@
 // =========================================================
 
 // How long sessions last (in hours)
-import { SESSION_TTL_SECONDS } from "../../../api_vars";
+import { SESSION_TTL_SECONDS } from "../../api_vars";
 
 // =========================================================
 // COOKIE HELPERS
