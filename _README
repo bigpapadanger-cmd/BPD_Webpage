@@ -73,3 +73,5 @@ FOR UPLOADING GIT CHANGES:
         git add .
         git commit -m "{ADD CHANGE DETAILS - INITIALS}"
         git push
+
+
