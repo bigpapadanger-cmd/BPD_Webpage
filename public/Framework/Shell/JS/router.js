@@ -30,6 +30,7 @@ window.addEventListener("popstate", () => {
 
 async function loadShell() {
     const path = window.location.pathname;
+    console.log("loadShell() started. Path:", window.location.pathname);
 
     // -----------------------------
     // Load correct sidebar
@@ -68,6 +69,8 @@ async function loadShell() {
 }
 
 async function loadPage() {
+    console.log("Loading page:", pageFile);
+
     const path = window.location.pathname;
     const pageFile = ROUTES[path] || ROUTES["/"];
     const page = await fetch(pageFile).then(r => r.text());
