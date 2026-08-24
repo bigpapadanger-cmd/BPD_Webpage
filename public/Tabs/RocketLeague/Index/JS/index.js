@@ -1,6 +1,5 @@
 "use strict";
-const ROCKET_LEAGUE_SESSION_URL = "/api/auth/session";
-const ROCKET_LEAGUE_PROFILE_URL = "/api/rocketleague/profile";
+import { ROCKET_LEAGUE_PROFILE_URL,ROCKET_LEAGUE_SESSION_URL } from "../../../../../scripts/apiRoutes";
 const ROCKET_LEAGUE_PLAYLISTS = [
     {
         key: "duel",

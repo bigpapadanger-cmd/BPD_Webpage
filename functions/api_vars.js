@@ -1,4 +1,3 @@
-export const OCR_API_PREFIX = "/api/ocr";
 export const EPIC_AUTHORIZE_URL =
     "https://www.epicgames.com/id/authorize";
 export const EPIC_TOKEN_URL =

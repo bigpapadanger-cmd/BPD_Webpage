@@ -5,8 +5,8 @@ import {
     AUTH_STATE_COOKIE,
     AUTH_SESSION_COOKIE,
     EPIC_REDIRECT_URI
-} from "../api.js";
-import { getCookie, createCookie, SESSION_TTL } from "../session.js";
+} from "../../../api_vars.js";
+import { getCookie, createCookie, SESSION_TTL } from "../reload/reload_sessions.js";
 
 export async function handleEpicCallback(request, env) {
     const url = new URL(request.url);

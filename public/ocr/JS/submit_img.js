@@ -5,7 +5,7 @@
    job polling, result rendering, and result tracking.
    It does NOT restore page/crop state or bind crop controls.
    ========================================================= */
-import { OCR_LOCALIZE_URL, OCR_API_URL, OCR_TRACKING_URL } from "../../../functions/auth/api";
+import { OCR_LOCALIZE_URL, OCR_API_URL, OCR_TRACKING_URL } from "../../../functions/api_vars";
 let OCR_LOADING_TIMER=null;
 let OCR_LOADING_PROGRESS=0;
 let OCR_LOADING_LAST_STATE_SAVE=0;
