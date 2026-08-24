@@ -1,5 +1,5 @@
 
-import { handleEpicLogin } from "./auth/epic/login.js";
+/*import { handleEpicLogin } from "./auth/epic/login.js";
 import { handleEpicCallback } from "./auth/epic/callback.js";
 import { handleAuthSession, handleAuthLogout } from "./auth/session.js";
 import { handleRocketLeagueProfile } from "./rocketleague/profile.js";
@@ -16,3 +16,4 @@ export async function onRequest(context) {
     if (path === "/api/auth/logout") return handleAuthLogout(request, env);
     if (path === "/api/rl/profile") return handleRocketLeagueProfile(request, env);
 }
+*/

@@ -5,7 +5,7 @@ import {
     AUTH_STATE_COOKIE,
     AUTH_STATE_MAX_AGE_SECONDS
 } from "../api.js"; // your constants module
-import { createRandomState, getMissingAuthConfiguration } from "./utils.js";
+import { createRandomState, getMissingAuthConfiguration } from "../utils.js";
 
 export async function handleEpicLogin(request, env) {
     const missing = getMissingAuthConfiguration(env);

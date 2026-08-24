@@ -1,5 +1,5 @@
-import { json } from "../responses.js";
-import { getStoredSession } from "../auth/sessions.js";
+import { json } from "../responses/responses.js";
+import { getStoredSession } from "../auth/session.js";
 import { fetchProfile, fetchSessions } from "trn-rocket-league";
 
 export async function handleRocketLeagueProfile(request, env) {
