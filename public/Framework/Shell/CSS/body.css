@@ -3,16 +3,23 @@
 .site-content {
     display: block;
     flex: 1 1 auto;
+    align-self: stretch;
     width: 100%;
+    max-width: none;
     min-width: 0;
     min-height: 60vh;
-    padding-left:
+    margin: 0;
+    padding:
+        0
+        0
+        0
         calc(
             var(--sidebar-width)
             + var(--sidebar-content-gap)
         );
     overflow-x: hidden;
     background: transparent;
+    box-sizing: border-box;
     transition:
         padding-left 0.25s ease;
 }
@@ -28,9 +35,13 @@ body.sidebar-collapsed .site-content {
 .site-content > section,
 .site-content > main,
 .site-content > article {
+    display: block;
     width: 100%;
+    max-width: none;
+    min-width: 0;
     min-height: 60vh;
     margin: 0;
+    box-sizing: border-box;
 }
 
 body[data-header="hidden"] .site-content {
