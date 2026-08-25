@@ -5,12 +5,8 @@ ROCKET LEAGUE SIDEBAR
 =========================================================
 -->
 
-<aside class="sidebar" id="sidebar">
-    <!-- =========================================================
-         SIDEBAR HEADER
-         ========================================================= -->
+<div class="sidebar-view sidebar-view-rocketleague">
     <div class="sidebar-header">
-        <div class="sidebar-logo">BPD</div>
         <button
             class="sidebar-toggle"
             id="sidebarToggle"
@@ -18,201 +14,291 @@ ROCKET LEAGUE SIDEBAR
             aria-label="Toggle navigation"
             aria-expanded="true"
         >
-            <span></span>
-            <span></span>
-            <span></span>
+            <span aria-hidden="true"></span>
+            <span aria-hidden="true"></span>
+            <span aria-hidden="true"></span>
         </button>
     </div>
 
-    <!-- =========================================================
-         SECTION TITLE
-         ========================================================= -->
-    <div class="section-title">
-        <span>ROCKET LEAGUE</span>
-    </div>
-
-    <!-- =========================================================
-         MAIN NAVIGATION
-         ========================================================= -->
-    <nav class="sidebar-nav">
-        <!-- Main Menu -->
+    <nav
+        class="sidebar-nav"
+        aria-label="Rocket League navigation"
+    >
+        <!-- Guest account action -->
         <a
-            href="/Global/Index/HTML/homepage.html"
-            class="nav-item"
-            data-nav-route="/public"
-            data-tooltip="Main Menu"
-        >
-            <span class="nav-icon">←</span>
-            <span class="nav-text">
-                <span class="nav-label">Main Menu</span>
-            </span>
-        </a>
-
-        <!-- Rocket League Overview -->
-        <a
-            href="/Categories/RocketLeague/Index/HTML/index.html"
-            class="nav-item"
-            data-nav-route="/public/Categories/RocketLeague/Index/HTML/index.html"
-            data-tooltip="Rocket League Overview"
-            data-auth="authenticated"
-            hidden
-        >
-            <span class="nav-icon">⌂</span>
-            <span class="nav-text">
-                <span class="nav-label">Overview</span>
-            </span>
-        </a>
-
-        <!-- =====================================================
-             PUBLIC / PRE-LOGIN OPTIONS
-             ===================================================== -->
-
-        <!-- Weekly Matches -->
-        <a
-            href="/RocketLeague/WeeklyMatches"
-            class="nav-item"
-            data-nav-route="/RocketLeague/WeeklyMatches"
-            data-tooltip="Join Weekly Matches"
-            data-auth="authenticated"
-            hidden
-        >
-            <span class="nav-icon">⚔</span>
-            <span class="nav-text">
-                <span class="nav-label">Join Weekly Matches</span>
-            </span>
-        </a>
-
-        <!-- Find Players -->
-        <a
-            href="/RocketLeague/FindPlayers"
-            class="nav-item"
-            data-nav-route="/RocketLeague/FindPlayers"
-            data-tooltip="Find Other Players"
-            data-auth="authenticated"
-            hidden
-        >
-            <span class="nav-icon">♙</span>
-            <span class="nav-text">
-                <span class="nav-label">Find Other Players</span>
-            </span>
-        </a>
-
-        <!-- Private Matches -->
-        <a
-            href="/RocketLeague/PrivateMatches"
-            class="nav-item"
-            data-nav-route="/RocketLeague/PrivateMatches"
-            data-tooltip="Private Matches"
-            data-auth="authenticated"
-            hidden
-        >
-            <span class="nav-icon">◆</span>
-            <span class="nav-text">
-                <span class="nav-label">Private Matches</span>
-            </span>
-        </a>
-                            <!-- Scoreboard OCR -->
-            <a
-                href="/ocr/HTML/submitimg.html"
-                class="nav-item"
-                data-nav-route="/public/ocr/HTML/submitimg.html"
-                data-tooltip="Submit Scoreboard"
-                data-auth="authenticated"
-                hidden
-            >
-                <span class="nav-icon">▦</span>
-                <span class="nav-text">
-                    <span class="nav-label">Submit Scoreboard</span>
-                </span>
-            </a>
-
-        <!-- =====================================================
-             ACCOUNT / LOGIN
-             ===================================================== -->
-
-        <div class="nav-divider"></div>
-
-        <!-- Login / Sign Up -->
-        <a
-            href="/auth/epic/login"
+            href="/api/auth/epic/epic_login"
             class="nav-item sidebar-auth-button"
-            id="sidebarAuthButton"
-            data-nav-route="/auth/epic/login"
-            data-tooltip="Login or Sign Up"
+            id="sidebarLoginButton"
+            data-auth="guest"
+            data-tooltip="Login or Register"
         >
-            <span class="nav-icon" id="sidebarAuthIcon">⇥</span>
+            <span
+                class="nav-icon"
+                aria-hidden="true"
+            >
+                ⇥
+            </span>
+
             <span class="nav-text">
-                <span
-                    class="nav-label"
-                    id="sidebarAuthLabel"
-                >
+                <span class="nav-label">
                     Login / Register
                 </span>
             </span>
         </a>
 
-        <!-- =====================================================
-             AUTHENTICATED OPTIONS
-             ===================================================== -->
+        <!-- Authenticated account action -->
+        <form
+            class="sidebar-logout-form"
+            action="/api/auth/logout"
+            method="post"
+            data-auth="authenticated"
+            hidden
+        >
+            <button
+                class="nav-item sidebar-auth-button"
+                id="sidebarLogoutButton"
+                type="submit"
+                data-tooltip="Logout"
+            >
+                <span
+                    class="nav-icon"
+                    aria-hidden="true"
+                >
+                    ⇤
+                </span>
 
+                <span class="nav-text">
+                    <span class="nav-label">
+                        Logout
+                    </span>
+                </span>
+            </button>
+        </form>
+
+        <div
+            class="nav-divider"
+            data-auth="authenticated"
+            hidden
+        ></div>
+
+        <!-- Authenticated navigation -->
         <div
             class="sidebar-authenticated"
             id="sidebarAuthenticated"
             data-auth="authenticated"
             hidden
         >
-            <!-- My Matches -->
             <a
-                href="/RocketLeague/MyMatches"
+                href="/"
                 class="nav-item"
-                data-nav-route="/RocketLeague/MyMatches"
-                data-tooltip="My Matches"
+                data-router-link
+                data-nav-route="/"
+                data-tooltip="Main Menu"
             >
-                <span class="nav-icon">▣</span>
+                <span
+                    class="nav-icon"
+                    aria-hidden="true"
+                >
+                    ←
+                </span>
+
                 <span class="nav-text">
-                    <span class="nav-label">My Matches</span>
+                    <span class="nav-label">
+                        Main Menu
+                    </span>
                 </span>
             </a>
 
-            <!-- My Profile -->
+            <a
+                href="/RocketLeague"
+                class="nav-item"
+                data-router-link
+                data-nav-route="/RocketLeague"
+                data-tooltip="Rocket League Overview"
+            >
+                <span
+                    class="nav-icon"
+                    aria-hidden="true"
+                >
+                    ⌂
+                </span>
+
+                <span class="nav-text">
+                    <span class="nav-label">
+                        Overview
+                    </span>
+                </span>
+            </a>
+
+            <a
+                href="/RocketLeague/WeeklyMatches"
+                class="nav-item"
+                data-router-link
+                data-nav-route="/RocketLeague/WeeklyMatches"
+                data-tooltip="Join Weekly Matches"
+            >
+                <span
+                    class="nav-icon"
+                    aria-hidden="true"
+                >
+                    ⚔
+                </span>
+
+                <span class="nav-text">
+                    <span class="nav-label">
+                        Join Weekly Matches
+                    </span>
+                </span>
+            </a>
+
+            <a
+                href="/RocketLeague/FindPlayers"
+                class="nav-item"
+                data-router-link
+                data-nav-route="/RocketLeague/FindPlayers"
+                data-tooltip="Find Other Players"
+            >
+                <span
+                    class="nav-icon"
+                    aria-hidden="true"
+                >
+                    ♙
+                </span>
+
+                <span class="nav-text">
+                    <span class="nav-label">
+                        Find Other Players
+                    </span>
+                </span>
+            </a>
+
+            <a
+                href="/RocketLeague/PrivateMatches"
+                class="nav-item"
+                data-router-link
+                data-nav-route="/RocketLeague/PrivateMatches"
+                data-tooltip="Private Matches"
+            >
+                <span
+                    class="nav-icon"
+                    aria-hidden="true"
+                >
+                    ◆
+                </span>
+
+                <span class="nav-text">
+                    <span class="nav-label">
+                        Private Matches
+                    </span>
+                </span>
+            </a>
+
+            <a
+                href="/RocketLeague/MatchResults"
+                class="nav-item"
+                data-router-link
+                data-nav-route="/RocketLeague/MatchResults"
+                data-tooltip="Match Results"
+            >
+                <span
+                    class="nav-icon"
+                    aria-hidden="true"
+                >
+                    ◫
+                </span>
+
+                <span class="nav-text">
+                    <span class="nav-label">
+                        Match Results
+                    </span>
+                </span>
+            </a>
+
+            <a
+                href="/RocketLeague/SubmitMatchScore"
+                class="nav-item"
+                data-router-link
+                data-nav-route="/RocketLeague/SubmitMatchScore"
+                data-tooltip="Submit Scoreboard"
+            >
+                <span
+                    class="nav-icon"
+                    aria-hidden="true"
+                >
+                    ▦
+                </span>
+
+                <span class="nav-text">
+                    <span class="nav-label">
+                        Submit Scoreboard
+                    </span>
+                </span>
+            </a>
+
             <a
                 href="/RocketLeague/Profile"
                 class="nav-item"
+                data-router-link
                 data-nav-route="/RocketLeague/Profile"
                 data-tooltip="My Profile"
             >
-                <span class="nav-icon">♙</span>
+                <span
+                    class="nav-icon"
+                    aria-hidden="true"
+                >
+                    ◉
+                </span>
+
                 <span class="nav-text">
-                    <span class="nav-label">My Profile</span>
+                    <span class="nav-label">
+                        My Profile
+                    </span>
                 </span>
             </a>
 
+            <a
+                href="/RocketLeague/MyMatches"
+                class="nav-item"
+                data-router-link
+                data-nav-route="/RocketLeague/MyMatches"
+                data-tooltip="My Matches"
+            >
+                <span
+                    class="nav-icon"
+                    aria-hidden="true"
+                >
+                    ▣
+                </span>
+
+                <span class="nav-text">
+                    <span class="nav-label">
+                        My Matches
+                    </span>
+                </span>
+            </a>
         </div>
     </nav>
 
-    <!-- =========================================================
-         SIDEBAR BOTTOM
-         ========================================================= -->
     <div class="sidebar-bottom">
-        <!-- Sidebar Advertisement -->
-        <div
-            class="ad-slot ad-slot-sidebar"
-            data-ad-location="rocket-league-sidebar"
-        >
-            <span></span>
-        </div>
-
-        <!-- Settings -->
         <a
-            href="../../Settings/HTML/settings.html"
+            href="/Settings"
             class="nav-item"
-            data-nav-route="../../Settings/HTML/settings.html"
+            data-router-link
+            data-nav-route="/Settings"
             data-tooltip="Settings"
         >
-            <span class="nav-icon">⚙</span>
+            <span
+                class="nav-icon"
+                aria-hidden="true"
+            >
+                ⚙
+            </span>
+
             <span class="nav-text">
-                <span class="nav-label">Settings</span>
+                <span class="nav-label">
+                    Settings
+                </span>
             </span>
         </a>
     </div>
-</aside>
+</div>

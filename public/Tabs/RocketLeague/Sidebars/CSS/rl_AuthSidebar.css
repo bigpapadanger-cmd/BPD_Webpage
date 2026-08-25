@@ -18,3 +18,169 @@
 [hidden] {
     display: none !important;
 }
+.sidebar-view-rocketleague {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+}
+
+.sidebar-view-rocketleague .sidebar-nav {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+    padding:
+        52px
+        5px
+        8px;
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+.sidebar-view-rocketleague .nav-item {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-height: 44px;
+}
+
+.sidebar-view-rocketleague .nav-icon {
+    display: flex;
+    flex:
+        0 0
+        var(--sidebar-icon-width);
+    align-items: center;
+    justify-content: center;
+    width: var(--sidebar-icon-width);
+    min-width: var(--sidebar-icon-width);
+}
+.sidebar-view-rocketleague .sidebar-authenticated {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+}
+
+.sidebar-view-rocketleague .sidebar-bottom {
+    flex: none;
+    width: 100%;
+    padding: 6px 3px 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    background: inherit;
+}
+
+.sidebar-view-rocketleague [hidden] {
+    display: none !important;
+}
+.sidebar-view-rocketleague
+#sidebarLoginButton {
+    border: 1px solid rgba(124, 92, 255, 0.38);
+    background: rgba(124, 92, 255, 0.1);
+    color: #d7ceff;
+    animation:
+        sidebarLoginPulse 2.2s
+        ease-in-out infinite;
+}
+
+.sidebar-view-rocketleague
+#sidebarLoginButton:hover,
+.sidebar-view-rocketleague
+#sidebarLoginButton:focus-visible {
+    border-color: rgba(169, 152, 255, 0.8);
+    background: rgba(124, 92, 255, 0.18);
+    box-shadow:
+        0 0 22px rgba(124, 92, 255, 0.48);
+    outline: none;
+    animation-play-state: paused;
+}
+
+@keyframes sidebarLoginPulse {
+    0%,
+    100% {
+        border-color:
+            rgba(124, 92, 255, 0.32);
+
+        box-shadow:
+            0 0 0
+            rgba(124, 92, 255, 0);
+    }
+
+    50% {
+        border-color:
+            rgba(169, 152, 255, 0.78);
+
+        box-shadow:
+            0 0 18px
+            rgba(124, 92, 255, 0.42);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .sidebar-view-rocketleague
+    #sidebarLoginButton {
+        animation: none;
+    }
+}
+
+body[data-animations="off"]
+.sidebar-view-rocketleague
+#sidebarLoginButton {
+    animation: none;
+}
+.sidebar-logout-form {
+    width: 100%;
+    margin: 0;
+    padding: 0;
+}
+
+.sidebar-logout-form .nav-item {
+    width: 100%;
+    border: 0;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+.sidebar-view-rocketleague
+#sidebarLoginButton
+.nav-icon {
+    color: #d7ceff;
+    text-shadow:
+        0 0 8px rgba(124, 92, 255, 0.65);
+    animation:
+        sidebarLoginIconPulse
+        2.2s
+        ease-in-out
+        infinite;
+}
+
+@keyframes sidebarLoginIconPulse {
+    0%,
+    100% {
+        color: #d7ceff;
+        text-shadow:
+            0 0 5px
+            rgba(124, 92, 255, 0.35);
+    }
+
+    50% {
+        color: #ffffff;
+        text-shadow:
+            0 0 14px
+            rgba(169, 152, 255, 0.95);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .sidebar-view-rocketleague
+    #sidebarLoginButton
+    .nav-icon {
+        animation: none;
+    }
+}
+
+body[data-animations="off"]
+.sidebar-view-rocketleague
+#sidebarLoginButton
+.nav-icon {
+    animation: none;
+}
