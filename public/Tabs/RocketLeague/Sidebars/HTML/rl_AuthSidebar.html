@@ -25,12 +25,15 @@ ROCKET LEAGUE SIDEBAR
         aria-label="Rocket League navigation"
     >
         <!-- Guest account action -->
-        <a
-            href="/api/auth/epic/epic_login"
+        <!-- Guest account action -->
+        <button
             class="nav-item sidebar-auth-button"
             id="sidebarLoginButton"
+            type="button"
+            data-api-action="epic-login"
             data-auth="guest"
-            data-tooltip="Login or Register"
+            data-tooltip="Login For Full Access"
+            aria-label="Login"
         >
             <span
                 class="nav-icon"
@@ -44,36 +47,32 @@ ROCKET LEAGUE SIDEBAR
                     Login / Register
                 </span>
             </span>
-        </a>
+        </button>
 
         <!-- Authenticated account action -->
-        <form
-            class="sidebar-logout-form"
-            action="/api/auth/logout"
-            method="post"
+        <button
+            class="nav-item sidebar-auth-button"
+            id="sidebarLogoutButton"
+            type="button"
+            data-api-action="logout"
             data-auth="authenticated"
+            data-tooltip="Logout"
+            aria-label="Logout"
             hidden
         >
-            <button
-                class="nav-item sidebar-auth-button"
-                id="sidebarLogoutButton"
-                type="submit"
-                data-tooltip="Logout"
+            <span
+                class="nav-icon"
+                aria-hidden="true"
             >
-                <span
-                    class="nav-icon"
-                    aria-hidden="true"
-                >
-                    ⇤
-                </span>
+                ⇤
+            </span>
 
-                <span class="nav-text">
-                    <span class="nav-label">
-                        Logout
-                    </span>
+            <span class="nav-text">
+                <span class="nav-label">
+                    Logout
                 </span>
-            </button>
-        </form>
+            </span>
+        </button>
 
         <div
             class="nav-divider"
