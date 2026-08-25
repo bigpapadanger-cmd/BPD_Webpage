@@ -9,7 +9,8 @@ export const ROUTES = {
         sidebar:
             "/Framework/Shell/HTML/Sidebar/mainmenu.html",
         footer:
-            "/Framework/Shell/HTML/Footer/footer.html"
+            "/Framework/Shell/HTML/Footer/footer.html",
+        stylesheets: ["/Framework/Shell/CSS/shell.css"]
     },
 
     "/RocketLeague": {
@@ -47,7 +48,8 @@ export const ROUTES = {
     sidebar:
         "/Framework/Shell/HTML/Sidebar/mainmenu.html",
     footer:
-        "/Framework/Shell/HTML/Footer/footer.html"
+        "/Framework/Shell/HTML/Footer/footer.html",
+    stylesheets: ["/Global/404/CSS/404.css"]
     },
     
     "/Dashboard": {
@@ -59,7 +61,8 @@ export const ROUTES = {
     sidebar:
         "/Framework/Shell/HTML/Sidebar/mainmenu.html",
     footer:
-        "/Framework/Shell/HTML/Footer/footer.html"
+        "/Framework/Shell/HTML/Footer/footer.html",
+    stylesheets: ["/Global/Index/CSS/index.css"]
     },
     
     "/About": {
