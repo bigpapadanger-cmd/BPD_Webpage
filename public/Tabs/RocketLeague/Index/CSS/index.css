@@ -30,7 +30,7 @@ The global body controls sidebar clearance.
     align-items: stretch;
     justify-content: center;
     width: 100%;
-    min-width: 0;
+    min-width: fit-content;
     min-height: 60vh;
     margin: 0;
     padding: clamp(8px, 1vw, 16px);

@@ -40,7 +40,7 @@ body {
     display: block;
     width: 100%;
     max-width: none;
-    min-width: 0;
+    min-width: fit-content;
     min-height: 100dvh;
     margin: 0;
     background: transparent;
@@ -55,7 +55,7 @@ body {
     flex-direction: column;
     width: 100%;
     max-width: none;
-    min-width: 0;
+    min-width: fit-content;
     min-height: 100dvh;
     margin: 0;
     background: transparent;

@@ -4,7 +4,7 @@
     z-index: 1;
     flex: none;
     width: 100%;
-    min-width: 0;
+    min-width: fit-content;
     padding:
         14px
         24px
