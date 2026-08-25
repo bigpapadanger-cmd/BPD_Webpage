@@ -124,7 +124,6 @@ async function loadAuthenticatedUser() {
 }
 
 export async function initializeRocketLeagueAuthView() {
-    init
     try {
         const authSession =
             await loadAuthenticatedUser();

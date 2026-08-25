@@ -9,3 +9,4 @@ export const ROCKET_LEAGUE_SESSION_URL = "/api/auth/rocketleague/session";
 export const ROCKET_LEAGUE_PROFILE_URL = "/api/auth/rocketleague/profile";
 export const BPD_AUTH_SESSION_URL = "/api/auth/session";
 export const BPD_AUTH_LOGOUT_URL = "/api/auth/logout";
+export const EPIC_LOGIN_URL = "/api/auth/epic/epic_login";

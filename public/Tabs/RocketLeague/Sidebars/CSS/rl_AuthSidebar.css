@@ -12,19 +12,18 @@ ROCKET LEAGUE SIDEBAR
     height: 100%;
     min-width: 0;
     min-height: 0;
-    box-sizing: border-box;
 }
 
 /*
 =========================================================
-PERSISTENT HEADER
+PERSISTENT TOGGLE AREA
 =========================================================
 */
 
 .sidebar-view-rocketleague
 > .sidebar-header {
     position: relative;
-    z-index: 20;
+    z-index: 110;
     display: block;
     flex: 0 0 52px;
     width: 100%;
@@ -33,14 +32,15 @@ PERSISTENT HEADER
     padding: 0;
     border: 0;
     background: transparent;
+    box-shadow: none;
 }
 
 .sidebar-view-rocketleague
 .sidebar-toggle {
     position: absolute;
-    top: 10px;
+    top: 8px;
     left: 11px;
-    z-index: 21;
+    z-index: 111;
 }
 
 /*
@@ -60,7 +60,6 @@ SCROLLABLE NAVIGATION
     padding: 4px 3px 8px;
     overflow-x: hidden;
     overflow-y: auto;
-    box-sizing: border-box;
     scrollbar-width: thin;
     scrollbar-color:
         rgba(124, 92, 255, 0.42)
@@ -86,7 +85,7 @@ SCROLLABLE NAVIGATION
 
 /*
 =========================================================
-NAVIGATION ITEMS
+NAVIGATION ITEMS AND BUTTONS
 =========================================================
 */
 
@@ -100,8 +99,39 @@ NAVIGATION ITEMS
     min-height: 44px;
     padding: 0;
     overflow: hidden;
+    border: 0;
     border-radius: 8px;
-    box-sizing: border-box;
+    background: transparent;
+    color: #aeb5c3;
+    font: inherit;
+    text-align: left;
+    text-decoration: none;
+    appearance: none;
+    cursor: pointer;
+}
+
+.sidebar-view-rocketleague
+.nav-item:hover,
+.sidebar-view-rocketleague
+.nav-item:focus-visible,
+.sidebar-view-rocketleague
+.nav-item.active,
+.sidebar-view-rocketleague
+.nav-item[aria-current="page"] {
+    color: #ffffff;
+    background: #24202f;
+}
+
+.sidebar-view-rocketleague
+.nav-item:focus-visible {
+    outline: 2px solid #8b5cf6;
+    outline-offset: -2px;
+}
+
+.sidebar-view-rocketleague
+.nav-item:disabled {
+    cursor: wait;
+    opacity: 0.65;
 }
 
 .sidebar-view-rocketleague
@@ -112,10 +142,8 @@ NAVIGATION ITEMS
         var(--sidebar-icon-width);
     align-items: center;
     justify-content: center;
-    width:
-        var(--sidebar-icon-width);
-    min-width:
-        var(--sidebar-icon-width);
+    width: var(--sidebar-icon-width);
+    min-width: var(--sidebar-icon-width);
 }
 
 .sidebar-view-rocketleague
@@ -128,9 +156,21 @@ NAVIGATION ITEMS
 .sidebar-view-rocketleague
 .nav-label {
     display: block;
+    max-width: 150px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    opacity: 1;
+    transition:
+        max-width 0.2s ease,
+        opacity 0.2s ease;
+}
+
+body.sidebar-collapsed
+.sidebar-view-rocketleague
+.nav-label {
+    max-width: 0;
+    opacity: 0;
 }
 
 /*
@@ -142,8 +182,8 @@ AUTHENTICATED LINKS
 .sidebar-view-rocketleague
 .sidebar-authenticated {
     display: flex;
-    flex-direction: column;
     flex: 0 0 auto;
+    flex-direction: column;
     width: 100%;
     min-width: 0;
 }
@@ -204,7 +244,6 @@ LOGIN PULSE
     box-shadow:
         0 0 22px
         rgba(124, 92, 255, 0.48);
-    outline: none;
     animation-play-state: paused;
 }
 
@@ -220,6 +259,66 @@ LOGIN PULSE
         rgba(169, 152, 255, 0.95);
     animation-play-state: paused;
 }
+
+/*
+=========================================================
+LOGOUT BUTTON
+=========================================================
+*/
+
+.sidebar-view-rocketleague
+#sidebarLogoutButton {
+    border:
+        1px solid
+        transparent;
+    background: transparent;
+    color: #aeb5c3;
+}
+
+.sidebar-view-rocketleague
+#sidebarLogoutButton:hover,
+.sidebar-view-rocketleague
+#sidebarLogoutButton:focus-visible {
+    border-color:
+        rgba(255, 92, 110, 0.35);
+    background:
+        rgba(255, 92, 110, 0.12);
+    color: #ff9ba8;
+}
+
+/*
+=========================================================
+PERSISTENT SETTINGS AREA
+=========================================================
+*/
+
+.sidebar-view-rocketleague
+.sidebar-bottom {
+    flex: 0 0 auto;
+    width: 100%;
+    padding: 6px 3px 10px;
+    border-top:
+        1px solid
+        rgba(255, 255, 255, 0.08);
+    background: transparent;
+}
+
+/*
+=========================================================
+AUTH VISIBILITY
+=========================================================
+*/
+
+.sidebar-view-rocketleague
+[hidden] {
+    display: none !important;
+}
+
+/*
+=========================================================
+ANIMATIONS
+=========================================================
+*/
 
 @keyframes sidebarLoginPulse {
     0%,
@@ -256,80 +355,6 @@ LOGIN PULSE
             rgba(169, 152, 255, 0.95);
     }
 }
-
-/*
-=========================================================
-LOGOUT FORM
-=========================================================
-*/
-
-.sidebar-view-rocketleague
-.sidebar-logout-form {
-    flex: 0 0 auto;
-    width: 100%;
-    margin: 0;
-    padding: 0;
-}
-
-.sidebar-view-rocketleague
-.sidebar-logout-form
-.nav-item {
-    width: 100%;
-    border: 0;
-    background: transparent;
-    color: inherit;
-    font: inherit;
-    text-align: left;
-    appearance: none;
-    cursor: pointer;
-}
-
-.sidebar-view-rocketleague
-.sidebar-logout-form
-.nav-item:hover,
-.sidebar-view-rocketleague
-.sidebar-logout-form
-.nav-item:focus-visible {
-    background:
-        rgba(255, 92, 110, 0.12);
-    color: #ff9ba8;
-    outline: none;
-}
-
-/*
-=========================================================
-PERSISTENT SETTINGS AREA
-=========================================================
-*/
-
-.sidebar-view-rocketleague
-.sidebar-bottom {
-    flex: 0 0 auto;
-    width: 100%;
-    padding: 6px 3px 10px;
-    border-top:
-        1px solid
-        rgba(255, 255, 255, 0.08);
-    background: inherit;
-    box-sizing: border-box;
-}
-
-/*
-=========================================================
-AUTH VISIBILITY
-=========================================================
-*/
-
-.sidebar-view-rocketleague
-[hidden] {
-    display: none !important;
-}
-
-/*
-=========================================================
-ANIMATION ACCESSIBILITY
-=========================================================
-*/
 
 @media (prefers-reduced-motion: reduce) {
     .sidebar-view-rocketleague
