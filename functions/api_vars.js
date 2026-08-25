@@ -10,7 +10,7 @@ export const AUTH_STATE_COOKIE = "bpd_epic_state";
 export const AUTH_SESSION_COOKIE = "bpd_session";
 export const AUTH_STATE_MAX_AGE_SECONDS = 600;
 export const AUTH_SESSION_KEY_PREFIX = "session:";
-export const ttlSeconds = SESSION_DURATION_HOURS * 3600;
-export const SESSION_TTL_SECONDS = 60 * 60 * 24; // example: 24 hours
+export const SESSION_DURATION_HOURS = 24;
+export const SESSION_TTL_SECONDS = SESSION_DURATION_HOURS * 3600; // example: 24 hours
 export const EPIC_REDIRECT_URI = "https://bpd-gaming-network.com/api/auth/epic/callback";
 
