@@ -6,33 +6,35 @@ NAVIGATION
 =========================================================
 */
 
+export function initializePage() {
+
+    const backButton =
+        document.getElementById("errorGoBack");
+
+    if (!backButton) {
+        return;
+    }
+
+    backButton.addEventListener(
+        "click",
+        goBack
+    );
+
+}
+
 function goBack(event) {
-    /*
-    =====================================================
-    PREVENT DEFAULT LINK BEHAVIOR
-    =====================================================
-    */
 
     if (event) {
         event.preventDefault();
     }
 
-    /*
-    =====================================================
-    CHECK BROWSER HISTORY
-    =====================================================
-    */
-
     if (window.history.length > 1) {
+
         window.history.back();
         return;
+
     }
 
-    /*
-    =====================================================
-    FALLBACK TO MAIN MENU
-    =====================================================
-    */
+    window.location.assign("/");
 
-    window.location.href = "/";
 }

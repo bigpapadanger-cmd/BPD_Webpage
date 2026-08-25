@@ -1,41 +1,93 @@
 export const ROUTES = {
-    //Global
-    "/": "/index.html",
-    "/Error": "/Global/404/HTML/404.html",
-    "/Dashboard": "/Global/Index/HTML/dashboard.html",
 
-    //Categories
-    "/RocketLeague": "/Tabs/RocketLeague/Index/HTML/index.html",
-    "/RocketLeague/WeeklyMatches": "/Tabs/RocketLeague/WeeklyMatches/HTML/index.html",
-    "/RocketLeague/FindPlayers": "/Tabs/RocketLeague/FindPlayers/HTML/index.html",
-    "/RocketLeague/PrivateMatches": "/Tabs/RocketLeague/PrivateMatches/HTML/index.html",
-    "/RocketLeague/MatchResults": "/Tabs/RocketLeague/MatchResults/HTML/index.html",
+    "/": {
+        title: "BPD Gaming Network",
+        body:
+            "/Framework/Shell/HTML/Body/body.html",
+        header:
+            "/Framework/Shell/HTML/Header/header.html",
+        sidebar:
+            "/Framework/Shell/HTML/Sidebar/mainmenu.html",
+        footer:
+            "/Framework/Shell/HTML/Footer/footer.html"
+    },
 
-    //Required
-    "/Settings": "/Global/Settings/HTML/settings.html",
-    "/About": "/Global/Required/About/HTML/index.html",
-    "/Privacy": "/Global/Required/PrivacyPolicy/HTML/index.html",
-    "/Terms": "/Global/Required/TOS/HTML/index.html"
-    //ocr
+    "/RocketLeague": {
+        title: "Rocket League | BPD Gaming Network",
+        body:
+            "/Tabs/RocketLeague/Index/HTML/index.html",
+        header:
+            "/Framework/Shell/HTML/Header/header.html",
+        sidebar:
+            "/Framework/Shell/HTML/Sidebar/rocketleague.html",
+        footer:
+            "/Framework/Shell/HTML/Footer/footer.html"
+    },
+
+    "/RocketLeague/MatchResults": {
+        title: "Match Results | BPD Gaming Network",
+        body:
+            "/Tabs/RocketLeague/MatchResults/HTML/index.html",
+        header:
+            "/Framework/Shell/HTML/Header/header.html",
+        sidebar:
+            "/Framework/Shell/HTML/Sidebar/rocketleague.html",
+        footer:
+            "/Framework/Shell/HTML/Footer/footer.html",
+        module:
+            "/Tabs/RocketLeague/MatchResults/JS/index.js"
+    },
+    
+    "/Error": {
+    title: "Page Not Found | BPD Gaming Network",
+    body:
+        "/Global/404/HTML/404.html",
+    header:
+        "/Framework/Shell/HTML/Header/header.html",
+    sidebar:
+        "/Framework/Shell/HTML/Sidebar/mainmenu.html",
+    footer:
+        "/Framework/Shell/HTML/Footer/footer.html"
+    },
+    
+    "/Dashboard": {
+    title: "Dashboard | BPD Gaming Network",
+    body:
+        "/Global/Index/HTML/home.html",
+    header:
+        "/Framework/Shell/HTML/Header/header.html",
+    sidebar:
+        "/Framework/Shell/HTML/Sidebar/mainmenu.html",
+    footer:
+        "/Framework/Shell/HTML/Footer/footer.html"
+    },
+    
+    "/About": {
+    title: "Dashboard | BPD Gaming Network",
+    body:
+        "/Global/Index/HTML/home.html",
+    header:
+        "/Framework/Shell/HTML/Header/header.html",
+    sidebar:
+        "/Framework/Shell/HTML/Sidebar/mainmenu.html",
+    footer:
+        "/Framework/Shell/HTML/Footer/footer.html"
+    }
 
 };
 export const HEADER_MAP = {
     "/": false,
     "/RocketLeague": false,
     "/Settings": true,
-
+    "/About": true,
+    "/Privacy": true,
     // pages that should NOT show header
+    "/Error": false,
     "/RocketLeague/WeeklyMatches": false,
     "/RocketLeague/PrivateMatches": false,
     "/Dashboard": true
 };
 
-    //ALL SIDEBAR MAPPING 
-export const SIDEBAR_MAP = {
-    "/": "/Framework/Shell/HTML/Sidebar/mainmenu.html",
-    "/RocketLeague": "/Framework/Shell/HTML/Sidebar/rocketleague.html",
-    "/Settings": "/Framework/Shell/HTML/Sidebar/settings.html"
-};
 export const PRIORITY_MAP = {
     "/": 1.0,
     "/Dashboard": 0.9,

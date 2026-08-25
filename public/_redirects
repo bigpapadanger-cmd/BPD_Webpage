@@ -1,12 +1,11 @@
-/RocketLeague                   /Tabs/RocketLeague/Index/HTML/index.html
-/RocketLeague/WeeklyMatches     /Tabs/RocketLeague/WeeklyMatches/HTML/index.html
-/RocketLeague/FindPlayers       /Tabs/RocketLeague/FindPlayers/HTML/index.html
-/RocketLeague/PrivateMatches    /Tabs/RocketLeague/PrivateMatches/HTML/index.html
-/RocketLeague/MatchResults      /Tabs/RocketLeague/MatchResults/HTML/index.html
+/RocketLeague                   /index.html 200
+/RocketLeague/WeeklyMatches     /index.html 200
+/RocketLeague/FindPlayers       /index.html 200
+/RocketLeague/PrivateMatches    /index.html 200
+/RocketLeague/MatchResults      /index.html 200
 
-/Settings                       /Global/Settings/HTML/settings.html
-/About                          /Global/Required/About/HTML/index.html
-/Privacy                        /Global/Required/PrivacyPolicy/HTML/index.html
-/Terms                          /Global/Required/TOS/HTML/index.html
-
-
+/Settings                       /index.html 200
+/About                          /index.html 200
+/Privacy                        /index.html 200
+/Terms                          /index.html 200
+/Error                          /index.html 200

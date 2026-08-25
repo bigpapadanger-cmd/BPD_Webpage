@@ -1,37 +1,68 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>404 - BPD Gaming Network</title>
-    <link rel="stylesheet" href="../CSS/404.css">
-</head>
-<body>
-    <div class="background"></div>
-    <main class="container">
-        <div class="logo">BPD Gaming Network</div>
-        <div class="error-code">404</div>
-        <h1 class="title">Looks like you missed the match.</h1>
-        <p class="message">
-            The page you're looking for doesn't exist, has moved,
-            or isn't available yet.
+<section class="error-page">
+
+    <div
+        class="error-background"
+        aria-hidden="true">
+    </div>
+
+    <div class="error-container">
+
+        <div class="error-logo">
+            BPD Gaming Network
+        </div>
+
+        <div class="error-code">
+            404
+        </div>
+
+        <h1 class="error-title">
+            Looks like you missed the match.
+        </h1>
+
+        <p class="error-message">
+
+            The page you're looking for doesn't exist,
+            has moved, or isn't available yet.
+
         </p>
-        <div class="button-group">
-            <a class="button" href="#" onclick="goBack(event)">
+
+        <div class="error-button-group">
+
+            <button
+                id="errorGoBack"
+                class="button"
+                type="button">
+
                 Go Back
-            </a>
-            <a class="button button-secondary" href="/">
+
+            </button>
+
+            <a
+                class="button button-secondary"
+                href="/"
+                data-router-link>
+
                 Main Menu
+
             </a>
+
         </div>
-        <div class="status">
-            <span class="status-dot"></span>
+
+        <div class="error-status">
+
+            <span
+                class="status-dot"
+                aria-hidden="true">
+            </span>
+
             Network Online
+
         </div>
-        <div class="footer">
+
+        <div class="error-brand">
             BPD GAMING NETWORK
         </div>
-    </main>
-    <script src="../JS/404.js"></script>
-</body>
-</html>
+
+    </div>
+
+</section>
