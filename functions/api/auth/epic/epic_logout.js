@@ -1,6 +1,6 @@
 import {
     handleLogout
-} from "../../services/epic/logout.js";
+} from "../../../services/epic/logout.js";
 
 export async function onRequestPost(
     context
