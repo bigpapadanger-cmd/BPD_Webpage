@@ -1,12 +1,12 @@
 import {
     json,
     redirect
-} from "../../services/common_helpers/responses.js";
+} from "../common_helpers/responses.js";
 
 import {
     getCookie,
     createCookie
-} from "../../services/common_helpers/reload_sessions.js";
+} from "../common_helpers/reload_sessions.js";
 
 import {
     AUTH_SESSION_COOKIE,
