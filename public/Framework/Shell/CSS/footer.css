@@ -1,0 +1,168 @@
+/* BPD GAMING NETWORK - GLOBAL FOOTER */
+.site-footer {
+    position: relative;
+    z-index: 1;
+    flex: none;
+    width: 100%;
+    min-width: 0;
+    padding:
+        14px
+        24px
+        14px
+        calc(
+            var(--sidebar-width)
+            + 18px
+        );
+    border-top: 1px solid #252934;
+    background: rgba(17, 19, 24, 0.96);
+    color: #9299a8;
+    transition:
+        padding-left 0.25s ease;
+}
+
+body.sidebar-collapsed .site-footer {
+    padding-left:
+        calc(
+            var(--sidebar-collapsed-width)
+            + 18px
+        );
+}
+.site-footer-content {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: min(80%, 1440px);
+    margin-inline: auto;
+}
+.footer-primary-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    width: 100%;
+}
+.footer-brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    font-size: 0.78rem;
+    letter-spacing: 0.05em;
+}
+.footer-brand-name {
+    color: #d7dbe4;
+    font-weight: 700;
+}
+.footer-copyright,
+.footer-disclaimer {
+    color: #707787;
+}
+.footer-navigation {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.footer-navigation a {
+    color: #b8c6e3;
+    font-weight: 700;
+    text-decoration: underline;
+    text-decoration-color: rgba(139, 92, 246, 0.65);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 4px;
+}
+
+.footer-navigation a:hover,
+.footer-navigation a:focus-visible {
+    color: #ffffff;
+    text-decoration-color: #8b5cf6;
+}
+
+.footer-divider {
+    color: #4e5563;
+    font-size: 0.8rem;
+    user-select: none;
+}
+.footer-navigation a::after {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    height: 1px;
+    background: #8b5cf6;
+    content: "";
+    opacity: 0;
+    transform: scaleX(0);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.footer-navigation a:focus-visible {
+    border-radius: 3px;
+    outline: 2px solid #8b5cf6;
+    outline-offset: 4px;
+}
+.footer-disclaimer {
+    width: 100%;
+    margin: 0;
+    font-size: 0.7rem;
+    line-height: 1.4;
+    text-align: center;
+}
+@media (max-width: 600px) {
+    .site-footer {
+        padding:
+            14px
+            16px
+            14px
+            calc(
+                var(--sidebar-collapsed-width)
+                + 18px
+            );
+    }
+
+    .footer-primary-row {
+        flex-direction: column;
+        justify-content: center;
+        gap: 10px;
+        text-align: center;
+    }
+
+    .footer-navigation {
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 14px;
+    }
+}
+.site-footer-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    width: min(100%, 1440px);
+    margin-inline: auto;
+    text-align: center;
+}
+
+.footer-primary-row {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+}
+
+.footer-brand {
+    justify-content: center;
+}
+
+.footer-navigation {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.footer-disclaimer {
+    text-align: center;
+}

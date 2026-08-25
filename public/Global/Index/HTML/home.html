@@ -1,168 +1,39 @@
-
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <!-- =====================================================
-         DOCUMENT SETUP
-         ===================================================== -->
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BPD Gaming Network</title>
-
-    <!-- Homepage styling -->
-    <link rel="stylesheet" href="../CSS/index.css">
-
-    <!-- Global ad styling -->
-    <link rel="stylesheet" href="../../Ads/CSS/ads.css">
-
-    <!-- Global sidebar styling -->
-    <link rel="stylesheet" href="../../Sidebar/CSS/sidebar.css">
-   <!-- Global sidebar hovering styling -->
-    <link rel="stylesheet" href="../../Sidebar/CSS/hover.css">
-
-    <!-- Google AdSense -->
-    <script
-        async
-        src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9161533706304827"
-        crossorigin="anonymous">
-    </script>
-</head>
-
-<body data-theme="blue" data-animations="on">
-
-    <!-- =====================================================
-         BACKGROUND
-         ===================================================== -->
-    <div class="background-waves"></div>
-
-    <!-- =====================================================
-         GLOBAL SIDEBAR
-         ===================================================== -->
-    <div id="global-sidebar"></div>
-
-    <!-- =====================================================
-         MAIN PAGE CONTENT
-         ===================================================== -->
-    <main class="main-content">
-
-        <!-- =================================================
-             HERO
-             ================================================= -->
+<section class="home-page">
+    <div class="home-background-waves" aria-hidden="true"></div>
+    <div class="home-page-content">
         <header class="hero-header">
             <div class="hero-content">
                 <p class="hero-eyebrow">WELCOME TO</p>
-
                 <h1>BPD Gaming Network</h1>
-
-                <p class="hero-subtitle">
-                    Match. Compete. Climb.
-                </p>
+                <p class="hero-subtitle">Match. Compete. Climb.</p>
             </div>
         </header>
-
-        <!-- =================================================
-             TOP ADVERTISEMENT
-             ================================================= -->
-        <div
-            class="ad-slot ad-slot-top"
-            data-ad-location="home-top">
-        </div>
-
-        <!-- =================================================
-             WELCOME CONTENT
-             ================================================= -->
-        <section class="content-area">
-
+        <div class="ad-slot ad-slot-top" data-ad-location="home-top"></div>
+        <section class="content-area" aria-labelledby="homeWelcomeTitle">
             <div class="content-card">
                 <span class="card-label">BPD GAMING NETWORK</span>
-
-                <h2>Welcome</h2>
-
-                <p>
-                    Your central hub for gaming, matchmaking,
-                    communities, leaderboards, and everything
-                    BPD Gaming Network.
-                </p>
+                <h2 id="homeWelcomeTitle">Welcome</h2>
+                <p>Your central hub for gaming, matchmaking, communities, leaderboards, and everything BPD Gaming Network.</p>
             </div>
-
-            <!-- =============================================
-                 MIDDLE ADVERTISEMENT
-                 ============================================= -->
-            <div
-                class="ad-slot ad-slot-middle"
-                data-ad-location="home-middle">
-            </div>
-
-            <!-- =============================================
-                 AVAILABLE NETWORKS
-                 ============================================= -->
+            <div class="ad-slot ad-slot-middle" data-ad-location="home-middle"></div>
             <div class="content-grid">
-
-                <!-- Rocket League -->
-                <a
-                    href="../../../Categories/RocketLeague/Index/HTML/index.html"
-                    class="info-card">
-
-                    <div class="info-card-icon">⚽</div>
-
+                <a href="/RocketLeague" class="info-card" data-router-link>
+                    <div class="info-card-icon" aria-hidden="true">⚽</div>
                     <h3>Rocket League</h3>
-
-                    <p>
-                        Matchmaking, teams, leaderboards,
-                        voting, and competitive play.
-                    </p>
+                    <p>Matchmaking, teams, leaderboards, voting, and competitive play.</p>
                 </a>
-
-                <!-- Future category -->
-                <div class="info-card disabled">
-                    <div class="info-card-icon">◇</div>
-
+                <div class="info-card disabled" aria-disabled="true">
+                    <div class="info-card-icon" aria-hidden="true">◇</div>
                     <h3>Future</h3>
-
-                    <p>
-                        More games and features are coming
-                        to the BPD Gaming Network.
-                    </p>
+                    <p>More games and features are coming to the BPD Gaming Network.</p>
                 </div>
-
-                <!-- Future category -->
-                <div class="info-card disabled">
-                    <div class="info-card-icon">◇</div>
-
+                <div class="info-card disabled" aria-disabled="true">
+                    <div class="info-card-icon" aria-hidden="true">◇</div>
                     <h3>Future</h3>
-
-                    <p>
-                        New communities, tools, and
-                        experiences will be added here.
-                    </p>
+                    <p>New communities, tools, and experiences will be added here.</p>
                 </div>
-
             </div>
-
-            <!-- =================================================
-                 BOTTOM ADVERTISEMENT
-                 ================================================= -->
-            <div
-                class="ad-slot ad-slot-bottom"
-                data-ad-location="home-bottom">
-            </div>
-
+            <div class="ad-slot ad-slot-bottom" data-ad-location="home-bottom"></div>
         </section>
-    </main>
-
-    <!-- =====================================================
-         GLOBAL JAVASCRIPT
-         ===================================================== -->
-
-    <!-- Injects and controls the global sidebar -->
-    <script src="../../Sidebar/JS/sidebar.js"></script>
-
-    <!-- Handles global advertisements -->
-    <script src="../../Ads/JS/ads.js"></script>
-
-    <!-- Homepage-specific functionality -->
-    <script src="../JS/index.js"></script>
-
-</body>
-</html>
-
+    </div>
+</section>

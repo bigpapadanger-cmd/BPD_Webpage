@@ -24,7 +24,7 @@ SIDEBAR HOVER TOOLTIP
     white-space: nowrap;
     box-shadow:
         0 8px 25px rgba(0, 0, 0, 0.45),
-        0 0 12px rgba(77, 163, 255, 0.18),
+        0 0 12px rgba(0, 0, 0, 0.18),
         inset 0 0 12px rgba(77, 163, 255, 0.04);
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
@@ -68,7 +68,7 @@ TOOLTIP TEXT
     display: inline-block;
     text-shadow:
         0 0 5px rgba(242, 244, 248, 0.35),
-        0 0 10px rgba(77, 163, 255, 0.25);
+        0 0 10px rgba(0, 0, 0, 0.25);
 }
 
 /* 
@@ -86,7 +86,7 @@ FLASHING TEXT EFFECT
     100% {
         text-shadow:
             0 0 4px rgba(242, 244, 248, 0.3),
-            0 0 8px rgba(77, 163, 255, 0.18);
+            0 0 8px rgba(255, 217, 0, 0.18);
     }
 
     50% {

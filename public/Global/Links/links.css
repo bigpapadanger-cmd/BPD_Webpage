@@ -1,0 +1,159 @@
+/* BPD GAMING NETWORK - LINKS PAGE */
+.links-page {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 100%;
+    padding: clamp(14px, 2vw, 28px);
+    overflow: hidden;
+    background: transparent;
+}
+.links-background {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    background:
+        radial-gradient(circle at 20% 15%, rgba(139, 92, 246, 0.19), transparent 34%),
+        radial-gradient(circle at 82% 80%, rgba(77, 163, 255, 0.12), transparent 32%),
+        linear-gradient(145deg, #090b12 0%, #0d1019 55%, #080a0f 100%);
+    pointer-events: none;
+}
+.links-panel {
+    position: relative;
+    z-index: 1;
+    width: min(98%, 1040px);
+    padding: clamp(24px, 4vw, 52px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    background: rgba(15, 18, 26, 0.8);
+    box-shadow:
+        0 24px 70px rgba(0, 0, 0, 0.5),
+        0 0 30px rgba(139, 92, 246, 0.08);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+}
+.links-heading {
+    max-width: 680px;
+    margin: 0 auto clamp(24px, 4vw, 38px);
+    text-align: center;
+}
+.links-eyebrow {
+    color: #9f7aea;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.18em;
+}
+.links-heading h1 {
+    margin: 10px 0 8px;
+    color: #ffffff;
+    font-size: clamp(2rem, 5vw, 3.4rem);
+    line-height: 1.05;
+}
+.links-heading p {
+    margin: 0;
+    color: #9ca5b6;
+    line-height: 1.6;
+}
+.links-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+}
+.link-card {
+    display: grid;
+    grid-template-columns: 48px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 14px;
+    min-height: 88px;
+    padding: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.035);
+    color: #ffffff;
+    text-decoration: none;
+    transition:
+        transform 0.2s ease,
+        border-color 0.2s ease,
+        background 0.2s ease,
+        box-shadow 0.2s ease;
+}
+.link-card:hover,
+.link-card:focus-visible {
+    transform: translateY(-2px);
+    border-color: rgba(139, 92, 246, 0.75);
+    background: rgba(139, 92, 246, 0.09);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.3);
+}
+.link-card:focus-visible {
+    outline: 2px solid #8b5cf6;
+    outline-offset: 3px;
+}
+.link-card-youtube:hover,
+.link-card-youtube:focus-visible {
+    border-color: rgba(255, 70, 70, 0.8);
+    background: rgba(255, 40, 40, 0.08);
+}
+.link-card-discord:hover,
+.link-card-discord:focus-visible {
+    border-color: rgba(88, 101, 242, 0.85);
+    background: rgba(88, 101, 242, 0.1);
+}
+.link-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.06);
+    color: #ffffff;
+    font-size: 1.15rem;
+    font-weight: 800;
+}
+.link-icon-text {
+    font-size: 0.66rem;
+    letter-spacing: 0.05em;
+}
+.link-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 0;
+}
+.link-copy strong {
+    font-size: 0.98rem;
+}
+.link-copy small {
+    overflow: hidden;
+    color: #8f98a9;
+    font-size: 0.78rem;
+    line-height: 1.4;
+    text-overflow: ellipsis;
+}
+.link-arrow {
+    color: #8b93a4;
+    font-size: 1rem;
+}
+.links-note {
+    margin: 24px 0 0;
+    color: #70798a;
+    font-size: 0.75rem;
+    line-height: 1.5;
+    text-align: center;
+}
+@media (max-width: 720px) {
+    .links-page {
+        padding: 10px;
+    }
+    .links-panel {
+        width: 100%;
+        padding: 24px 14px;
+        border-radius: 16px;
+    }
+    .links-grid {
+        grid-template-columns: 1fr;
+    }
+}

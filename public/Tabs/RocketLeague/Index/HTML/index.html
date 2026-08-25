@@ -1,211 +1,274 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <!-- =========================================================
-         DOCUMENT SETUP
-         ========================================================= -->
-    <meta charset="UTF-8">
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0">
-    <title>Rocket League - BPD Gaming Network</title>
-    <!-- Rocket League page styling -->
-    <link
-        rel="stylesheet"
-        href="../CSS/index.css">
-    <!-- Global sidebar styling -->
-    <link
-        rel="stylesheet"
-        href="../../../../Global/Sidebar/CSS/sidebar.css">
-    <!-- Global sidebar hover styling -->
-    <link
-        rel="stylesheet"
-        href="../../../../Global/Sidebar/CSS/hover.css">
-    <!-- Global advertisement styling -->
-    <link
-        rel="stylesheet"
-        href="../../../../Global/Ads/CSS/ads.css">
-    <!-- Google AdSense -->
-    <script
-        async
-        src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9161533706304827"
-        crossorigin="anonymous">
-    </script>
-</head>
-<body data-theme="blue" data-animations="on">
-    <!-- =========================================================
-         BACKGROUND
-         ========================================================= -->
-    <div class="background-waves"></div>
-    <!-- =========================================================
-         GLOBAL SIDEBAR
-         ========================================================= -->
-    <div id="global-sidebar"></div>
-    <!-- =========================================================
-         MAIN CONTENT
-         ========================================================= -->
-    <main class="main-content">
-        <!-- =====================================================
-             HERO HEADER
-             ===================================================== -->
-        <header class="hero-header">
-            <div class="hero-content">
-                <p class="hero-eyebrow">
-                    BPD GAMING NETWORK
-                </p>
-                <h1>Rocket League</h1>
-                <section
-                    class="hero-player-profile"
-                    id="rocketLeaguePlayerProfile"
-                    aria-live="polite"
-                    hidden>
-                    <div class="hero-player-identity">
-                        <span class="hero-player-kicker">
-                            EPIC PLAYER
-                        </span>
-                        <strong id="rocketLeaguePlayerName">
-                            Loading player...
-                        </strong>
-                    </div>
-                    <div
-                        class="rank-row"
-                        id="rocketLeagueRankRow"
-                        aria-label="Competitive Rocket League ranks">
-                        <article
-                            class="rank-badge rank-loading"
-                            id="rocketLeagueRank1">
-                            <span class="rank-playlist">1V1</span>
-                            <strong class="rank-name">Loading</strong>
-                            <span class="rank-mmr">— MMR</span>
-                        </article>
-                        <article
-                            class="rank-badge rank-loading"
-                            id="rocketLeagueRank2">
-                            <span class="rank-playlist">2V2</span>
-                            <strong class="rank-name">Loading</strong>
-                            <span class="rank-mmr">— MMR</span>
-                        </article>
-                        <article
-                            class="rank-badge rank-loading"
-                            id="rocketLeagueRank3">
-                            <span class="rank-playlist">3V3</span>
-                            <strong class="rank-name">Loading</strong>
-                            <span class="rank-mmr">— MMR</span>
-                        </article>
-                    </div>
-                    <p
-                        class="rank-status"
-                        id="rocketLeagueRankStatus">
-                        Loading competitive ranks...
+<section
+    class="rocket-league-page"
+    aria-labelledby="rocketLeaguePageTitle"
+>
+    <div
+        class="rocket-league-background-waves"
+        aria-hidden="true"
+    ></div>
+
+    <div class="rocket-league-panel">
+        <div class="rocket-league-page-content">
+            <div class="rocket-league-hero">
+                <div class="hero-content">
+                    <p class="hero-eyebrow">
+                        BPD GAMING NETWORK
                     </p>
-                </section>
-                <p class="hero-subtitle">
-                    Compete. Climb. Dominate.
-                </p>
+
+                    <h1 id="rocketLeaguePageTitle">
+                        Rocket League
+                    </h1>
+
+                    <section
+                        class="hero-player-profile"
+                        id="rocketLeaguePlayerProfile"
+                        aria-label="Rocket League player profile"
+                        aria-live="polite"
+                        hidden
+                    >
+                        <div class="hero-player-identity">
+                            <span class="hero-player-kicker">
+                                EPIC PLAYER
+                            </span>
+
+                            <strong id="rocketLeaguePlayerName">
+                                Loading player...
+                            </strong>
+                        </div>
+
+                        <div
+                            class="rank-row"
+                            id="rocketLeagueRankRow"
+                            aria-label="Competitive Rocket League ranks"
+                        >
+                            <article
+                                class="rank-badge rank-loading"
+                                id="rocketLeagueRank1"
+                            >
+                                <span class="rank-playlist">
+                                    1V1
+                                </span>
+
+                                <strong class="rank-name">
+                                    Loading
+                                </strong>
+
+                                <span class="rank-mmr">
+                                    — MMR
+                                </span>
+                            </article>
+
+                            <article
+                                class="rank-badge rank-loading"
+                                id="rocketLeagueRank2"
+                            >
+                                <span class="rank-playlist">
+                                    2V2
+                                </span>
+
+                                <strong class="rank-name">
+                                    Loading
+                                </strong>
+
+                                <span class="rank-mmr">
+                                    — MMR
+                                </span>
+                            </article>
+
+                            <article
+                                class="rank-badge rank-loading"
+                                id="rocketLeagueRank3"
+                            >
+                                <span class="rank-playlist">
+                                    3V3
+                                </span>
+
+                                <strong class="rank-name">
+                                    Loading
+                                </strong>
+
+                                <span class="rank-mmr">
+                                    — MMR
+                                </span>
+                            </article>
+                        </div>
+
+                        <p
+                            class="rank-status"
+                            id="rocketLeagueRankStatus"
+                        >
+                            Loading competitive ranks...
+                        </p>
+                    </section>
+
+                    <p class="hero-subtitle">
+                        Compete. Climb. Dominate.
+                    </p>
+                </div>
             </div>
-        </header>
-        <!-- =====================================================
-             TOP ADVERTISEMENT
-             ===================================================== -->
-        <div
-            class="ad-slot ad-slot-top"
-            data-ad-location="rocket-league-top">
-            <span></span>
+
+            <div
+                class="ad-slot ad-slot-top"
+                data-ad-location="rocket-league-top"
+            ></div>
+
+            <section
+                class="rocket-league-content"
+                aria-labelledby="rocketLeagueWelcomeTitle"
+            >
+                <div class="content-card">
+                    <span class="card-label">
+                        ROCKET LEAGUE
+                    </span>
+
+                    <h2 id="rocketLeagueWelcomeTitle">
+                        Welcome to Rocket League
+                    </h2>
+
+                    <p>
+                        Your central hub for weekly matches,
+                        finding other players, private matches,
+                        and competitive play.
+                    </p>
+                </div>
+
+                <div
+                    class="content-card auth-login-card"
+                    id="rocketLeagueLoggedOut"
+                >
+                    <span class="card-label">
+                        ACCOUNT REQUIRED
+                    </span>
+
+                    <h2>
+                        Login to participate
+                    </h2>
+
+                    <p>
+                        Login or register with Epic Games to join matches,
+                        find players, enter private matches, and submit
+                        scoreboard results.
+                    </p>
+
+                    <div class="guest-action-row">
+                        <a
+                            class="auth-login-button"
+                            href="/api/auth/epic/epic_login"
+                        >
+                            Login / Register with Epic Games
+                        </a>
+
+                        <a
+                            class="guest-results-button"
+                            href="/RocketLeague/MatchResults"
+                            data-router-link
+                        >
+                            View Match Results
+                        </a>
+                    </div>
+                </div>
+
+                <div
+                    class="ad-slot ad-slot-middle"
+                    data-ad-location="rocket-league-middle"
+                ></div>
+
+                <div
+                    class="content-grid"
+                    id="rocketLeagueAuthenticatedContent"
+                    aria-label="Rocket League features"
+                    hidden
+                >
+                    <a
+                        href="/RocketLeague/WeeklyMatches"
+                        class="info-card"
+                        data-router-link
+                    >
+                        <div
+                            class="info-card-icon"
+                            aria-hidden="true"
+                        >
+                            ⚔
+                        </div>
+
+                        <h3>
+                            Join Weekly Matches
+                        </h3>
+
+                        <p>
+                            Join the next scheduled weekly matches.
+                        </p>
+                    </a>
+
+                    <a
+                        href="/RocketLeague/FindPlayers"
+                        class="info-card"
+                        data-router-link
+                    >
+                        <div
+                            class="info-card-icon"
+                            aria-hidden="true"
+                        >
+                            ♙
+                        </div>
+
+                        <h3>
+                            Find Other Players
+                        </h3>
+
+                        <p>
+                            Find players and connect with the community.
+                        </p>
+                    </a>
+
+                    <a
+                        href="/RocketLeague/PrivateMatches"
+                        class="info-card"
+                        data-router-link
+                    >
+                        <div
+                            class="info-card-icon"
+                            aria-hidden="true"
+                        >
+                            ◆
+                        </div>
+
+                        <h3>
+                            Private Matches
+                        </h3>
+
+                        <p>
+                            Sign up for upcoming private matches.
+                        </p>
+                    </a>
+
+                    <a
+                        href="/RocketLeague/MatchResults"
+                        class="info-card"
+                        data-router-link
+                    >
+                        <div
+                            class="info-card-icon"
+                            aria-hidden="true"
+                        >
+                            ◫
+                        </div>
+
+                        <h3>
+                            Match Results
+                        </h3>
+
+                        <p>
+                            Review submitted matches and player results.
+                        </p>
+                    </a>
+                </div>
+
+                <div
+                    class="ad-slot ad-slot-bottom"
+                    data-ad-location="rocket-league-bottom"
+                ></div>
+            </section>
         </div>
-        <!-- =====================================================
-             PAGE CONTENT
-             ===================================================== -->
-        <section class="content-area">
-            <!-- Welcome card -->
-            <div class="content-card">
-                <span class="card-label">
-                    ROCKET LEAGUE
-                </span>
-                <h2>Welcome to Rocket League</h2>
-                <p>
-                    Your central hub for weekly matches, finding other players,
-                    private matches, and competitive play.
-                </p>
-            </div>
-            <!-- =================================================
-                 LOGGED-OUT CONTENT
-                 Visible by default and hidden only after a valid
-                 authenticated session is confirmed.
-                 ================================================= -->
-            <div
-                class="content-card auth-login-card"
-                id="rocketLeagueLoggedOut">
-                <span class="card-label">
-                    ACCOUNT REQUIRED
-                </span>
-                <h2>Login to continue</h2>
-                <p>
-                    Login or register with Epic Games to access Rocket League
-                    matches, players, private matches, profiles, and scoreboard
-                    submissions.
-                </p>
-                <a
-                    class="auth-login-button"
-                    href="/auth/epic/login">
-                    Login / Register with Epic Games
-                </a>
-            </div>
-            <!-- =================================================
-                 MIDDLE ADVERTISEMENT
-                 ================================================= -->
-            <div
-                class="ad-slot ad-slot-middle"
-                data-ad-location="rocket-league-middle">
-                <span></span>
-            </div>
-            <!-- =================================================
-                 AUTHENTICATED CONTENT
-                 Hidden until authentication is confirmed.
-                 ================================================= -->
-            <div
-                class="content-grid"
-                id="rocketLeagueAuthenticatedContent"
-                hidden>
-                <!-- Weekly matches -->
-                <a
-                    href="/RocketLeague/WeeklyMatches"
-                    class="info-card">
-                    <div class="info-card-icon">⚔</div>
-                    <h3>Join Weekly Matches</h3>
-                    <p>
-                        Join the next scheduled weekly matches.
-                    </p>
-                </a>
-                <!-- Find players -->
-                <a
-                    href="/RocketLeague/FindPlayers"
-                    class="info-card">
-                    <div class="info-card-icon">♙</div>
-                    <h3>Find Other Players</h3>
-                    <p>
-                        Find players and connect with the community.
-                    </p>
-                </a>
-                <!-- Private matches -->
-                <a
-                    href="/RocketLeague/PrivateMatches"
-                    class="info-card">
-                    <div class="info-card-icon">◆</div>
-                    <h3>Private Matches</h3>
-                    <p>
-                        Sign up for upcoming private matches.
-                    </p>
-                </a>
-            </div>
-        </section>
-    </main>
-    <!-- =========================================================
-         GLOBAL SCRIPTS
-         Load sidebar.js before index.js because it creates
-         window.BPDAuth.
-         ========================================================= -->
-    <script src="../../../../Global/Sidebar/JS/sidebar.js"></script>
-    <script src="../../../../Global/Ads/JS/ads.js"></script>
-    <script src="../JS/index.js"></script>
-</body>
-</html>
+    </div>
+</section>

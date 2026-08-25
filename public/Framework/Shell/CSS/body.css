@@ -1,0 +1,77 @@
+/* BPD GAMING NETWORK - GLOBAL BODY */
+
+.site-content {
+    display: block;
+    flex: 1 1 auto;
+    width: 100%;
+    min-width: 0;
+    min-height: 60vh;
+    padding-left:
+        calc(
+            var(--sidebar-width)
+            + var(--sidebar-content-gap)
+        );
+    overflow-x: hidden;
+    background: transparent;
+    transition:
+        padding-left 0.25s ease;
+}
+
+body.sidebar-collapsed .site-content {
+    padding-left:
+        calc(
+            var(--sidebar-collapsed-width)
+            + var(--sidebar-content-gap)
+        );
+}
+
+.site-content > section,
+.site-content > main,
+.site-content > article {
+    width: 100%;
+    min-height: 60vh;
+    margin: 0;
+}
+
+body[data-header="hidden"] .site-content {
+    min-height: calc(100dvh - 60px);
+}
+
+.route-load-error {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    min-height: 60vh;
+    padding: 24px;
+    text-align: center;
+}
+
+.route-load-error h1,
+.route-load-error p {
+    margin: 0;
+}
+
+.route-load-error p {
+    color: #9299a8;
+}
+
+.route-load-error a {
+    margin-top: 10px;
+    padding: 10px 18px;
+    border: 1px solid #8b5cf6;
+    border-radius: 7px;
+    color: #ffffff;
+    text-decoration: none;
+}
+
+@media (max-width: 700px) {
+    .site-content {
+        padding-left:
+            calc(
+                var(--sidebar-collapsed-width)
+                + var(--sidebar-content-gap)
+            );
+    }
+}

@@ -174,62 +174,84 @@ SIDEBAR TOGGLE
 */
 
 function setupSidebarToggle() {
-
     const sidebar =
-        document.getElementById("sidebar");
-
+        document.getElementById(
+            "sidebar"
+        );
     const sidebarToggle =
         document.getElementById(
             "sidebarToggle"
         );
-
     if (
         !sidebar
         || !sidebarToggle
     ) {
         return;
     }
-
+    const minimumExpandWidth = 701;
     sidebarToggle.addEventListener(
         "click",
         function() {
-
-            const willCollapse =
-                !sidebar.classList.contains(
+            const isCollapsed =
+                sidebar.classList.contains(
                     "collapsed"
                 );
-
+            const expansionBlocked =
+                isCollapsed
+                && window.innerWidth
+                    < minimumExpandWidth;
+            if (expansionBlocked) {
+                sidebarToggle.classList.remove(
+                    "expand-denied"
+                );
+                void sidebarToggle.offsetWidth;
+                sidebarToggle.classList.add(
+                    "expand-denied"
+                );
+                sidebarToggle.setAttribute(
+                    "aria-label",
+                    "Navigation cannot expand at this screen size"
+                );
+                window.setTimeout(
+                    function() {
+                        sidebarToggle.classList.remove(
+                            "expand-denied"
+                        );
+                        sidebarToggle.setAttribute(
+                            "aria-label",
+                            "Toggle navigation"
+                        );
+                    },
+                    500
+                );
+                return;
+            }
+            const willCollapse =
+                !isCollapsed;
             sidebar.classList.toggle(
                 "collapsed",
                 willCollapse
             );
-
             document.body.classList.toggle(
                 "sidebar-collapsed",
                 willCollapse
             );
-
             localStorage.setItem(
                 "bpdSidebar",
                 willCollapse
                     ? "collapsed"
                     : "open"
             );
-
             sidebarToggle.setAttribute(
                 "aria-expanded",
                 String(!willCollapse)
             );
-
             if (!willCollapse) {
                 hideSidebarTooltip();
             }
-
         }
     );
-
 }
-
 /*
 =========================================================
 TOOLTIP SYSTEM

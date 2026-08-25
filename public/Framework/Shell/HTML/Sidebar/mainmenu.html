@@ -1,39 +1,61 @@
 <div class="sidebar-header">
-
     <button
         id="sidebarToggle"
+        class="sidebar-toggle"
         type="button"
         aria-label="Toggle navigation"
         aria-expanded="true">
-
-        ☰
-
+        <span aria-hidden="true"></span>
+        <span aria-hidden="true"></span>
+        <span aria-hidden="true"></span>
     </button>
-
 </div>
-
-<nav class="sidebar-navigation">
-
+<nav
+    class="sidebar-navigation"
+    aria-label="Main navigation">
     <a
         href="/"
         class="nav-item"
         data-router-link
+        data-nav-route="/"
         data-tooltip="Home">
-
-        <span class="nav-icon">⌂</span>
-        <span class="nav-label">Home</span>
-
+        <span
+            class="nav-icon"
+            aria-hidden="true">
+            🏠︎
+        </span>
+        <span class="nav-label">
+            Home
+        </span>
     </a>
-
+    <a
+        href="/Dashboard"
+        class="nav-item"
+        data-router-link
+        data-nav-route="/Dashboard"
+        data-tooltip="Dashboard">
+        <span
+            class="nav-icon"
+            aria-hidden="true">
+            𓃑
+        </span>
+        <span class="nav-label">
+            Dashboard
+        </span>
+    </a>
     <a
         href="/RocketLeague"
         class="nav-item"
         data-router-link
+        data-nav-route="/RocketLeague"
         data-tooltip="Rocket League">
-
-        <span class="nav-icon">RL</span>
-        <span class="nav-label">Rocket League</span>
-
+        <span
+            class="nav-icon"
+            aria-hidden="true">
+            ꔮ
+        </span>
+        <span class="nav-label">
+            Rocket League
+        </span>
     </a>
-
 </nav>

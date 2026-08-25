@@ -10,7 +10,9 @@ export const ROUTES = {
             "/Framework/Shell/HTML/Sidebar/mainmenu.html",
         footer:
             "/Framework/Shell/HTML/Footer/footer.html",
-        stylesheets: ["/Framework/Shell/CSS/shell.css"]
+        module: 
+            "/Framework/Shell/JS/initialization.js",
+        sitemap: true
     },
 
     "/RocketLeague": {
@@ -20,9 +22,14 @@ export const ROUTES = {
         header:
             "/Framework/Shell/HTML/Header/header.html",
         sidebar:
-            "/Framework/Shell/HTML/Sidebar/rocketleague.html",
+            "/Tabs/RocketLeague/Sidebars/HTML/rl_AuthSidebar.html",
         footer:
-            "/Framework/Shell/HTML/Footer/footer.html"
+            "/Framework/Shell/HTML/Footer/footer.html",
+        module: 
+            "/Tabs/RocketLeague/Index/JS/index.js",
+        sitemap: true
+
+        
     },
 
     "/RocketLeague/MatchResults": {
@@ -36,7 +43,9 @@ export const ROUTES = {
         footer:
             "/Framework/Shell/HTML/Footer/footer.html",
         module:
-            "/Tabs/RocketLeague/MatchResults/JS/index.js"
+            "/Tabs/RocketLeague/MatchResults/JS/index.js",
+        requiresAuth: true,
+        sitemap: false
     },
     
     "/Error": {
@@ -49,7 +58,10 @@ export const ROUTES = {
         "/Framework/Shell/HTML/Sidebar/mainmenu.html",
     footer:
         "/Framework/Shell/HTML/Footer/footer.html",
-    stylesheets: ["/Global/404/CSS/404.css"]
+    module: 
+        "/Framework/Shell/JS/initialization.js",
+        requiresAuth: false,
+        sitemap: false
     },
     
     "/Dashboard": {
@@ -62,7 +74,9 @@ export const ROUTES = {
         "/Framework/Shell/HTML/Sidebar/mainmenu.html",
     footer:
         "/Framework/Shell/HTML/Footer/footer.html",
-    stylesheets: ["/Global/Index/CSS/index.css"]
+    module: 
+        "/Global/Index/JS/Index.js",
+        sitemap: true
     },
     
     "/About": {
@@ -74,7 +88,8 @@ export const ROUTES = {
     sidebar:
         "/Framework/Shell/HTML/Sidebar/mainmenu.html",
     footer:
-        "/Framework/Shell/HTML/Footer/footer.html"
+        "/Framework/Shell/HTML/Footer/footer.html",
+        sitemap: true
     }
 
 };

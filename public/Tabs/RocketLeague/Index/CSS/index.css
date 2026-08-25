@@ -1,78 +1,42 @@
 /*
 =========================================================
 BPD GAMING NETWORK
-ROCKET LEAGUE
+ROCKET LEAGUE HOME
 =========================================================
 */
 
 /*
 =========================================================
-GLOBAL RESET
+ROCKET LEAGUE PAGE
+The global body controls sidebar clearance.
 =========================================================
 */
 
-* {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-}
+.rocket-league-page {
+    --rl-background: #070812;
+    --rl-panel: rgba(15, 17, 29, 0.9);
+    --rl-border: rgba(255, 255, 255, 0.09);
+    --rl-border-bright: rgba(124, 92, 255, 0.42);
+    --rl-text: #f5f7ff;
+    --rl-text-muted: #9ba3b8;
+    --rl-accent: #7c5cff;
+    --rl-accent-light: #a998ff;
+    --rl-accent-secondary: #58b6ff;
+    --rl-accent-soft: rgba(124, 92, 255, 0.14);
+    --rl-accent-glow: rgba(124, 92, 255, 0.32);
 
-:root {
-    --background: #070707;
-    --background-secondary: #0e0e0e;
-    --background-tertiary: #151515;
-    --panel: rgba(20, 20, 20, 0.9);
-    --panel-light: rgba(30, 30, 30, 0.88);
-    --border: rgba(255, 255, 255, 0.08);
-    --border-bright: rgba(255, 138, 36, 0.32);
-    --text: #f5f5f5;
-    --text-muted: #929292;
-    --accent: #ff8a24;
-    --accent-light: #ffb45f;
-    --accent-soft: rgba(255, 138, 36, 0.13);
-    --accent-glow: rgba(255, 138, 36, 0.3);
-    --secondary: #ffd166;
-    --secondary-soft: rgba(255, 209, 102, 0.1);
-    --success: #55d68a;
-    --danger: #ff5c5c;
-    --content-transition: 0.3s ease;
-}
-
-/*
-=========================================================
-DOCUMENT
-=========================================================
-*/
-
-html,
-body {
+    position: relative;
+    display: flex;
+    align-items: stretch;
+    justify-content: center;
     width: 100%;
-    min-height: 100%;
-}
-
-html {
-    scroll-behavior: smooth;
-}
-
-body {
-    min-height: 100vh;
-    background: var(--background);
-    color: var(--text);
-    font-family: Arial, Helvetica, sans-serif;
-    overflow-x: hidden;
-}
-
-button,
-a {
-    font-family: inherit;
-}
-
-button {
-    color: inherit;
-}
-
-[hidden] {
-    display: none !important;
+    min-width: 0;
+    min-height: 60vh;
+    margin: 0;
+    padding: clamp(8px, 1vw, 16px);
+    overflow: hidden;
+    background: transparent;
+    color: var(--rl-text);
 }
 
 /*
@@ -81,44 +45,43 @@ BACKGROUND
 =========================================================
 */
 
-.background-waves {
-    position: fixed;
+.rocket-league-background-waves {
+    position: absolute;
     inset: 0;
-    z-index: -10;
+    z-index: 0;
     overflow: hidden;
     pointer-events: none;
     background:
         radial-gradient(
             circle at 72% 18%,
-            rgba(255, 138, 36, 0.09),
-            transparent 30%
+            rgba(124, 92, 255, 0.12),
+            transparent 32%
         ),
         radial-gradient(
             circle at 18% 82%,
-            rgba(255, 209, 102, 0.045),
-            transparent 30%
+            rgba(88, 182, 255, 0.08),
+            transparent 32%
         ),
         linear-gradient(
             145deg,
-            #050505 0%,
-            #0d0d0d 48%,
-            #050505 100%
+            #060711 0%,
+            #101326 48%,
+            #070812 100%
         );
 }
-
-.background-waves::before,
-.background-waves::after {
-    content: "";
+.rocket-league-background-waves::before,
+.rocket-league-background-waves::after {
     position: absolute;
     left: -20%;
     width: 140%;
     border: 1px solid rgba(255, 138, 36, 0.07);
     border-radius: 50%;
+    content: "";
     transform-origin: center;
-    animation: arenaWave 10s ease-in-out infinite;
+    animation: rocketLeagueArenaWave 10s ease-in-out infinite;
 }
 
-.background-waves::before {
+.rocket-league-background-waves::before {
     top: 8%;
     height: 42%;
     box-shadow:
@@ -126,7 +89,7 @@ BACKGROUND
         0 0 220px rgba(255, 138, 36, 0.02);
 }
 
-.background-waves::after {
+.rocket-league-background-waves::after {
     top: 43%;
     height: 48%;
     border-color: rgba(255, 209, 102, 0.04);
@@ -134,75 +97,94 @@ BACKGROUND
     animation-duration: 13s;
 }
 
-@keyframes arenaWave {
+@keyframes rocketLeagueArenaWave {
     0%,
     100% {
-        transform: scale(0.92) rotate(-1deg);
         opacity: 0.25;
+        transform: scale(0.92) rotate(-1deg);
     }
 
     50% {
-        transform: scale(1.08) rotate(1deg);
         opacity: 0.7;
+        transform: scale(1.08) rotate(1deg);
     }
 }
 
 /*
 =========================================================
-MAIN CONTENT
+PAGE PANEL
 =========================================================
 */
 
-.main-content {
-    min-height: 100vh;
-    margin-left: var(--sidebar-width);
-    transition: margin-left var(--content-transition);
+.rocket-league-panel {
+    position: relative;
+    z-index: 1;
+    width: 98%;
+    min-width: 0;
+    min-height: 60vh;
+    overflow: hidden;
+    border: 1px solid var(--rl-border);
+    border-radius: 20px;
+    background:
+        linear-gradient(
+            145deg,
+            rgba(19, 21, 38, 0.92),
+            rgba(8, 10, 20, 0.88)
+        );
+    box-shadow:
+        0 20px 60px rgba(0, 0, 0, 0.42),
+        0 0 28px rgba(124, 92, 255, 0.09);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
 }
 
-body.sidebar-collapsed .main-content {
-    margin-left: var(--sidebar-collapsed-width);
+.rocket-league-page-content {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    min-width: 0;
+    min-height: 60vh;
 }
 
 /*
 =========================================================
-HERO HEADER
+HERO
 =========================================================
 */
 
-.hero-header {
+.rocket-league-hero {
     position: relative;
-    min-height: 470px;
     display: flex;
     align-items: center;
     justify-content: center;
+    min-height: 470px;
     padding: 90px 40px;
-    text-align: center;
     overflow: hidden;
+    text-align: center;
 }
 
-.hero-header::before {
-    content: "";
+.rocket-league-hero::before {
     position: absolute;
     top: 50%;
     left: 50%;
     width: 650px;
     height: 320px;
-    transform: translate(-50%, -50%);
+    pointer-events: none;
     background:
         radial-gradient(
             ellipse,
             rgba(255, 138, 36, 0.11),
             transparent 65%
         );
-    pointer-events: none;
+    content: "";
+    transform: translate(-50%, -50%);
 }
 
-.hero-header::after {
-    content: "";
+.rocket-league-hero::after {
     position: absolute;
-    left: 8%;
     right: 8%;
     bottom: 0;
+    left: 8%;
     height: 1px;
     background:
         linear-gradient(
@@ -211,22 +193,26 @@ HERO HEADER
             rgba(255, 138, 36, 0.3),
             transparent
         );
+    content: "";
 }
 
-.hero-content {
+.rocket-league-page .hero-content {
     position: relative;
     z-index: 2;
+    width: 100%;
 }
 
-.hero-eyebrow {
-    margin-bottom: 18px;
-    color: var(--accent-light);
+.rocket-league-page .hero-eyebrow {
+    margin: 0 0 18px;
+    color: var(--rl-accent-light);
     font-size: 12px;
     font-weight: 800;
     letter-spacing: 5px;
 }
 
-.hero-header h1 {
+.rocket-league-hero h1 {
+    margin: 0;
+    color: var(--rl-text);
     font-size: clamp(46px, 7vw, 92px);
     font-weight: 900;
     line-height: 0.95;
@@ -236,18 +222,26 @@ HERO HEADER
         0 8px 30px rgba(0, 0, 0, 0.6);
 }
 
+.rocket-league-page .hero-subtitle {
+    margin: 24px 0 0;
+    color: var(--rl-text-muted);
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: 4px;
+}
+
 /*
 =========================================================
-AUTHENTICATED PLAYER RANKS
+PLAYER PROFILE
 =========================================================
 */
 
-.hero-player-profile {
-    width: min(760px, calc(100vw - 48px));
+.rocket-league-page .hero-player-profile {
+    width: min(760px, calc(100% - 24px));
     margin: 24px auto 0;
 }
 
-.hero-player-identity {
+.rocket-league-page .hero-player-identity {
     display: flex;
     align-items: baseline;
     justify-content: center;
@@ -255,45 +249,42 @@ AUTHENTICATED PLAYER RANKS
     margin-bottom: 10px;
 }
 
-.hero-player-kicker {
-    color: var(--text-muted);
+.rocket-league-page .hero-player-kicker {
+    color: var(--rl-text-muted);
     font-size: 9px;
     font-weight: 900;
     letter-spacing: 2px;
 }
 
-#rocketLeaguePlayerName {
+.rocket-league-page #rocketLeaguePlayerName {
     color: #ffffff;
     font-size: 17px;
     letter-spacing: 0.4px;
 }
 
-.rank-row {
+.rocket-league-page .rank-row {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 9px;
 }
 
-.rank-badge {
+.rocket-league-page .rank-badge {
     --rank-color: #929292;
     --rank-color-light: #d0d0d0;
     --rank-color-soft: rgba(146, 146, 146, 0.16);
+
     position: relative;
-    min-width: 0;
     display: grid;
-    grid-template-columns: auto 1fr;
     grid-template-areas:
         "playlist name"
         "playlist mmr";
+    grid-template-columns: auto minmax(0, 1fr);
     align-items: center;
-    column-gap: 10px;
+    min-width: 0;
     padding: 11px 13px;
+    column-gap: 10px;
     overflow: hidden;
-    border: 1px solid color-mix(
-        in srgb,
-        var(--rank-color) 48%,
-        transparent
-    );
+    border: 1px solid var(--rank-color);
     border-radius: 12px;
     background:
         linear-gradient(
@@ -302,52 +293,30 @@ AUTHENTICATED PLAYER RANKS
             rgba(8, 8, 8, 0.88) 68%
         );
     box-shadow:
-        inset 0 0 18px var(--rank-color-soft),
-        0 0 18px transparent;
+        inset 0 0 18px var(--rank-color-soft);
     text-align: left;
     animation:
-        rankBadgeEntrance 0.45s ease both,
-        rankBadgeGlow 3.4s ease-in-out infinite;
+        rocketLeagueRankEntrance 0.45s ease both,
+        rocketLeagueRankGlow 3.4s ease-in-out infinite;
 }
 
-.rank-badge:nth-child(2) {
+.rocket-league-page .rank-badge:nth-child(2) {
     animation-delay: 0.08s, -1.1s;
 }
 
-.rank-badge:nth-child(3) {
+.rocket-league-page .rank-badge:nth-child(3) {
     animation-delay: 0.16s, -2.2s;
 }
 
-.rank-badge::before {
-    content: "";
-    position: absolute;
-    inset: -70% -35%;
-    background:
-        linear-gradient(
-            110deg,
-            transparent 38%,
-            color-mix(
-                in srgb,
-                var(--rank-color-light) 22%,
-                transparent
-            ) 48%,
-            transparent 58%
-        );
-    transform: translateX(-55%) rotate(8deg);
-    animation: rankBadgeSweep 5.4s ease-in-out infinite;
-    pointer-events: none;
-}
-
-.rank-playlist {
+.rocket-league-page .rank-playlist {
     position: relative;
     grid-area: playlist;
     color: var(--rank-color-light);
     font-size: 15px;
-    font-weight: 950;
-    letter-spacing: 0.5px;
+    font-weight: 900;
 }
 
-.rank-name {
+.rocket-league-page .rank-name {
     position: relative;
     grid-area: name;
     min-width: 0;
@@ -359,92 +328,90 @@ AUTHENTICATED PLAYER RANKS
     white-space: nowrap;
 }
 
-.rank-mmr {
+.rocket-league-page .rank-mmr {
     position: relative;
     grid-area: mmr;
     color: rgba(255, 255, 255, 0.78);
     font-size: 10px;
     font-weight: 800;
-    letter-spacing: 0.5px;
 }
 
-.rank-status {
-    margin-top: 8px;
-    color: var(--text-muted);
+.rocket-league-page .rank-status {
+    margin: 8px 0 0;
+    color: var(--rl-text-muted);
     font-size: 10px;
     font-weight: 700;
-    letter-spacing: 0.35px;
 }
 
-.rank-status[data-state="error"] {
+.rocket-league-page .rank-status[data-state="error"] {
     color: #ff9189;
 }
 
-.rank-loading {
+.rocket-league-page .rank-loading {
     opacity: 0.72;
 }
 
-.rank-bronze {
+.rocket-league-page .rank-bronze {
     --rank-color: #b66a3c;
     --rank-color-light: #f0a574;
     --rank-color-soft: rgba(182, 106, 60, 0.18);
 }
 
-.rank-silver {
+.rocket-league-page .rank-silver {
     --rank-color: #aeb8c4;
     --rank-color-light: #eef4fa;
     --rank-color-soft: rgba(174, 184, 196, 0.17);
 }
 
-.rank-gold {
+.rocket-league-page .rank-gold {
     --rank-color: #e7ad29;
     --rank-color-light: #ffe47d;
     --rank-color-soft: rgba(231, 173, 41, 0.18);
 }
 
-.rank-platinum {
+.rocket-league-page .rank-platinum {
     --rank-color: #2bc5b7;
     --rank-color-light: #8affee;
     --rank-color-soft: rgba(43, 197, 183, 0.18);
 }
 
-.rank-diamond {
+.rocket-league-page .rank-diamond {
     --rank-color: #3f92ff;
     --rank-color-light: #8fc9ff;
     --rank-color-soft: rgba(63, 146, 255, 0.2);
 }
 
-.rank-champion {
+.rocket-league-page .rank-champion {
     --rank-color: #9e52ff;
     --rank-color-light: #d5a8ff;
     --rank-color-soft: rgba(158, 82, 255, 0.2);
 }
 
-.rank-grand-champion {
+.rocket-league-page .rank-grand-champion {
     --rank-color: #f04747;
     --rank-color-light: #ff9b88;
     --rank-color-soft: rgba(240, 71, 71, 0.2);
 }
 
-.rank-supersonic {
+.rocket-league-page .rank-supersonic {
     --rank-color: #f2f2f2;
     --rank-color-light: #ffffff;
     --rank-color-soft: rgba(255, 255, 255, 0.17);
 }
 
-@keyframes rankBadgeEntrance {
+@keyframes rocketLeagueRankEntrance {
     from {
-        transform: translateY(12px) scale(0.96);
         opacity: 0;
+        transform: translateY(12px) scale(0.96);
     }
 
     to {
-        transform: translateY(0) scale(1);
         opacity: 1;
+        transform: translateY(0) scale(1);
     }
 }
 
-@keyframes rankBadgeGlow {
+@keyframes rocketLeagueRankGlow {
     0%,
     100% {
         box-shadow:
@@ -459,118 +426,92 @@ AUTHENTICATED PLAYER RANKS
     }
 }
 
-@keyframes rankBadgeSweep {
-    0%,
-    64% {
-        transform: translateX(-55%) rotate(8deg);
-    }
-
-    86%,
-    100% {
-        transform: translateX(55%) rotate(8deg);
-    }
-}
-
-.hero-subtitle {
-    margin-top: 24px;
-    color: var(--text-muted);
-    font-size: 17px;
-    font-weight: 600;
-    letter-spacing: 4px;
-}
-
 /*
 =========================================================
-CONTENT AREA
+CONTENT
 =========================================================
 */
 
-.content-area {
+.rocket-league-content {
     width: min(1200px, calc(100% - 60px));
-    margin: 0 auto;
+    margin-inline: auto;
     padding: 55px 0 90px;
 }
 
-/*
-=========================================================
-WELCOME CARD
-=========================================================
-*/
-
-.content-card {
+.rocket-league-page .content-card {
     position: relative;
-    overflow: hidden;
     padding: 38px;
+    overflow: hidden;
+    border: 1px solid var(--rl-border);
+    border-radius: 18px;
     background:
         linear-gradient(
             135deg,
             rgba(27, 24, 20, 0.92),
             rgba(12, 12, 12, 0.88)
         );
-    border: 1px solid var(--border);
-    border-radius: 18px;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.28);
+    box-shadow:
+        0 20px 60px rgba(0, 0, 0, 0.28);
 }
 
-.content-card::before {
-    content: "";
+.rocket-league-page .content-card::before {
     position: absolute;
     top: 0;
+    bottom: 0;
     left: 0;
     width: 4px;
-    height: 100%;
     background:
         linear-gradient(
             180deg,
-            var(--accent),
+            var(--rl-accent),
             rgba(255, 138, 36, 0.08)
         );
+    content: "";
 }
 
-.card-label {
-    color: var(--accent-light);
+.rocket-league-page .card-label {
+    color: var(--rl-accent-light);
     font-size: 10px;
     font-weight: 800;
     letter-spacing: 3px;
 }
 
-.content-card h2 {
-    margin-top: 11px;
+.rocket-league-page .content-card h2 {
+    margin: 11px 0 0;
     font-size: 31px;
     font-weight: 800;
 }
 
-.content-card p {
+.rocket-league-page .content-card p {
     max-width: 720px;
-    margin-top: 12px;
-    color: var(--text-muted);
+    margin: 12px 0 0;
+    color: var(--rl-text-muted);
     line-height: 1.8;
 }
 
 /*
 =========================================================
-AUTHENTICATION CARD
+LOGIN
 =========================================================
 */
 
-.auth-login-card {
+.rocket-league-page .auth-login-card {
     margin-top: 20px;
 }
 
-.auth-login-button {
+.rocket-league-page .auth-login-button {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     min-height: 46px;
     margin-top: 22px;
     padding: 0 24px;
-    border: 1px solid var(--border-bright);
+    border: 1px solid var(--rl-border-bright);
     border-radius: 11px;
-    background: var(--accent-soft);
-    color: var(--accent-light);
+    background: var(--rl-accent-soft);
+    color: var(--rl-accent-light);
     font-size: 14px;
     font-weight: 800;
-    line-height: 1.2;
     text-align: center;
     text-decoration: none;
     cursor: pointer;
@@ -581,51 +522,45 @@ AUTHENTICATION CARD
         box-shadow 0.2s ease;
 }
 
-.auth-login-button:hover,
-.auth-login-button:focus-visible {
-    transform: translateY(-2px);
-    border-color: var(--accent-light);
-    background: var(--accent-soft);
+.rocket-league-page .auth-login-button:hover,
+.rocket-league-page .auth-login-button:focus-visible {
+    border-color: var(--rl-accent-light);
+    background: rgba(255, 138, 36, 0.18);
     box-shadow:
         0 10px 28px rgba(0, 0, 0, 0.24),
-        0 0 22px var(--accent-glow);
+        0 0 22px var(--rl-accent-glow);
     outline: none;
+    transform: translateY(-2px);
 }
 
 /*
 =========================================================
-FEATURE GRID
+FEATURES
 =========================================================
 */
 
-.content-grid {
+.rocket-league-page .content-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 18px;
     margin-top: 20px;
 }
 
-/*
-=========================================================
-FEATURE CARD
-=========================================================
-*/
-
-.info-card {
+.rocket-league-page .info-card {
     position: relative;
-    min-height: 190px;
     display: block;
+    min-height: 190px;
     padding: 30px;
     overflow: hidden;
+    border: 1px solid var(--rl-border);
+    border-radius: 17px;
     background:
         linear-gradient(
             145deg,
             rgba(24, 24, 24, 0.88),
             rgba(10, 10, 10, 0.92)
         );
-    border: 1px solid var(--border);
-    border-radius: 17px;
-    color: var(--text);
+    color: var(--rl-text);
     text-decoration: none;
     backdrop-filter: blur(15px);
     -webkit-backdrop-filter: blur(15px);
@@ -635,127 +570,121 @@ FEATURE CARD
         box-shadow 0.25s ease;
 }
 
-.info-card::before {
-    content: "";
+.rocket-league-page .info-card::before {
     position: absolute;
     top: -80px;
     right: -80px;
     width: 180px;
     height: 180px;
     border-radius: 50%;
+    pointer-events: none;
     background:
         radial-gradient(
             circle,
             rgba(255, 138, 36, 0.12),
             transparent 70%
         );
+    content: "";
     transition: transform 0.35s ease;
-    pointer-events: none;
 }
 
-.info-card:hover {
-    transform: translateY(-6px);
-    border-color: var(--border-bright);
+.rocket-league-page .info-card:hover,
+.rocket-league-page .info-card:focus-visible {
+    border-color: var(--rl-border-bright);
     box-shadow:
         0 15px 45px rgba(0, 0, 0, 0.3),
-        0 0 25px rgba(255, 138, 36, 0.06);
+        0 0 25px rgba(255, 138, 36, 0.08);
+    outline: none;
+    transform: translateY(-6px);
 }
 
-.info-card:hover::before {
+.rocket-league-page .info-card:hover::before,
+.rocket-league-page .info-card:focus-visible::before {
     transform: scale(1.4);
 }
 
-.info-card-icon {
+.rocket-league-page .info-card-icon {
     position: relative;
-    width: 46px;
-    height: 46px;
     display: flex;
     align-items: center;
     justify-content: center;
+    width: 46px;
+    height: 46px;
     margin-bottom: 22px;
     border: 1px solid rgba(255, 138, 36, 0.18);
     border-radius: 11px;
-    background: var(--accent-soft);
-    color: var(--accent-light);
+    background: var(--rl-accent-soft);
+    color: var(--rl-accent-light);
     font-size: 19px;
-    box-shadow: inset 0 0 15px rgba(255, 138, 36, 0.05);
 }
 
-.info-card h3 {
+.rocket-league-page .info-card h3 {
     position: relative;
-    margin-bottom: 9px;
+    margin: 0 0 9px;
     font-size: 18px;
     font-weight: 750;
 }
 
-.info-card p {
+.rocket-league-page .info-card p {
     position: relative;
-    color: var(--text-muted);
+    margin: 0;
+    color: var(--rl-text-muted);
     font-size: 14px;
     line-height: 1.65;
 }
 
 /*
 =========================================================
-THEME
+ADS
 =========================================================
 */
 
-body[data-theme="orange"] {
-    --accent: #ff8a24;
-    --accent-light: #ffb45f;
-    --accent-soft: rgba(255, 138, 36, 0.13);
-    --accent-glow: rgba(255, 138, 36, 0.3);
-    --border-bright: rgba(255, 138, 36, 0.32);
+.rocket-league-page .ad-slot {
+    width: min(1200px, calc(100% - 60px));
+    min-height: 1px;
+    margin-inline: auto;
 }
 
-body[data-theme="gold"] {
-    --accent: #f2b84b;
-    --accent-light: #ffd77a;
-    --accent-soft: rgba(242, 184, 75, 0.13);
-    --accent-glow: rgba(242, 184, 75, 0.3);
-    --border-bright: rgba(242, 184, 75, 0.32);
+.rocket-league-page .ad-slot-top {
+    margin-top: 20px;
 }
 
-body[data-theme="red"] {
-    --accent: #ff5a4f;
-    --accent-light: #ff9189;
-    --accent-soft: rgba(255, 90, 79, 0.13);
-    --accent-glow: rgba(255, 90, 79, 0.3);
-    --border-bright: rgba(255, 90, 79, 0.32);
+.rocket-league-page .ad-slot-middle {
+    margin-top: 20px;
 }
 
-body[data-theme="green"] {
-    --accent: #45d483;
-    --accent-light: #80e9aa;
-    --accent-soft: rgba(69, 212, 131, 0.13);
-    --accent-glow: rgba(69, 212, 131, 0.3);
-    --border-bright: rgba(69, 212, 131, 0.32);
-}
-
-body[data-theme="white"] {
-    --accent: #e6e6e6;
-    --accent-light: #ffffff;
-    --accent-soft: rgba(230, 230, 230, 0.1);
-    --accent-glow: rgba(230, 230, 230, 0.2);
-    --border-bright: rgba(230, 230, 230, 0.25);
+.rocket-league-page .ad-slot-bottom {
+    margin-top: 20px;
 }
 
 /*
 =========================================================
-ANIMATION CONTROL
+THEMES
 =========================================================
 */
 
-.animations-off *,
-.animations-off *::before,
-.animations-off *::after,
-body[data-animations="off"] *,
-body[data-animations="off"] *::before,
-body[data-animations="off"] *::after {
-    animation: none !important;
-    transition: none !important;
-    scroll-behavior: auto !important;
+body[data-theme="gold"] .rocket-league-page {
+    --rl-accent: #f2b84b;
+    --rl-accent-light: #ffd77a;
+    --rl-accent-soft: rgba(242, 184, 75, 0.13);
+    --rl-accent-glow: rgba(242, 184, 75, 0.3);
+    --rl-border-bright: rgba(242, 184, 75, 0.32);
+}
+
+body[data-theme="red"] .rocket-league-page {
+    --rl-accent: #ff5a4f;
+    --rl-accent-light: #ff9189;
+    --rl-accent-soft: rgba(255, 90, 79, 0.13);
+    --rl-accent-glow: rgba(255, 90, 79, 0.3);
+    --rl-border-bright: rgba(255, 90, 79, 0.32);
+}
+
+body[data-theme="green"] .rocket-league-page {
+    --rl-accent: #45d483;
+    --rl-accent-light: #80e9aa;
+    --rl-accent-soft: rgba(69, 212, 131, 0.13);
+    --rl-accent-glow: rgba(69, 212, 131, 0.3);
+    --rl-border-bright: rgba(69, 212, 131, 0.32);
 }
 
 /*
@@ -764,110 +693,51 @@ RESPONSIVE
 =========================================================
 */
 
-@media (max-width: 1000px) {
-    .content-grid {
+@media (max-width: 900px) {
+    .rocket-league-page .content-grid {
         grid-template-columns: 1fr;
     }
 
-    .info-card {
+    .rocket-league-page .info-card {
         min-height: 160px;
     }
 }
 
 @media (max-width: 800px) {
-    .hero-header {
-        min-height: 390px;
-        padding: 70px 25px;
-    }
-
-    .hero-header h1 {
-        font-size: clamp(42px, 12vw, 70px);
-    }
-
-    .hero-subtitle {
-        font-size: 14px;
-        letter-spacing: 3px;
-    }
-
-    .content-area {
-        width: calc(100% - 30px);
-        padding-top: 35px;
-    }
-
-    .content-card {
-        padding: 28px;
+    .rocket-league-panel {
+        width: 100%;
     }
 }
 
 @media (max-width: 500px) {
-    .hero-header {
-        min-height: 340px;
-        padding-left: 20px;
-        padding-right: 20px;
+    .rocket-league-page {
+        padding: 6px;
     }
 
-    .hero-eyebrow {
-        font-size: 10px;
-        letter-spacing: 3px;
-    }
-
-    .hero-subtitle {
-        font-size: 12px;
-        letter-spacing: 2px;
-    }
-
-    .hero-player-profile {
-        width: calc(100vw - 24px);
-        margin-top: 18px;
-    }
-
-    .rank-row {
-        gap: 5px;
-    }
-
-    .rank-badge {
-        display: flex;
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 2px;
-        padding: 9px 8px;
-    }
-
-    .rank-playlist {
-        font-size: 13px;
-    }
-
-    .rank-name {
-        width: 100%;
-        font-size: 9px;
-    }
-
-    .rank-mmr {
-        font-size: 9px;
-    }
-
-    .content-area {
-        width: calc(100% - 20px);
-    }
-
-    .auth-login-button {
-        width: 100%;
-        padding: 13px 18px;
+    .rocket-league-panel {
+        min-height: 60vh;
+        border-radius: 14px;
     }
 }
 
 /*
 =========================================================
-REDUCED MOTION
+ANIMATION CONTROL
 =========================================================
 */
 
+body[data-animations="off"] .rocket-league-page *,
+body[data-animations="off"] .rocket-league-page *::before,
+body[data-animations="off"] .rocket-league-page *::after {
+    animation: none !important;
+    transition: none !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
-    body[data-animations="on"] *,
-    body[data-animations="on"] *::before,
-    body[data-animations="on"] *::after {
+    .rocket-league-page *,
+    .rocket-league-page *::before,
+    .rocket-league-page *::after {
         animation: none !important;
         transition: none !important;
-        scroll-behavior: auto !important;
     }
 }

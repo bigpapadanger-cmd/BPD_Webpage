@@ -1,151 +1,56 @@
-/* ==========================================================
-   BASE LAYOUT (your original)
-   ========================================================== */
+/* BPD GAMING NETWORK - GLOBAL SHELL */
 
-html, body {
-    margin: 0;
-    min-height: 100%;
+:root {
+    --sidebar-width: 210px;
+    --sidebar-collapsed-width: 56px;
+    --sidebar-icon-width: 50px;
+    --sidebar-content-gap: 18px;
 }
 
-body {
-    min-height: 100dvh;
-}
 *,
 *::before,
 *::after {
     box-sizing: border-box;
 }
 
-.site-header[hidden] {
-    display: none;
-}
-
-body.sidebar-collapsed .site-shell {
-    grid-template-columns: 76px minmax(0, 1fr);
-}
-
-.site-shell {
-    transition:
-        grid-template-columns 0.25s ease;
-}
-
-.site-content {
-    overflow-x: hidden;
-}
-
-.header-tab {
-    transition:
-        background 0.25s ease,
-        box-shadow 0.25s ease,
-        transform 0.25s ease;
-}
-
-@media (max-width: 700px) {
-    .site-shell {
-        grid-template-columns: 76px minmax(0, 1fr);
-    }
-
-    .site-header {
-        padding: 10px 12px;
-    }
-
-    .site-footer {
-        padding: 10px 12px;
-    }
-}
-/* Grid shell */
-.site-shell {
-    display: grid;
-    grid-template-columns: 260px minmax(0, 1fr);
-    min-height: 100dvh;
-}
-
-/* Sidebar */
-.site-sidebar {
-    min-height: 100dvh;
-}
-
-/* Page area */
-.site-page {
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-    min-height: 100dvh;
-}
-
-/* Header */
-.site-header {
-    flex: none;
-}
-
-/* Main content */
-.site-content {
-    flex: 1;
+html,
+body {
     width: 100%;
-    box-sizing: border-box;
+    min-height: 100%;
+    margin: 0;
 }
 
-/* Footer */
-.site-footer {
-    flex: none;
+html {
+    background: #0d0f13;
 }
-
-.footer-links {
-    display: flex;
-    gap: 20px;
-}
-
-/* ==========================================================
-   DARK HIGH-CONTRAST STYLING (new)
-   ========================================================== */
 
 body {
+    min-height: 100dvh;
+    overflow-x: hidden;
     background: #0d0f13;
-    color: #fff;
-    font-family: 'Inter', 'Segoe UI', sans-serif;
+    color: #ffffff;
+    font-family:
+        "Inter",
+        "Segoe UI",
+        sans-serif;
 }
 
-.site-sidebar {
-    background: #16181d;
-    border-right: 1px solid #22252b;
+.site-shell {
+    position: relative;
+    display: block;
+    width: 100%;
+    min-height: 100dvh;
+    background: transparent;
+    isolation: isolate;
 }
 
 .site-page {
-    background: #0d0f13;
-}
-
-.site-header {
-    background: #16181d;
-    border-bottom: 1px solid #22252b;
-    padding: 12px 20px;
-
+    position: relative;
+    z-index: 1;
     display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-}
-
-.site-footer {
-    background: #16181d;
-    border-top: 1px solid #22252b;
-    padding: 12px 20px;
-}
-
-/* ==========================================================
-   GLOWING BUTTONS (new)
-   ========================================================== */
-
-.header-tab {
-    padding: 10px 16px;
-    background: #1f2228;
-    border-radius: 6px;
-    color: #fff;
-    text-decoration: none;
-    font-weight: 500;
-    transition: all 0.25s ease;
-}
-
-.header-tab:hover {
-    background: #00aaff;
-    box-shadow: 0 0 12px rgba(0,170,255,0.7);
-    transform: translateY(-2px);
+    flex-direction: column;
+    width: 100%;
+    min-width: 0;
+    min-height: 100dvh;
+    background: transparent;
 }

@@ -1,135 +1,684 @@
-import { ROUTES, HEADER_MAP } from "./routes.js";
-import { loadSidebarHover, initializeSidebar } from "./sidebar.js";
-const DEFAULT_HEADER_FILE = "/Framework/Shell/HTML/Header/header.html";
-const DEFAULT_FOOTER_FILE = "/Framework/Shell/HTML/Footer/footer.html";
+import {
+    ROUTES,
+    HEADER_MAP
+} from "./routes.js";
+
+import {
+    loadSidebarHover,
+    initializeSidebar
+} from "./sidebar.js";
+
+import {
+    initializeRouteModule
+} from "./initialization.js";
+
+import {
+    BPD_AUTH_SESSION_URL
+} from "/scripts/apiRoutes.js";
+
 const DEFAULT_ROUTE = "/";
 const ERROR_ROUTE = "/Error";
+const AUTH_FALLBACK_ROUTE = "/RocketLeague";
+
 let navigationId = 0;
 
-
 function normalizePath(path) {
-    let normalizedPath = String(path || "/").trim();
-    if (!normalizedPath.startsWith("/")) {
-        normalizedPath = `/${normalizedPath}`;
+    let pathname;
+
+    try {
+        pathname =
+            new URL(
+                String(path || "/"),
+                window.location.origin
+            ).pathname;
+    } catch (error) {
+        pathname =
+            String(path || "/");
     }
-    if (normalizedPath.length > 1 && normalizedPath.endsWith("/")) {
-        normalizedPath = normalizedPath.slice(0, -1);
+
+    pathname =
+        pathname.trim();
+
+    if (!pathname.startsWith("/")) {
+        pathname =
+            `/${pathname}`;
     }
-    if (normalizedPath === "/index.html") {
+
+    if (
+        pathname.length > 1 &&
+        pathname.endsWith("/")
+    ) {
+        pathname =
+            pathname.slice(0, -1);
+    }
+
+    if (pathname === "/index.html") {
         return "/";
     }
-    return normalizedPath;
+
+    return pathname;
 }
+
+function normalizeDestination(destination) {
+    const url =
+        new URL(
+            String(destination || "/"),
+            window.location.origin
+        );
+
+    const pathname =
+        normalizePath(url.pathname);
+
+    return (
+        pathname +
+        url.search +
+        url.hash
+    );
+}
+
 function resolveRoute(path) {
-    const normalizedPath = normalizePath(path);
-    if (Object.prototype.hasOwnProperty.call(ROUTES, normalizedPath)) {
+    const normalizedPath =
+        normalizePath(path);
+
+    if (
+        Object.prototype.hasOwnProperty.call(
+            ROUTES,
+            normalizedPath
+        )
+    ) {
         return {
-            requestedPath: normalizedPath,
-            routePath: normalizedPath,
-            config: ROUTES[normalizedPath],
-            found: true
+            requestedPath:
+                normalizedPath,
+            routePath:
+                normalizedPath,
+            config:
+                ROUTES[normalizedPath],
+            found:
+                true
         };
     }
-    if (Object.prototype.hasOwnProperty.call(ROUTES, ERROR_ROUTE)) {
+
+    if (
+        Object.prototype.hasOwnProperty.call(
+            ROUTES,
+            ERROR_ROUTE
+        )
+    ) {
         return {
-            requestedPath: normalizedPath,
-            routePath: ERROR_ROUTE,
-            config: ROUTES[ERROR_ROUTE],
-            found: false
+            requestedPath:
+                normalizedPath,
+            routePath:
+                ERROR_ROUTE,
+            config:
+                ROUTES[ERROR_ROUTE],
+            found:
+                false
         };
     }
+
     return {
-        requestedPath: normalizedPath,
-        routePath: DEFAULT_ROUTE,
-        config: ROUTES[DEFAULT_ROUTE],
-        found: false
+        requestedPath:
+            normalizedPath,
+        routePath:
+            DEFAULT_ROUTE,
+        config:
+            ROUTES[DEFAULT_ROUTE],
+        found:
+            false
     };
 }
-function findInheritedMapValue(map, path, fallbackValue) {
-    const normalizedPath = normalizePath(path);
-    if (Object.prototype.hasOwnProperty.call(map, normalizedPath)) {
+
+function findInheritedMapValue(
+    map,
+    path,
+    fallbackValue
+) {
+    const normalizedPath =
+        normalizePath(path);
+
+    if (
+        Object.prototype.hasOwnProperty.call(
+            map,
+            normalizedPath
+        )
+    ) {
         return map[normalizedPath];
     }
-    const matchingRoutes = Object.keys(map)
-        .filter(function(route) {
-            const normalizedRoute = normalizePath(route);
-            return normalizedRoute !== "/" && normalizedPath.startsWith(`${normalizedRoute}/`);
-        })
-        .sort(function(firstRoute, secondRoute) {
-            return secondRoute.length - firstRoute.length;
-        });
+
+    const matchingRoutes =
+        Object.keys(map)
+            .filter(function(route) {
+                const normalizedRoute =
+                    normalizePath(route);
+
+                return (
+                    normalizedRoute !== "/" &&
+                    normalizedPath.startsWith(
+                        `${normalizedRoute}/`
+                    )
+                );
+            })
+            .sort(function(
+                firstRoute,
+                secondRoute
+            ) {
+                return (
+                    secondRoute.length -
+                    firstRoute.length
+                );
+            });
+
     if (matchingRoutes.length > 0) {
         return map[matchingRoutes[0]];
     }
-    if (Object.prototype.hasOwnProperty.call(map, DEFAULT_ROUTE)) {
+
+    if (
+        Object.prototype.hasOwnProperty.call(
+            map,
+            DEFAULT_ROUTE
+        )
+    ) {
         return map[DEFAULT_ROUTE];
     }
+
     return fallbackValue;
 }
-async function fetchHTML(file, label) {
+
+function getRoutingControl(event) {
+    if (!(event.target instanceof Element)) {
+        return null;
+    }
+
+    return event.target.closest(
+        "a[data-router-link], button[data-router-link]"
+    );
+}
+
+function getRoutingDestination(control) {
+    if (!control) {
+        return null;
+    }
+
+    const destination =
+        control.dataset.route ||
+        control.getAttribute("href");
+
+    if (!destination) {
+        return null;
+    }
+
+    const url =
+        new URL(
+            destination,
+            window.location.origin
+        );
+
+    if (
+        url.origin !==
+        window.location.origin
+    ) {
+        return null;
+    }
+
+    return normalizeDestination(url.href);
+}
+
+async function handleRoutingButtonPressed(
+    event
+) {
+    const control =
+        getRoutingControl(event);
+
+    if (!control) {
+        return;
+    }
+
+    if (
+        event.defaultPrevented ||
+        event.button !== 0 ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.shiftKey ||
+        event.altKey ||
+        control.hasAttribute("download") ||
+        control.target === "_blank" ||
+        control.disabled ||
+        control.classList.contains("disabled")
+    ) {
+        return;
+    }
+
+    const destination =
+        getRoutingDestination(control);
+
+    if (!destination) {
+        return;
+    }
+
+    event.preventDefault();
+
+    const routeTest =
+        testRoute(destination);
+
+    console.info(
+        "ROUTER: Navigation button pressed.",
+        routeTest
+    );
+
+    document.dispatchEvent(
+        new CustomEvent(
+            "bpd:route-button-pressed",
+            {
+                detail: {
+                    control,
+                    destination,
+                    route:
+                        routeTest
+                }
+            }
+        )
+    );
+
+    await navigate(destination);
+}
+
+export function testRoute(path = "/") {
+    const route =
+        resolveRoute(path);
+
+    const result = {
+        requestedPath:
+            route.requestedPath,
+        resolvedPath:
+            route.routePath,
+        found:
+            route.found,
+        requiresAuth:
+            route.config
+                ?.requiresAuth === true,
+        sitemap:
+            route.config
+                ?.sitemap !== false,
+        title:
+            route.config?.title || null,
+        body:
+            route.config?.body || null,
+        header:
+            route.config?.header || null,
+        sidebar:
+            route.config?.sidebar || null,
+        footer:
+            route.config?.footer || null,
+        module:
+            route.config?.module || null
+    };
+
+    console.table(result);
+
+    return result;
+}
+
+export async function testRouteNavigation(
+    path = "/"
+) {
+    const result =
+        testRoute(path);
+
+    await navigate(path);
+
+    return result;
+}
+
+async function fetchHTML(
+    file,
+    label
+) {
     if (!file) {
         return "";
     }
-    const response = await fetch(file, {
-        method: "GET",
-        cache: "no-store",
-        headers: {
-            "accept": "text/html"
-        }
-    });
+
+    const response =
+        await fetch(
+            file,
+            {
+                method: "GET",
+                cache: "no-store",
+                headers: {
+                    "accept": "text/html"
+                }
+            }
+        );
+
     if (!response.ok) {
         throw new Error(
-            `${label} failed to load: ${response.status} (${file})`
+            `${label} failed to load: ` +
+            `${response.status} (${file})`
         );
     }
+
     return response.text();
 }
+
+async function loadRouterAuthSession() {
+    if (
+        window.BPDAuth &&
+        typeof window.BPDAuth.getSession ===
+            "function"
+    ) {
+        return window.BPDAuth.getSession();
+    }
+
+    const response =
+        await fetch(
+            BPD_AUTH_SESSION_URL,
+            {
+                method: "GET",
+                credentials: "same-origin",
+                cache: "no-store",
+                headers: {
+                    "accept":
+                        "application/json"
+                }
+            }
+        );
+
+    if (!response.ok) {
+        return {
+            authenticated: false,
+            user: null
+        };
+    }
+
+    const result =
+        await response.json().catch(
+            function() {
+                return {};
+            }
+        );
+
+    return {
+        ...result,
+        authenticated:
+            result?.authenticated === true,
+        user:
+            result?.user || null
+    };
+}
+
+async function enforceRouteAuthentication(
+    route
+) {
+    if (
+        route.config?.requiresAuth !== true
+    ) {
+        return {
+            route,
+            authSession: null,
+            redirected: false
+        };
+    }
+
+    let authSession;
+
+    try {
+        authSession =
+            await loadRouterAuthSession();
+    } catch (error) {
+        console.warn(
+            "ROUTER: Unable to verify authentication.",
+            error
+        );
+
+        authSession = {
+            authenticated: false,
+            user: null
+        };
+    }
+
+    if (
+        authSession?.authenticated === true
+    ) {
+        return {
+            route,
+            authSession,
+            redirected: false
+        };
+    }
+
+    const requestedPath =
+        route.requestedPath;
+
+    const fallbackUrl =
+        `${AUTH_FALLBACK_ROUTE}` +
+        `?returnTo=${encodeURIComponent(
+            requestedPath
+        )}`;
+
+    window.history.replaceState(
+        {},
+        "",
+        fallbackUrl
+    );
+
+    document.dispatchEvent(
+        new CustomEvent(
+            "bpd:route-auth-denied",
+            {
+                detail: {
+                    requestedPath,
+                    fallbackPath:
+                        AUTH_FALLBACK_ROUTE
+                }
+            }
+        )
+    );
+
+    return {
+        route:
+            resolveRoute(
+                AUTH_FALLBACK_ROUTE
+            ),
+        authSession,
+        redirected: true
+    };
+}
+
+function dispatchAuthState(authSession) {
+    if (!authSession) {
+        return;
+    }
+
+    document.dispatchEvent(
+        new CustomEvent(
+            "bpd:auth-changed",
+            {
+                detail: {
+                    authenticated:
+                        authSession
+                            ?.authenticated ===
+                        true,
+                    user:
+                        authSession?.user ||
+                        null
+                }
+            }
+        )
+    );
+}
+
 function setHeaderVisibility(showHeader) {
-    const headerElement = document.getElementById("header");
-    document.body.dataset.header = showHeader ? "visible" : "hidden";
-    document.body.classList.toggle("header-hidden", !showHeader);
+    const headerElement =
+        document.getElementById("header");
+
+    document.body.dataset.header =
+        showHeader
+            ? "visible"
+            : "hidden";
+
+    document.body.classList.toggle(
+        "header-hidden",
+        !showHeader
+    );
+
     if (!headerElement) {
         return;
     }
-    headerElement.hidden = !showHeader;
+
+    headerElement.hidden =
+        !showHeader;
+
     if (!showHeader) {
         headerElement.innerHTML = "";
     }
 }
+
 function setPageLoading(loading) {
-    document.body.dataset.pageLoading = String(loading);
-    document.body.classList.toggle("page-loading", loading);
-}
-async function loadShell() {
-    const currentNavigationId = ++navigationId;
-    const route = resolveRoute(window.location.pathname);
-    const routeConfig = route.config;
-    const showHeader = findInheritedMapValue(
-        HEADER_MAP,
-        route.routePath,
-        true
-    ) !== false;
-    const headerFile =
-        routeConfig.header;
-    const sidebarFile =
-        routeConfig.sidebar;
-    const pageFile =
-        routeConfig.body;
-    const footerFile =
-        routeConfig.footer;
-    await loadRouteStyles(
-        routeConfig.stylesheets || []
+    document.body.dataset.pageLoading =
+        String(loading);
+
+    document.body.classList.toggle(
+        "page-loading",
+        loading
     );
-    const headerElement = document.getElementById("header");
-    const sidebarElement = document.getElementById("sidebar");
-    const contentElement = document.getElementById("siteContent");
-    const footerElement = document.getElementById("footer");
-    if (!sidebarElement || !contentElement) {
-        console.error("ROUTER: Required shell elements were not found.");
+}
+
+async function initializeLoadedSidebar(
+    authSession
+) {
+    try {
+        await loadSidebarHover();
+
+        initializeSidebar();
+
+        dispatchAuthState(
+            authSession
+        );
+    } catch (error) {
+        console.error(
+            "ROUTER: Sidebar initialization failed.",
+            error
+        );
+    }
+}
+
+async function initializeLoadedRouteModule(
+    moduleFile
+) {
+    if (!moduleFile) {
         return;
     }
+
+    try {
+        await initializeRouteModule(
+            moduleFile
+        );
+    } catch (error) {
+        console.error(
+            "ROUTER: Route module initialization failed.",
+            error
+        );
+
+        document.dispatchEvent(
+            new CustomEvent(
+                "bpd:route-module-error",
+                {
+                    detail: {
+                        module:
+                            moduleFile,
+                        error
+                    }
+                }
+            )
+        );
+    }
+}
+
+async function loadShell() {
+    const currentNavigationId =
+        ++navigationId;
+
     setPageLoading(true);
-    setHeaderVisibility(showHeader);
+
+    let route =
+        resolveRoute(
+            window.location.pathname
+        );
+
+    const authCheck =
+        await enforceRouteAuthentication(
+            route
+        );
+
+    if (
+        currentNavigationId !== navigationId
+    ) {
+        return;
+    }
+
+    route =
+        authCheck.route;
+
+    const routeConfig =
+        route.config;
+
+    if (!routeConfig) {
+        console.error(
+            "ROUTER: Route configuration was not found."
+        );
+
+        setPageLoading(false);
+
+        return;
+    }
+
+    const showHeader =
+        findInheritedMapValue(
+            HEADER_MAP,
+            route.routePath,
+            true
+        ) !== false;
+
+    const headerElement =
+        document.getElementById(
+            "header"
+        );
+
+    const sidebarElement =
+        document.getElementById(
+            "sidebar"
+        );
+
+    const contentElement =
+        document.getElementById(
+            "siteContent"
+        );
+
+    const footerElement =
+        document.getElementById(
+            "footer"
+        );
+
+    if (
+        !sidebarElement ||
+        !contentElement
+    ) {
+        console.error(
+            "ROUTER: Required shell elements were not found."
+        );
+
+        setPageLoading(false);
+
+        return;
+    }
+
+    setHeaderVisibility(
+        showHeader
+    );
+
+    document.title =
+        routeConfig.title ||
+        "BPD Gaming Network";
+
     try {
         const [
             headerHTML,
@@ -138,121 +687,183 @@ async function loadShell() {
             footerHTML
         ] = await Promise.all([
             showHeader
-                ? fetchHTML(headerFile, "Header")
+                ? fetchHTML(
+                    routeConfig.header,
+                    "Header"
+                )
                 : Promise.resolve(""),
-            fetchHTML(sidebarFile, "Sidebar"),
-            fetchHTML(pageFile, "Page"),
-            fetchHTML(footerFile, "Footer")
+
+            fetchHTML(
+                routeConfig.sidebar,
+                "Sidebar"
+            ),
+
+            fetchHTML(
+                routeConfig.body,
+                "Page"
+            ),
+
+            fetchHTML(
+                routeConfig.footer,
+                "Footer"
+            )
         ]);
-        if (currentNavigationId !== navigationId) {
+
+        if (
+            currentNavigationId !==
+            navigationId
+        ) {
             return;
         }
-        if (headerElement && showHeader) {
-            headerElement.innerHTML = headerHTML;
+
+        if (
+            headerElement &&
+            showHeader
+        ) {
+            headerElement.innerHTML =
+                headerHTML;
         }
-        sidebarElement.innerHTML = sidebarHTML;
-        contentElement.innerHTML = pageHTML;
+
+        sidebarElement.innerHTML =
+            sidebarHTML;
+
+        contentElement.innerHTML =
+            pageHTML;
+
         if (footerElement) {
-            footerElement.innerHTML = footerHTML;
+            footerElement.innerHTML =
+                footerHTML;
         }
-        document.body.dataset.currentRoute = route.routePath;
-        document.body.dataset.routeFound = String(route.found);
-        await loadSidebarHover();
-        initializeSidebar();
+
+        document.body.dataset.currentRoute =
+            route.routePath;
+
+        document.body.dataset.routeFound =
+            String(route.found);
+
+        await initializeLoadedSidebar(
+            authCheck.authSession
+        );
+
+        await initializeLoadedRouteModule(
+            routeConfig.module
+        );
+
         contentElement.focus({
             preventScroll: true
         });
+
         window.scrollTo({
             top: 0,
             left: 0,
-            behavior: "instant"
+            behavior: "auto"
         });
+
         document.dispatchEvent(
-            new CustomEvent("bpd:page-loaded", {
-                detail: {
-                    requestedPath: route.requestedPath,
-                    routePath: route.routePath,
-                    found: route.found
+            new CustomEvent(
+                "bpd:page-loaded",
+                {
+                    detail: {
+                        requestedPath:
+                            route.requestedPath,
+                        routePath:
+                            route.routePath,
+                        found:
+                            route.found,
+                        redirected:
+                            authCheck.redirected
+                    }
                 }
-            })
+            )
         );
     } catch (error) {
-        console.error("ROUTER: Shell loading failed.", error);
+        console.error(
+            "ROUTER: Shell loading failed.",
+            error
+        );
+
         contentElement.innerHTML = `
             <section class="route-load-error">
                 <h1>Unable to load this page</h1>
-                <p>Please refresh the page or return to the main menu.</p>
-                <a href="/" data-router-link>Main Menu</a>
+                <p>
+                    Please refresh the page or return
+                    to the main menu.
+                </p>
+                <a href="/" data-router-link>
+                    Main Menu
+                </a>
             </section>
         `;
     } finally {
-        if (currentNavigationId === navigationId) {
+        if (
+            currentNavigationId ===
+            navigationId
+        ) {
             setPageLoading(false);
         }
     }
 }
-async function navigate(path, options = {}) {
-    const normalizedPath = normalizePath(path);
-    const replace = options.replace === true;
-    const currentPath = normalizePath(window.location.pathname);
-    if (normalizedPath !== currentPath) {
-        if (replace) {
-            window.history.replaceState({}, "", normalizedPath);
+
+async function navigate(
+    destination,
+    options = {}
+) {
+    const normalizedDestination =
+        normalizeDestination(
+            destination
+        );
+
+    const destinationUrl =
+        new URL(
+            normalizedDestination,
+            window.location.origin
+        );
+
+    const currentUrl =
+        window.location.pathname +
+        window.location.search +
+        window.location.hash;
+
+    if (
+        normalizedDestination !==
+        currentUrl
+    ) {
+        if (options.replace === true) {
+            window.history.replaceState(
+                {},
+                "",
+                destinationUrl.href
+            );
         } else {
-            window.history.pushState({}, "", normalizedPath);
+            window.history.pushState(
+                {},
+                "",
+                destinationUrl.href
+            );
         }
     }
+
     await loadShell();
 }
-document.addEventListener("click", function(event) {
-    const link = event.target.closest("a[data-router-link]");
-    if (!link) {
-        return;
+
+document.addEventListener(
+    "click",
+    handleRoutingButtonPressed
+);
+
+window.addEventListener(
+    "popstate",
+    function() {
+        loadShell();
     }
-    if (link.hasAttribute("download") || link.target === "_blank") {
-        return;
-    }
-    const url = new URL(link.href, window.location.origin);
-    if (url.origin !== window.location.origin) {
-        return;
-    }
-    event.preventDefault();
-    navigate(`${url.pathname}${url.search}${url.hash}`);
-});
-window.addEventListener("popstate", function() {
-    loadShell();
-});
-async function loadRouteStyles(stylesheets = []) {
-    document.querySelectorAll(
-        'link[data-route-stylesheet="true"]'
-    ).forEach(function(link) {
-        link.remove();
-    });
-    const files = Array.isArray(stylesheets)
-        ? stylesheets
-        : [stylesheets];
-    await Promise.all(
-        files.filter(Boolean).map(function(file) {
-            return new Promise(function(resolve, reject) {
-                const link = document.createElement("link");
-                link.rel = "stylesheet";
-                link.href = file;
-                link.dataset.routeStylesheet = "true";
-                link.addEventListener("load", resolve, {
-                    once: true
-                });
-                link.addEventListener("error", function() {
-                    reject(
-                        new Error(
-                            `Stylesheet failed to load: ${file}`
-                        )
-                    );
-                }, {
-                    once: true
-                });
-                document.head.appendChild(link);
-            });
-        })
-    );
-}
+);
+
+window.BPDRouter = {
+    testRoute,
+    testRouteNavigation,
+    navigate,
+    reload:
+        loadShell
+};
+
 loadShell();

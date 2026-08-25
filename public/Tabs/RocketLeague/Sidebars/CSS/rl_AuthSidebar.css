@@ -1,0 +1,20 @@
+.sidebar-navigation {
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar-navigation-spacer {
+    flex: 1;
+    min-height: 16px;
+}
+
+.nav-divider {
+    flex: none;
+    height: 1px;
+    margin: 12px 9px;
+    background: rgba(255, 255, 255, 0.09);
+}
+
+[hidden] {
+    display: none !important;
+}
