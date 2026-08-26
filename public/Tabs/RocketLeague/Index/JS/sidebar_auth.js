@@ -19,14 +19,9 @@ export function applySidebarAuthState(
             const requiredState =
                 element.dataset.auth;
 
-            if (
-                requiredState ===
-                "authenticated"
-            ) {
+            if (requiredState === "authenticated") {
                 element.hidden =
                     !authenticated;
-
-                return;
             }
 
             if (requiredState === "guest") {
