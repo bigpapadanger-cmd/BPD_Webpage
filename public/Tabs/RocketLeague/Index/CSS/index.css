@@ -5,18 +5,13 @@ ROCKET LEAGUE HOME
 =========================================================
 */
 
-/*
-=========================================================
-ROCKET LEAGUE PAGE
-The global body controls sidebar clearance.
-=========================================================
-*/
-
 .rocket-league-page {
     --rl-background: #070812;
-    --rl-panel: rgba(15, 17, 29, 0.9);
+    --rl-panel: rgba(13, 15, 27, 0.9);
+    --rl-card: rgba(18, 20, 34, 0.88);
+    --rl-card-hover: rgba(25, 27, 45, 0.94);
     --rl-border: rgba(255, 255, 255, 0.09);
-    --rl-border-bright: rgba(124, 92, 255, 0.42);
+    --rl-border-bright: rgba(124, 92, 255, 0.48);
     --rl-text: #f5f7ff;
     --rl-text-muted: #9ba3b8;
     --rl-accent: #7c5cff;
@@ -30,7 +25,7 @@ The global body controls sidebar clearance.
     align-items: stretch;
     justify-content: center;
     width: 100%;
-    min-width: fit-content;
+    min-width: 0;
     min-height: 60vh;
     margin: 0;
     padding: clamp(8px, 1vw, 16px);
@@ -53,61 +48,46 @@ BACKGROUND
     pointer-events: none;
     background:
         radial-gradient(
-            circle at 72% 18%,
-            rgba(124, 92, 255, 0.12),
-            transparent 32%
+            circle at 82% 10%,
+            rgba(88, 182, 255, 0.12),
+            transparent 34%
         ),
         radial-gradient(
-            circle at 18% 82%,
-            rgba(88, 182, 255, 0.08),
-            transparent 32%
+            circle at 20% 78%,
+            rgba(124, 92, 255, 0.16),
+            transparent 38%
         ),
         linear-gradient(
             145deg,
-            #060711 0%,
-            #101326 48%,
-            #070812 100%
+            #070812,
+            #0a0c18 52%,
+            #080916
         );
 }
+
 .rocket-league-background-waves::before,
 .rocket-league-background-waves::after {
     position: absolute;
-    left: -20%;
-    width: 140%;
-    border: 1px solid rgba(255, 138, 36, 0.07);
-    border-radius: 50%;
+    width: 55vw;
+    height: 55vw;
+    border:
+        1px solid
+        rgba(124, 92, 255, 0.12);
+    border-radius: 45%;
     content: "";
-    transform-origin: center;
-    animation: rocketLeagueArenaWave 10s ease-in-out infinite;
+    filter: blur(2px);
 }
 
 .rocket-league-background-waves::before {
-    top: 8%;
-    height: 42%;
-    box-shadow:
-        0 0 100px rgba(255, 138, 36, 0.04),
-        0 0 220px rgba(255, 138, 36, 0.02);
+    top: -30vw;
+    right: -18vw;
+    transform: rotate(22deg);
 }
 
 .rocket-league-background-waves::after {
-    top: 43%;
-    height: 48%;
-    border-color: rgba(255, 209, 102, 0.04);
-    animation-delay: -5s;
-    animation-duration: 13s;
-}
-
-@keyframes rocketLeagueArenaWave {
-    0%,
-    100% {
-        opacity: 0.25;
-        transform: scale(0.92) rotate(-1deg);
-    }
-
-    50% {
-        opacity: 0.7;
-        transform: scale(1.08) rotate(1deg);
-    }
+    bottom: -36vw;
+    left: -20vw;
+    transform: rotate(-18deg);
 }
 
 /*
@@ -120,6 +100,7 @@ PAGE PANEL
     position: relative;
     z-index: 1;
     width: 98%;
+    max-width: 1500px;
     min-width: 0;
     min-height: 60vh;
     overflow: hidden;
@@ -128,22 +109,22 @@ PAGE PANEL
     background:
         linear-gradient(
             145deg,
-            rgba(19, 21, 38, 0.92),
-            rgba(8, 10, 20, 0.88)
+            rgba(16, 18, 31, 0.92),
+            rgba(9, 11, 21, 0.88)
         );
     box-shadow:
-        0 20px 60px rgba(0, 0, 0, 0.42),
-        0 0 28px rgba(124, 92, 255, 0.09);
+        0 22px 60px
+        rgba(0, 0, 0, 0.42),
+        0 0 28px
+        rgba(124, 92, 255, 0.08);
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
 }
 
 .rocket-league-page-content {
     position: relative;
-    z-index: 1;
     width: 100%;
     min-width: 0;
-    min-height: 60vh;
 }
 
 /*
@@ -157,77 +138,77 @@ HERO
     display: flex;
     align-items: center;
     justify-content: center;
-    min-height: 470px;
-    padding: 90px 40px;
+    min-height: 280px;
+    padding: 48px 28px;
     overflow: hidden;
+    border-bottom: 1px solid var(--rl-border);
     text-align: center;
+    background:
+        linear-gradient(
+            135deg,
+            rgba(124, 92, 255, 0.14),
+            rgba(88, 182, 255, 0.06),
+            transparent
+        );
 }
 
 .rocket-league-hero::before {
     position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 650px;
-    height: 320px;
-    pointer-events: none;
-    background:
-        radial-gradient(
-            ellipse,
-            rgba(255, 138, 36, 0.11),
-            transparent 65%
-        );
-    content: "";
-    transform: translate(-50%, -50%);
-}
-
-.rocket-league-hero::after {
-    position: absolute;
-    right: 8%;
-    bottom: 0;
-    left: 8%;
-    height: 1px;
+    inset: 0;
     background:
         linear-gradient(
-            90deg,
-            transparent,
-            rgba(255, 138, 36, 0.3),
-            transparent
+            115deg,
+            transparent 20%,
+            rgba(124, 92, 255, 0.08) 48%,
+            transparent 72%
         );
     content: "";
+    pointer-events: none;
 }
 
-.rocket-league-page .hero-content {
+.rocket-league-page
+.hero-content {
     position: relative;
-    z-index: 2;
-    width: 100%;
+    z-index: 1;
+    width: min(100%, 1000px);
 }
 
-.rocket-league-page .hero-eyebrow {
-    margin: 0 0 18px;
+.rocket-league-page
+.hero-eyebrow {
+    margin: 0;
     color: var(--rl-accent-light);
-    font-size: 12px;
+    font-size: 0.72rem;
     font-weight: 800;
-    letter-spacing: 5px;
+    letter-spacing: 0.24em;
 }
 
 .rocket-league-hero h1 {
-    margin: 0;
-    color: var(--rl-text);
-    font-size: clamp(46px, 7vw, 92px);
-    font-weight: 900;
+    margin: 10px 0 0;
+    font-size:
+        clamp(
+            2.5rem,
+            7vw,
+            5.4rem
+        );
     line-height: 0.95;
-    letter-spacing: -4px;
+    letter-spacing: -0.055em;
     text-shadow:
-        0 0 30px rgba(255, 138, 36, 0.12),
-        0 8px 30px rgba(0, 0, 0, 0.6);
+        0 0 28px
+        rgba(124, 92, 255, 0.22);
 }
 
-.rocket-league-page .hero-subtitle {
-    margin: 24px 0 0;
+.rocket-league-page
+.hero-subtitle {
+    margin: 18px 0 0;
     color: var(--rl-text-muted);
-    font-size: 17px;
+    font-size:
+        clamp(
+            0.95rem,
+            2vw,
+            1.15rem
+        );
     font-weight: 600;
-    letter-spacing: 4px;
+    letter-spacing: 0.08em;
 }
 
 /*
@@ -236,194 +217,153 @@ PLAYER PROFILE
 =========================================================
 */
 
-.rocket-league-page .hero-player-profile {
-    width: min(760px, calc(100% - 24px));
-    margin: 24px auto 0;
+.rocket-league-page
+.hero-player-profile {
+    width: min(100%, 820px);
+    margin: 28px auto 0;
 }
 
-.rocket-league-page .hero-player-identity {
+.rocket-league-page
+.hero-player-identity {
     display: flex;
-    align-items: baseline;
-    justify-content: center;
-    gap: 10px;
-    margin-bottom: 10px;
-}
-
-.rocket-league-page .hero-player-kicker {
-    color: var(--rl-text-muted);
-    font-size: 9px;
-    font-weight: 900;
-    letter-spacing: 2px;
-}
-
-.rocket-league-page #rocketLeaguePlayerName {
-    color: #ffffff;
-    font-size: 17px;
-    letter-spacing: 0.4px;
-}
-
-.rocket-league-page .rank-row {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 9px;
-}
-
-.rocket-league-page .rank-badge {
-    --rank-color: #929292;
-    --rank-color-light: #d0d0d0;
-    --rank-color-soft: rgba(146, 146, 146, 0.16);
-
-    position: relative;
-    display: grid;
-    grid-template-areas:
-        "playlist name"
-        "playlist mmr";
-    grid-template-columns: auto minmax(0, 1fr);
+    flex-direction: column;
     align-items: center;
-    min-width: 0;
-    padding: 11px 13px;
-    column-gap: 10px;
-    overflow: hidden;
-    border: 1px solid var(--rank-color);
+    gap: 5px;
+}
+
+.rocket-league-page
+.hero-player-kicker {
+    color: var(--rl-text-muted);
+    font-size: 0.66rem;
+    font-weight: 800;
+    letter-spacing: 0.18em;
+}
+
+.rocket-league-page
+#rocketLeaguePlayerName {
+    color: #ffffff;
+    font-size:
+        clamp(
+            1.2rem,
+            3vw,
+            1.8rem
+        );
+}
+
+.rocket-league-page
+.rank-row {
+    display: grid;
+    grid-template-columns:
+        repeat(
+            3,
+            minmax(0, 1fr)
+        );
+    gap: 10px;
+    margin-top: 18px;
+}
+
+.rocket-league-page
+.rank-badge {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding: 14px;
+    border:
+        1px solid
+        var(--rank-color, var(--rl-border));
     border-radius: 12px;
     background:
-        linear-gradient(
-            125deg,
-            var(--rank-color-soft),
-            rgba(8, 8, 8, 0.88) 68%
-        );
+        rgba(8, 10, 20, 0.62);
     box-shadow:
-        inset 0 0 18px var(--rank-color-soft);
-    text-align: left;
-    animation:
-        rocketLeagueRankEntrance 0.45s ease both,
-        rocketLeagueRankGlow 3.4s ease-in-out infinite;
+        inset 0 0 20px
+        color-mix(
+            in srgb,
+            var(--rank-color, #7c5cff) 9%,
+            transparent
+        );
 }
 
-.rocket-league-page .rank-badge:nth-child(2) {
-    animation-delay: 0.08s, -1.1s;
-}
-
-.rocket-league-page .rank-badge:nth-child(3) {
-    animation-delay: 0.16s, -2.2s;
-}
-
-.rocket-league-page .rank-playlist {
-    position: relative;
-    grid-area: playlist;
-    color: var(--rank-color-light);
-    font-size: 15px;
-    font-weight: 900;
-}
-
-.rocket-league-page .rank-name {
-    position: relative;
-    grid-area: name;
-    min-width: 0;
-    overflow: hidden;
-    color: var(--rank-color-light);
-    font-size: 11px;
-    line-height: 1.25;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.rocket-league-page .rank-mmr {
-    position: relative;
-    grid-area: mmr;
-    color: rgba(255, 255, 255, 0.78);
-    font-size: 10px;
-    font-weight: 800;
-}
-
-.rocket-league-page .rank-status {
-    margin: 8px 0 0;
+.rocket-league-page
+.rank-playlist {
     color: var(--rl-text-muted);
-    font-size: 10px;
-    font-weight: 700;
+    font-size: 0.66rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
 }
 
-.rocket-league-page .rank-status[data-state="error"] {
-    color: #ff9189;
+.rocket-league-page
+.rank-name {
+    color:
+        var(
+            --rank-color,
+            var(--rl-text)
+        );
+    font-size: 0.9rem;
 }
 
-.rocket-league-page .rank-loading {
-    opacity: 0.72;
+.rocket-league-page
+.rank-mmr {
+    color: var(--rl-text-muted);
+    font-size: 0.75rem;
 }
 
-.rocket-league-page .rank-bronze {
-    --rank-color: #b66a3c;
-    --rank-color-light: #f0a574;
-    --rank-color-soft: rgba(182, 106, 60, 0.18);
+.rocket-league-page
+.rank-status {
+    margin: 12px 0 0;
+    color: var(--rl-text-muted);
+    font-size: 0.76rem;
 }
 
-.rocket-league-page .rank-silver {
-    --rank-color: #aeb8c4;
-    --rank-color-light: #eef4fa;
-    --rank-color-soft: rgba(174, 184, 196, 0.17);
+.rocket-league-page
+.rank-status[data-state="error"] {
+    color: #ff9ba8;
 }
 
-.rocket-league-page .rank-gold {
-    --rank-color: #e7ad29;
-    --rank-color-light: #ffe47d;
-    --rank-color-soft: rgba(231, 173, 41, 0.18);
+.rocket-league-page
+.rank-loading,
+.rocket-league-page
+.rank-unranked {
+    --rank-color: #7f8799;
 }
 
-.rocket-league-page .rank-platinum {
-    --rank-color: #2bc5b7;
-    --rank-color-light: #8affee;
-    --rank-color-soft: rgba(43, 197, 183, 0.18);
+.rocket-league-page
+.rank-bronze {
+    --rank-color: #c58b9b;
 }
 
-.rocket-league-page .rank-diamond {
-    --rank-color: #3f92ff;
-    --rank-color-light: #8fc9ff;
-    --rank-color-soft: rgba(63, 146, 255, 0.2);
+.rocket-league-page
+.rank-silver {
+    --rank-color: #c4cad8;
 }
 
-.rocket-league-page .rank-champion {
-    --rank-color: #9e52ff;
-    --rank-color-light: #d5a8ff;
-    --rank-color-soft: rgba(158, 82, 255, 0.2);
+.rocket-league-page
+.rank-gold {
+    --rank-color: #f1d784;
 }
 
-.rocket-league-page .rank-grand-champion {
-    --rank-color: #f04747;
-    --rank-color-light: #ff9b88;
-    --rank-color-soft: rgba(240, 71, 71, 0.2);
+.rocket-league-page
+.rank-platinum {
+    --rank-color: #75d9e8;
 }
 
-.rocket-league-page .rank-supersonic {
-    --rank-color: #f2f2f2;
-    --rank-color-light: #ffffff;
-    --rank-color-soft: rgba(255, 255, 255, 0.17);
+.rocket-league-page
+.rank-diamond {
+    --rank-color: #58b6ff;
 }
 
-@keyframes rocketLeagueRankEntrance {
-    from {
-        opacity: 0;
-        transform: translateY(12px) scale(0.96);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateY(0) scale(1);
-    }
+.rocket-league-page
+.rank-champion {
+    --rank-color: #a998ff;
 }
 
-@keyframes rocketLeagueRankGlow {
-    0%,
-    100% {
-        box-shadow:
-            inset 0 0 18px var(--rank-color-soft),
-            0 0 10px transparent;
-    }
+.rocket-league-page
+.rank-grand-champion {
+    --rank-color: #ff8ebd;
+}
 
-    50% {
-        box-shadow:
-            inset 0 0 25px var(--rank-color-soft),
-            0 0 22px var(--rank-color-soft);
-    }
+.rocket-league-page
+.rank-supersonic {
+    --rank-color: #e8ecff;
 }
 
 /*
@@ -433,28 +373,38 @@ CONTENT
 */
 
 .rocket-league-content {
-    width: min(1200px, calc(100% - 60px));
+    width: min(1200px, calc(100% - 40px));
     margin-inline: auto;
-    padding: 55px 0 90px;
+    padding: 42px 0 70px;
 }
 
-.rocket-league-page .content-card {
+.rocket-league-page
+.content-card,
+.rocket-league-dashboard {
     position: relative;
-    padding: 38px;
+    padding:
+        clamp(
+            22px,
+            4vw,
+            38px
+        );
     overflow: hidden;
     border: 1px solid var(--rl-border);
     border-radius: 18px;
     background:
         linear-gradient(
             135deg,
-            rgba(27, 24, 20, 0.92),
-            rgba(12, 12, 12, 0.88)
+            rgba(20, 22, 37, 0.92),
+            rgba(11, 13, 24, 0.88)
         );
     box-shadow:
-        0 20px 60px rgba(0, 0, 0, 0.28);
+        0 20px 60px
+        rgba(0, 0, 0, 0.28);
 }
 
-.rocket-league-page .content-card::before {
+.rocket-league-page
+.content-card::before,
+.rocket-league-dashboard::before {
     position: absolute;
     top: 0;
     bottom: 0;
@@ -464,29 +414,38 @@ CONTENT
         linear-gradient(
             180deg,
             var(--rl-accent),
-            rgba(255, 138, 36, 0.08)
+            var(--rl-accent-secondary)
         );
     content: "";
 }
 
-.rocket-league-page .card-label {
+.rocket-league-page
+.card-label {
     color: var(--rl-accent-light);
-    font-size: 10px;
+    font-size: 0.65rem;
     font-weight: 800;
-    letter-spacing: 3px;
+    letter-spacing: 0.2em;
 }
 
-.rocket-league-page .content-card h2 {
-    margin: 11px 0 0;
-    font-size: 31px;
-    font-weight: 800;
+.rocket-league-page
+.content-card h2,
+.rocket-league-dashboard h2 {
+    margin: 10px 0 0;
+    font-size:
+        clamp(
+            1.55rem,
+            4vw,
+            2rem
+        );
 }
 
-.rocket-league-page .content-card p {
-    max-width: 720px;
+.rocket-league-page
+.content-card p,
+.rocket-league-dashboard p {
+    max-width: 760px;
     margin: 12px 0 0;
     color: var(--rl-text-muted);
-    line-height: 1.8;
+    line-height: 1.7;
 }
 
 /*
@@ -495,196 +454,364 @@ LOGIN
 =========================================================
 */
 
-.rocket-league-page .auth-login-card {
+.rocket-league-page
+.auth-login-card {
     margin-top: 20px;
 }
 
-.rocket-league-page .auth-login-button {
+.rocket-league-page
+.guest-action-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    margin-top: 22px;
+}
+
+.rocket-league-page
+.auth-login-button {
+    position: relative;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-height: 46px;
-    margin-top: 22px;
+    gap: 10px;
+    min-height: 48px;
     padding: 0 24px;
-    border: 1px solid var(--rl-border-bright);
+    overflow: hidden;
+    border:
+        1px solid
+        var(--rl-border-bright);
     border-radius: 11px;
-    background: var(--rl-accent-soft);
+    background:
+        linear-gradient(
+            135deg,
+            rgba(124, 92, 255, 0.2),
+            rgba(88, 182, 255, 0.12)
+        );
     color: var(--rl-accent-light);
+    font: inherit;
     font-size: 14px;
     font-weight: 800;
     text-align: center;
-    text-decoration: none;
+    appearance: none;
     cursor: pointer;
+    box-shadow:
+        0 8px 24px
+        rgba(0, 0, 0, 0.24),
+        0 0 16px
+        rgba(124, 92, 255, 0.14);
     transition:
+        color 0.2s ease,
+        transform 0.2s ease,
+        border-color 0.2s ease,
+        background 0.2s ease,
+        box-shadow 0.2s ease;
+    animation:
+        pageLoginPulse
+        2.4s
+        ease-in-out
+        infinite;
+}
+
+.rocket-league-page
+.auth-login-button::before {
+    position: absolute;
+    top: -50%;
+    bottom: -50%;
+    left: -45%;
+    width: 30%;
+    background:
+        linear-gradient(
+            90deg,
+            transparent,
+            rgba(255, 255, 255, 0.22),
+            transparent
+        );
+    content: "";
+    pointer-events: none;
+    transform:
+        rotate(18deg)
+        translateX(-200%);
+    transition:
+        transform 0.55s ease;
+}
+
+.rocket-league-page
+.auth-login-button:hover::before,
+.rocket-league-page
+.auth-login-button:focus-visible::before {
+    transform:
+        rotate(18deg)
+        translateX(650%);
+}
+
+.rocket-league-page
+.auth-login-button:hover,
+.rocket-league-page
+.auth-login-button:focus-visible {
+    border-color:
+        var(--rl-accent-light);
+    background:
+        linear-gradient(
+            135deg,
+            rgba(124, 92, 255, 0.32),
+            rgba(88, 182, 255, 0.2)
+        );
+    color: #ffffff;
+    box-shadow:
+        0 12px 30px
+        rgba(0, 0, 0, 0.3),
+        0 0 24px
+        var(--rl-accent-glow);
+    outline: none;
+    transform:
+        translateY(-2px)
+        scale(1.02);
+    animation-play-state: paused;
+}
+
+.rocket-league-page
+.auth-login-button:focus-visible {
+    outline:
+        2px solid
+        var(--rl-accent-light);
+    outline-offset: 3px;
+}
+
+.rocket-league-page
+.auth-login-button:active {
+    transform:
+        translateY(0)
+        scale(0.98);
+}
+
+.rocket-league-page
+.auth-login-button-icon {
+    font-size: 1.1rem;
+    text-shadow:
+        0 0 10px
+        var(--rl-accent-glow);
+}
+
+/*
+=========================================================
+ADVERTISEMENT SLOTS
+=========================================================
+*/
+
+.rocket-league-page
+.ad-slot {
+    width: 100%;
+    min-height: 0;
+}
+
+.rocket-league-page
+.ad-slot:not(:empty) {
+    margin-top: 20px;
+}
+
+/*
+=========================================================
+DASHBOARD
+=========================================================
+*/
+
+.rocket-league-dashboard {
+    margin-top: 20px;
+}
+
+.dashboard-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 24px;
+}
+
+.dashboard-history-link,
+.dashboard-primary-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 40px;
+    padding: 0 16px;
+    border:
+        1px solid
+        var(--rl-border-bright);
+    border-radius: 9px;
+    background: var(--rl-accent-soft);
+    color: var(--rl-accent-light);
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-decoration: none;
+    white-space: nowrap;
+    transition:
+        color 0.2s ease,
         transform 0.2s ease,
         border-color 0.2s ease,
         background 0.2s ease,
         box-shadow 0.2s ease;
 }
 
-.rocket-league-page .auth-login-button:hover,
-.rocket-league-page .auth-login-button:focus-visible {
+.dashboard-history-link:hover,
+.dashboard-history-link:focus-visible,
+.dashboard-primary-link:hover,
+.dashboard-primary-link:focus-visible {
+    color: #ffffff;
     border-color: var(--rl-accent-light);
-    background: rgba(255, 138, 36, 0.18);
+    background:
+        rgba(124, 92, 255, 0.24);
     box-shadow:
-        0 10px 28px rgba(0, 0, 0, 0.24),
-        0 0 22px var(--rl-accent-glow);
+        0 0 18px
+        var(--rl-accent-glow);
     outline: none;
-    transform: translateY(-2px);
+    transform: translateY(-1px);
 }
 
 /*
 =========================================================
-FEATURES
+MATCH TABLE
 =========================================================
 */
 
-.rocket-league-page .content-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 18px;
-    margin-top: 20px;
-}
-
-.rocket-league-page .info-card {
-    position: relative;
-    display: block;
-    min-height: 190px;
-    padding: 30px;
-    overflow: hidden;
+.matches-table-wrapper {
+    width: 100%;
+    margin-top: 26px;
+    overflow-x: auto;
     border: 1px solid var(--rl-border);
-    border-radius: 17px;
+    border-radius: 13px;
     background:
-        linear-gradient(
-            145deg,
-            rgba(24, 24, 24, 0.88),
-            rgba(10, 10, 10, 0.92)
-        );
-    color: var(--rl-text);
-    text-decoration: none;
-    backdrop-filter: blur(15px);
-    -webkit-backdrop-filter: blur(15px);
+        rgba(7, 8, 18, 0.48);
+}
+
+.matches-table {
+    width: 100%;
+    min-width: 900px;
+    border-collapse: collapse;
+}
+
+.matches-table th,
+.matches-table td {
+    padding: 14px 16px;
+    border-bottom:
+        1px solid
+        rgba(255, 255, 255, 0.07);
+    text-align: left;
+    vertical-align: middle;
+}
+
+.matches-table th {
+    background:
+        rgba(124, 92, 255, 0.09);
+    color: #c8cee0;
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+}
+
+.matches-table td {
+    color: #dce1ee;
+    font-size: 0.82rem;
+}
+
+.matches-table tbody tr:last-child td {
+    border-bottom: 0;
+}
+
+.matches-table tbody tr {
     transition:
-        transform 0.25s ease,
-        border-color 0.25s ease,
-        box-shadow 0.25s ease;
+        background 0.2s ease;
 }
 
-.rocket-league-page .info-card::before {
-    position: absolute;
-    top: -80px;
-    right: -80px;
-    width: 180px;
-    height: 180px;
-    border-radius: 50%;
-    pointer-events: none;
+.matches-table tbody tr:hover {
     background:
-        radial-gradient(
-            circle,
-            rgba(255, 138, 36, 0.12),
-            transparent 70%
-        );
-    content: "";
-    transition: transform 0.35s ease;
+        rgba(124, 92, 255, 0.07);
 }
 
-.rocket-league-page .info-card:hover,
-.rocket-league-page .info-card:focus-visible {
-    border-color: var(--rl-border-bright);
-    box-shadow:
-        0 15px 45px rgba(0, 0, 0, 0.3),
-        0 0 25px rgba(255, 138, 36, 0.08);
-    outline: none;
-    transform: translateY(-6px);
-}
+/*
+=========================================================
+EMPTY DASHBOARD
+=========================================================
+*/
 
-.rocket-league-page .info-card:hover::before,
-.rocket-league-page .info-card:focus-visible::before {
-    transform: scale(1.4);
-}
-
-.rocket-league-page .info-card-icon {
-    position: relative;
+.dashboard-empty-state {
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    width: 46px;
-    height: 46px;
-    margin-bottom: 22px;
-    border: 1px solid rgba(255, 138, 36, 0.18);
-    border-radius: 11px;
+    min-height: 230px;
+    padding: 32px 20px;
+    text-align: center;
+}
+
+.dashboard-empty-state[hidden] {
+    display: none;
+}
+
+.empty-state-icon {
+    display: grid;
+    place-items: center;
+    width: 52px;
+    height: 52px;
+    border:
+        1px solid
+        var(--rl-border-bright);
+    border-radius: 50%;
     background: var(--rl-accent-soft);
     color: var(--rl-accent-light);
-    font-size: 19px;
+    font-size: 1.4rem;
+    box-shadow:
+        0 0 18px
+        rgba(124, 92, 255, 0.18);
 }
 
-.rocket-league-page .info-card h3 {
-    position: relative;
-    margin: 0 0 9px;
-    font-size: 18px;
-    font-weight: 750;
+.dashboard-empty-state h3 {
+    margin: 16px 0 0;
+    font-size: 1.2rem;
 }
 
-.rocket-league-page .info-card p {
-    position: relative;
-    margin: 0;
-    color: var(--rl-text-muted);
-    font-size: 14px;
-    line-height: 1.65;
+.dashboard-empty-state p {
+    margin-top: 8px;
 }
 
-/*
-=========================================================
-ADS
-=========================================================
-*/
-
-.rocket-league-page .ad-slot {
-    width: min(1200px, calc(100% - 60px));
-    min-height: 1px;
-    margin-inline: auto;
-}
-
-.rocket-league-page .ad-slot-top {
-    margin-top: 20px;
-}
-
-.rocket-league-page .ad-slot-middle {
-    margin-top: 20px;
-}
-
-.rocket-league-page .ad-slot-bottom {
-    margin-top: 20px;
+.dashboard-primary-link {
+    margin-top: 18px;
 }
 
 /*
 =========================================================
-THEMES
+VISIBILITY
 =========================================================
 */
 
-body[data-theme="gold"] .rocket-league-page {
-    --rl-accent: #f2b84b;
-    --rl-accent-light: #ffd77a;
-    --rl-accent-soft: rgba(242, 184, 75, 0.13);
-    --rl-accent-glow: rgba(242, 184, 75, 0.3);
-    --rl-border-bright: rgba(242, 184, 75, 0.32);
+.rocket-league-page
+[hidden] {
+    display: none !important;
 }
 
-body[data-theme="red"] .rocket-league-page {
-    --rl-accent: #ff5a4f;
-    --rl-accent-light: #ff9189;
-    --rl-accent-soft: rgba(255, 90, 79, 0.13);
-    --rl-accent-glow: rgba(255, 90, 79, 0.3);
-    --rl-border-bright: rgba(255, 90, 79, 0.32);
-}
+/*
+=========================================================
+ANIMATIONS
+=========================================================
+*/
 
-body[data-theme="green"] .rocket-league-page {
-    --rl-accent: #45d483;
-    --rl-accent-light: #80e9aa;
-    --rl-accent-soft: rgba(69, 212, 131, 0.13);
-    --rl-accent-glow: rgba(69, 212, 131, 0.3);
-    --rl-border-bright: rgba(69, 212, 131, 0.32);
+@keyframes pageLoginPulse {
+    0%,
+    100% {
+        box-shadow:
+            0 8px 24px
+            rgba(0, 0, 0, 0.24),
+            0 0 10px
+            rgba(124, 92, 255, 0.14);
+    }
+
+    50% {
+        box-shadow:
+            0 10px 28px
+            rgba(0, 0, 0, 0.28),
+            0 0 22px
+            rgba(124, 92, 255, 0.4);
+    }
 }
 
 /*
@@ -694,50 +821,84 @@ RESPONSIVE
 */
 
 @media (max-width: 900px) {
-    .rocket-league-page .content-grid {
+    .rocket-league-page
+    .rank-row {
         grid-template-columns: 1fr;
     }
 
-    .rocket-league-page .info-card {
-        min-height: 160px;
+    .dashboard-heading {
+        flex-direction: column;
     }
 }
 
-@media (max-width: 800px) {
+@media (max-width: 700px) {
+    .rocket-league-page {
+        padding: 8px;
+    }
+
     .rocket-league-panel {
         width: 100%;
-    }
-}
-
-@media (max-width: 500px) {
-    .rocket-league-page {
-        padding: 6px;
+        border-radius: 15px;
     }
 
-    .rocket-league-panel {
-        min-height: 60vh;
+    .rocket-league-hero {
+        min-height: 230px;
+        padding: 36px 18px;
+    }
+
+    .rocket-league-content {
+        width:
+            calc(
+                100%
+                - 24px
+            );
+        padding: 24px 0 42px;
+    }
+
+    .rocket-league-page
+    .content-card,
+    .rocket-league-dashboard {
         border-radius: 14px;
+    }
+
+    .rocket-league-page
+    .auth-login-button {
+        width: 100%;
+        padding: 0 16px;
+    }
+
+    .dashboard-history-link {
+        width: 100%;
     }
 }
 
 /*
 =========================================================
-ANIMATION CONTROL
+REDUCED MOTION
 =========================================================
 */
 
-body[data-animations="off"] .rocket-league-page *,
-body[data-animations="off"] .rocket-league-page *::before,
-body[data-animations="off"] .rocket-league-page *::after {
-    animation: none !important;
-    transition: none !important;
-}
-
 @media (prefers-reduced-motion: reduce) {
+    .rocket-league-page
+    .auth-login-button {
+        animation: none;
+    }
+
+    .rocket-league-page
+    .auth-login-button::before {
+        display: none;
+    }
+
     .rocket-league-page *,
     .rocket-league-page *::before,
     .rocket-league-page *::after {
-        animation: none !important;
-        transition: none !important;
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
     }
+}
+
+body[data-animations="off"]
+.rocket-league-page
+.auth-login-button {
+    animation: none;
 }

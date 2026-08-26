@@ -9,7 +9,8 @@
 
     <div class="rocket-league-panel">
         <div class="rocket-league-page-content">
-            <div class="rocket-league-hero">
+            <!-- Hero -->
+            <header class="rocket-league-hero">
                 <div class="hero-content">
                     <p class="hero-eyebrow">
                         BPD GAMING NETWORK
@@ -19,104 +20,107 @@
                         Rocket League
                     </h1>
 
-                        <section
-                            class="hero-player-profile"
-                            id="rocketLeaguePlayerProfile"
-                            aria-label="Rocket League player profile"
-                            aria-live="polite"
-                            hidden
+                    <!-- Authenticated player profile -->
+                    <section
+                        class="hero-player-profile"
+                        id="rocketLeaguePlayerProfile"
+                        aria-label="Rocket League player profile"
+                        aria-live="polite"
+                        hidden
+                    >
+                        <div class="hero-player-identity">
+                            <span class="hero-player-kicker">
+                                EPIC PLAYER
+                            </span>
+
+                            <strong id="rocketLeaguePlayerName">
+                                Loading player...
+                            </strong>
+                        </div>
+
+                        <div
+                            class="rank-row"
+                            id="rocketLeagueRankRow"
+                            aria-label="Competitive Rocket League ranks"
                         >
-                            <div class="hero-player-identity">
-                                <span class="hero-player-kicker">
-                                    EPIC PLAYER
+                            <article
+                                class="rank-badge rank-loading"
+                                id="rocketLeagueRank1"
+                            >
+                                <span class="rank-playlist">
+                                    1V1
                                 </span>
 
-                                <strong id="rocketLeaguePlayerName">
-                                    Loading player...
+                                <strong class="rank-name">
+                                    Loading
                                 </strong>
-                            </div>
 
-                            <div
-                                class="rank-row"
-                                id="rocketLeagueRankRow"
-                                aria-label="Competitive Rocket League ranks"
+                                <span class="rank-mmr">
+                                    — MMR
+                                </span>
+                            </article>
+
+                            <article
+                                class="rank-badge rank-loading"
+                                id="rocketLeagueRank2"
                             >
-                                <article
-                                    class="rank-badge rank-loading"
-                                    id="rocketLeagueRank1"
-                                >
-                                    <span class="rank-playlist">
-                                        1V1
-                                    </span>
+                                <span class="rank-playlist">
+                                    2V2
+                                </span>
 
-                                    <strong class="rank-name">
-                                        Loading
-                                    </strong>
+                                <strong class="rank-name">
+                                    Loading
+                                </strong>
 
-                                    <span class="rank-mmr">
-                                        — MMR
-                                    </span>
-                                </article>
+                                <span class="rank-mmr">
+                                    — MMR
+                                </span>
+                            </article>
 
-                                <article
-                                    class="rank-badge rank-loading"
-                                    id="rocketLeagueRank2"
-                                >
-                                    <span class="rank-playlist">
-                                        2V2
-                                    </span>
-
-                                    <strong class="rank-name">
-                                        Loading
-                                    </strong>
-
-                                    <span class="rank-mmr">
-                                        — MMR
-                                    </span>
-                                </article>
-
-                                <article
-                                    class="rank-badge rank-loading"
-                                    id="rocketLeagueRank3"
-                                >
-                                    <span class="rank-playlist">
-                                        3V3
-                                    </span>
-
-                                    <strong class="rank-name">
-                                        Loading
-                                    </strong>
-
-                                    <span class="rank-mmr">
-                                        — MMR
-                                    </span>
-                                </article>
-                            </div>
-
-                            <p
-                                class="rank-status"
-                                id="rocketLeagueRankStatus"
+                            <article
+                                class="rank-badge rank-loading"
+                                id="rocketLeagueRank3"
                             >
-                                Loading competitive ranks...
-                            </p>
-                        </section>
+                                <span class="rank-playlist">
+                                    3V3
+                                </span>
+
+                                <strong class="rank-name">
+                                    Loading
+                                </strong>
+
+                                <span class="rank-mmr">
+                                    — MMR
+                                </span>
+                            </article>
+                        </div>
+
+                        <p
+                            class="rank-status"
+                            id="rocketLeagueRankStatus"
+                        >
+                            Loading competitive ranks...
+                        </p>
+                    </section>
 
                     <p class="hero-subtitle">
                         Compete. Climb. Dominate.
                     </p>
                 </div>
-            </div>
+            </header>
 
+            <!-- Top advertisement -->
             <div
                 class="ad-slot ad-slot-top"
                 data-ad-location="rocket-league-top"
             ></div>
 
-            <section
-                class="rocket-league-content"
-                aria-labelledby="rocketLeagueWelcomeTitle"
-            >
-                <div class="content-card">
+            <main class="rocket-league-content">
+                <!-- Introduction -->
+                <section
+                    class="content-card welcome-card"
+                    aria-labelledby="rocketLeagueWelcomeTitle"
+                >
                     <span class="card-label">
                         ROCKET LEAGUE
                     </span>
@@ -126,165 +130,171 @@
                     </h2>
 
                     <p>
-                        Your central hub for weekly matches,
-                        finding other players, private matches,
-                        and competitive play.
+                        Your central hub for scheduled matches,
+                        competitive leagues, player connections,
+                        private matches, and submitted results.
                     </p>
-                </div>
+                </section>
 
-                <div
+                <!-- Guest-only login -->
+                <section
                     class="content-card auth-login-card"
                     id="rocketLeagueLoggedOut"
+                    aria-labelledby="rocketLeagueLoginTitle"
                 >
                     <span class="card-label">
                         ACCOUNT REQUIRED
                     </span>
 
-                    <h2>
+                    <h2 id="rocketLeagueLoginTitle">
                         Login to participate
                     </h2>
 
                     <p>
-                        Login or register with Epic Games to join matches,
-                        find players, enter private matches, and submit
-                        scoreboard results.
+                        Login or register with Epic Games to join
+                        matches, find players, enter private matches,
+                        and submit scoreboard results.
                     </p>
 
                     <div class="guest-action-row">
                         <button
-                            class="nav-item sidebar-auth-button"
-                            id="sidebarLoginButton"
+                            class="auth-login-button"
                             type="button"
                             data-api-action="epic-login"
-                            data-auth="guest"
-                            data-tooltip="Login For Full Access"
-                            aria-label="Login"
+                            aria-label="Login or Register with Epic Games"
                         >
                             <span
-                                class="nav-icon"
+                                class="auth-login-button-icon"
                                 aria-hidden="true"
                             >
                                 ⇥
                             </span>
 
-                            <span class="nav-text">
-                                <span class="nav-label">
-                                    Login / Register
-                                </span>
+                            <span>
+                                Login / Register with Epic Games
                             </span>
                         </button>
                     </div>
-                </div>
+                </section>
 
+                <!-- Middle advertisement -->
                 <div
                     class="ad-slot ad-slot-middle"
                     data-ad-location="rocket-league-middle"
                 ></div>
 
-                <div
-                    class="content-grid"
+                <!-- Authenticated dashboard -->
+                <section
+                    class="rocket-league-dashboard"
                     id="rocketLeagueAuthenticatedContent"
-                    aria-label="Rocket League features"
+                    aria-labelledby="upcomingMatchesTitle"
                     hidden
                 >
-                  <section
-    class="rocket-league-dashboard"
-    id="rocketLeagueAuthenticatedContent"
-    aria-labelledby="upcomingMatchesTitle"
-    hidden
->
-    <div class="dashboard-heading">
-        <div>
-            <span class="card-label">
-                PLAYER DASHBOARD
-            </span>
+                    <div class="dashboard-heading">
+                        <div>
+                            <span class="card-label">
+                                PLAYER DASHBOARD
+                            </span>
 
-            <h2 id="upcomingMatchesTitle">
-                Upcoming Matches
-            </h2>
-        </div>
+                            <h2 id="upcomingMatchesTitle">
+                                Upcoming Matches
+                            </h2>
 
-        <a
-            class="dashboard-history-link"
-            href="/RocketLeague/MyMatches"
-            data-router-link
-        >
-            View My Matches
-        </a>
-    </div>
+                            <p>
+                                Your next scheduled league and
+                                private matches.
+                            </p>
+                        </div>
 
-    <div class="matches-table-wrapper">
-        <table class="matches-table">
-            <thead>
-                <tr>
-                    <th scope="col">
-                        Match
-                    </th>
+                        <a
+                            class="dashboard-history-link"
+                            href="/RocketLeague/MyMatches"
+                            data-router-link
+                        >
+                            View My Matches
+                        </a>
+                    </div>
 
-                    <th scope="col">
-                        Opponent
-                    </th>
+                    <div class="matches-table-wrapper">
+                        <table class="matches-table">
+                            <thead>
+                                <tr>
+                                    <th scope="col">
+                                        Match
+                                    </th>
 
-                    <th scope="col">
-                        Time
-                    </th>
+                                    <th scope="col">
+                                        Opponent
+                                    </th>
 
-                    <th scope="col">
-                        Date
-                    </th>
+                                    <th scope="col">
+                                        Time
+                                    </th>
 
-                    <th scope="col">
-                        League
-                    </th>
+                                    <th scope="col">
+                                        Date
+                                    </th>
 
-                    <th scope="col">
-                        Format
-                    </th>
+                                    <th scope="col">
+                                        League
+                                    </th>
 
-                    <th scope="col">
-                        Status
-                    </th>
+                                    <th scope="col">
+                                        Format
+                                    </th>
 
-                    <th scope="col">
-                        Action
-                    </th>
-                </tr>
-            </thead>
+                                    <th scope="col">
+                                        Status
+                                    </th>
 
-            <tbody id="upcomingMatchesBody">
-                <!-- Authenticated match rows load here -->
-            </tbody>
-        </table>
-    </div>
+                                    <th scope="col">
+                                        Action
+                                    </th>
+                                </tr>
+                            </thead>
 
-    <div
-        class="dashboard-empty-state"
-        id="upcomingMatchesEmpty"
-        role="status"
-    >
-        <h3>
-            No upcoming matches
-        </h3>
+                            <tbody id="upcomingMatchesBody">
+                                <!-- Match rows load here -->
+                            </tbody>
+                        </table>
+                    </div>
 
-        <p>
-            Your scheduled matches will appear here.
-        </p>
+                    <div
+                        class="dashboard-empty-state"
+                        id="upcomingMatchesEmpty"
+                        role="status"
+                    >
+                        <span
+                            class="empty-state-icon"
+                            aria-hidden="true"
+                        >
+                            ◇
+                        </span>
 
-        <a
-            href="/RocketLeague/WeeklyMatches"
-            data-router-link
-        >
-            Find a Match
-        </a>
-    </div>
-</section>
-                </div>
+                        <h3>
+                            No upcoming matches
+                        </h3>
 
+                        <p>
+                            Your scheduled matches will appear here.
+                        </p>
+
+                        <a
+                            class="dashboard-primary-link"
+                            href="/RocketLeague/WeeklyMatches"
+                            data-router-link
+                        >
+                            Find a Match
+                        </a>
+                    </div>
+                </section>
+
+                <!-- Bottom advertisement -->
                 <div
                     class="ad-slot ad-slot-bottom"
                     data-ad-location="rocket-league-bottom"
                 ></div>
-            </section>
+            </main>
         </div>
     </div>
 </section>
