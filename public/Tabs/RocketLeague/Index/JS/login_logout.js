@@ -60,27 +60,42 @@ export function initializeButtons() {
             "sidebarLoginButton"
         );
 
+    const loginHomepageButton =
+        document.getElementById(
+            "mainRLLoginButton"
+        );
+
     const logoutButton =
         document.getElementById(
             "sidebarLogoutButton"
         );
 
-    if (
-        loginButton &&
-        loginButton.dataset.initialized !== "true"
-    ) {
-        loginButton.addEventListener(
-            "click",
-            handleEpicLogin
-        );
+    [
+        loginButton,
+        loginHomepageButton
+    ]
+        .filter(Boolean)
+        .forEach((button) => {
+            if (
+                button.dataset.initialized ===
+                "true"
+            ) {
+                return;
+            }
 
-        loginButton.dataset.initialized =
-            "true";
-    }
+            button.addEventListener(
+                "click",
+                handleEpicLogin
+            );
+
+            button.dataset.initialized =
+                "true";
+        });
 
     if (
         logoutButton &&
-        logoutButton.dataset.initialized !== "true"
+        logoutButton.dataset.initialized !==
+            "true"
     ) {
         logoutButton.addEventListener(
             "click",

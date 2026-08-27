@@ -1,0 +1,354 @@
+.rl-registration {
+    --rl-bg: #070812;
+    --rl-card: rgba(17, 19, 32, 0.94);
+    --rl-field: rgba(7, 9, 17, 0.72);
+    --rl-border: rgba(255, 255, 255, 0.1);
+    --rl-accent: #7c5cff;
+    --rl-accent-light: #b3a5ff;
+    --rl-text: #f5f7ff;
+    --rl-muted: #a5adbf;
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    padding: clamp(18px, 4vw, 54px) clamp(10px, 3vw, 28px) 70px;
+    color: var(--rl-text);
+    background:
+        radial-gradient(circle at 85% 8%, rgba(88, 182, 255, 0.12), transparent 30%),
+        radial-gradient(circle at 10% 75%, rgba(124, 92, 255, 0.16), transparent 35%),
+        var(--rl-bg);
+}
+
+.rl-registration,
+.rl-registration * {
+    box-sizing: border-box;
+}
+
+.rl-registration-form {
+    width: min(100%, 980px);
+    margin-inline: auto;
+}
+
+.registration-intro {
+    margin-bottom: 24px;
+    text-align: center;
+}
+
+.registration-eyebrow {
+    color: var(--rl-accent-light);
+    font-size: 0.68rem;
+    font-weight: 900;
+    letter-spacing: 0.2em;
+}
+
+.registration-intro h1 {
+    margin: 9px 0 0;
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    line-height: 1.05;
+}
+
+.registration-intro p,
+.section-description,
+.form-actions p {
+    margin: 10px 0 0;
+    color: var(--rl-muted);
+    line-height: 1.6;
+}
+
+.form-section {
+    min-width: 0;
+    margin: 0 0 16px;
+    padding: clamp(20px, 4vw, 32px);
+    border: 1px solid var(--rl-border);
+    border-radius: 17px;
+    background: linear-gradient(145deg, rgba(23, 25, 41, 0.96), var(--rl-card));
+    box-shadow: 0 16px 44px rgba(0, 0, 0, 0.25);
+}
+
+.form-section legend {
+    padding: 0 9px;
+    color: #ffffff;
+    font-size: 1.15rem;
+    font-weight: 800;
+}
+
+.field-grid {
+    display: grid;
+    gap: 16px;
+    margin-top: 18px;
+}
+
+.two-columns {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.form-field {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    min-width: 0;
+    color: #e8ebf5;
+    font-weight: 700;
+}
+
+.form-field small,
+.toggle-field small {
+    color: var(--rl-muted);
+    font-size: 0.75rem;
+    font-weight: 400;
+}
+
+.form-field input,
+.availability-time {
+    width: 100%;
+    min-height: 44px;
+    padding: 9px 12px;
+    border: 1px solid var(--rl-border);
+    border-radius: 9px;
+    background: var(--rl-field);
+    color: #ffffff;
+    font: inherit;
+}
+
+.form-field input:focus,
+.availability-time:focus {
+    border-color: var(--rl-accent-light);
+    outline: 2px solid rgba(124, 92, 255, 0.25);
+}
+
+.form-field input[readonly] {
+    color: #ccd2e2;
+    cursor: default;
+}
+
+.choice-row,
+.choice-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 9px;
+    margin-top: 16px;
+}
+
+.choice-card {
+    position: relative;
+    display: inline-flex;
+    flex: 1 1 130px;
+    align-items: center;
+    justify-content: center;
+    min-height: 43px;
+    padding: 8px 14px;
+    border: 1px solid var(--rl-border);
+    border-radius: 9px;
+    background: var(--rl-field);
+    color: #cbd1df;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.choice-card:has(input:checked) {
+    border-color: var(--rl-accent-light);
+    background: rgba(124, 92, 255, 0.2);
+    color: #ffffff;
+    box-shadow: 0 0 15px rgba(124, 92, 255, 0.18);
+}
+
+.choice-card input {
+    position: absolute;
+    opacity: 0;
+}
+
+.confirmation-row,
+.toggle-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    color: #d8dce8;
+    line-height: 1.55;
+    cursor: pointer;
+}
+
+.confirmation-row input {
+    flex: 0 0 auto;
+    width: 18px;
+    height: 18px;
+    margin-top: 3px;
+    accent-color: var(--rl-accent);
+}
+
+.toggle-field {
+    justify-content: flex-start;
+}
+
+.toggle-row input {
+    position: absolute;
+    opacity: 0;
+}
+
+.toggle-control {
+    position: relative;
+    flex: 0 0 auto;
+    width: 42px;
+    height: 23px;
+    border: 1px solid var(--rl-border);
+    border-radius: 999px;
+    background: #303542;
+}
+
+.toggle-control::after {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    background: #ffffff;
+    content: "";
+    transition: transform 0.2s ease;
+}
+
+.toggle-row input:checked + .toggle-control {
+    background: var(--rl-accent);
+}
+
+.toggle-row input:checked + .toggle-control::after {
+    transform: translateX(19px);
+}
+
+.other-mode-field {
+    margin-top: 16px;
+}
+
+.timezone-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 16px;
+    padding: 12px 14px;
+    border: 1px solid var(--rl-border);
+    border-radius: 9px;
+    background: var(--rl-field);
+}
+
+.timezone-row strong {
+    color: var(--rl-accent-light);
+    overflow-wrap: anywhere;
+}
+
+.availability-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 14px;
+}
+
+.availability-row {
+    display: grid;
+    grid-template-columns: minmax(105px, 1fr) minmax(115px, 150px) auto minmax(115px, 150px);
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--rl-border);
+    border-radius: 10px;
+    background: rgba(6, 8, 15, 0.46);
+}
+
+.availability-day {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-weight: 700;
+}
+
+.availability-day input {
+    width: 17px;
+    height: 17px;
+    accent-color: var(--rl-accent);
+}
+
+.availability-row:not(.enabled) .availability-time {
+    opacity: 0.45;
+}
+
+.reminder-options {
+    margin-top: 18px;
+    padding-top: 16px;
+    border-top: 1px solid var(--rl-border);
+}
+
+.field-label {
+    color: #e8ebf5;
+    font-weight: 700;
+}
+
+.registration-message {
+    margin-bottom: 16px;
+    padding: 13px 16px;
+    border: 1px solid var(--rl-border);
+    border-radius: 10px;
+}
+
+.registration-message[data-state="error"] {
+    border-color: rgba(255, 92, 110, 0.5);
+    background: rgba(255, 92, 110, 0.1);
+    color: #ffabb5;
+}
+
+.registration-message[data-state="success"] {
+    border-color: rgba(80, 220, 150, 0.5);
+    background: rgba(80, 220, 150, 0.1);
+    color: #9bf0c5;
+}
+
+.form-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-top: 8px;
+    text-align: center;
+}
+
+.primary-button {
+    min-height: 48px;
+    padding: 0 26px;
+    border: 1px solid var(--rl-accent-light);
+    border-radius: 10px;
+    background: linear-gradient(135deg, #6d4df2, #4c90e8);
+    color: #ffffff;
+    font: inherit;
+    font-weight: 800;
+    cursor: pointer;
+    box-shadow: 0 10px 28px rgba(80, 70, 220, 0.28);
+}
+
+.primary-button:disabled {
+    cursor: wait;
+    opacity: 0.65;
+}
+
+.rl-registration [hidden] {
+    display: none !important;
+}
+
+@media (max-width: 700px) {
+    .two-columns {
+        grid-template-columns: 1fr;
+    }
+
+    .availability-row {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .availability-day {
+        grid-column: 1 / -1;
+    }
+
+    .availability-separator {
+        display: none;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .rl-registration * {
+        transition: none !important;
+    }
+}

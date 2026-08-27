@@ -454,8 +454,13 @@ export async function handleEpicCallback(
             }
         );
 
+        const redirectDestination =
+            registrationComplete
+                ? "/RocketLeague"
+                : "/RocketLeague/Register";
+
         return redirect(
-            "/RocketLeague",
+            redirectDestination,
             [cookie]
         );
     } catch (error) {

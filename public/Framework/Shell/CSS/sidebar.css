@@ -1,11 +1,46 @@
 /* BPD GAMING NETWORK - FLOATING SIDEBAR */
-
 :root {
-    --sidebar-width: 210px;
-    --sidebar-collapsed-width: 56px;
-    --sidebar-icon-width: 50px;
+    --sidebar-width:
+        clamp(
+            250px,
+            22vw,
+            360px
+        );
+
+    --sidebar-collapsed-width:
+        clamp(
+            68px,
+            5vw,
+            82px
+        );
+
+    --sidebar-content-gap:
+        clamp(
+            10px,
+            1.2vw,
+            20px
+        );
+
+    --sidebar-icon-width:
+        var(--sidebar-collapsed-width);
+}
+.sidebar-navigation-top,
+.sidebar-navigation-bottom {
+    display: flex;
+    flex: 0 0 auto;
+    flex-direction: column;
+    width: 100%;
+    min-width: 0;
+    gap: 2px;
 }
 
+.sidebar-navigation-bottom {
+    margin-top: auto;
+    padding-top: 8px;
+    border-top:
+        1px solid
+        rgba(255, 255, 255, 0.08);
+}
 html,
 body {
     margin: 0;
@@ -26,18 +61,33 @@ SIDEBAR POSITIONING CONTAINER
 
 .site-sidebar {
     position: fixed;
-    top: 12px;
-    bottom: 12px;
+    top: 50%;
+    bottom: auto;
     left: 6px;
     z-index: 100;
+
     width: var(--sidebar-width);
     min-width: 0;
+    height:
+        clamp(
+            480px,
+            80dvh,
+            760px
+        );
+    max-height:
+        calc(
+            100dvh
+            - 24px
+        );
+
     overflow: visible;
     border: 0;
     background: transparent;
     box-shadow: none;
+    transform: translateY(-50%);
     transition:
-        width 0.25s ease;
+        width 0.25s ease,
+        height 0.25s ease;
 }
 
 body.sidebar-collapsed
@@ -143,6 +193,8 @@ SEPARATE NAVIGATION BODY
 */
 
 .sidebar-navigation {
+    justify-content: flex-start;
+    gap: 2px;
     position: absolute;
     top:
         calc(
@@ -216,6 +268,7 @@ NAVIGATION ITEMS
     text-decoration: none;
     appearance: none;
     cursor: pointer;
+    white-space: nowrap;
 }
 
 .site-sidebar

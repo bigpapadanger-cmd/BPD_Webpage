@@ -31,7 +31,22 @@ export const ROUTES = {
 
         
     },
+    "/RocketLeague/": {
+        title: "Rocket League | BPD Gaming Network",
+        body:
+            "/Tabs/RocketLeague/Index/HTML/index.html",
+        header:
+            "/Framework/Shell/HTML/Header/header.html",
+        sidebar:
+            "/Tabs/RocketLeague/Sidebars/HTML/rl_AuthSidebar.html",
+        footer:
+            "/Framework/Shell/HTML/Footer/footer.html",
+        module: 
+            "/Tabs/RocketLeague/Index/JS/index.js",
+        sitemap: true
 
+        
+    },
     "/RocketLeague/MatchResults": {
         title: "Match Results | BPD Gaming Network",
         body:
@@ -79,16 +94,47 @@ export const ROUTES = {
         sitemap: true
     },
     
-    "/About": {
-    title: "Dashboard | BPD Gaming Network",
+    "/Privacy": {
+    title: "Privacy | BPD Gaming Network",
     body:
-        "/Global/Index/HTML/home.html",
+        "/Required/PrivacyPolicy/HTML/index.html",
     header:
         "/Framework/Shell/HTML/Header/header.html",
     sidebar:
         "/Framework/Shell/HTML/Sidebar/mainmenu.html",
     footer:
         "/Framework/Shell/HTML/Footer/footer.html",
+    module: 
+        "/Global/Index/JS/Index.js",
+        sitemap: true
+    },
+
+    "/About": {
+    title: "About Us | BPD Gaming Network",
+    body:
+        "/Required/About/HTML/index.html",
+    header:
+        "/Framework/Shell/HTML/Header/header.html",
+    sidebar:
+        "/Framework/Shell/HTML/Sidebar/mainmenu.html",
+    footer:
+        "/Framework/Shell/HTML/Footer/footer.html",
+    module: 
+        "/Required/About/JS/loadPage.js",
+        sitemap: true
+    },
+    "/TOS": {
+    title: "Terms Of Service | BPD Gaming Network",
+    body:
+        "/Required/TOS/HTML/index.html",
+    header:
+        "/Framework/Shell/HTML/Header/header.html",
+    sidebar:
+        "/Framework/Shell/HTML/Sidebar/mainmenu.html",
+    footer:
+        "/Framework/Shell/HTML/Footer/footer.html",
+    module: 
+        "/Required/TOS/JS/loadPage.js",
         sitemap: true
     }
 
@@ -98,6 +144,7 @@ export const HEADER_MAP = {
     "/RocketLeague": false,
     "/Settings": true,
     "/About": true,
+    "/TOS": true,
     "/Privacy": true,
     // pages that should NOT show header
     "/Error": false,
@@ -119,5 +166,5 @@ export const PRIORITY_MAP = {
     "/Settings": 0.6,
     "/About": 0.4,
     "/Privacy": 0.3,
-    "/Terms": 0.3
+    "/TOS": 0.3
 };
