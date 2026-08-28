@@ -24,7 +24,14 @@
     --sidebar-icon-width:
         var(--sidebar-collapsed-width);
 }
-.sidebar-navigation-top,
+.sidebar-navigation-top{
+    display: flex;
+    flex: 0 0 auto;
+    flex-direction: column;
+    height: fit-content;
+    min-width: 0;
+    gap: 2px;
+}
 .sidebar-navigation-bottom {
     display: flex;
     flex: 0 0 auto;
@@ -59,41 +66,46 @@ SIDEBAR POSITIONING CONTAINER
 =========================================================
 */
 
+:root {
+    --sidebar-width: 300px;
+    --sidebar-collapsed-width: 76px;
+    --sidebar-content-gap: 14px;
+    --sidebar-icon-width: var(--sidebar-collapsed-width);
+}
+
 .site-sidebar {
     position: fixed;
-    top: 50%;
+    top: 41.5%;
     bottom: auto;
     left: 6px;
     z-index: 100;
 
     width: var(--sidebar-width);
-    min-width: 0;
-    height:
-        clamp(
-            480px,
-            80dvh,
-            760px
-        );
-    max-height:
-        calc(
-            100dvh
-            - 24px
-        );
+    min-width: var(--sidebar-width);
+    max-width: var(--sidebar-width);
 
-    overflow: visible;
+    height: 620px;
+    min-height: fit-content;
+    max-height: auto;
+
+    overflow: auto;
+
     border: 0;
     background: transparent;
     box-shadow: none;
+
     transform: translateY(-50%);
+
     transition:
-        width 0.25s ease,
-        height 0.25s ease;
+        width 0.33s ease;
 }
 
-body.sidebar-collapsed
-.site-sidebar {
-    width:
-        var(--sidebar-collapsed-width);
+
+
+body.sidebar-collapsed .site-sidebar {
+    width: var(--sidebar-collapsed-width);
+    min-width: var(--sidebar-collapsed-width);
+    max-width: var(--sidebar-collapsed-width);
 }
 
 .site-sidebar::before,
@@ -109,9 +121,9 @@ SEPARATE TOGGLE BOX
 */
 
 .sidebar-toggle-box {
-    position: relative;
-    top: 0;
-    left: 0;
+    position: absolute;
+    inset-inline-start: 0px;
+    inset-block-start: 0px;
     z-index: 110;
     display: flex;
     align-items: center;
@@ -120,13 +132,13 @@ SEPARATE TOGGLE BOX
         var(--sidebar-collapsed-width);
     height:
         var(--sidebar-collapsed-width);
-    border: 1px solid #303541;
+    border: 2px solid #303541;
     border-radius: 14px;
     background:
         linear-gradient(
             180deg,
-            #191c22,
-            #12141a
+            #000c24,
+            #00028f
         );
     box-shadow:
         0 8px 24px
@@ -146,7 +158,7 @@ SEPARATE TOGGLE BOX
     height: 32px;
     padding: 0;
     cursor: pointer;
-    border: 1px solid #353b48;
+    border: 2px solid #353b48;
     border-radius: 8px;
     background: #1b1e25;
     box-shadow:
@@ -210,19 +222,15 @@ SEPARATE NAVIGATION BODY
     padding: 6px 3px 8px;
     overflow-x: hidden;
     overflow-y: auto;
-    border: 1px solid #303541;
+    border: 2px solid #303541;
     border-radius: 18px;
     background:
         linear-gradient(
             180deg,
-            #191c22 0%,
+            #000000 10%,
             #01004e 100%
         );
-    box-shadow:
-        8px 0 24px
-        rgba(0, 0, 0, 0.4),
-        0 18px 45px
-        rgba(0, 0, 0, 0.55);
+
     scrollbar-width: thin;
     scrollbar-color:
         rgba(139, 92, 246, 0.45)
@@ -256,7 +264,7 @@ NAVIGATION ITEMS
     align-items: center;
     width: 100%;
     min-width: 0;
-    min-height: 44px;
+    min-height: 10px;
     padding: 0;
     overflow: hidden;
     border: 0;
@@ -291,8 +299,8 @@ NAVIGATION ITEMS
 
 .site-sidebar
 .nav-icon {
-    display: flex;
-    flex:
+    display: grid;
+    flex-basis:
         0 0
         var(--sidebar-icon-width);
     align-items: center;
@@ -300,13 +308,15 @@ NAVIGATION ITEMS
     width:
         var(--sidebar-icon-width);
     min-width:
-        var(--sidebar-icon-width);
+        auto;
 }
 
 .site-sidebar
 .nav-label {
-    display: block;
-    max-width: 150px;
+    min-width:
+        auto;
+    display: inline flow-root;
+    max-width: auto;
     overflow: hidden;
     white-space: nowrap;
     opacity: 1;

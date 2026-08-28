@@ -3,7 +3,7 @@
 .site-content {
     display: block;
     flex: 1 1 auto;
-    align-self: stretch;
+    align-self: auto;
     width: 100%;
     max-width: none;
     min-width: fit-content;

@@ -1,0 +1,156 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>FAQ | BPD Gaming Network</title>
+
+    <link
+        rel="stylesheet"
+        href="./faq.css"
+    >
+</head>
+
+<body>
+
+    <main class="faq-page">
+
+        <section class="faq-header">
+
+            <div class="faq-header-content">
+
+                <span class="faq-eyebrow">
+                    SUPPORT
+                </span>
+
+                <h1>
+                    Frequently Asked Questions
+                </h1>
+
+                <p>
+                    Find answers to common questions about BPD Gaming Network.
+                </p>
+
+            </div>
+
+        </section>
+
+
+        <section
+            class="faq-content"
+            aria-label="Frequently asked questions"
+        >
+
+            <div
+                class="faq-list"
+                id="faqList"
+            ></div>
+
+        </section>
+
+
+        <section class="faq-suggestion">
+
+            <div class="faq-suggestion-content">
+
+                <div>
+
+                    <h2>
+                        Can't find your question?
+                    </h2>
+
+                    <p>
+                        Suggest a question you'd like added to the FAQ.
+                    </p>
+
+                </div>
+
+                <button
+                    class="faq-suggestion-button"
+                    id="faqSuggestionButton"
+                    type="button"
+                >
+                    Suggest an FAQ
+                </button>
+
+            </div>
+
+        </section>
+
+    </main>
+
+
+    <div
+        class="faq-login-modal"
+        id="faqLoginModal"
+        hidden
+    >
+
+        <div
+            class="faq-login-backdrop"
+            data-close-login
+        ></div>
+
+        <div
+            class="faq-login-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="faqLoginTitle"
+        >
+
+            <button
+                class="faq-login-close"
+                type="button"
+                aria-label="Close login prompt"
+                data-close-login
+            >
+                ×
+            </button>
+
+            <span class="faq-login-eyebrow">
+                ACCOUNT REQUIRED
+            </span>
+
+            <h2 id="faqLoginTitle">
+                Sign in to continue
+            </h2>
+
+            <p id="faqLoginMessage">
+                You need to be logged in to perform this action.
+            </p>
+
+            <div class="faq-login-actions">
+
+                <button
+                    class="faq-login-primary"
+                    id="faqLoginButton"
+                    type="button"
+                >
+                    Log In
+                </button>
+
+                <button
+                    class="faq-login-secondary"
+                    type="button"
+                    data-close-login
+                >
+                    Cancel
+                </button>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <script src="./faq.js"></script>
+
+</body>
+</html>

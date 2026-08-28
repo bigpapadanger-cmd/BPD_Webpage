@@ -1,3 +1,9 @@
+/*
+NEW LINKS REQUIRE Being Added in their own Folder, they need a unique title, and module, 
+these handle loading unique data on each injected page. The css goes in index.html.
+The header and sidebar can stay default but add to const HEADER_MAP, and PRIORITY_MAP
+*/
+
 export const ROUTES = {
 
     "/": {
@@ -86,7 +92,7 @@ export const ROUTES = {
     header:
         "/Framework/Shell/HTML/Header/header.html",
     sidebar:
-        "/Framework/Shell/HTML/Sidebar/mainmenu.html",
+        "/Framework/Shell/HTML/Sidebar/dashboard.html",
     footer:
         "/Framework/Shell/HTML/Footer/footer.html",
     module: 
@@ -123,8 +129,53 @@ export const ROUTES = {
         "/Required/About/JS/loadPage.js",
         sitemap: true
     },
+
+    "/FAQ": {
+    title: "Frequently Asked Questions | BPD Gaming Network",
+    body:
+        "/Required/FAQ/HTML/index.html",
+    header:
+        "/Framework/Shell/HTML/Header/header.html",
+    sidebar:
+        "/Framework/Shell/HTML/Sidebar/mainmenu.html",
+    footer:
+        "/Framework/Shell/HTML/Footer/footer.html",
+    module: 
+        "/Required/FAQ/JS/index.js",
+        sitemap: true
+    },
     "/TOS": {
     title: "Terms Of Service | BPD Gaming Network",
+    body:
+        "/Required/TOS/HTML/index.html",
+    header:
+        "/Framework/Shell/HTML/Header/header.html",
+    sidebar:
+        "/Framework/Shell/HTML/Sidebar/mainmenu.html",
+    footer:
+        "/Framework/Shell/HTML/Footer/footer.html",
+    module: 
+        "/Required/TOS/JS/loadPage.js",
+        sitemap: true
+    },
+
+    //NEED TO BUILD THESE PAGES
+    "/Minecraft": {
+    title: "Minecraft | BPD Gaming Network",
+    body:
+        "/Required/TOS/HTML/index.html",
+    header:
+        "/Framework/Shell/HTML/Header/header.html",
+    sidebar:
+        "/Framework/Shell/HTML/Sidebar/mainmenu.html",
+    footer:
+        "/Framework/Shell/HTML/Footer/footer.html",
+    module: 
+        "/Required/TOS/JS/loadPage.js",
+        sitemap: true
+    },
+    "/Ark": {
+    title: "Ark Survival Ascended | BPD Gaming Network",
     body:
         "/Required/TOS/HTML/index.html",
     header:
@@ -150,7 +201,10 @@ export const HEADER_MAP = {
     "/Error": false,
     "/RocketLeague/WeeklyMatches": false,
     "/RocketLeague/PrivateMatches": false,
-    "/Dashboard": true
+    "/Dashboard": true,
+    "/FAQ": false,
+    "/Minecraft":false,
+    "/Ark":false
 };
 
 export const PRIORITY_MAP = {

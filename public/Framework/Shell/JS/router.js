@@ -1,7 +1,7 @@
 import {
     ROUTES,
     HEADER_MAP
-} from "./routes.js";
+} from "/routes.js";
 
 import {
     loadSidebarHover,

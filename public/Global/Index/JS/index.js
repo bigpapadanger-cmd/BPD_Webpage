@@ -8,6 +8,14 @@ Global sidebar behavior is handled separately by:
     /Framework/Shell/JS/sidebar.js
 =========================================================
 */
+import {
+    renderHeader
+} from "/Framework/Shell/JS/renderHeader.js";
+
+renderHeader({
+    title: "My Dashboard"
+});
+
 export function initializePage() {
     document.body.dataset.page = "dashboard";
     initializeHomepageCards();
