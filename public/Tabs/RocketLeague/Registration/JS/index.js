@@ -1,3 +1,8 @@
+"use strict";
+const ROCKET_LEAGUE_PROFILE_URL =
+    "/api/rocketleague/profile";
+const ROCKET_LEAGUE_PROFILE_UPDATE_URL =
+    "/api/rocketleague/profile";
 const DAYS = [
     "Monday",
     "Tuesday",
@@ -7,7 +12,6 @@ const DAYS = [
     "Saturday",
     "Sunday"
 ];
-
 const TIME_OPTIONS = [
     ["17:00", "5:00 PM"],
     ["17:30", "5:30 PM"],
@@ -21,7 +25,6 @@ const TIME_OPTIONS = [
     ["21:30", "9:30 PM"],
     ["22:00", "10:00 PM"]
 ];
-
 function createTimeOptions(
     selectedValue
 ) {
@@ -40,23 +43,19 @@ function createTimeOptions(
         `)
         .join("");
 }
-
 function renderAvailabilityRows() {
     const container =
         document.getElementById(
             "availabilityRows"
         );
-
     if (!container) {
         return;
     }
-
     container.innerHTML =
         DAYS
             .map((day) => {
                 const key =
                     day.toLowerCase();
-
                 return `
                     <div
                         class="availability-row"
@@ -68,12 +67,10 @@ function renderAvailabilityRows() {
                                 name="availableDays"
                                 value="${key}"
                             >
-
                             <span>
                                 ${day}
                             </span>
                         </label>
-
                         <select
                             class="availability-time"
                             name="${key}Start"
@@ -84,11 +81,9 @@ function renderAvailabilityRows() {
                                 "17:00"
                             )}
                         </select>
-
                         <span class="availability-separator">
                             to
                         </span>
-
                         <select
                             class="availability-time"
                             name="${key}End"
@@ -103,7 +98,6 @@ function renderAvailabilityRows() {
                 `;
             })
             .join("");
-
     container
         .querySelectorAll(
             'input[name="availableDays"]'
@@ -112,138 +106,143 @@ function renderAvailabilityRows() {
             checkbox.addEventListener(
                 "change",
                 () => {
-                    const row =
-                        checkbox.closest(
-                            ".availability-row"
-                        );
-
-                    row.classList.toggle(
-                        "enabled",
-                        checkbox.checked
+                    updateAvailabilityRow(
+                        checkbox
                     );
-
-                    row
-                        .querySelectorAll(
-                            "select"
-                        )
-                        .forEach((select) => {
-                            select.disabled =
-                                !checkbox.checked;
-                        });
                 }
             );
         });
 }
-
+function updateAvailabilityRow(
+    checkbox
+) {
+    const row =
+        checkbox.closest(
+            ".availability-row"
+        );
+    if (!row) {
+        return;
+    }
+    row.classList.toggle(
+        "enabled",
+        checkbox.checked
+    );
+    row
+        .querySelectorAll(
+            "select"
+        )
+        .forEach((select) => {
+            select.disabled =
+                !checkbox.checked;
+        });
+}
 function updateContactFields() {
     const method =
         document.querySelector(
             'input[name="contactMethod"]:checked'
-        )?.value || "email";
-
+        )?.value ||
+        "email";
     const emailField =
         document.getElementById(
             "emailField"
         );
-
     const phoneField =
         document.getElementById(
             "phoneField"
         );
-
     const email =
         document.getElementById(
             "email"
         );
-
     const phone =
         document.getElementById(
             "phone"
         );
-
     const needsEmail =
         method === "email" ||
         method === "both";
-
     const needsPhone =
         method === "phone" ||
         method === "both";
-
-    emailField.hidden =
-        !needsEmail;
-
-    phoneField.hidden =
-        !needsPhone;
-
-    email.required =
-        needsEmail;
-
-    phone.required =
-        needsPhone;
+    if (emailField) {
+        emailField.hidden =
+            !needsEmail;
+    }
+    if (phoneField) {
+        phoneField.hidden =
+            !needsPhone;
+    }
+    if (email) {
+        email.required =
+            needsEmail;
+    }
+    if (phone) {
+        phone.required =
+            needsPhone;
+    }
 }
-
 function updateModeField() {
     const mode =
         document.querySelector(
             'input[name="preferredMode"]:checked'
         )?.value;
-
     const field =
         document.getElementById(
             "otherModeField"
         );
-
     const input =
         document.getElementById(
             "otherMode"
         );
-
     const isOther =
         mode === "other";
-
-    field.hidden =
-        !isOther;
-
-    input.required =
-        isOther;
-
-    if (!isOther) {
-        input.value = "";
+    if (field) {
+        field.hidden =
+            !isOther;
+    }
+    if (input) {
+        input.required =
+            isOther;
+        if (!isOther) {
+            input.value =
+                "";
+        }
     }
 }
-
 function updateReminderOptions() {
-    const enabled =
+    const checkbox =
         document.getElementById(
             "matchReminders"
-        ).checked;
-
+        );
     const options =
         document.getElementById(
             "reminderOptions"
         );
-
+    if (
+        !checkbox ||
+        !options
+    ) {
+        return;
+    }
+    const enabled =
+        checkbox.checked;
     const timingInputs =
         options.querySelectorAll(
             'input[name="reminderTiming"]'
         );
-
     options.hidden =
         !enabled;
-
     timingInputs.forEach(
-        (input, index) => {
+        (input) => {
             input.required =
-                enabled &&
-                index === 0;
-
+                false;
             if (!enabled) {
-                input.checked = false;
+                input.checked =
+                    false;
             }
         }
     );
 }
-
 function getAvailability() {
     return [
         ...document.querySelectorAll(
@@ -252,19 +251,18 @@ function getAvailability() {
     ].map((row) => ({
         day:
             row.dataset.day,
-
         start:
             row.querySelector(
                 'select[name$="Start"]'
-            ).value,
-
+            )?.value ||
+            "",
         end:
             row.querySelector(
                 'select[name$="End"]'
-            ).value
+            )?.value ||
+            ""
     }));
 }
-
 function showMessage(
     message,
     state
@@ -273,93 +271,392 @@ function showMessage(
         document.getElementById(
             "registrationMessage"
         );
-
+    if (!element) {
+        return;
+    }
     element.textContent =
         message;
-
     element.dataset.state =
         state;
-
     element.hidden =
         false;
-
     element.scrollIntoView({
-        behavior: "smooth",
-        block: "center"
+        behavior:
+            "smooth",
+        block:
+            "center"
     });
 }
-
-async function loadEpicProfile() {
+function hideMessage() {
+    const element =
+        document.getElementById(
+            "registrationMessage"
+        );
+    if (!element) {
+        return;
+    }
+    element.hidden =
+        true;
+    element.textContent =
+        "";
+    element.dataset.state =
+        "";
+}
+function setInputValue(
+    id,
+    value
+) {
+    const element =
+        document.getElementById(
+            id
+        );
+    if (!element) {
+        return;
+    }
+    element.value =
+        value ??
+        "";
+}
+function setCheckboxValue(
+    id,
+    value
+) {
+    const element =
+        document.getElementById(
+            id
+        );
+    if (!element) {
+        return;
+    }
+    element.checked =
+        value === true;
+}
+function setRadioValue(
+    name,
+    value
+) {
+    if (
+        value === null ||
+        value === undefined ||
+        value === ""
+    ) {
+        return;
+    }
+    const input =
+        document.querySelector(
+            `input[name="${name}"][value="${CSS.escape(
+                String(value)
+            )}"]`
+        );
+    if (input) {
+        input.checked =
+            true;
+    }
+}
+function populateAvailability(
+    availability
+) {
+    if (!Array.isArray(availability)) {
+        return;
+    }
+    availability.forEach(
+        (item) => {
+            const day =
+                String(
+                    item?.day ||
+                    ""
+                )
+                    .trim()
+                    .toLowerCase();
+            if (!day) {
+                return;
+            }
+            const row =
+                document.querySelector(
+                    `.availability-row[data-day="${CSS.escape(
+                        day
+                    )}"]`
+                );
+            if (!row) {
+                return;
+            }
+            const checkbox =
+                row.querySelector(
+                    'input[name="availableDays"]'
+                );
+            const start =
+                row.querySelector(
+                    'select[name$="Start"]'
+                );
+            const end =
+                row.querySelector(
+                    'select[name$="End"]'
+                );
+            if (checkbox) {
+                checkbox.checked =
+                    true;
+                updateAvailabilityRow(
+                    checkbox
+                );
+            }
+            if (
+                start &&
+                item?.start
+            ) {
+                start.value =
+                    item.start;
+            }
+            if (
+                end &&
+                item?.end
+            ) {
+                end.value =
+                    item.end;
+            }
+        }
+    );
+}
+function normalizeProfile(
+    result
+) {
+    const profile =
+        result?.profile &&
+        typeof result.profile ===
+        "object"
+            ? result.profile
+            : {};
+    return {
+        EpicUniqueId:
+            profile.EpicUniqueId ||
+            profile.epicUniqueId ||
+            result?.user?.EpicUniqueId ||
+            null,
+        EpicDisplayName:
+            profile.EpicDisplayName ||
+            profile.epicDisplayName ||
+            profile.displayName ||
+            result?.user?.EpicDisplayName ||
+            result?.user?.displayName ||
+            "",
+        EpicPreferredUsername:
+            profile.EpicPreferredUsername ||
+            profile.epicPreferredUsername ||
+            result?.user?.EpicPreferredUsername ||
+            null,
+        displayName:
+            profile.displayName ||
+            profile.username ||
+            profile.EpicDisplayName ||
+            profile.epicDisplayName ||
+            result?.user?.EpicDisplayName ||
+            "",
+        contactMethod:
+            profile.contactMethod ||
+            profile.contact_method ||
+            "email",
+        email:
+            profile.email ||
+            "",
+        phone:
+            profile.phone ||
+            "",
+        preferredMode:
+            profile.preferredMode ||
+            profile.preferred_mode ||
+            "",
+        otherMode:
+            profile.otherMode ||
+            profile.other_mode ||
+            "",
+        timezone:
+            profile.timezone ||
+            "",
+        availability:
+            Array.isArray(
+                profile.availability
+            )
+                ? profile.availability
+                : [],
+        showOnlineStatus:
+            profile.showOnlineStatus ===
+            true ||
+            profile.show_online_status ===
+            true,
+        matchReminders:
+            profile.matchReminders ===
+            true ||
+            profile.match_reminders ===
+            true,
+        reminderTiming:
+            profile.reminderTiming ||
+            profile.reminder_timing ||
+            null,
+        ageConsent:
+            profile.ageConsent ===
+            true ||
+            profile.age_consent ===
+            true,
+        profileComplete:
+            result?.profileComplete ===
+            true ||
+            profile.profileComplete ===
+            true ||
+            profile.profile_complete ===
+            true
+    };
+}
+function populateProfileForm(
+    profile
+) {
+    setInputValue(
+        "epicDisplayName",
+        profile.EpicDisplayName ||
+        "Epic Player"
+    );
+    setInputValue(
+        "epicPlatform",
+        "Epic Games"
+    );
+    setInputValue(
+        "displayName",
+        profile.displayName ||
+        profile.EpicDisplayName ||
+        ""
+    );
+    setRadioValue(
+        "contactMethod",
+        profile.contactMethod
+    );
+    setInputValue(
+        "email",
+        profile.email
+    );
+    setInputValue(
+        "phone",
+        profile.phone
+    );
+    if (profile.preferredMode) {
+        setRadioValue(
+            "preferredMode",
+            profile.preferredMode
+        );
+    }
+    setInputValue(
+        "otherMode",
+        profile.otherMode
+    );
+    setCheckboxValue(
+        "showOnlineStatus",
+        profile.showOnlineStatus
+    );
+    setCheckboxValue(
+        "matchReminders",
+        profile.matchReminders
+    );
+    setCheckboxValue(
+        "ageConsent",
+        profile.ageConsent
+    );
+    if (
+        profile.reminderTiming
+    ) {
+        setRadioValue(
+            "reminderTiming",
+            profile.reminderTiming
+        );
+    }
+    const detectedTimezone =
+        Intl
+            .DateTimeFormat()
+            .resolvedOptions()
+            .timeZone ||
+        "UTC";
+    const timezone =
+        profile.timezone ||
+        detectedTimezone;
+    setInputValue(
+        "timezone",
+        timezone
+    );
+    const detectedTimezoneElement =
+        document.getElementById(
+            "detectedTimezone"
+        );
+    if (detectedTimezoneElement) {
+        detectedTimezoneElement.textContent =
+            timezone;
+    }
+    populateAvailability(
+        profile.availability
+    );
+    updateContactFields();
+    updateModeField();
+    updateReminderOptions();
+}
+async function loadRocketLeagueProfile() {
     const response =
         await fetch(
-            "/api/auth/session",
+            ROCKET_LEAGUE_PROFILE_URL,
             {
+                method:
+                    "GET",
                 credentials:
                     "same-origin",
                 cache:
-                    "no-store"
+                    "no-store",
+                headers: {
+                    "accept":
+                        "application/json"
+                }
             }
         );
-
-    if (!response.ok) {
+    const result =
+        await response
+            .json()
+            .catch(
+                () => ({})
+            );
+    if (response.status === 401) {
+        window.location.replace(
+            "/RocketLeague"
+        );
+        return null;
+    }
+    if (
+        !response.ok ||
+        result.success !== true
+    ) {
         throw new Error(
-            "Your Epic login session could not be loaded."
+            result.message ||
+            "Your Rocket League profile could not be loaded."
         );
     }
-
-    const result =
-        await response.json();
-
-    const profile =
-        result.session ||
-        result.user ||
-        result;
-
-    document.getElementById(
-        "epicDisplayName"
-    ).value =
-        profile.displayName ||
-        profile.epicDisplayName ||
-        "Epic Player";
-
-    document.getElementById(
-        "epicPlatform"
-    ).value =
-        profile.platform ||
-        "Epic Games";
-
-    document.getElementById(
-        "displayName"
-    ).value =
-        profile.displayName ||
-        profile.epicDisplayName ||
-        "";
+    return normalizeProfile(
+        result
+    );
 }
-
 async function submitRegistration(
     event
 ) {
     event.preventDefault();
-
+    hideMessage();
     const form =
         event.currentTarget;
-
     const availability =
         getAvailability();
-
     if (!form.reportValidity()) {
         return;
     }
-
-    if (availability.length === 0) {
+    if (
+        availability.length ===
+        0
+    ) {
         showMessage(
             "Select at least one day when you are available.",
             "error"
         );
-
         return;
     }
-
     if (
         availability.some(
             ({ start, end }) =>
@@ -370,146 +667,165 @@ async function submitRegistration(
             "Each availability end time must be later than its start time.",
             "error"
         );
-
         return;
     }
-
     const data =
-        new FormData(form);
-
+        new FormData(
+            form
+        );
     const submitButton =
         document.getElementById(
             "registrationSubmit"
         );
-
     const payload = {
         ageConsent:
-            data.get("ageConsent") ===
+            data.get(
+                "ageConsent"
+            ) ===
             "on",
-
         displayName:
             String(
-                data.get("displayName") ||
+                data.get(
+                    "displayName"
+                ) ||
                 ""
             ).trim(),
-
         showOnlineStatus:
-            data.get("showOnlineStatus") ===
+            data.get(
+                "showOnlineStatus"
+            ) ===
             "on",
-
         contactMethod:
-            data.get("contactMethod"),
-
+            data.get(
+                "contactMethod"
+            ),
         email:
             String(
-                data.get("email") ||
+                data.get(
+                    "email"
+                ) ||
                 ""
             ).trim(),
-
         phone:
             String(
-                data.get("phone") ||
+                data.get(
+                    "phone"
+                ) ||
                 ""
             ).trim(),
-
         preferredMode:
-            data.get("preferredMode"),
-
+            data.get(
+                "preferredMode"
+            ),
         otherMode:
             String(
-                data.get("otherMode") ||
+                data.get(
+                    "otherMode"
+                ) ||
                 ""
             ).trim(),
-
         timezone:
-            data.get("timezone"),
-
+            data.get(
+                "timezone"
+            ),
         availability,
-
         matchReminders:
-            data.get("matchReminders") ===
+            data.get(
+                "matchReminders"
+            ) ===
             "on",
-
         reminderTiming:
             data.get(
                 "reminderTiming"
-            ) || null
+            ) ||
+            null
     };
-
-    submitButton.disabled =
-        true;
-
-    submitButton.textContent =
-        "Saving…";
-
+    if (submitButton) {
+        submitButton.disabled =
+            true;
+        submitButton.textContent =
+            "Saving…";
+    }
     try {
         const response =
             await fetch(
-                "/api/auth/register",
+                ROCKET_LEAGUE_PROFILE_UPDATE_URL,
                 {
                     method:
                         "POST",
-
                     credentials:
                         "same-origin",
-
+                    cache:
+                        "no-store",
                     headers: {
                         "Content-Type":
+                            "application/json",
+                        "accept":
                             "application/json"
                     },
-
                     body:
                         JSON.stringify(
                             payload
                         )
                 }
             );
-
         const result =
             await response
                 .json()
-                .catch(() => ({}));
-
+                .catch(
+                    () => ({})
+                );
         if (
             !response.ok ||
-            result.success === false
+            result.success !== true
         ) {
             throw new Error(
                 result.message ||
-                "Registration could not be completed."
+                "Profile could not be saved."
             );
         }
-
         showMessage(
-            "Registration completed. Redirecting…",
+            result.profileComplete ===
+            true
+                ? "Profile completed. Redirecting…"
+                : "Profile saved.",
             "success"
         );
-
-        window.location.replace(
-            result.redirectTo ||
-            "/RocketLeague"
-        );
+        if (
+            result.profileComplete ===
+            true
+        ) {
+            window.location.replace(
+                result.redirectTo ||
+                "/RocketLeague"
+            );
+            return;
+        }
+        if (submitButton) {
+            submitButton.disabled =
+                false;
+            submitButton.textContent =
+                "Save Profile";
+        }
     } catch (error) {
         showMessage(
-            error.message ||
-            "Registration could not be completed.",
+            error?.message ||
+            "Profile could not be saved.",
             "error"
         );
-
-        submitButton.disabled =
-            false;
-
-        submitButton.textContent =
-            "Complete Registration";
+        if (submitButton) {
+            submitButton.disabled =
+                false;
+            submitButton.textContent =
+                "Complete Registration";
+        }
     }
 }
-
 export async function initializeRegistrationPage() {
     const form =
         document.getElementById(
             "rlRegistrationForm"
         );
-
     if (
         !form ||
         form.dataset.initialized ===
@@ -517,29 +833,27 @@ export async function initializeRegistrationPage() {
     ) {
         return;
     }
-
     form.dataset.initialized =
         "true";
-
     renderAvailabilityRows();
-
-    const timezone =
+    const detectedTimezone =
         Intl
             .DateTimeFormat()
             .resolvedOptions()
             .timeZone ||
         "UTC";
-
-    document.getElementById(
-        "timezone"
-    ).value =
-        timezone;
-
-    document.getElementById(
-        "detectedTimezone"
-    ).textContent =
-        timezone;
-
+    setInputValue(
+        "timezone",
+        detectedTimezone
+    );
+    const detectedTimezoneElement =
+        document.getElementById(
+            "detectedTimezone"
+        );
+    if (detectedTimezoneElement) {
+        detectedTimezoneElement.textContent =
+            detectedTimezone;
+    }
     document
         .querySelectorAll(
             'input[name="contactMethod"]'
@@ -550,7 +864,6 @@ export async function initializeRegistrationPage() {
                 updateContactFields
             );
         });
-
     document
         .querySelectorAll(
             'input[name="preferredMode"]'
@@ -561,30 +874,36 @@ export async function initializeRegistrationPage() {
                 updateModeField
             );
         });
-
-    document
-        .getElementById(
+    const matchReminders =
+        document.getElementById(
             "matchReminders"
-        )
-        .addEventListener(
+        );
+    if (matchReminders) {
+        matchReminders.addEventListener(
             "change",
             updateReminderOptions
         );
-
+    }
     form.addEventListener(
         "submit",
         submitRegistration
     );
-
     updateContactFields();
     updateModeField();
     updateReminderOptions();
-
     try {
-        await loadEpicProfile();
+        const profile =
+            await loadRocketLeagueProfile();
+        if (!profile) {
+            return;
+        }
+        populateProfileForm(
+            profile
+        );
     } catch (error) {
         showMessage(
-            error.message,
+            error?.message ||
+            "Your profile could not be loaded.",
             "error"
         );
     }
