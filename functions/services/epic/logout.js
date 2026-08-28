@@ -13,6 +13,7 @@ import {
     AUTH_STATE_COOKIE
 } from "../../api_vars.js";
 
+
 export async function handleLogout(
     request,
     env
@@ -36,21 +37,45 @@ export async function handleLogout(
                 AUTH_SESSION_COOKIE
             );
 
-        if (
-            sessionId &&
-            env.AUTH_SESSIONS
-        ) {
-            await env.AUTH_SESSIONS.delete(
-                `session:${sessionId}`
-            );
 
-            console.info(
-                "LOGOUT SERVICE: Session deleted.",
-                {
-                    debugId
-                }
-            );
+        /*
+        =========================================================
+        DELETE SERVER-SIDE SESSION
+        =========================================================
+        */
+
+        if (sessionId) {
+
+            if (!env.AUTH_SESSIONS) {
+                console.warn(
+                    "LOGOUT SERVICE: AUTH_SESSIONS binding unavailable.",
+                    {
+                        debugId
+                    }
+                );
+            } else {
+                await env.AUTH_SESSIONS.delete(
+                    `session:${sessionId}`
+                );
+
+                console.info(
+                    "LOGOUT SERVICE: Cloudflare session deleted.",
+                    {
+                        debugId,
+                        sessionDeleted:
+                            true
+                    }
+                );
+            }
+
         }
+
+
+        /*
+        =========================================================
+        EXPIRE AUTH COOKIES
+        =========================================================
+        */
 
         const sessionCookie =
             createCookie(
@@ -68,6 +93,7 @@ export async function handleLogout(
                 0
             );
 
+
         console.info(
             "LOGOUT SERVICE: Completed.",
             {
@@ -77,6 +103,13 @@ export async function handleLogout(
             }
         );
 
+
+        /*
+        =========================================================
+        RETURN TO LOGGED-OUT PAGE
+        =========================================================
+        */
+
         return redirect(
             "/RocketLeague",
             [
@@ -84,18 +117,22 @@ export async function handleLogout(
                 stateCookie
             ]
         );
+
     } catch (error) {
+
         console.error(
             "LOGOUT SERVICE: Failed.",
             {
                 debugId,
                 name:
-                    error?.name || "Error",
+                    error?.name ||
+                    "Error",
                 message:
                     error?.message ||
                     "Unknown error",
                 stack:
-                    error?.stack || null
+                    error?.stack ||
+                    null
             }
         );
 
