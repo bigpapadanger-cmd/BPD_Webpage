@@ -455,9 +455,7 @@ export async function handleEpicCallback(
         );
 
         const redirectDestination =
-            registrationComplete
-                ? "/RocketLeague"
-                : "/RocketLeague/Register";
+                "/RocketLeague";
 
         return redirect(
             redirectDestination,
