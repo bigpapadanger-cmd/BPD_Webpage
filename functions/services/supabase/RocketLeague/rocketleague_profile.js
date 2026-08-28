@@ -4,25 +4,26 @@ export async function getRocketLeagueProfileByEpicId(
 ) {
     // Supabase fetch/query here
 
-    // Normalize DB result before returning it:
+    // Normalize DB result before returning it: 
+    /**** CHANGE WHAT IS RETURNED AND THEN CALL THAT FOR THE RETURN */
     return {
-        profileComplete: true,
-        displayName: "PlayerName",
+        profileComplete: false,
+        displayName: "...",
         ranked: {
             duel: {
-                tier: "Champion 1",
-                division: "Division II",
-                mmr: 1100
+                tier: "Unranked",
+                division: "",
+                mmr: null
             },
             double: {
-                tier: "Champion 2",
-                division: "Division III",
-                mmr: 1250
+                tier: "Unranked",
+                division: "",
+                mmr: null
             },
             standard: {
-                tier: "Champion 1",
-                division: "Division IV",
-                mmr: 1180
+                tier: "Unranked",
+                division: "",
+                mmr: null
             }
         }
     };

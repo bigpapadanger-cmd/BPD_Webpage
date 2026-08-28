@@ -316,3 +316,107 @@ document.addEventListener(
         once: true
     }
 );
+async function loadProfileForm() {
+    const response =
+        await fetch(
+            "/api/rocketleague/profile",
+            {
+                method:
+                    "GET",
+                credentials:
+                    "same-origin",
+                cache:
+                    "no-store",
+                headers: {
+                    "accept":
+                        "application/json"
+                }
+            }
+        );
+
+    const result =
+        await response.json();
+
+    if (
+        !response.ok ||
+        result.success !== true
+    ) {
+        throw new Error(
+            result.message ||
+            "Unable to load profile."
+        );
+    }
+
+    populateProfileForm(
+        result.profile
+    );
+}
+function populateProfileForm(
+    profile
+) {
+    const displayName =
+        document.getElementById(
+            "profileDisplayName"
+        );
+
+    const email =
+        document.getElementById(
+            "profileEmail"
+        );
+
+    const phone =
+        document.getElementById(
+            "profilePhone"
+        );
+
+    const preferredMode =
+        document.getElementById(
+            "profilePreferredMode"
+        );
+
+    const showOnlineStatus =
+        document.getElementById(
+            "profileShowOnlineStatus"
+        );
+
+    const matchReminders =
+        document.getElementById(
+            "profileMatchReminders"
+        );
+
+    if (displayName) {
+        displayName.value =
+            profile?.EpicDisplayName ||
+            "";
+    }
+
+    if (email) {
+        email.value =
+            profile?.email ||
+            "";
+    }
+
+    if (phone) {
+        phone.value =
+            profile?.phone ||
+            "";
+    }
+
+    if (preferredMode) {
+        preferredMode.value =
+            profile?.preferredMode ||
+            "";
+    }
+
+    if (showOnlineStatus) {
+        showOnlineStatus.checked =
+            profile?.showOnlineStatus ===
+            true;
+    }
+
+    if (matchReminders) {
+        matchReminders.checked =
+            profile?.matchReminders ===
+            true;
+    }
+}

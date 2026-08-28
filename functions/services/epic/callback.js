@@ -13,6 +13,7 @@ import {
     createCookie,
     SESSION_TTL
 } from "../common_helpers/reload_sessions.js";
+import { handleRocketLeagueSignin } from "../supabase/RocketLeague/signin.js";
 function limitMessage(value) {
     return String(
         value || ""
@@ -406,10 +407,22 @@ export async function handleEpicCallback(
                 500
             );
         }
-        console.info(
-            "EPIC CALLBACK: Authentication completed.",
+
+        //////////////////////////////////////////////////
+        // ***ADD SUPABASE CALL HERE                    //
+        // ***USE sessionData for passed minimum vars   //
+        // ***/supabase/RocketLeague/signin.js          //
+        // ***Above Fn will pass minimum data           //
+        //////////////////////////////////////////////////
+        await handleRocketLeagueSignin(
+            env,
             {
-                debugId
+                EpicUniqueId:
+                    sessionData.EpicUniqueId,
+                EpicDisplayName:
+                    sessionData.EpicDisplayName,
+                EpicPreferredUsername:
+                    sessionData.EpicPreferredUsername
             }
         );
         return redirect(

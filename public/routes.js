@@ -38,6 +38,23 @@ export const ROUTES = {
 
         
     },
+
+    "/RocketLeague/Profile": {
+        title: "Rocket League Profile Creation| BPD Gaming Network",
+        body:
+            "/Tabs/RocketLeague/Registration/HTML/index.html",
+        header:
+            "/Framework/Shell/HTML/Header/header.html",
+        sidebar:
+            "/Framework/Shell/HTML/Sidebar/mainmenu.html",
+        footer:
+            "/Framework/Shell/HTML/Footer/footer.html",
+        module: 
+            "/Tabs/RocketLeague/Index/JS/index.js",
+        sitemap: true
+
+        
+    },
     "/RocketLeague/ImageScanning": {
         title: "Rocket League | BPD Gaming Network",
         body:
