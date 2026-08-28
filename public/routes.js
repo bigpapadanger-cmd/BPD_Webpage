@@ -50,7 +50,7 @@ export const ROUTES = {
         footer:
             "/Framework/Shell/HTML/Footer/footer.html",
         module: 
-            "/Tabs/RocketLeague/Index/JS/index.js",
+            "/Tabs/RocketLeague/Registration/JS/index.js",
         sitemap: true
 
         
