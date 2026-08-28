@@ -2,6 +2,7 @@
 NEW LINKS REQUIRE Being Added in their own Folder, they need a unique title, and module, 
 these handle loading unique data on each injected page. The css goes in index.html.
 The header and sidebar can stay default but add to const HEADER_MAP, and PRIORITY_MAP
+LASTLY ADD IN _redirects
 */
 
 export const ROUTES = {
@@ -28,7 +29,7 @@ export const ROUTES = {
         header:
             "/Framework/Shell/HTML/Header/header.html",
         sidebar:
-            "/Tabs/RocketLeague/Sidebars/HTML/rl_AuthSidebar.html",
+            "/Framework/Shell/HTML/Sidebar/rl_AuthSidebar.html",
         footer:
             "/Framework/Shell/HTML/Footer/footer.html",
         module: 
@@ -37,7 +38,23 @@ export const ROUTES = {
 
         
     },
-    "/RocketLeague/": {
+    "/RocketLeague/ImageScanning": {
+        title: "Rocket League | BPD Gaming Network",
+        body:
+            "/Tabs/RocketLeague/Index/HTML/index.html",
+        header:
+            "/Framework/Shell/HTML/Header/header.html",
+        sidebar:
+            "/Framework/Shell/HTML/Sidebar/rl_AuthSidebar.html",
+        footer:
+            "/Framework/Shell/HTML/Footer/footer.html",
+        module: 
+            "/Tabs/RocketLeague/Index/JS/index.js",
+        sitemap: true
+
+        
+    },
+    "/RocketLeague/Leaderboards": {
         title: "Rocket League | BPD Gaming Network",
         body:
             "/Tabs/RocketLeague/Index/HTML/index.html",
@@ -177,7 +194,7 @@ export const ROUTES = {
     "/Ark": {
     title: "Ark Survival Ascended | BPD Gaming Network",
     body:
-        "/Required/TOS/HTML/index.html",
+        "/Tabs/Ark/HTML/index.html",
     header:
         "/Framework/Shell/HTML/Header/header.html",
     sidebar:
@@ -185,7 +202,7 @@ export const ROUTES = {
     footer:
         "/Framework/Shell/HTML/Footer/footer.html",
     module: 
-        "/Required/TOS/JS/loadPage.js",
+        "/Tabs/Ark/JS/index.js",
         sitemap: true
     }
 
@@ -204,7 +221,7 @@ export const HEADER_MAP = {
     "/Dashboard": true,
     "/FAQ": false,
     "/Minecraft":false,
-    "/Ark":false
+    "/Ark":true
 };
 
 export const PRIORITY_MAP = {

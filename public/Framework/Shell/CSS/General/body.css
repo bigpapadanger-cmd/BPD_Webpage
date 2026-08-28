@@ -1,14 +1,16 @@
 /* BPD GAMING NETWORK - GLOBAL BODY */
-
+* {
+    box-sizing: border-box;
+    padding: 2px;
+}
 .site-content {
     display: block;
     flex: 1 1 auto;
     align-self: auto;
     width: 100%;
-    max-width: none;
+    max-width: auto;
     min-width: fit-content;
     min-height: 60vh;
-    margin: 0;
     padding:
         0
         0

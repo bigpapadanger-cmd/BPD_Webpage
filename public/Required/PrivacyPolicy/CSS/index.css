@@ -11,11 +11,7 @@
     --accent-soft: rgba(255, 138, 36, 0.13);
     --max-width: 980px;
 }
-* {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-}
+
 html {
     scroll-behavior: smooth;
 }
