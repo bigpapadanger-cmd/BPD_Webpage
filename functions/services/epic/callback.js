@@ -407,6 +407,7 @@ export async function handleEpicCallback(
         const sessionKey =
             `session:${sessionId}`;
 
+        //**are their other variables able to pick up?
         const sessionData = {
             epicAccountId:
                 profile.id || "",
@@ -416,7 +417,7 @@ export async function handleEpicCallback(
             createdAt:
                 Date.now()
         };
-
+        //**add function here to store session data in the DB
         await env.AUTH_SESSIONS.put(
             sessionKey,
             JSON.stringify(sessionData),
