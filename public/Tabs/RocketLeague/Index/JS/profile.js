@@ -1,27 +1,33 @@
 "use strict";
-
 import {
     ROCKET_LEAGUE_PROFILE_URL
 } from "/scripts/apiRoutes.js";
-
 import {
     renderRocketLeagueRanks
 } from "./ranks.js";
-
+function getEpicDisplayName(
+    authUser
+) {
+    return (
+        authUser?.EpicDisplayName ||
+        authUser?.EpicPreferredUsername ||
+        authUser?.displayName ||
+        authUser?.preferredUsername ||
+        ""
+    );
+}
 function setPlayerName(value) {
     const playerNameElement =
         document.getElementById(
             "rocketLeaguePlayerName"
         );
-
     if (!playerNameElement) {
         return;
     }
-
     playerNameElement.textContent =
-        value || "Epic Player";
+        value ||
+        "Epic Player";
 }
-
 function setRankStatus(
     message,
     state
@@ -30,47 +36,71 @@ function setRankStatus(
         document.getElementById(
             "rocketLeagueRankStatus"
         );
-
     if (!statusElement) {
         return;
     }
-
     statusElement.textContent =
         message;
-
     statusElement.dataset.state =
         state;
 }
-
+function isProfileComplete(
+    result,
+    profile
+) {
+    if (
+        result?.profileComplete === true ||
+        result?.profileCompleted === true ||
+        result?.registrationComplete === true ||
+        profile?.profileComplete === true ||
+        profile?.profileCompleted === true ||
+        profile?.registrationComplete === true
+    ) {
+        return true;
+    }
+    return false;
+}
 function renderRocketLeagueProfile(
     authUser,
     profile
 ) {
     setPlayerName(
         profile?.username ||
-        authUser?.displayName ||
+        profile?.displayName ||
+        getEpicDisplayName(
+            authUser
+        ) ||
         "Epic Player"
     );
-
     const ranked =
-        profile?.stats?.ranked || {};
-
-    renderRocketLeagueRanks(ranked);
-
+        profile?.stats?.ranked ||
+        profile?.ranked ||
+        {};
+    renderRocketLeagueRanks(
+        ranked
+    );
+    const hasRankData =
+        Object.keys(
+            ranked
+        ).length > 0;
     setRankStatus(
-        "Current competitive playlist ratings",
-        "ready"
+        hasRankData
+            ? "Current competitive playlist ratings"
+            : "No competitive MMR found",
+        hasRankData
+            ? "ready"
+            : "empty"
     );
 }
-
 export async function loadRocketLeagueProfile(
     authUser
 ) {
     setPlayerName(
-        authUser?.displayName ||
+        getEpicDisplayName(
+            authUser
+        ) ||
         "Epic Player"
     );
-
     const response =
         await fetch(
             ROCKET_LEAGUE_PROFILE_URL,
@@ -84,14 +114,12 @@ export async function loadRocketLeagueProfile(
                 }
             }
         );
-
     const result =
         await response.json().catch(
             function() {
                 return {};
             }
         );
-
     if (
         !response.ok ||
         result.success !== true
@@ -101,9 +129,18 @@ export async function loadRocketLeagueProfile(
             "Rocket League profile could not be loaded."
         );
     }
-
+    const profile =
+        result.profile || {};
     renderRocketLeagueProfile(
         authUser,
-        result.profile
+        profile
     );
+    return {
+        profile,
+        profileComplete:
+            isProfileComplete(
+                result,
+                profile
+            )
+    };
 }

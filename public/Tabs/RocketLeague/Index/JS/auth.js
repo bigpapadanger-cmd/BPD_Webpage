@@ -1,21 +1,18 @@
 "use strict";
-
 import {
     ROCKET_LEAGUE_SESSION_URL
 } from "/scripts/apiRoutes.js";
-
 import {
     applySidebarAuthState
 } from "./sidebar_auth.js";
-
 import {
     loadRocketLeagueProfile
 } from "./profile.js";
-
 import {
     renderUnavailableRanks
 } from "./ranks.js";
-
+const ROCKET_LEAGUE_PROFILE_PAGE =
+    "/RocketLeague/Profile";
 function normalizeAuthSession(
     authSession
 ) {
@@ -23,12 +20,10 @@ function normalizeAuthSession(
         authenticated:
             authSession?.authenticated ===
             true,
-
         user:
             authSession?.user || null
     };
 }
-
 function applyRocketLeagueAuthView(
     authSession
 ) {
@@ -36,48 +31,38 @@ function applyRocketLeagueAuthView(
         normalizeAuthSession(
             authSession
         );
-
     const {
         authenticated
     } = normalizedSession;
-
     const loggedOutContent =
         document.getElementById(
             "rocketLeagueLoggedOut"
         );
-
     const authenticatedContent =
         document.getElementById(
             "rocketLeagueAuthenticatedContent"
         );
-
     const playerProfile =
         document.getElementById(
             "rocketLeaguePlayerProfile"
         );
-
     if (loggedOutContent) {
         loggedOutContent.hidden =
             authenticated;
     }
-
     if (authenticatedContent) {
         authenticatedContent.hidden =
             !authenticated;
     }
-
     if (playerProfile) {
         playerProfile.hidden =
             !authenticated;
     }
-
     document.body.dataset.authenticated =
         String(authenticated);
-
     applySidebarAuthState(
         normalizedSession
     );
-
     document.dispatchEvent(
         new CustomEvent(
             "bpd:auth-changed",
@@ -87,19 +72,16 @@ function applyRocketLeagueAuthView(
             }
         )
     );
-
     return normalizedSession;
 }
-
 async function loadAuthenticatedUser() {
     if (
         window.BPDAuth &&
         typeof window.BPDAuth.getSession ===
-            "function"
+        "function"
     ) {
         return window.BPDAuth.getSession();
     }
-
     const response =
         await fetch(
             ROCKET_LEAGUE_SESSION_URL,
@@ -113,42 +95,67 @@ async function loadAuthenticatedUser() {
                 }
             }
         );
-
     if (!response.ok) {
         throw new Error(
             `Authentication request failed with ${response.status}.`
         );
     }
-
     return response.json();
 }
-
+function openRequiredProfilePage() {
+    if (
+        window.location.pathname ===
+        ROCKET_LEAGUE_PROFILE_PAGE
+    ) {
+        return;
+    }
+    if (
+        window.BPDRouter &&
+        typeof window.BPDRouter.navigate ===
+        "function"
+    ) {
+        window.BPDRouter.navigate(
+            ROCKET_LEAGUE_PROFILE_PAGE,
+            {
+                replace: true
+            }
+        );
+        return;
+    }
+    window.location.replace(
+        ROCKET_LEAGUE_PROFILE_PAGE
+    );
+}
 export async function initializeRocketLeagueAuthView() {
     try {
         const authSession =
             await loadAuthenticatedUser();
-
         const normalizedSession =
             applyRocketLeagueAuthView(
                 authSession
             );
-
         if (
             !normalizedSession.authenticated
         ) {
             return;
         }
-
         try {
-            await loadRocketLeagueProfile(
-                normalizedSession.user
-            );
+            const profileResult =
+                await loadRocketLeagueProfile(
+                    normalizedSession.user
+                );
+            if (
+                profileResult.profileComplete !==
+                true
+            ) {
+                openRequiredProfilePage();
+                return;
+            }
         } catch (profileError) {
             console.warn(
-                "ROCKET LEAGUE PROFILE: Unable to load ranks.",
+                "ROCKET LEAGUE PROFILE: Unable to load profile.",
                 profileError
             );
-
             renderUnavailableRanks(
                 profileError.message
             );
@@ -158,7 +165,6 @@ export async function initializeRocketLeagueAuthView() {
             "ROCKET LEAGUE AUTH: Unable to load session.",
             error
         );
-
         applyRocketLeagueAuthView({
             authenticated: false,
             user: null

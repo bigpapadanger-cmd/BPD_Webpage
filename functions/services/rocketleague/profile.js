@@ -1,131 +1,131 @@
-import { json } from "../common_helpers/responses.js";
-
-import { getStoredSession } from "../common_helpers/reload_sessions.js";
-
-/*
-=========================================================
-TEMPORARILY DISABLED — TRN ROCKET LEAGUE LOOKUP
-=========================================================
-
-Cloudflare Pages Functions cannot bundle `trn-rocket-league`
-because that package depends on Node.js `child_process`.
-
-Previous import:
-
 import {
-    fetchProfile,
-    fetchSessions
-} from "trn-rocket-league";
+    json
+} from "../common_helpers/responses.js";
+import {
+    getStoredSession
+} from "../common_helpers/reload_sessions.js";
+import {
+    getRocketLeagueProfileByEpicId
+} from "/functions/supabase/RocketLeague/rocketleague_profile.js";
+export async function handleRocketLeagueProfile(
+    request,
+    env
+) {
+    try {
+        const storedSession =
+            await getStoredSession(
+                request,
+                env
+            );
 
-Previous calls:
+        if (!storedSession) {
+            return json(
+                {
+                    success: false,
+                    authenticated: false,
+                    message:
+                        "Login is required to load Rocket League profile."
+                },
+                401
+            );
+        }
 
-const profile = await fetchProfile(
-    username,
-    platform,
-    {
-        signal: controller.signal
-    }
-);
+        const sessionData =
+            storedSession.sessionData || {};
 
-const sessions = await fetchSessions(
-    username,
-    platform,
-    {
-        signal: controller.signal
-    }
-);
+        const EpicUniqueId =
+            String(
+                sessionData.EpicUniqueId ||
+                ""
+            ).trim();
 
-This functionality can later be moved to a separate Cloud Run
-service and called from this function using fetch().
-=========================================================
-*/
+        const EpicDisplayName =
+            String(
+                sessionData.EpicDisplayName ||
+                sessionData.EpicPreferredUsername ||
+                ""
+            ).trim();
 
-export async function handleRocketLeagueProfile(request, env) {
+        if (!EpicUniqueId) {
+            return json(
+                {
+                    success: false,
+                    authenticated: true,
+                    message:
+                        "Epic account identity is missing from the session."
+                },
+                400
+            );
+        }
 
-    const storedSession = await getStoredSession(
-        request,
-        env
-    );
+        const databaseProfile =
+            await getRocketLeagueProfileByEpicId(
+                env,
+                EpicUniqueId
+            );
 
-    if (!storedSession) {
+        if (!databaseProfile) {
+            return json(
+                {
+                    success: true,
+                    authenticated: true,
+                    profileComplete: false,
+                    profile: {
+                        username:
+                            EpicDisplayName ||
+                            "Epic Player",
+                        stats: {
+                            ranked: {}
+                        }
+                    }
+                },
+                200
+            );
+        }
 
         return json(
             {
-                success: false,
-                authenticated: false,
-                message:
-                    "Login is required to load Rocket League ranks."
+                success: true,
+                authenticated: true,
+                profileComplete:
+                    databaseProfile.profileComplete ===
+                    true,
+                profile: {
+                    username:
+                        databaseProfile.displayName ||
+                        EpicDisplayName ||
+                        "Epic Player",
+                    stats: {
+                        ranked:
+                            databaseProfile.ranked ||
+                            {}
+                    }
+                }
             },
-            401
+            200
         );
 
-    }
-
-    const sessionData = storedSession.sessionData;
-
-    const username = String(
-        sessionData.rocketLeagueLookup?.username
-        || sessionData.displayName
-        || ""
-    ).trim();
-
-    if (
-        !username
-        || username.length < 2
-    ) {
+    } catch (error) {
+        console.error(
+            "ROCKET LEAGUE PROFILE: Unexpected failure.",
+            {
+                name:
+                    error?.name ||
+                    "Error",
+                message:
+                    error?.message ||
+                    "Unknown error"
+            }
+        );
 
         return json(
             {
                 success: false,
                 authenticated: true,
                 message:
-                    "Invalid Rocket League username in session."
+                    "Rocket League profile failed to load."
             },
-            400
+            500
         );
-
     }
-
-    const platform = String(
-        sessionData.rocketLeagueLookup?.platform
-        || "epic"
-    )
-        .trim()
-        .toLowerCase();
-
-    const allowedPlatforms = [
-        "psn",
-        "xbl",
-        "steam",
-        "epic",
-        "switch"
-    ];
-
-    if (!allowedPlatforms.includes(platform)) {
-
-        return json(
-            {
-                success: false,
-                authenticated: true,
-                message:
-                    "Invalid Rocket League platform in session."
-            },
-            400
-        );
-
-    }
-
-    return json(
-        {
-            success: false,
-            authenticated: true,
-            temporarilyUnavailable: true,
-            username,
-            platform,
-            message:
-                "Rocket League profile lookup is temporarily unavailable."
-        },
-        503
-    );
-
 }
