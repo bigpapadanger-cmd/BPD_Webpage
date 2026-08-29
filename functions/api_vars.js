@@ -13,4 +13,4 @@ export const AUTH_STATE_MAX_AGE_SECONDS = 600;
 export const AUTH_SESSION_KEY_PREFIX = "session:";
 export const SESSION_DURATION_HOURS = 24; 
 export const SESSION_TTL_SECONDS = SESSION_DURATION_HOURS * 3600; // example: 24 hours
-export const future = 1;
+

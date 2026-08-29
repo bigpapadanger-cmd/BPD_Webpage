@@ -1,4 +1,4 @@
-import {future} from "/functions/api_vars.js"
+//import {future} from "../../../api_vars";
 export async function handleRocketLeagueSignin(
     env,
     sessionData
