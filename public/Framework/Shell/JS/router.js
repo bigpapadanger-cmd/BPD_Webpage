@@ -866,4 +866,10 @@ window.BPDRouter = {
         loadShell
 };
 
-loadShell();
+if (
+    !window.location.pathname.startsWith(
+        "/api/"
+    )
+) {
+    loadShell();
+}

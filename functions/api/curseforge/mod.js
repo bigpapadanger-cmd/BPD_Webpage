@@ -1,27 +1,10 @@
 export async function onRequestGet(context) {
     const {
-        request,
-        env,
-        params
+        env
     } = context;
 
     const modId =
-        params.id;
-
-    if (
-        !modId ||
-        !/^\d+$/.test(modId)
-    ) {
-        return Response.json(
-            {
-                success: false,
-                message: "Invalid mod ID."
-            },
-            {
-                status: 400
-            }
-        );
-    }
+        "980486";
 
     try {
         const response =
@@ -47,7 +30,8 @@ export async function onRequestGet(context) {
                         response.status
                 },
                 {
-                    status: response.status
+                    status:
+                        response.status
                 }
             );
         }
@@ -57,6 +41,18 @@ export async function onRequestGet(context) {
 
         const mod =
             result.data;
+
+        const latestFile =
+            mod.latestFiles?.find(
+                function(file) {
+                    return (
+                        file.id ===
+                        mod.mainFileId
+                    );
+                }
+            ) ||
+            mod.latestFiles?.[0] ||
+            null;
 
         return Response.json(
             {
@@ -79,6 +75,13 @@ export async function onRequestGet(context) {
 
                 lastUpdated:
                     mod.dateModified,
+
+                version:
+                    latestFile
+                        ?.displayName ||
+                    latestFile
+                        ?.fileName ||
+                    null,
 
                 mainFileId:
                     mod.mainFileId,
