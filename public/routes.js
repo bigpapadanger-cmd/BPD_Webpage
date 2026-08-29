@@ -197,7 +197,7 @@ export const ROUTES = {
     "/Minecraft": {
     title: "Minecraft | BPD Gaming Network",
     body:
-        "/Required/TOS/HTML/index.html",
+        "/Tabs/Minecraft/HTML/index.html",
     header:
         "/Framework/Shell/HTML/Header/header.html",
     sidebar:
@@ -205,7 +205,7 @@ export const ROUTES = {
     footer:
         "/Framework/Shell/HTML/Footer/footer.html",
     module: 
-        "/Required/TOS/JS/loadPage.js",
+        "/Tabs/Minecraft/JS/index.js",
         sitemap: true
     },
     "/Ark": {
@@ -222,7 +222,6 @@ export const ROUTES = {
         "/Tabs/Ark/JS/index.js",
         sitemap: true
     }
-
 };
 export const HEADER_MAP = {
     "/": false,

@@ -1,35 +1,32 @@
-
-/* BPD GAMING NETWORK - ARK */
-
-
+/* BPD GAMING NETWORK - MINECRAFT */
 
 /*
 =========================================================
 PANELS
 =========================================================
 */
+
 * {
     box-sizing: border-box;
 }
 
-.ark-page {
+.minecraft-page {
     display: flex;
     flex-direction: column;
     gap: 64px;
-
     width: 100%;
     max-width: 1100px;
     margin: 5% auto;
-
     padding:
         clamp(28px, 4vw, 56px)
         clamp(30px, 5vw, 70px);
 }
-.ark-panel {
+
+.minecraft-panel {
     width: 100%;
 }
 
-.ark-panel[hidden] {
+.minecraft-panel[hidden] {
     display: none;
 }
 
@@ -39,21 +36,21 @@ SECTION HEADING
 =========================================================
 */
 
-.ark-section-heading {
+.minecraft-section-heading {
     margin-bottom: 28px;
 }
 
-.ark-section-eyebrow,
-.ark-content-eyebrow {
+.minecraft-section-eyebrow,
+.minecraft-content-eyebrow {
     display: inline-block;
     margin-bottom: 8px;
-    color: #8b5cf6;
+    color: #65c466;
     font-size: 0.75rem;
     font-weight: 700;
     letter-spacing: 0.12em;
 }
 
-.ark-section-title {
+.minecraft-section-title {
     margin: 0;
     color: #ffffff;
     font-size:
@@ -64,7 +61,7 @@ SECTION HEADING
         );
 }
 
-.ark-section-description {
+.minecraft-section-description {
     max-width: 760px;
     margin: 10px 0 0;
     color: #9ca5b5;
@@ -72,14 +69,13 @@ SECTION HEADING
     line-height: 1.6;
 }
 
-
 /*
 =========================================================
 OVERVIEW
 =========================================================
 */
 
-.ark-overview {
+.minecraft-overview {
     margin-bottom: 32px;
     padding: 22px;
     border:
@@ -89,31 +85,30 @@ OVERVIEW
     background:
         linear-gradient(
             135deg,
-            rgba(139, 92, 246, 0.08),
+            rgba(101, 196, 102, 0.08),
             #15181f
         );
 }
 
-.ark-overview-content {
+.minecraft-overview-content {
     max-width: 800px;
 }
 
-.ark-overview-content h3 {
+.minecraft-overview-content h3 {
     margin: 0 0 10px;
     color: #ffffff;
     font-size: 1.1rem;
 }
 
-.ark-overview-content p {
+.minecraft-overview-content p {
     margin: 0;
     color: #aab2c1;
     line-height: 1.65;
 }
 
-.ark-overview-content p + p {
+.minecraft-overview-content p + p {
     margin-top: 10px;
 }
-
 
 /*
 =========================================================
@@ -121,11 +116,11 @@ CONTENT SECTIONS
 =========================================================
 */
 
-.ark-content-section {
+.minecraft-content-section {
     margin-top: 32px;
 }
 
-.ark-content-heading {
+.minecraft-content-heading {
     display: flex;
     align-items: flex-end;
     justify-content: space-between;
@@ -133,12 +128,11 @@ CONTENT SECTIONS
     margin-bottom: 14px;
 }
 
-.ark-content-heading h3 {
+.minecraft-content-heading h3 {
     margin: 0;
     color: #ffffff;
     font-size: 1.25rem;
 }
-
 
 /*
 =========================================================
@@ -146,14 +140,13 @@ LISTS
 =========================================================
 */
 
-.ark-mod-list,
-.ark-update-list,
-.ark-announcement-list {
+.minecraft-mod-list,
+.minecraft-update-list,
+.minecraft-announcement-list {
     display: flex;
     flex-direction: column;
     gap: 14px;
 }
-
 
 /*
 =========================================================
@@ -161,7 +154,7 @@ MOD CARDS
 =========================================================
 */
 
-.ark-mod-card {
+.minecraft-mod-card {
     padding: 20px;
     border:
         1px solid
@@ -174,49 +167,49 @@ MOD CARDS
         transform 0.2s ease;
 }
 
-.ark-mod-card:hover {
+.minecraft-mod-card:hover {
     border-color: #3b4250;
     background: #191d25;
     transform: translateY(-1px);
 }
 
-.ark-mod-header {
+.minecraft-mod-header {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
     gap: 16px;
 }
 
-.ark-mod-header h4 {
+.minecraft-mod-header h4 {
     margin: 5px 0 0;
     color: #ffffff;
     font-size: 1.05rem;
 }
 
-.ark-mod-status {
+.minecraft-mod-status {
     display: inline-flex;
     align-items: center;
     padding: 4px 8px;
     border:
         1px solid
-        rgba(139, 92, 246, 0.35);
+        rgba(101, 196, 102, 0.35);
     border-radius: 999px;
     background:
-        rgba(139, 92, 246, 0.1);
-    color: #b79cff;
+        rgba(101, 196, 102, 0.1);
+    color: #8ee990;
     font-size: 0.7rem;
     font-weight: 700;
     letter-spacing: 0.05em;
     text-transform: uppercase;
 }
 
-.ark-mod-description {
+.minecraft-mod-description {
     margin: 12px 0 0;
     color: #aab2c1;
     line-height: 1.6;
 }
 
-.ark-mod-meta {
+.minecraft-mod-meta {
     display: flex;
     flex-wrap: wrap;
     gap: 8px 16px;
@@ -229,14 +222,13 @@ MOD CARDS
     font-size: 0.8rem;
 }
 
-
 /*
 =========================================================
 UPDATE CARDS
 =========================================================
 */
 
-.ark-update-card {
+.minecraft-update-card {
     padding: 18px 20px;
     border:
         1px solid
@@ -245,31 +237,30 @@ UPDATE CARDS
     background: #15181f;
 }
 
-.ark-update-header {
+.minecraft-update-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 16px;
 }
 
-.ark-update-header h4 {
+.minecraft-update-header h4 {
     margin: 0;
     color: #ffffff;
     font-size: 1rem;
 }
 
-.ark-update-header time {
+.minecraft-update-header time {
     flex: 0 0 auto;
     color: #7f8999;
     font-size: 0.78rem;
 }
 
-.ark-update-card p {
+.minecraft-update-card p {
     margin: 10px 0 0;
     color: #aab2c1;
     line-height: 1.6;
 }
-
 
 /*
 =========================================================
@@ -277,7 +268,7 @@ ANNOUNCEMENTS
 =========================================================
 */
 
-.ark-announcement-card {
+.minecraft-announcement-card {
     padding: 22px;
     border:
         1px solid
@@ -286,40 +277,39 @@ ANNOUNCEMENTS
     background: #15181f;
 }
 
-.ark-announcement-header {
+.minecraft-announcement-header {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
     gap: 20px;
 }
 
-.ark-announcement-header h3 {
+.minecraft-announcement-header h3 {
     margin: 5px 0 0;
     color: #ffffff;
     font-size: 1.1rem;
 }
 
-.ark-announcement-header time {
+.minecraft-announcement-header time {
     flex: 0 0 auto;
     color: #7f8999;
     font-size: 0.78rem;
 }
 
-.ark-announcement-type {
+.minecraft-announcement-type {
     display: inline-block;
-    color: #8b5cf6;
+    color: #65c466;
     font-size: 0.7rem;
     font-weight: 700;
     letter-spacing: 0.1em;
     text-transform: uppercase;
 }
 
-.ark-announcement-card p {
+.minecraft-announcement-card p {
     margin: 12px 0 0;
     color: #aab2c1;
     line-height: 1.65;
 }
-
 
 /*
 =========================================================
@@ -327,7 +317,7 @@ IDEAS SECTION
 =========================================================
 */
 
-.ark-ideas-section {
+.minecraft-ideas-section {
     margin-top: 40px;
     padding: 24px;
     border:
@@ -337,28 +327,27 @@ IDEAS SECTION
     background:
         linear-gradient(
             135deg,
-            rgba(139, 92, 246, 0.08),
+            rgba(101, 196, 102, 0.08),
             #15181f
         );
 }
 
-.ark-ideas-header {
+.minecraft-ideas-header {
     margin-bottom: 20px;
 }
 
-.ark-ideas-header h2 {
+.minecraft-ideas-header h2 {
     margin: 0;
     color: #ffffff;
     font-size: 1.3rem;
 }
 
-.ark-ideas-header p {
+.minecraft-ideas-header p {
     max-width: 700px;
     margin: 8px 0 0;
     color: #9ca5b5;
     line-height: 1.6;
 }
-
 
 /*
 =========================================================
@@ -366,26 +355,25 @@ IDEA FORM
 =========================================================
 */
 
-.ark-idea-form {
+.minecraft-idea-form {
     display: flex;
     flex-direction: column;
     row-gap: 1em;
 }
 
-.ark-idea-field {
+.minecraft-idea-field {
     display: flex;
     flex-direction: column;
-
 }
 
-.ark-idea-field label {
+.minecraft-idea-field label {
     color: #d7dce5;
     font-size: 0.82rem;
     font-weight: 700;
 }
 
-.ark-idea-field input,
-.ark-idea-field textarea {
+.minecraft-idea-field input,
+.minecraft-idea-field textarea {
     width: 100%;
     padding: 11px 12px;
     border:
@@ -401,24 +389,23 @@ IDEA FORM
         box-shadow 0.2s ease;
 }
 
-.ark-idea-field input::placeholder,
-.ark-idea-field textarea::placeholder {
+.minecraft-idea-field input::placeholder,
+.minecraft-idea-field textarea::placeholder {
     color: #687181;
 }
 
-.ark-idea-field textarea {
+.minecraft-idea-field textarea {
     min-height: 120px;
     resize: vertical;
 }
 
-.ark-idea-field input:focus,
-.ark-idea-field textarea:focus {
-    border-color: #8b5cf6;
+.minecraft-idea-field input:focus,
+.minecraft-idea-field textarea:focus {
+    border-color: #65c466;
     box-shadow:
         0 0 0 3px
-        rgba(139, 92, 246, 0.12);
+        rgba(101, 196, 102, 0.12);
 }
-
 
 /*
 =========================================================
@@ -426,28 +413,28 @@ IDEA FOOTER
 =========================================================
 */
 
-.ark-idea-footer {
+.minecraft-idea-footer {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 16px;
 }
 
-.ark-idea-status {
+.minecraft-idea-status {
     min-height: 18px;
     color: #9ca5b5;
     font-size: 0.8rem;
 }
 
-.ark-idea-submit {
+.minecraft-idea-submit {
     flex: 0 0 auto;
     padding: 10px 18px;
     cursor: pointer;
     border:
         1px solid
-        #8b5cf6;
+        #65c466;
     border-radius: 8px;
-    background: #8b5cf6;
+    background: #65c466;
     color: #ffffff;
     font: inherit;
     font-weight: 700;
@@ -457,25 +444,24 @@ IDEA FOOTER
         box-shadow 0.2s ease;
 }
 
-.ark-idea-submit:hover {
-    background: #9d74ff;
+.minecraft-idea-submit:hover {
+    background: #75d876;
     transform: translateY(-1px);
     box-shadow:
         0 6px 18px
-        rgba(139, 92, 246, 0.25);
+        rgba(101, 196, 102, 0.25);
 }
 
-.ark-idea-submit:active {
+.minecraft-idea-submit:active {
     transform: translateY(0);
 }
 
-.ark-idea-submit:disabled {
+.minecraft-idea-submit:disabled {
     cursor: not-allowed;
     opacity: 0.55;
     transform: none;
     box-shadow: none;
 }
-
 
 /*
 =========================================================
@@ -485,37 +471,60 @@ MOBILE
 
 @media (max-width: 700px) {
 
-    .ark-page {
+    .minecraft-page {
         padding:
             24px
             16px;
     }
 
-    .ark-overview,
-    .ark-mod-card,
-    .ark-announcement-card,
-    .ark-ideas-section {
+    .minecraft-overview,
+    .minecraft-mod-card,
+    .minecraft-announcement-card,
+    .minecraft-ideas-section {
         padding: 18px;
     }
 
-    .ark-update-header,
-    .ark-announcement-header {
+    .minecraft-update-header,
+    .minecraft-announcement-header {
         flex-direction: column;
         align-items: flex-start;
         gap: 6px;
     }
 
-    .ark-idea-footer {
+    .minecraft-idea-footer {
         flex-direction: column;
         align-items: stretch;
     }
 
-    .ark-idea-submit {
+    .minecraft-idea-submit {
         width: 100%;
     }
-
 }
-.ark-ideas-chevron {
+.minecraft-ideas-toggle {
+    display: flex;
+    align-items: normal;
+    justify-content: space-between;
+    gap: 20px;
+    width: 100%;
+    cursor: pointer;
+    list-style: none;
+}
+
+.minecraft-ideas-toggle::-webkit-details-marker {
+    display: none;
+}
+
+.minecraft-ideas-toggle::marker {
+    display: none;
+    content: "";
+}
+
+.minecraft-ideas-toggle > div {
+    flex: 1;
+    min-width: 0;
+}
+
+.minecraft-ideas-chevron {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -542,7 +551,7 @@ MOBILE
         );
 
     color:
-        hsl(271, 100%, 28%);
+        #65c466;
 
     font-size:
         0.75rem;
@@ -553,33 +562,22 @@ MOBILE
         transform 0.2s ease;
 }
 
-.ark-ideas-toggle:hover
-.ark-ideas-chevron {
+.minecraft-ideas-toggle:hover
+.minecraft-ideas-chevron {
     background:
-        #00000014;
+        rgba(
+            101,
+            196,
+            102,
+            0.08
+        );
 
     color:
-        hsl(278, 100%, 16%);
+        #8ee990;
 }
 
-.ark-ideas-section[open]
-.ark-ideas-chevron {
+.minecraft-ideas-section[open]
+.minecraft-ideas-chevron {
     transform:
         rotate(180deg);
-}
-.ark-ideas-toggle {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    width: 100%;
-}
-
-.ark-ideas-toggle > div {
-    flex: 1;
-    min-width: 0;
-}
-
-.ark-ideas-chevron {
-    margin-left: auto;
 }
