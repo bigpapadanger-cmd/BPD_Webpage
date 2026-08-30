@@ -8,20 +8,28 @@ const arkPanels =
         "[data-ark-panel]"
     );
 
-
+const gameCategory = "ark";
 renderHeader({
-    eyebrow: "BPD GAMING NETWORK",
+    eyebrow:
+        "BPD GAMING NETWORK",
 
-    title: "ARK",
+    title:
+        "ARK",
 
     tabs: [
         {
-            label: "Mods",
-            href: "/ARK?tab=mods"
+            label:
+                "Mods",
+
+            href:
+                "/Ark?tab=mods"
         },
         {
-            label: "Announcements",
-            href: "/ARK?tab=announcements"
+            label:
+                "Announcements",
+
+            href:
+                "/Ark?tab=announcements"
         }
     ]
 });
@@ -43,7 +51,8 @@ function renderArkPanel() {
         panel => {
 
             panel.hidden =
-                panel.dataset.arkPanel !== tab;
+                panel.dataset.arkPanel !==
+                tab;
 
         }
     );
@@ -60,10 +69,12 @@ function navigateArkTab(
             window.location.href
         );
 
+
     url.searchParams.set(
         "tab",
         tab
     );
+
 
     window.history.pushState(
         {},
@@ -71,7 +82,9 @@ function navigateArkTab(
         url
     );
 
+
     renderArkPanel();
+
 }
 
 
@@ -101,14 +114,17 @@ function initializeArkTabs() {
 }
 
 
-async function loadPapaDangerAdminMod() {
+async function loadModsForGame(
+    game
+) {
 
-    const card =
+    const modList =
         document.getElementById(
-            "papaDangerAdminCard"
+            "arkModList"
         );
 
-    if (!card) {
+
+    if (!modList) {
         return;
     }
 
@@ -117,7 +133,9 @@ async function loadPapaDangerAdminMod() {
 
         const response =
             await fetch(
-                "/api/cursforge/mod",
+                `/api/curseforge/mods?game=${encodeURIComponent(
+                    game
+                )}`,
                 {
                     method:
                         "GET",
@@ -152,115 +170,51 @@ async function loadPapaDangerAdminMod() {
 
             throw new Error(
                 data?.message ||
-                "Unable to load mod."
+                "Unable to load mods."
             );
 
         }
 
 
-        const title =
-            document.getElementById(
-                "papaDangerAdminTitle"
-            );
-
-        const description =
-            document.getElementById(
-                "papaDangerAdminDescription"
-            );
-
-        const version =
-            document.getElementById(
-                "papaDangerAdminVersion"
-            );
-
-        const updated =
-            document.getElementById(
-                "papaDangerAdminUpdated"
-            );
-
-        const downloads =
-            document.getElementById(
-                "papaDangerAdminDownloads"
-            );
-
-        const image =
-            document.getElementById(
-                "papaDangerAdminImage"
-            );
+        const mods =
+            Array.isArray(
+                data.mods
+            )
+                ? data.mods
+                : [];
 
 
-        if (title) {
-
-            title.textContent =
-                data.name ||
-                "Papa Danger's Admin Advancements";
-
-        }
-
-
-        if (description) {
-
-            description.textContent =
-                data.summary ||
-                "No description available.";
-
-        }
-
-
-        if (version) {
-
-            version.textContent =
-                `Version: ${
-                    data.version ||
-                    "—"
-                }`;
-
-        }
-
-
-        if (updated) {
-
-            updated.textContent =
-                `Updated: ${
-                    formatModDate(
-                        data.lastUpdated
-                    )
-                }`;
-
-        }
-
-
-        if (downloads) {
-
-            downloads.textContent =
-                `Downloads: ${
-                    formatModDownloads(
-                        data.downloads
-                    )
-                }`;
-
-        }
+        modList.innerHTML =
+            "";
 
 
         if (
-            image &&
-            data.logo?.thumbnailUrl
+            mods.length === 0
         ) {
 
-            image.src =
-                data.logo.thumbnailUrl;
+            modList.innerHTML = `
+                <p class="ark-mod-empty">
+                    No active mods are currently listed.
+                </p>
+            `;
+
+            return;
 
         }
 
 
-        if (
-            data.links?.websiteUrl
-        ) {
+        mods.forEach(
+            mod => {
 
-            card.href =
-                data.links.websiteUrl;
+                modList.insertAdjacentHTML(
+                    "beforeend",
+                    createModCard(
+                        mod
+                    )
+                );
 
-        }
+            }
+        );
 
     }
     catch (
@@ -268,25 +222,199 @@ async function loadPapaDangerAdminMod() {
     ) {
 
         console.error(
-            "ARK: Unable to load CurseForge mod.",
+            "ARK: Unable to load CurseForge mods.",
             error
         );
 
 
-        const description =
-            document.getElementById(
-                "papaDangerAdminDescription"
-            );
-
-
-        if (description) {
-
-            description.textContent =
-                "Mod information is currently unavailable.";
-
-        }
+        modList.innerHTML = `
+            <p class="ark-mod-empty">
+                Mod information is currently unavailable.
+            </p>
+        `;
 
     }
+
+}
+
+async function loadCurseForgeMod(
+    modId
+) {
+
+    const response =
+        await fetch(
+            `/api/curseforge/mod?game=${encodeURIComponent(
+                gameCategory
+            )}&id=${encodeURIComponent(
+                modId
+            )}`,
+            {
+                method:
+                    "GET",
+
+                cache:
+                    "no-store",
+
+                headers: {
+                    "accept":
+                        "application/json"
+                }
+            }
+        );
+
+
+    if (!response.ok) {
+
+        throw new Error(
+            `CurseForge mod ${modId} returned ${response.status}`
+        );
+
+    }
+
+
+    const data =
+        await response.json();
+
+
+    if (
+        data?.success !== true
+    ) {
+
+        throw new Error(
+            data?.message ||
+            `Unable to load mod ${modId}.`
+        );
+
+    }
+
+
+    return data;
+
+}
+
+
+function createModCard(
+    mod
+) {
+
+    const name =
+        escapeHTML(
+            mod.name ||
+            "Unnamed Mod"
+        );
+
+    const summary =
+        escapeHTML(
+            mod.summary ||
+            "No description available."
+        );
+
+    const website =
+        escapeAttribute(
+            mod.links?.websiteUrl ||
+            "#"
+        );
+
+    const image =
+        escapeAttribute(
+            mod.logo?.thumbnailUrl ||
+            ""
+        );
+
+    const version =
+        escapeHTML(
+            mod.version ||
+            "—"
+        );
+
+    const updated =
+        formatModDate(
+            mod.lastUpdated
+        );
+
+    const downloads =
+        formatModDownloads(
+            mod.downloads
+        );
+
+
+    return `
+        <a
+            class="ark-mod-card"
+            href="${website}"
+            target="_blank"
+            rel="noopener noreferrer"
+        >
+
+            <div class="ark-mod-media">
+
+                ${
+                    image
+                        ? `
+                            <img
+                                class="ark-mod-image"
+                                src="${image}"
+                                alt="${name}"
+                                loading="lazy"
+                            >
+                        `
+                        : ""
+                }
+
+                <div class="ark-mod-overlay">
+
+                    <div class="ark-mod-overlay-content">
+
+                        <span class="ark-mod-status">
+                            Active
+                        </span>
+
+                        <h4 class="ark-mod-title">
+                            ${name}
+                        </h4>
+
+                    </div>
+
+
+                    <span
+                        class="ark-mod-external"
+                        aria-hidden="true"
+                    >
+                        ↗
+                    </span>
+
+                </div>
+
+            </div>
+
+
+            <div class="ark-mod-content">
+
+                <p class="ark-mod-description">
+                    ${summary}
+                </p>
+
+
+                <div class="ark-mod-meta">
+
+                    <span>
+                        Version: ${version}
+                    </span>
+
+                    <span>
+                        Updated: ${updated}
+                    </span>
+
+                    <span>
+                        Downloads: ${downloads}
+                    </span>
+
+                </div>
+
+            </div>
+
+        </a>
+    `;
 
 }
 
@@ -356,11 +484,55 @@ function formatModDownloads(
 }
 
 
+function escapeHTML(
+    value
+) {
+
+    return String(
+        value ?? ""
+    )
+        .replaceAll(
+            "&",
+            "&amp;"
+        )
+        .replaceAll(
+            "<",
+            "&lt;"
+        )
+        .replaceAll(
+            ">",
+            "&gt;"
+        )
+        .replaceAll(
+            '"',
+            "&quot;"
+        )
+        .replaceAll(
+            "'",
+            "&#039;"
+        );
+
+}
+
+
+function escapeAttribute(
+    value
+) {
+
+    return escapeHTML(
+        value
+    );
+
+}
+
+
 initializeArkTabs();
 
 renderArkPanel();
 
-loadPapaDangerAdminMod();
+loadModsForGame(
+    "ark"
+);
 
 
 window.addEventListener(
