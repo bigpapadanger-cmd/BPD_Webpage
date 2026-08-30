@@ -283,7 +283,7 @@ function createModCard(
 
     const version =
         escapeHtml(
-            mod?.version ||
+            mod?.modVersion ||
             "Unknown"
         );
 
@@ -410,7 +410,7 @@ function createModCard(
                 <div class="minecraft-mod-meta-item">
 
                     <span class="minecraft-mod-meta-label">
-                        Version
+                        Mod Version
                     </span>
 
                     <strong class="minecraft-mod-meta-value">

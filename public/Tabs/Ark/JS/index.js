@@ -29,7 +29,7 @@ renderHeader({
 });
 
 
-initializeArkCommunityActions();
+
 
 
 function initializeArkCommunityActions() {
@@ -165,3 +165,4 @@ function initializeArkCommunityActions() {
     }
 
 }
+initializeArkCommunityActions();

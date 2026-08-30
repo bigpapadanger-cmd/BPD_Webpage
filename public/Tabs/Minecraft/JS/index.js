@@ -29,7 +29,6 @@ renderHeader({
 });
 
 
-initializeMinecraftCommunityActions();
 
 
 function initializeMinecraftCommunityActions() {
@@ -165,3 +164,4 @@ function initializeMinecraftCommunityActions() {
     }
 
 }
+initializeMinecraftCommunityActions();

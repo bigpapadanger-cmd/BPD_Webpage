@@ -569,8 +569,21 @@ async function initializeLoadedRouteModule(
     }
 
     try {
+        const moduleUrl =
+            new URL(
+                moduleFile,
+                window.location.origin
+            );
+
+        moduleUrl.searchParams.set(
+            "routeLoad",
+            String(
+                navigationId
+            )
+        );
+
         await initializeRouteModule(
-            moduleFile
+            moduleUrl.href
         );
     } catch (error) {
         console.error(

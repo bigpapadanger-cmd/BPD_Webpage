@@ -18,7 +18,6 @@ const MODS = {
         1547536,
         1512650,
         1258974
-
     ]
 };
 
@@ -59,7 +58,8 @@ export async function onRequestGet(
         return Response.json(
             {
                 success: false,
-                message: "Invalid game."
+                message:
+                    "Invalid game."
             },
             {
                 status: 400
@@ -81,56 +81,72 @@ export async function onRequestGet(
                     modId =>
                         fetchCurseForgeMod(
                             env,
-                            modId
+                            modId,
+                            game
                         )
                 )
             );
 
-   const mods =  [];
+
+        const mods =
+            [];
+
+        const errors =
+            [];
 
 
-    results.forEach(
-        (
-            result,
-            index
-        ) => {
+        results.forEach(
+            (
+                result,
+                index
+            ) => {
 
-            if (
-                result.status ===
-                "fulfilled"
-            ) {
+                if (
+                    result.status ===
+                    "fulfilled"
+                ) {
 
-                mods.push(
-                    result.value
+                    mods.push(
+                        result.value
+                    );
+
+                    return;
+
+                }
+
+
+                errors.push(
+                    {
+                        modId:
+                            modIds[index],
+
+                        message:
+                            result.reason?.message ||
+                            String(
+                                result.reason
+                            )
+                    }
                 );
 
-                return;
-
             }
+        );
 
 
-            console.error(
-                `CurseForge mod ${modIds[index]} failed:`,
-                result.reason
-            );
+        return Response.json(
+            {
+                success:
+                    true,
 
-        }
-    );
+                game:
+                    game,
 
+                mods:
+                    mods,
 
-    return Response.json(
-        {
-            success: true,
-
-            game:
-                game,
-
-            mods:
-                mods
-        }
-    );
-
-
+                errors:
+                    errors
+            }
+        );
 
     }
     catch (
@@ -161,7 +177,8 @@ export async function onRequestGet(
 
 async function fetchCurseForgeMod(
     env,
-    modId
+    modId,
+    game
 ) {
 
     const response =
@@ -176,9 +193,7 @@ async function fetchCurseForgeMod(
         );
 
 
-    if (
-        !response.ok
-    ) {
+    if (!response.ok) {
 
         throw new Error(
             `CurseForge mod ${modId} returned ${response.status}`
@@ -205,6 +220,30 @@ async function fetchCurseForgeMod(
         null;
 
 
+    const fileName =
+        latestFile?.displayName ||
+        latestFile?.fileName ||
+        null;
+
+
+    const modVersion =
+        game ===
+        "minecraft"
+            ? extractMinecraftModVersion(
+                fileName
+            )
+            : null;
+
+
+    const ue5Version =
+        game ===
+        "ark"
+            ? cleanArkVersion(
+                fileName
+            )
+            : null;
+
+
     return {
         id:
             mod.id,
@@ -224,10 +263,14 @@ async function fetchCurseForgeMod(
         lastUpdated:
             mod.dateModified,
 
-        version:
-            latestFile?.displayName ||
-            latestFile?.fileName ||
-            null,
+        modVersion:
+            modVersion,
+
+        ue5Version:
+            ue5Version,
+
+        fileName:
+            fileName,
 
         gameVersions:
             latestFile?.gameVersions ||
@@ -242,5 +285,80 @@ async function fetchCurseForgeMod(
         links:
             mod.links
     };
+
+}
+
+
+function extractMinecraftModVersion(
+    value
+) {
+
+    const text =
+        String(
+            value || ""
+        )
+            .trim();
+
+
+    if (!text) {
+        return null;
+    }
+
+
+    const match =
+        text.match(
+            /v?(\d+(?:\.\d+)+)/i
+        );
+
+
+    if (!match) {
+        return null;
+    }
+
+
+    return match[1];
+
+}
+
+
+function cleanArkVersion(
+    value
+) {
+
+    const text =
+        String(
+            value || ""
+        )
+            .trim();
+
+
+    if (!text) {
+        return null;
+    }
+
+
+    const decimalMatch =
+        text.match(
+            /(\d+(?:\.\d+)+)/
+        );
+
+
+    if (decimalMatch) {
+        return decimalMatch[1];
+    }
+
+
+    const trailingNumberMatch =
+        text.match(
+            /(?:^|[\s_-])(\d+)(?=\.(?:zip|rar|7z)$|[\s_-]*$)/i
+        );
+
+
+    if (trailingNumberMatch) {
+        return trailingNumberMatch[1];
+    }
+
+
+    return text;
 
 }

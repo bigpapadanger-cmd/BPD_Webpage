@@ -281,9 +281,9 @@ function createModCard(
         );
 
 
-    const version =
+    const ue5Version =
         escapeHtml(
-            mod?.version ||
+            mod?.ue5Version ||
             "Unknown"
         );
 
@@ -407,17 +407,17 @@ function createModCard(
 
             <div class="ark-mod-meta">
 
-                <div class="ark-mod-meta-item">
+                    <div class="ark-mod-meta-item">
 
-                    <span class="ark-mod-meta-label">
-                        Version
-                    </span>
+                        <span class="ark-mod-meta-label">
+                            UE5 Version
+                        </span>
 
-                    <strong class="ark-mod-meta-value">
-                        ${version}
-                    </strong>
+                        <strong class="ark-mod-meta-value">
+                            ${ue5Version}
+                        </strong>
 
-                </div>
+                    </div>
 
 
                 <div class="ark-mod-meta-item">
