@@ -49,15 +49,6 @@ export async function onRequestGet(
             .toLowerCase();
 
 
-    const modId =
-        String(
-            url.searchParams.get(
-                "id"
-            ) || ""
-        )
-            .trim();
-
-
     if (
         !Object.prototype.hasOwnProperty.call(
             MODS,
@@ -78,156 +69,77 @@ export async function onRequestGet(
     }
 
 
-    if (
-        !/^\d+$/.test(
-            modId
-        )
-    ) {
-
-        return Response.json(
-            {
-                success: false,
-                message: "Invalid mod ID."
-            },
-            {
-                status: 400
-            }
-        );
-
-    }
-
-
-    const numericModId =
-        Number(
-            modId
-        );
-
-
-    if (
-        !MODS[game].includes(
-            numericModId
-        )
-    ) {
-
-        return Response.json(
-            {
-                success: false,
-                message:
-                    "This mod is not approved for this game."
-            },
-            {
-                status: 403
-            }
-        );
-
-    }
-
-
     try {
 
-        const response =
-            await fetch(
-                `https://api.curseforge.com/v1/mods/${numericModId}`,
-                {
-                    headers: {
-                        "x-api-key":
-                            env.CURSEFORGE_API_KEY
-                    }
-                }
+        const modIds =
+            MODS[game];
+
+
+        const results =
+            await Promise.allSettled(
+                modIds.map(
+                    modId =>
+                        fetchCurseForgeMod(
+                            env,
+                            modId
+                        )
+                )
             );
 
+    const mods =
+        [];
 
-        if (
-            !response.ok
-        ) {
+    const errors =
+        [];
 
-            return Response.json(
-                {
-                    success: false,
-                    message:
-                        "CurseForge request failed.",
-                    status:
-                        response.status
-                },
-                {
-                    status:
-                        response.status
-                }
-            );
+
+    results.forEach(
+        (
+            result,
+            index
+        ) => {
+
+            if (
+                result.status ===
+                "fulfilled"
+            ) {
+
+                mods.push(
+                    result.value
+                );
+
+                return;
+
+            }
+
+
+            errors.push({
+                modId:
+                    modIds[index],
+
+                message:
+                    result.reason?.message ||
+                    "Unknown error"
+            });
 
         }
+    );
 
 
-        const result =
-            await response.json();
+    return Response.json(
+        {
+            success: true,
 
+            game:
+                game,
 
-        const mod =
-            result.data;
+            mods:
+                mods,
 
-
-        const latestFile =
-            mod.latestFiles?.find(
-                function(file) {
-
-                    return (
-                        file.id ===
-                        mod.mainFileId
-                    );
-
-                }
-            ) ||
-            mod.latestFiles?.[0] ||
-            null;
-
-
-        return Response.json(
-            {
-                success: true,
-
-                game:
-                    game,
-
-                id:
-                    mod.id,
-
-                name:
-                    mod.name,
-
-                slug:
-                    mod.slug,
-
-                summary:
-                    mod.summary,
-
-                downloads:
-                    mod.downloadCount,
-
-                lastUpdated:
-                    mod.dateModified,
-
-                version:
-                    latestFile
-                        ?.displayName ||
-                    latestFile
-                        ?.fileName ||
-                    null,
-
-                gameVersions:
-                    latestFile
-                        ?.gameVersions ||
-                    [],
-
-                mainFileId:
-                    mod.mainFileId,
-
-                logo:
-                    mod.logo,
-
-                links:
-                    mod.links
-            }
-        );
+            errors:
+                errors
+        }
+    );
 
     }
     catch (
@@ -235,7 +147,7 @@ export async function onRequestGet(
     ) {
 
         console.error(
-            "CurseForge API error:",
+            "CurseForge mods error:",
             error
         );
 
@@ -244,7 +156,7 @@ export async function onRequestGet(
             {
                 success: false,
                 message:
-                    "Unable to contact CurseForge."
+                    "Unable to load CurseForge mods."
             },
             {
                 status: 500
@@ -252,5 +164,92 @@ export async function onRequestGet(
         );
 
     }
+
+}
+
+
+async function fetchCurseForgeMod(
+    env,
+    modId
+) {
+
+    const response =
+        await fetch(
+            `https://api.curseforge.com/v1/mods/${modId}`,
+            {
+                headers: {
+                    "x-api-key":
+                        env.CURSEFORGE_API_KEY
+                }
+            }
+        );
+
+
+    if (
+        !response.ok
+    ) {
+
+        throw new Error(
+            `CurseForge mod ${modId} returned ${response.status}`
+        );
+
+    }
+
+
+    const result =
+        await response.json();
+
+
+    const mod =
+        result.data;
+
+
+    const latestFile =
+        mod.latestFiles?.find(
+            file =>
+                file.id ===
+                mod.mainFileId
+        ) ||
+        mod.latestFiles?.[0] ||
+        null;
+
+
+    return {
+        id:
+            mod.id,
+
+        name:
+            mod.name,
+
+        slug:
+            mod.slug,
+
+        summary:
+            mod.summary,
+
+        downloads:
+            mod.downloadCount,
+
+        lastUpdated:
+            mod.dateModified,
+
+        version:
+            latestFile?.displayName ||
+            latestFile?.fileName ||
+            null,
+
+        gameVersions:
+            latestFile?.gameVersions ||
+            [],
+
+        mainFileId:
+            mod.mainFileId,
+
+        logo:
+            mod.logo,
+
+        links:
+            mod.links
+    };
 
 }
