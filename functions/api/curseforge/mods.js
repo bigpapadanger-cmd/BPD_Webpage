@@ -86,11 +86,7 @@ export async function onRequestGet(
                 )
             );
 
-    const mods =
-        [];
-
-    const errors =
-        [];
+   const mods =  [];
 
 
     results.forEach(
@@ -113,14 +109,10 @@ export async function onRequestGet(
             }
 
 
-            errors.push({
-                modId:
-                    modIds[index],
-
-                message:
-                    result.reason?.message ||
-                    "Unknown error"
-            });
+            console.error(
+                `CurseForge mod ${modIds[index]} failed:`,
+                result.reason
+            );
 
         }
     );
@@ -134,12 +126,11 @@ export async function onRequestGet(
                 game,
 
             mods:
-                mods,
-
-            errors:
-                errors
+                mods
         }
     );
+
+
 
     }
     catch (

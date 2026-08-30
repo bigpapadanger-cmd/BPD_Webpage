@@ -70,6 +70,10 @@ function navigateArkTab(
         );
 
 
+    url.pathname =
+        "/Ark";
+
+
     url.searchParams.set(
         "tab",
         tab
@@ -234,61 +238,6 @@ async function loadModsForGame(
         `;
 
     }
-
-}
-
-async function loadCurseForgeMod(
-    modId
-) {
-
-    const response =
-        await fetch(
-            `/api/curseforge/mod?game=${encodeURIComponent(
-                gameCategory
-            )}&id=${encodeURIComponent(
-                modId
-            )}`,
-            {
-                method:
-                    "GET",
-
-                cache:
-                    "no-store",
-
-                headers: {
-                    "accept":
-                        "application/json"
-                }
-            }
-        );
-
-
-    if (!response.ok) {
-
-        throw new Error(
-            `CurseForge mod ${modId} returned ${response.status}`
-        );
-
-    }
-
-
-    const data =
-        await response.json();
-
-
-    if (
-        data?.success !== true
-    ) {
-
-        throw new Error(
-            data?.message ||
-            `Unable to load mod ${modId}.`
-        );
-
-    }
-
-
-    return data;
 
 }
 
@@ -525,13 +474,41 @@ function escapeAttribute(
 
 }
 
+function normalizeArkPath() {
 
+    if (
+        window.location.pathname.toLowerCase() ===
+        "/ark" &&
+        window.location.pathname !==
+        "/Ark"
+    ) {
+
+        const url =
+            new URL(
+                window.location.href
+            );
+
+
+        url.pathname =
+            "/Ark";
+
+
+        window.history.replaceState(
+            {},
+            "",
+            url
+        );
+
+    }
+
+}
+normalizeArkPath();
 initializeArkTabs();
 
 renderArkPanel();
 
 loadModsForGame(
-    "ark"
+     gameCategory
 );
 
 
