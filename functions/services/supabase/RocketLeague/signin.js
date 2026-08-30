@@ -23,17 +23,33 @@ export async function callSupabaseSignin(
     env,
     epicData
 ) {
+    if (
+        !env.SUPABASE_URL
+    ) {
+        throw new Error(
+            "SUPABASE_URL is not configured."
+        );
+    }
+
+    if (
+        !env.SUPA2CLOUDFLARE_AUTH
+    ) {
+        throw new Error(
+            "SUPA2CLOUDFLARE_AUTH is not configured."
+        );
+    }
     const response =
+    
         await fetch(
-            `${env.SUPABASE_URL}/rest/v1/rpc/rocketleague_signin`,
+            `${env.SUPABASE_URL}rpc/rocketleague_signin`,
             {
                 method:
                     "POST",
                 headers: {
                     "apikey":
-                        env.SUPABASE_SERVICE_ROLE_KEY,
+                        env.SUPA2CLOUDFLARE_AUTH,
                     "Authorization":
-                        `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+                        `Bearer ${env.SUPA2CLOUDFLARE_AUTH}`,
                     "Content-Type":
                         "application/json"
                 },
