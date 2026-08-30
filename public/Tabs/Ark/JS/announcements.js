@@ -95,7 +95,9 @@ function renderAnnouncements() {
 
 
     if (!announcementList) {
+
         return;
+
     }
 
 
@@ -201,7 +203,13 @@ function createAnnouncement(
 
 
     return `
-        <article class="ark-announcement-item">
+        <article
+            class="ark-announcement-item"
+            id="${escapeAttribute(
+                announcement?.id ||
+                ""
+            )}"
+        >
 
             <div class="ark-announcement-marker">
 
@@ -228,9 +236,7 @@ function createAnnouncement(
                         ${date}
                     </time>
 
-                    <span
-                        class="ark-announcement-type"
-                    >
+                    <span class="ark-announcement-type">
                         ${type}
                     </span>
 
@@ -259,7 +265,9 @@ function formatAnnouncementDate(
 ) {
 
     if (!value) {
+
         return "Unknown Date";
+
     }
 
 
@@ -274,7 +282,9 @@ function formatAnnouncementDate(
             date.getTime()
         )
     ) {
+
         return "Unknown Date";
+
     }
 
 

@@ -59,9 +59,11 @@ function initializeModsPage() {
         retryButton.addEventListener(
             "click",
             () => {
+
                 loadModsForGame(
                     gameCategory
                 );
+
             }
         );
 
@@ -96,8 +98,10 @@ async function loadModsForGame(
 
 
     if (errorSection) {
+
         errorSection.hidden =
             true;
+
     }
 
 
@@ -464,7 +468,9 @@ function formatNumber(
             number
         )
     ) {
+
         return "—";
+
     }
 
 
@@ -482,7 +488,9 @@ function formatDate(
 ) {
 
     if (!value) {
+
         return "—";
+
     }
 
 
@@ -497,7 +505,9 @@ function formatDate(
             date.getTime()
         )
     ) {
+
         return "—";
+
     }
 
 
@@ -525,7 +535,9 @@ function safeUrl(
 ) {
 
     if (!value) {
+
         return "";
+
     }
 
 
@@ -544,7 +556,9 @@ function safeUrl(
             url.protocol !==
                 "http:"
         ) {
+
             return "";
+
         }
 
 
@@ -552,7 +566,9 @@ function safeUrl(
 
     }
     catch {
+
         return "";
+
     }
 
 }

@@ -422,6 +422,10 @@ LANDING PAGE OPTIONS
         background 0.2s ease,
         box-shadow 0.2s ease,
         transform 0.2s ease;
+
+
+    text-decoration:
+        none;
 }
 
 
@@ -2615,3 +2619,74 @@ ANNOUNCEMENT MOBILE
     }
 
 }
+
+
+/*
+=========================================================
+MOD IMAGE PLACEHOLDER
+=========================================================
+*/
+
+.ark-mod-image-placeholder {
+    display:
+        flex;
+
+    align-items:
+        center;
+
+    justify-content:
+        center;
+
+    color:
+        #8b5cf6;
+
+    font-size:
+        0.72rem;
+
+    font-weight:
+        800;
+
+    letter-spacing:
+        0.08em;
+
+    background:
+        linear-gradient(
+            135deg,
+            rgba(
+                139,
+                92,
+                246,
+                0.12
+            ),
+            #101319
+        );
+}
+
+
+/*
+=========================================================
+MOD EMPTY STATE
+=========================================================
+*/
+
+.ark-mod-empty {
+    margin:
+        0;
+
+    padding:
+        20px;
+
+    border:
+        1px solid
+        #2d3340;
+
+    border-radius:
+        12px;
+
+    background:
+        #15181f;
+
+    color:
+        #9ca5b5;
+}
+
