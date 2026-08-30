@@ -193,7 +193,6 @@ export const ROUTES = {
         sitemap: true
     },
 
-    //NEED TO BUILD THESE PAGES
     "/Minecraft": {
     title: "Minecraft | BPD Gaming Network",
     body:
@@ -206,6 +205,34 @@ export const ROUTES = {
         "/Framework/Shell/HTML/Footer/footer.html",
     module: 
         "/Tabs/Minecraft/JS/index.js",
+        sitemap: true
+    },
+    "/Minecraft/Mods": {
+    title: "Minecraft Mods | BPD Gaming Network",
+    body:
+        "/Tabs/Minecraft/HTML/mods.html",
+    header:
+        "/Framework/Shell/HTML/Header/header.html",
+    sidebar:
+        "/Framework/Shell/HTML/Sidebar/mainmenu.html",
+    footer:
+        "/Framework/Shell/HTML/Footer/footer.html",
+    module: 
+        "/Tabs/Minecraft/JS/mods.js",
+        sitemap: true
+    },
+    "/Minecraft/Announcements": {
+    title: "Minecraft Announcements | BPD Gaming Network",
+    body:
+        "/Tabs/Minecraft/HTML/announcements.html",
+    header:
+        "/Framework/Shell/HTML/Header/header.html",
+    sidebar:
+        "/Framework/Shell/HTML/Sidebar/mainmenu.html",
+    footer:
+        "/Framework/Shell/HTML/Footer/footer.html",
+    module: 
+        "/Tabs/Minecraft/JS/announcements.js",
         sitemap: true
     },
     "/Ark": {
@@ -247,7 +274,7 @@ export const ROUTES = {
     footer:
         "/Framework/Shell/HTML/Footer/footer.html",
     module: 
-        "/Tabs/Ark/JS/mannouncements.js",
+        "/Tabs/Ark/JS/announcements.js",
         sitemap: true
     }
 };

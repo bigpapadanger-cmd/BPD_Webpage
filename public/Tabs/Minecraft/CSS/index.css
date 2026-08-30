@@ -1,8 +1,9 @@
 /* BPD GAMING NETWORK - MINECRAFT */
 
+
 /*
 =========================================================
-PANELS
+PAGE
 =========================================================
 */
 
@@ -10,49 +11,76 @@ PANELS
     box-sizing: border-box;
 }
 
-.minecraft-page {
+
+.minecraft-page,
+.minecraft-landing {
     display: flex;
     flex-direction: column;
-    gap: 64px;
+    gap: 48px;
+
     width: 100%;
     max-width: 1100px;
-    margin: 5% auto;
+
+    margin:
+        5%
+        auto;
+
     padding:
-        clamp(28px, 4vw, 56px)
-        clamp(30px, 5vw, 70px);
+        clamp(
+            28px,
+            4vw,
+            56px
+        )
+        clamp(
+            24px,
+            5vw,
+            64px
+        );
 }
 
-.minecraft-panel {
-    width: 100%;
-}
-
-.minecraft-panel[hidden] {
-    display: none;
-}
 
 /*
 =========================================================
-SECTION HEADING
+SECTION HEADINGS
 =========================================================
 */
 
 .minecraft-section-heading {
-    margin-bottom: 28px;
+    margin-bottom: 24px;
 }
 
+
 .minecraft-section-eyebrow,
-.minecraft-content-eyebrow {
+.minecraft-content-eyebrow,
+.minecraft-landing-card-eyebrow,
+.minecraft-community-button-eyebrow {
     display: inline-block;
+
     margin-bottom: 8px;
-    color: #65c466;
-    font-size: 0.75rem;
-    font-weight: 700;
-    letter-spacing: 0.12em;
+
+    color:
+        #22c55e;
+
+    font-size:
+        0.72rem;
+
+    font-weight:
+        700;
+
+    letter-spacing:
+        0.12em;
+
+    text-transform:
+        uppercase;
 }
+
 
 .minecraft-section-title {
     margin: 0;
-    color: #ffffff;
+
+    color:
+        #ffffff;
+
     font-size:
         clamp(
             1.8rem,
@@ -61,13 +89,122 @@ SECTION HEADING
         );
 }
 
+
 .minecraft-section-description {
     max-width: 760px;
-    margin: 10px 0 0;
-    color: #9ca5b5;
-    font-size: 0.95rem;
-    line-height: 1.6;
+
+    margin:
+        10px
+        0
+        0;
+
+    color:
+        #9ca5b5;
+
+    font-size:
+        0.95rem;
+
+    line-height:
+        1.65;
 }
+
+
+/*
+=========================================================
+HERO
+=========================================================
+*/
+
+.minecraft-hero {
+    position: relative;
+
+    overflow: hidden;
+
+    padding:
+        clamp(
+            28px,
+            5vw,
+            50px
+        );
+
+    border:
+        1px solid
+        rgba(
+            34,
+            197,
+            94,
+            0.2
+        );
+
+    border-radius:
+        18px;
+
+    background:
+        linear-gradient(
+            135deg,
+            rgba(
+                34,
+                197,
+                94,
+                0.12
+            ),
+            rgba(
+                21,
+                24,
+                31,
+                0.95
+            )
+        );
+
+    box-shadow:
+        0
+        0
+        24px
+        rgba(
+            34,
+            197,
+            94,
+            0.06
+        );
+}
+
+
+.minecraft-hero-title {
+    margin: 0;
+
+    color:
+        #ffffff;
+
+    font-size:
+        clamp(
+            2.2rem,
+            6vw,
+            4rem
+        );
+
+    line-height:
+        1;
+}
+
+
+.minecraft-hero-description {
+    max-width: 720px;
+
+    margin:
+        16px
+        0
+        0;
+
+    color:
+        #aab2c1;
+
+    font-size:
+        1rem;
+
+    line-height:
+        1.7;
+}
+
 
 /*
 =========================================================
@@ -76,39 +213,64 @@ OVERVIEW
 */
 
 .minecraft-overview {
-    margin-bottom: 32px;
     padding: 22px;
+
     border:
         1px solid
         #2d3340;
-    border-radius: 14px;
+
+    border-radius:
+        14px;
+
     background:
         linear-gradient(
             135deg,
-            rgba(101, 196, 102, 0.08),
+            rgba(
+                34,
+                197,
+                94,
+                0.07
+            ),
             #15181f
         );
 }
+
 
 .minecraft-overview-content {
     max-width: 800px;
 }
 
+
+.minecraft-overview-content h2,
 .minecraft-overview-content h3 {
-    margin: 0 0 10px;
-    color: #ffffff;
-    font-size: 1.1rem;
+    margin:
+        0
+        0
+        10px;
+
+    color:
+        #ffffff;
+
+    font-size:
+        1.25rem;
 }
+
 
 .minecraft-overview-content p {
     margin: 0;
-    color: #aab2c1;
-    line-height: 1.65;
+
+    color:
+        #aab2c1;
+
+    line-height:
+        1.65;
 }
+
 
 .minecraft-overview-content p + p {
     margin-top: 10px;
 }
+
 
 /*
 =========================================================
@@ -117,467 +279,2100 @@ CONTENT SECTIONS
 */
 
 .minecraft-content-section {
-    margin-top: 32px;
+    width: 100%;
 }
+
 
 .minecraft-content-heading {
     display: flex;
+
     align-items: flex-end;
+
     justify-content: space-between;
+
     gap: 20px;
-    margin-bottom: 14px;
+
+    margin-bottom: 16px;
 }
 
+
+.minecraft-content-heading h2,
 .minecraft-content-heading h3 {
     margin: 0;
-    color: #ffffff;
-    font-size: 1.25rem;
+
+    color:
+        #ffffff;
+
+    font-size:
+        1.3rem;
 }
 
-/*
-=========================================================
-LISTS
-=========================================================
-*/
 
-.minecraft-mod-list,
-.minecraft-update-list,
-.minecraft-announcement-list {
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-}
-
-/*
-=========================================================
-MOD CARDS
-=========================================================
-*/
-
-.minecraft-mod-card {
-    padding: 20px;
-    border:
-        1px solid
-        #2d3340;
-    border-radius: 14px;
-    background: #15181f;
-    transition:
-        border-color 0.2s ease,
-        background 0.2s ease,
-        transform 0.2s ease;
-}
-
-.minecraft-mod-card:hover {
-    border-color: #3b4250;
-    background: #191d25;
-    transform: translateY(-1px);
-}
-
-.minecraft-mod-header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 16px;
-}
-
-.minecraft-mod-header h4 {
-    margin: 5px 0 0;
-    color: #ffffff;
-    font-size: 1.05rem;
-}
-
-.minecraft-mod-status {
-    display: inline-flex;
-    align-items: center;
-    padding: 4px 8px;
-    border:
-        1px solid
-        rgba(101, 196, 102, 0.35);
-    border-radius: 999px;
-    background:
-        rgba(101, 196, 102, 0.1);
-    color: #8ee990;
-    font-size: 0.7rem;
-    font-weight: 700;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-}
-
-.minecraft-mod-description {
-    margin: 12px 0 0;
-    color: #aab2c1;
-    line-height: 1.6;
-}
-
-.minecraft-mod-meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px 16px;
-    margin-top: 14px;
-    padding-top: 14px;
-    border-top:
-        1px solid
-        rgba(255, 255, 255, 0.06);
-    color: #7f8999;
-    font-size: 0.8rem;
-}
-
-/*
-=========================================================
-UPDATE CARDS
-=========================================================
-*/
-
-.minecraft-update-card {
-    padding: 18px 20px;
-    border:
-        1px solid
-        #2d3340;
-    border-radius: 12px;
-    background: #15181f;
-}
-
-.minecraft-update-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-}
-
-.minecraft-update-header h4 {
-    margin: 0;
-    color: #ffffff;
-    font-size: 1rem;
-}
-
-.minecraft-update-header time {
-    flex: 0 0 auto;
-    color: #7f8999;
-    font-size: 0.78rem;
-}
-
-.minecraft-update-card p {
-    margin: 10px 0 0;
-    color: #aab2c1;
-    line-height: 1.6;
-}
-
-/*
-=========================================================
-ANNOUNCEMENTS
-=========================================================
-*/
-
-.minecraft-announcement-card {
-    padding: 22px;
-    border:
-        1px solid
-        #2d3340;
-    border-radius: 14px;
-    background: #15181f;
-}
-
-.minecraft-announcement-header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 20px;
-}
-
-.minecraft-announcement-header h3 {
-    margin: 5px 0 0;
-    color: #ffffff;
-    font-size: 1.1rem;
-}
-
-.minecraft-announcement-header time {
-    flex: 0 0 auto;
-    color: #7f8999;
-    font-size: 0.78rem;
-}
-
-.minecraft-announcement-type {
-    display: inline-block;
-    color: #65c466;
-    font-size: 0.7rem;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-}
-
-.minecraft-announcement-card p {
-    margin: 12px 0 0;
-    color: #aab2c1;
-    line-height: 1.65;
-}
-
-/*
-=========================================================
-IDEAS SECTION
-=========================================================
-*/
-
-.minecraft-ideas-section {
-    margin-top: 40px;
-    padding: 24px;
-    border:
-        1px solid
-        #2d3340;
-    border-radius: 16px;
-    background:
-        linear-gradient(
-            135deg,
-            rgba(101, 196, 102, 0.08),
-            #15181f
-        );
-}
-
-.minecraft-ideas-header {
-    margin-bottom: 20px;
-}
-
-.minecraft-ideas-header h2 {
-    margin: 0;
-    color: #ffffff;
-    font-size: 1.3rem;
-}
-
-.minecraft-ideas-header p {
+.minecraft-content-description {
     max-width: 700px;
-    margin: 8px 0 0;
-    color: #9ca5b5;
-    line-height: 1.6;
+
+    margin:
+        7px
+        0
+        0;
+
+    color:
+        #8f98a8;
+
+    font-size:
+        0.88rem;
+
+    line-height:
+        1.55;
 }
+
 
 /*
 =========================================================
-IDEA FORM
+LANDING PAGE OPTIONS
 =========================================================
 */
 
-.minecraft-idea-form {
-    display: flex;
-    flex-direction: column;
-    row-gap: 1em;
-}
+.minecraft-landing-options {
+    display: grid;
 
-.minecraft-idea-field {
-    display: flex;
-    flex-direction: column;
-}
+    grid-template-columns:
+        repeat(
+            2,
+            minmax(
+                0,
+                1fr
+            )
+        );
 
-.minecraft-idea-field label {
-    color: #d7dce5;
-    font-size: 0.82rem;
-    font-weight: 700;
-}
-
-.minecraft-idea-field input,
-.minecraft-idea-field textarea {
-    width: 100%;
-    padding: 11px 12px;
-    border:
-        1px solid
-        #343a47;
-    border-radius: 9px;
-    outline: none;
-    background: #101319;
-    color: #ffffff;
-    font: inherit;
-    transition:
-        border-color 0.2s ease,
-        box-shadow 0.2s ease;
-}
-
-.minecraft-idea-field input::placeholder,
-.minecraft-idea-field textarea::placeholder {
-    color: #687181;
-}
-
-.minecraft-idea-field textarea {
-    min-height: 120px;
-    resize: vertical;
-}
-
-.minecraft-idea-field input:focus,
-.minecraft-idea-field textarea:focus {
-    border-color: #65c466;
-    box-shadow:
-        0 0 0 3px
-        rgba(101, 196, 102, 0.12);
-}
-
-/*
-=========================================================
-IDEA FOOTER
-=========================================================
-*/
-
-.minecraft-idea-footer {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
     gap: 16px;
 }
 
-.minecraft-idea-status {
-    min-height: 18px;
-    color: #9ca5b5;
-    font-size: 0.8rem;
-}
 
-.minecraft-idea-submit {
-    flex: 0 0 auto;
-    padding: 10px 18px;
-    cursor: pointer;
-    border:
-        1px solid
-        #65c466;
-    border-radius: 8px;
-    background: #65c466;
-    color: #ffffff;
-    font: inherit;
-    font-weight: 700;
-    transition:
-        background 0.2s ease,
-        transform 0.15s ease,
-        box-shadow 0.2s ease;
-}
-
-.minecraft-idea-submit:hover {
-    background: #75d876;
-    transform: translateY(-1px);
-    box-shadow:
-        0 6px 18px
-        rgba(101, 196, 102, 0.25);
-}
-
-.minecraft-idea-submit:active {
-    transform: translateY(0);
-}
-
-.minecraft-idea-submit:disabled {
-    cursor: not-allowed;
-    opacity: 0.55;
-    transform: none;
-    box-shadow: none;
-}
-
-/*
-=========================================================
-MOBILE
-=========================================================
-*/
-
-@media (max-width: 700px) {
-
-    .minecraft-page {
-        padding:
-            24px
-            16px;
-    }
-
-    .minecraft-overview,
-    .minecraft-mod-card,
-    .minecraft-announcement-card,
-    .minecraft-ideas-section {
-        padding: 18px;
-    }
-
-    .minecraft-update-header,
-    .minecraft-announcement-header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 6px;
-    }
-
-    .minecraft-idea-footer {
-        flex-direction: column;
-        align-items: stretch;
-    }
-
-    .minecraft-idea-submit {
-        width: 100%;
-    }
-}
-.minecraft-ideas-toggle {
+.minecraft-landing-card {
     display: flex;
-    align-items: normal;
-    justify-content: space-between;
-    gap: 20px;
-    width: 100%;
-    cursor: pointer;
-    list-style: none;
-}
 
-.minecraft-ideas-toggle::-webkit-details-marker {
-    display: none;
-}
-
-.minecraft-ideas-toggle::marker {
-    display: none;
-    content: "";
-}
-
-.minecraft-ideas-toggle > div {
-    flex: 1;
-    min-width: 0;
-}
-
-.minecraft-ideas-chevron {
-    display: flex;
     align-items: center;
-    justify-content: center;
 
-    width: 52px;
-    height: 52px;
-    flex: 0 0 52px;
+    justify-content: space-between;
 
-    align-self: center;
+    gap: 20px;
+
+    width: 100%;
+
+    min-height: 150px;
+
+    padding: 22px;
+
+    cursor: pointer;
 
     border:
         1px solid
         #2d3340;
 
     border-radius:
+        14px;
+
+    background:
+        #15181f;
+
+    color:
+        inherit;
+
+    text-align:
+        left;
+
+    text-decoration:
+        none;
+
+    box-shadow:
+        0
+        0
+        16px
+        rgba(
+            34,
+            197,
+            94,
+            0.04
+        );
+
+    transition:
+        border-color 0.2s ease,
+        background 0.2s ease,
+        box-shadow 0.2s ease,
+        transform 0.2s ease;
+}
+
+
+.minecraft-landing-card:hover {
+    border-color:
+        rgba(
+            34,
+            197,
+            94,
+            0.5
+        );
+
+    background:
+        #191d25;
+
+    box-shadow:
+        0
+        0
+        18px
+        rgba(
+            34,
+            197,
+            94,
+            0.14
+        );
+
+    transform:
+        translateY(
+            -2px
+        );
+}
+
+
+.minecraft-landing-card-content {
+    min-width: 0;
+}
+
+
+.minecraft-landing-card h3 {
+    margin: 0;
+
+    color:
+        #ffffff;
+
+    font-size:
+        1.15rem;
+}
+
+
+.minecraft-landing-card p {
+    max-width:
+        440px;
+
+    margin:
+        8px
+        0
+        0;
+
+    color:
+        #9ca5b5;
+
+    font-size:
+        0.88rem;
+
+    line-height:
+        1.55;
+}
+
+
+.minecraft-landing-card-action {
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    flex:
+        0
+        0
+        42px;
+
+    width:
+        42px;
+
+    height:
+        42px;
+
+    border:
+        1px solid
+        #343a47;
+
+    border-radius:
+        10px;
+
+    color:
+        #4ade80;
+
+    font-size:
+        1.25rem;
+
+    transition:
+        border-color 0.2s ease,
+        background 0.2s ease,
+        transform 0.2s ease;
+}
+
+
+.minecraft-landing-card:hover
+.minecraft-landing-card-action {
+    border-color:
+        #22c55e;
+
+    background:
+        rgba(
+            34,
+            197,
+            94,
+            0.1
+        );
+
+    transform:
+        translateX(
+            2px
+        );
+}
+
+
+/*
+=========================================================
+COMMUNITY
+=========================================================
+*/
+
+.minecraft-community-section {
+    padding:
+        24px;
+
+    border:
+        1px solid
+        #2d3340;
+
+    border-radius:
+        16px;
+
+    background:
+        linear-gradient(
+            135deg,
+            rgba(
+                34,
+                197,
+                94,
+                0.07
+            ),
+            #15181f
+        );
+}
+
+
+.minecraft-community-heading {
+    margin-bottom:
+        18px;
+}
+
+
+.minecraft-community-heading h2 {
+    margin: 0;
+
+    color:
+        #ffffff;
+
+    font-size:
+        1.3rem;
+}
+
+
+.minecraft-community-heading p {
+    max-width:
+        700px;
+
+    margin:
+        8px
+        0
+        0;
+
+    color:
+        #9ca5b5;
+
+    line-height:
+        1.6;
+}
+
+
+.minecraft-community-buttons {
+    display: grid;
+
+    grid-template-columns:
+        repeat(
+            2,
+            minmax(
+                0,
+                1fr
+            )
+        );
+
+    gap:
+        14px;
+}
+
+
+.minecraft-community-button {
+    display: flex;
+
+    align-items: center;
+
+    justify-content: space-between;
+
+    gap:
+        18px;
+
+    width:
+        100%;
+
+    min-height:
+        110px;
+
+    padding:
+        18px;
+
+    cursor:
+        pointer;
+
+    border:
+        1px solid
+        #343a47;
+
+    border-radius:
+        12px;
+
+    background:
+        rgba(
+            16,
+            19,
+            25,
+            0.7
+        );
+
+    color:
+        inherit;
+
+    text-align:
+        left;
+
+    transition:
+        border-color 0.2s ease,
+        background 0.2s ease,
+        box-shadow 0.2s ease,
+        transform 0.2s ease;
+}
+
+
+.minecraft-community-button:hover,
+.minecraft-community-button[aria-expanded="true"] {
+    border-color:
+        rgba(
+            34,
+            197,
+            94,
+            0.55
+        );
+
+    background:
+        rgba(
+            34,
+            197,
+            94,
+            0.06
+        );
+
+    box-shadow:
+        0
+        0
+        18px
+        rgba(
+            34,
+            197,
+            94,
+            0.12
+        );
+
+    transform:
+        translateY(
+            -1px
+        );
+}
+
+
+.minecraft-community-button-content {
+    display: flex;
+
+    flex-direction:
+        column;
+
+    min-width:
+        0;
+}
+
+
+.minecraft-community-button-title {
+    color:
+        #ffffff;
+
+    font-size:
+        1rem;
+
+    font-weight:
+        700;
+}
+
+
+.minecraft-community-button-description {
+    margin-top:
+        6px;
+
+    color:
+        #8f98a8;
+
+    font-size:
+        0.82rem;
+
+    line-height:
+        1.45;
+}
+
+
+.minecraft-community-button-action {
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    flex:
+        0
+        0
+        38px;
+
+    width:
+        38px;
+
+    height:
+        38px;
+
+    border:
+        1px solid
+        #343a47;
+
+    border-radius:
+        9px;
+
+    color:
+        #4ade80;
+
+    font-size:
+        1.2rem;
+
+    transition:
+        transform 0.2s ease,
+        border-color 0.2s ease,
+        background 0.2s ease;
+}
+
+
+.minecraft-community-button[aria-expanded="true"]
+.minecraft-community-button-action {
+    border-color:
+        #22c55e;
+
+    background:
+        rgba(
+            34,
+            197,
+            94,
+            0.1
+        );
+
+    transform:
+        rotate(
+            45deg
+        );
+}
+
+
+/*
+=========================================================
+COMMUNITY PANELS
+=========================================================
+*/
+
+.minecraft-community-panel {
+    margin-top:
+        18px;
+
+    padding:
+        20px;
+
+    border:
+        1px solid
+        #343a47;
+
+    border-radius:
+        12px;
+
+    background:
+        #101319;
+}
+
+
+.minecraft-community-panel[hidden] {
+    display:
+        none;
+}
+
+
+.minecraft-community-panel-heading {
+    margin-bottom:
+        18px;
+}
+
+
+.minecraft-community-panel-heading h3 {
+    margin:
+        0;
+
+    color:
+        #ffffff;
+
+    font-size:
+        1.1rem;
+}
+
+
+.minecraft-community-panel-heading p {
+    max-width:
+        700px;
+
+    margin:
+        7px
+        0
+        0;
+
+    color:
+        #8f98a8;
+
+    font-size:
+        0.88rem;
+
+    line-height:
+        1.55;
+}
+
+
+/*
+=========================================================
+FORMS
+=========================================================
+*/
+
+.minecraft-idea-form,
+.minecraft-team-form {
+    display: flex;
+
+    flex-direction:
+        column;
+
+    gap:
+        14px;
+}
+
+
+.minecraft-idea-field {
+    display: flex;
+
+    flex-direction:
+        column;
+
+    gap:
+        6px;
+}
+
+
+.minecraft-idea-field label {
+    color:
+        #d7dce5;
+
+    font-size:
+        0.82rem;
+
+    font-weight:
+        700;
+}
+
+
+.minecraft-idea-field input,
+.minecraft-idea-field textarea,
+.minecraft-idea-field select {
+    width:
+        100%;
+
+    padding:
+        11px
+        12px;
+
+    border:
+        1px solid
+        #343a47;
+
+    border-radius:
+        9px;
+
+    outline:
+        none;
+
+    background:
+        #0d1015;
+
+    color:
+        #ffffff;
+
+    font:
+        inherit;
+
+    transition:
+        border-color 0.2s ease,
+        box-shadow 0.2s ease,
+        background 0.2s ease;
+}
+
+
+.minecraft-idea-field input::placeholder,
+.minecraft-idea-field textarea::placeholder {
+    color:
+        #687181;
+}
+
+
+.minecraft-idea-field textarea {
+    min-height:
+        120px;
+
+    resize:
+        vertical;
+}
+
+
+.minecraft-idea-field input:focus,
+.minecraft-idea-field textarea:focus,
+.minecraft-idea-field select:focus {
+    border-color:
+        #22c55e;
+
+    background:
+        #101319;
+
+    box-shadow:
+        0
+        0
+        0
+        3px
+        rgba(
+            34,
+            197,
+            94,
+            0.12
+        );
+}
+
+
+.minecraft-idea-footer {
+    display: flex;
+
+    align-items: center;
+
+    justify-content: space-between;
+
+    gap:
+        16px;
+}
+
+
+.minecraft-idea-status {
+    min-height:
+        18px;
+
+    color:
+        #9ca5b5;
+
+    font-size:
+        0.8rem;
+}
+
+
+.minecraft-idea-submit {
+    flex:
+        0
+        0
+        auto;
+
+    padding:
+        10px
+        18px;
+
+    cursor:
+        pointer;
+
+    border:
+        1px solid
+        #22c55e;
+
+    border-radius:
+        8px;
+
+    background:
+        #22c55e;
+
+    color:
+        #ffffff;
+
+    font:
+        inherit;
+
+    font-weight:
+        700;
+
+    transition:
+        background 0.2s ease,
+        transform 0.15s ease,
+        box-shadow 0.2s ease;
+}
+
+
+.minecraft-idea-submit:hover {
+    background:
+        #2dd268;
+
+    transform:
+        translateY(
+            -1px
+        );
+
+    box-shadow:
+        0
+        8px
+        20px
+        rgba(
+            34,
+            197,
+            94,
+            0.22
+        );
+}
+
+
+.minecraft-idea-submit:active {
+    transform:
+        translateY(
+            0
+        );
+}
+
+
+.minecraft-idea-submit:disabled {
+    cursor:
+        not-allowed;
+
+    opacity:
+        0.55;
+
+    transform:
+        none;
+
+    box-shadow:
+        none;
+}
+
+
+/*
+=========================================================
+MOD LIST
+=========================================================
+*/
+
+.minecraft-mod-list {
+    display: flex;
+
+    flex-direction:
+        column;
+
+    gap:
+        14px;
+}
+
+
+/*
+=========================================================
+MOD BANNER CARD
+=========================================================
+*/
+
+.minecraft-mod-card {
+    --mod-glow:
+        34,
+        197,
+        94;
+
+    position:
+        relative;
+
+    overflow:
+        hidden;
+
+    width:
+        100%;
+
+    border:
+        1px solid
+        rgba(
+            var(--mod-glow),
+            0.18
+        );
+
+    border-radius:
+        13px;
+
+    background:
+        #15181f;
+
+    box-shadow:
+        0
+        0
+        14px
+        rgba(
+            var(--mod-glow),
+            0.055
+        );
+
+    transition:
+        border-color 0.2s ease,
+        background 0.2s ease,
+        box-shadow 0.2s ease,
+        transform 0.2s ease;
+}
+
+
+.minecraft-mod-card:hover {
+    border-color:
+        rgba(
+            var(--mod-glow),
+            0.58
+        );
+
+    background:
+        #191d25;
+
+    box-shadow:
+        0
+        0
+        16px
+        rgba(
+            var(--mod-glow),
+            0.22
+        ),
+        0
+        0
+        34px
+        rgba(
+            var(--mod-glow),
+            0.12
+        );
+
+    transform:
+        translateY(
+            -2px
+        );
+}
+
+
+/*
+=========================================================
+MOD BANNER
+=========================================================
+*/
+
+.minecraft-mod-banner {
+    display: flex;
+
+    align-items:
+        center;
+
+    gap:
+        16px;
+
+    min-height:
+        106px;
+
+    padding:
+        12px
+        16px;
+}
+
+
+.minecraft-mod-image-wrap {
+    display: flex;
+
+    align-items: center;
+
+    justify-content:
+        center;
+
+    flex:
+        0
+        0
+        78px;
+
+    width:
+        78px;
+
+    height:
+        78px;
+
+    overflow:
+        hidden;
+
+    border:
+        1px solid
+        rgba(
+            255,
+            255,
+            255,
+            0.06
+        );
+
+    border-radius:
+        10px;
+
+    background:
+        #101319;
+}
+
+
+.minecraft-mod-image {
+    display: block;
+
+    width:
+        100%;
+
+    height:
+        100%;
+
+    object-fit:
+        cover;
+}
+
+
+.minecraft-mod-image-placeholder {
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    color:
+        #22c55e;
+
+    font-size:
+        0.72rem;
+
+    font-weight:
+        800;
+
+    letter-spacing:
+        0.08em;
+
+    background:
+        linear-gradient(
+            135deg,
+            rgba(
+                34,
+                197,
+                94,
+                0.12
+            ),
+            #101319
+        );
+}
+
+
+.minecraft-mod-main {
+    flex:
+        1;
+
+    min-width:
+        0;
+}
+
+
+.minecraft-mod-heading {
+    display: flex;
+
+    align-items:
+        flex-start;
+
+    justify-content:
+        space-between;
+
+    gap:
+        16px;
+
+    margin-bottom:
+        5px;
+}
+
+
+.minecraft-mod-title-group {
+    min-width:
+        0;
+}
+
+
+.minecraft-mod-label {
+    display: block;
+
+    margin-bottom:
+        3px;
+
+    color:
+        rgba(
+            var(--mod-glow),
+            0.9
+        );
+
+    font-size:
+        0.67rem;
+
+    font-weight:
+        700;
+
+    letter-spacing:
+        0.11em;
+
+    text-transform:
+        uppercase;
+}
+
+
+.minecraft-mod-name {
+    margin: 0;
+
+    overflow:
+        hidden;
+
+    color:
+        #ffffff;
+
+    font-size:
+        clamp(
+            1rem,
+            1.5vw,
+            1.2rem
+        );
+
+    line-height:
+        1.25;
+
+    text-overflow:
+        ellipsis;
+}
+
+
+.minecraft-mod-description {
+    display:
+        -webkit-box;
+
+    margin:
+        0;
+
+    overflow:
+        hidden;
+
+    color:
+        #aab2c1;
+
+    font-size:
+        0.86rem;
+
+    line-height:
+        1.45;
+
+    line-clamp:
+        2;
+
+    -webkit-line-clamp:
+        2;
+
+    -webkit-box-orient:
+        vertical;
+}
+
+
+/*
+=========================================================
+CURSEFORGE LINK
+=========================================================
+*/
+
+.minecraft-mod-link {
+    display:
+        inline-flex;
+
+    align-items:
+        center;
+
+    gap:
+        6px;
+
+    flex:
+        0
+        0
+        auto;
+
+    padding:
+        7px
+        10px;
+
+    border:
+        1px solid
+        rgba(
+            var(--mod-glow),
+            0.22
+        );
+
+    border-radius:
         8px;
 
     background:
         rgba(
-            255,
-            255,
-            255,
-            0.025
+            var(--mod-glow),
+            0.045
         );
 
     color:
-        #65c466;
+        #d8dde7;
 
     font-size:
-        0.75rem;
+        0.76rem;
+
+    font-weight:
+        700;
+
+    text-decoration:
+        none;
 
     transition:
+        border-color 0.2s ease,
         background 0.2s ease,
-        color 0.2s ease,
+        box-shadow 0.2s ease,
+        color 0.2s ease;
+}
+
+
+.minecraft-mod-link:hover {
+    border-color:
+        rgba(
+            var(--mod-glow),
+            0.7
+        );
+
+    background:
+        rgba(
+            var(--mod-glow),
+            0.12
+        );
+
+    color:
+        #ffffff;
+
+    box-shadow:
+        0
+        0
+        12px
+        rgba(
+            var(--mod-glow),
+            0.16
+        );
+}
+
+
+/*
+=========================================================
+MOD META
+=========================================================
+*/
+
+.minecraft-mod-meta {
+    display:
+        grid;
+
+    grid-template-columns:
+        repeat(
+            3,
+            minmax(
+                0,
+                1fr
+            )
+        );
+
+    border-top:
+        1px solid
+        rgba(
+            var(--mod-glow),
+            0.12
+        );
+
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            0.018
+        );
+}
+
+
+.minecraft-mod-meta-item {
+    display:
+        flex;
+
+    align-items:
+        center;
+
+    justify-content:
+        space-between;
+
+    gap:
+        10px;
+
+    min-width:
+        0;
+
+    padding:
+        9px
+        14px;
+}
+
+
+.minecraft-mod-meta-item:not(:last-child) {
+    border-right:
+        1px solid
+        rgba(
+            255,
+            255,
+            255,
+            0.055
+        );
+}
+
+
+.minecraft-mod-meta-label {
+    color:
+        #727c8d;
+
+    font-size:
+        0.67rem;
+
+    font-weight:
+        700;
+
+    letter-spacing:
+        0.07em;
+
+    text-transform:
+        uppercase;
+}
+
+
+.minecraft-mod-meta-value {
+    overflow:
+        hidden;
+
+    color:
+        #d9dee7;
+
+    font-size:
+        0.8rem;
+
+    font-weight:
+        700;
+
+    text-overflow:
+        ellipsis;
+
+    white-space:
+        nowrap;
+}
+
+
+/*
+=========================================================
+MOD LOADING
+=========================================================
+*/
+
+.minecraft-mod-loading {
+    display:
+        flex;
+
+    align-items:
+        center;
+
+    justify-content:
+        center;
+
+    gap:
+        12px;
+
+    min-height:
+        110px;
+
+    padding:
+        20px;
+
+    border:
+        1px solid
+        #2d3340;
+
+    border-radius:
+        13px;
+
+    background:
+        #15181f;
+
+    color:
+        #8f98a8;
+
+    font-size:
+        0.86rem;
+}
+
+
+.minecraft-mod-loading-spinner {
+    width:
+        18px;
+
+    height:
+        18px;
+
+    border:
+        2px solid
+        rgba(
+            34,
+            197,
+            94,
+            0.18
+        );
+
+    border-top-color:
+        #22c55e;
+
+    border-radius:
+        50%;
+
+    animation:
+        minecraft-spin
+        0.8s
+        linear
+        infinite;
+}
+
+
+@keyframes minecraft-spin {
+
+    to {
+        transform:
+            rotate(
+                360deg
+            );
+    }
+
+}
+
+
+/*
+=========================================================
+MOD ERROR
+=========================================================
+*/
+
+.minecraft-mod-error {
+    padding:
+        22px;
+
+    border:
+        1px solid
+        rgba(
+            220,
+            90,
+            90,
+            0.25
+        );
+
+    border-radius:
+        14px;
+
+    background:
+        rgba(
+            90,
+            20,
+            25,
+            0.12
+        );
+}
+
+
+.minecraft-mod-error[hidden] {
+    display:
+        none;
+}
+
+
+.minecraft-mod-error-content h2 {
+    margin:
+        0;
+
+    color:
+        #ffffff;
+
+    font-size:
+        1.15rem;
+}
+
+
+.minecraft-mod-error-content p {
+    margin:
+        8px
+        0
+        16px;
+
+    color:
+        #9ca5b5;
+
+    line-height:
+        1.55;
+}
+
+
+.minecraft-mod-retry {
+    padding:
+        8px
+        14px;
+
+    cursor:
+        pointer;
+
+    border:
+        1px solid
+        #22c55e;
+
+    border-radius:
+        8px;
+
+    background:
+        rgba(
+            34,
+            197,
+            94,
+            0.1
+        );
+
+    color:
+        #ffffff;
+
+    font:
+        inherit;
+
+    font-size:
+        0.82rem;
+
+    font-weight:
+        700;
+}
+
+
+/*
+=========================================================
+ANNOUNCEMENT LIST
+=========================================================
+*/
+
+.minecraft-announcement-list {
+    display:
+        flex;
+
+    flex-direction:
+        column;
+
+    gap:
+        0;
+}
+
+
+.minecraft-announcement-item {
+    display:
+        grid;
+
+    grid-template-columns:
+        28px
+        minmax(
+            0,
+            1fr
+        );
+
+    gap:
+        14px;
+
+    position:
+        relative;
+}
+
+
+.minecraft-announcement-marker {
+    display:
+        flex;
+
+    flex-direction:
+        column;
+
+    align-items:
+        center;
+}
+
+
+.minecraft-announcement-dot {
+    width:
+        11px;
+
+    height:
+        11px;
+
+    flex:
+        0
+        0
+        11px;
+
+    margin-top:
+        8px;
+
+    border:
+        2px solid
+        #22c55e;
+
+    border-radius:
+        50%;
+
+    background:
+        #15181f;
+
+    box-shadow:
+        0
+        0
+        10px
+        rgba(
+            34,
+            197,
+            94,
+            0.22
+        );
+
+    transition:
+        box-shadow 0.2s ease,
         transform 0.2s ease;
 }
 
-.minecraft-ideas-toggle:hover
-.minecraft-ideas-chevron {
+
+.minecraft-announcement-line {
+    width:
+        1px;
+
+    flex:
+        1;
+
+    min-height:
+        40px;
+
+    margin-top:
+        6px;
+
+    background:
+        linear-gradient(
+            to bottom,
+            rgba(
+                34,
+                197,
+                94,
+                0.28
+            ),
+            rgba(
+                34,
+                197,
+                94,
+                0.05
+            )
+        );
+}
+
+
+.minecraft-announcement-item:last-child
+.minecraft-announcement-line {
+    display:
+        none;
+}
+
+
+.minecraft-announcement-content {
+    margin-bottom:
+        16px;
+
+    padding:
+        16px
+        18px;
+
+    border:
+        1px solid
+        #2d3340;
+
+    border-radius:
+        12px;
+
+    background:
+        #15181f;
+
+    box-shadow:
+        0
+        0
+        14px
+        rgba(
+            34,
+            197,
+            94,
+            0.035
+        );
+
+    transition:
+        border-color 0.2s ease,
+        background 0.2s ease,
+        box-shadow 0.2s ease,
+        transform 0.2s ease;
+}
+
+
+.minecraft-announcement-item:hover
+.minecraft-announcement-content {
+    border-color:
+        rgba(
+            34,
+            197,
+            94,
+            0.38
+        );
+
+    background:
+        #191d25;
+
+    box-shadow:
+        0
+        0
+        18px
+        rgba(
+            34,
+            197,
+            94,
+            0.1
+        );
+
+    transform:
+        translateY(
+            -1px
+        );
+}
+
+
+.minecraft-announcement-item:hover
+.minecraft-announcement-dot {
+    box-shadow:
+        0
+        0
+        14px
+        rgba(
+            34,
+            197,
+            94,
+            0.5
+        );
+
+    transform:
+        scale(
+            1.08
+        );
+}
+
+
+.minecraft-announcement-meta {
+    display:
+        flex;
+
+    align-items:
+        center;
+
+    flex-wrap:
+        wrap;
+
+    gap:
+        8px
+        12px;
+
+    margin-bottom:
+        7px;
+}
+
+
+.minecraft-announcement-meta time {
+    color:
+        #7f8999;
+
+    font-size:
+        0.72rem;
+
+    font-weight:
+        700;
+
+    letter-spacing:
+        0.07em;
+}
+
+
+.minecraft-announcement-type {
+    display:
+        inline-flex;
+
+    align-items:
+        center;
+
+    padding:
+        3px
+        7px;
+
+    border:
+        1px solid
+        rgba(
+            34,
+            197,
+            94,
+            0.25
+        );
+
+    border-radius:
+        999px;
+
     background:
         rgba(
-            101,
-            196,
-            102,
-            0.08
+            34,
+            197,
+            94,
+            0.07
         );
 
     color:
-        #8ee990;
+        #4ade80;
+
+    font-size:
+        0.64rem;
+
+    font-weight:
+        700;
+
+    letter-spacing:
+        0.08em;
+
+    text-transform:
+        uppercase;
 }
 
-.minecraft-ideas-section[open]
-.minecraft-ideas-chevron {
-    transform:
-        rotate(180deg);
+
+.minecraft-announcement-title {
+    margin:
+        0;
+
+    color:
+        #ffffff;
+
+    font-size:
+        1.05rem;
+
+    line-height:
+        1.35;
+}
+
+
+.minecraft-announcement-description {
+    margin:
+        8px
+        0
+        0;
+
+    color:
+        #aab2c1;
+
+    font-size:
+        0.88rem;
+
+    line-height:
+        1.6;
+}
+
+
+.minecraft-announcement-empty {
+    padding:
+        20px;
+
+    border:
+        1px solid
+        #2d3340;
+
+    border-radius:
+        12px;
+
+    background:
+        #15181f;
+}
+
+
+.minecraft-announcement-empty p {
+    margin:
+        4px
+        0
+        0;
+
+    color:
+        #9ca5b5;
+}
+
+
+/*
+=========================================================
+RESPONSIVE
+=========================================================
+*/
+
+@media (
+    max-width: 760px
+) {
+
+    .minecraft-page,
+    .minecraft-landing {
+        gap:
+            34px;
+
+        margin:
+            0
+            auto;
+
+        padding:
+            24px
+            16px;
+    }
+
+
+    .minecraft-landing-options,
+    .minecraft-community-buttons {
+        grid-template-columns:
+            1fr;
+    }
+
+
+    .minecraft-mod-banner {
+        align-items:
+            flex-start;
+
+        gap:
+            12px;
+
+        padding:
+            12px;
+    }
+
+
+    .minecraft-mod-image-wrap {
+        flex-basis:
+            66px;
+
+        width:
+            66px;
+
+        height:
+            66px;
+    }
+
+
+    .minecraft-mod-heading {
+        flex-direction:
+            column;
+
+        gap:
+            8px;
+    }
+
+
+    .minecraft-mod-link {
+        align-self:
+            flex-start;
+    }
+
+
+    .minecraft-mod-meta {
+        grid-template-columns:
+            1fr;
+    }
+
+
+    .minecraft-mod-meta-item:not(:last-child) {
+        border-right:
+            0;
+
+        border-bottom:
+            1px solid
+            rgba(
+                255,
+                255,
+                255,
+                0.055
+            );
+    }
+
+
+    .minecraft-announcement-item {
+        grid-template-columns:
+            20px
+            minmax(
+                0,
+                1fr
+            );
+
+        gap:
+            10px;
+    }
+
+
+    .minecraft-announcement-content {
+        padding:
+            14px;
+    }
+
+
+    .minecraft-idea-footer {
+        flex-direction:
+            column;
+
+        align-items:
+            stretch;
+    }
+
+
+    .minecraft-idea-submit {
+        width:
+            100%;
+    }
+
+}
+
+
+@media (
+    max-width: 480px
+) {
+
+    .minecraft-hero,
+    .minecraft-community-section,
+    .minecraft-overview {
+        padding:
+            18px;
+    }
+
+
+    .minecraft-landing-card {
+        min-height:
+            130px;
+
+        padding:
+            18px;
+    }
+
+
+    .minecraft-landing-card-action {
+        flex-basis:
+            36px;
+
+        width:
+            36px;
+
+        height:
+            36px;
+    }
+
+
+    .minecraft-mod-banner {
+        display:
+            grid;
+
+        grid-template-columns:
+            58px
+            minmax(
+                0,
+                1fr
+            );
+    }
+
+
+    .minecraft-mod-image-wrap {
+        width:
+            58px;
+
+        height:
+            58px;
+    }
+
+
+    .minecraft-mod-description {
+        line-clamp:
+            3;
+
+        -webkit-line-clamp:
+            3;
+    }
+
+}
+
+
+/*
+=========================================================
+REDUCED MOTION
+=========================================================
+*/
+
+@media (
+    prefers-reduced-motion: reduce
+) {
+
+    .minecraft-mod-card,
+    .minecraft-mod-link,
+    .minecraft-landing-card,
+    .minecraft-landing-card-action,
+    .minecraft-community-button,
+    .minecraft-community-button-action,
+    .minecraft-announcement-content,
+    .minecraft-announcement-dot,
+    .minecraft-idea-submit,
+    .minecraft-mod-retry {
+        transition:
+            none;
+    }
+
+
+    .minecraft-mod-loading-spinner {
+        animation:
+            none;
+    }
+
 }
