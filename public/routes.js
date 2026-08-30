@@ -263,6 +263,7 @@ export const ROUTES = {
         "/Tabs/Ark/JS/mods.js",
         sitemap: true
     },
+
     "/Ark/Announcements": {
     title: "Ark Survival Ascended Announcements | BPD Gaming Network",
     body:
@@ -291,7 +292,9 @@ export const HEADER_MAP = {
     "/RocketLeague/PrivateMatches": false,
     "/Dashboard": true,
     "/FAQ": false,
-    "/Minecraft":false,
+    "/Minecraft":true,
+    "/Minecraft/Mods":true,
+    "/Minecraft/Announcements":true,
     "/Ark":true,
     "/Ark/Mods":true,
     "/Ark/Announcements":true
