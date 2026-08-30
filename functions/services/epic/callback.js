@@ -287,6 +287,32 @@ export async function handleEpicCallback(
         }
         const profile =
             await profileResponse.json();
+        console.info(
+            "EPIC CALLBACK: Profile inspection.",
+            {
+                debugId,
+                id:
+                    profile?.id || null,
+                sub:
+                    profile?.sub || null,
+                displayName:
+                    profile?.displayName || null,
+                preferred_username:
+                    profile?.preferred_username || null,
+
+                externalAccounts:
+                    profile?.externalAccounts || null,
+                linkedAccounts:
+                    profile?.linkedAccounts || null,
+
+                accountType:
+                    profile?.accountType || null,
+                platform:
+                    profile?.platform || null,
+                provider:
+                    profile?.provider || null
+            }
+        );
         const EpicUniqueId =
             (
                 typeof profile?.id ===
