@@ -1,46 +1,53 @@
-
 <section
-    class="ark-panel"
-    id="arkModsPanel"
-    data-ark-panel="mods"
+    class="ark-landing"
+    id="arkLanding"
 >
 
-    <div class="ark-section-heading">
+    <section class="ark-hero">
 
-        <span class="ark-section-eyebrow">
-            ARK MODS
-        </span>
+        <div class="ark-hero-content">
 
-        <h2 class="ark-section-title">
-            BPD ARK Mods
-        </h2>
+            <span class="ark-section-eyebrow">
+                BPD GAMING NETWORK
+            </span>
 
-        <p class="ark-section-description">
-            Browse ARK mods created for BPD Gaming Network, including
-            current projects, released content, and upcoming features.
-        </p>
+            <h1 class="ark-hero-title">
+                ARK
+            </h1>
 
-    </div>
+            <p class="ark-hero-description">
+                Explore ARK projects created and maintained by
+                BPD Gaming Network, including mods, development
+                updates, announcements, and community projects.
+            </p>
+
+        </div>
+
+    </section>
 
 
     <section class="ark-overview">
 
         <div class="ark-overview-content">
 
-            <h3>
-                About the Mods
-            </h3>
+            <span class="ark-content-eyebrow">
+                ABOUT
+            </span>
+
+            <h2>
+                BPD Gaming Network ARK
+            </h2>
 
             <p>
-                This section contains information about the ARK mods
-                currently being developed or maintained by BPD Gaming
-                Network.
+                Our ARK section is focused on mods, tools, and
+                projects developed for the ARK community.
             </p>
 
             <p>
-                Each mod can include its current status, a brief
-                description, supported features, download information,
-                and recent changes.
+                Browse our current projects, follow development
+                progress, view announcements, or submit an idea
+                for something you would like to see added in the
+                future.
             </p>
 
         </div>
@@ -55,287 +62,418 @@
             <div>
 
                 <span class="ark-content-eyebrow">
-                    PROJECTS
+                    EXPLORE
                 </span>
 
-                <h3>
-                    Mods
-                </h3>
+                <h2>
+                    ARK Content
+                </h2>
 
             </div>
 
         </div>
 
 
-        <div
-            class="ark-mod-list"
-            id="arkModList"
-        >
+        <div class="ark-landing-options">
 
-            <article class="ark-mod-card">
+            <button
+                class="ark-landing-card"
+                id="arkModsButton"
+                type="button"
+                data-ark-open-tab="mods"
+            >
 
-                <div class="ark-mod-header">
+                <div class="ark-landing-card-content">
 
-                    <div>
+                    <span class="ark-landing-card-eyebrow">
+                        PROJECTS
+                    </span>
 
-                        <span class="ark-mod-status">
-                            In Development
-                        </span>
+                    <h3>
+                        Mods
+                    </h3>
 
-                        <h4>
-                            Example Mod
-                        </h4>
-
-                    </div>
+                    <p>
+                        Browse current ARK mods, project information,
+                        versions, download counts, and CurseForge
+                        releases.
+                    </p>
 
                 </div>
 
 
-                <p class="ark-mod-description">
-                    A short description of what the mod does and what
-                    players can expect from it.
-                </p>
-
-
-                <div class="ark-mod-meta">
-
-                    <span>
-                        Version: 0.1.0
-                    </span>
-
-                    <span>
-                        Updated: August 2026
-                    </span>
-
-                </div>
-
-            </article>
-
-        </div>
-
-    </section>
-
-
-    <section class="ark-content-section">
-
-        <div class="ark-content-heading">
-
-            <div>
-
-                <span class="ark-content-eyebrow">
-                    DEVELOPMENT
+                <span
+                    class="ark-landing-card-action"
+                    aria-hidden="true"
+                >
+                    →
                 </span>
 
-                <h3>
-                    Recent Updates
-                </h3>
-
-            </div>
-
-        </div>
+            </button>
 
 
-        <div
-            class="ark-update-list"
-            id="arkModUpdateList"
-        >
+            <button
+                class="ark-landing-card"
+                id="arkAnnouncementsButton"
+                type="button"
+                data-ark-open-tab="announcements"
+            >
 
-            <article class="ark-update-card">
+                <div class="ark-landing-card-content">
 
-                <div class="ark-update-header">
+                    <span class="ark-landing-card-eyebrow">
+                        NEWS
+                    </span>
 
-                    <h4>
-                        Development Update
-                    </h4>
+                    <h3>
+                        Announcements
+                    </h3>
 
-                    <time datetime="2026-08-28">
-                        August 28, 2026
-                    </time>
+                    <p>
+                        Follow releases, development updates,
+                        upcoming features, and other ARK-related
+                        announcements.
+                    </p>
 
                 </div>
 
 
-                <p>
-                    Add development notes, feature changes, fixes,
-                    or other mod-related updates here.
-                </p>
+                <span
+                    class="ark-landing-card-action"
+                    aria-hidden="true"
+                >
+                    →
+                </span>
 
-            </article>
+            </button>
 
         </div>
 
     </section>
 
-</section>
 
+    <section class="ark-community-section">
 
-<section
-    class="ark-panel"
-    id="arkAnnouncementsPanel"
-    data-ark-panel="announcements"
-    hidden
->
-
-    <div class="ark-section-heading">
-
-        <span class="ark-section-eyebrow">
-            ARK ANNOUNCEMENTS
-        </span>
-
-        <h2 class="ark-section-title">
-            Announcements
-        </h2>
-
-        <p class="ark-section-description">
-            News, releases, development updates, and other announcements
-            related to BPD Gaming Network ARK projects.
-        </p>
-
-    </div>
-
-
-    <section class="ark-content-section">
-
-        <div
-            class="ark-announcement-list"
-            id="arkAnnouncementList"
-        >
-
-            <article class="ark-announcement-card">
-
-                <div class="ark-announcement-header">
-
-                    <div>
-
-                        <span class="ark-announcement-type">
-                            Announcement
-                        </span>
-
-                        <h3>
-                            ARK Development Has Started
-                        </h3>
-
-                    </div>
-
-
-                    <time datetime="2026-08-28">
-                        August 28, 2026
-                    </time>
-
-                </div>
-
-
-                <p>
-                    Announcements can contain release information,
-                    development progress, upcoming features,
-                    or general ARK-related news.
-                </p>
-
-            </article>
-
-        </div>
-
-    </section>
-
-</section>
-
-
-<details class="ark-ideas-section">
-
-    <summary class="ark-ideas-toggle">
-
-        <div>
+        <div class="ark-community-heading">
 
             <span class="ark-content-eyebrow">
                 COMMUNITY
             </span>
 
             <h2>
-                Have an Idea?
+                Get Involved
             </h2>
 
             <p>
-                Suggest a mod, feature, improvement, or other idea for
-                BPD Gaming Network ARK projects.
+                Have an idea for one of our projects or interested
+                in helping develop, test, or support them?
             </p>
 
         </div>
 
 
-        <span
-            class="ark-ideas-chevron"
-            aria-hidden="true"
-        >
-            ▼
-        </span>
+        <div class="ark-community-buttons">
 
-    </summary>
+            <button
+                class="ark-community-button"
+                id="arkSuggestIdeaButton"
+                type="button"
+                aria-expanded="false"
+                aria-controls="arkIdeaPanel"
+            >
 
+                <div class="ark-community-button-content">
 
-    <div class="ark-ideas-content">
+                    <span class="ark-community-button-eyebrow">
+                        SUGGESTION
+                    </span>
 
-        <form
-            class="ark-idea-form"
-            id="arkIdeaForm"
-        >
+                    <span class="ark-community-button-title">
+                        Suggest an Idea
+                    </span>
 
-            <div class="ark-idea-field">
+                    <span class="ark-community-button-description">
+                        Suggest a mod, feature, improvement,
+                        or other project idea.
+                    </span>
 
-                <label for="arkIdeaTitle">
-                    Idea Title
-                </label>
+                </div>
 
-                <input
-                    id="arkIdeaTitle"
-                    name="title"
-                    type="text"
-                    maxlength="100"
-                    placeholder="Briefly describe your idea"
-                    required
-                >
-
-            </div>
-
-
-            <div class="ark-idea-field">
-
-                <label for="arkIdeaDescription">
-                    Description
-                </label>
-
-                <textarea
-                    id="arkIdeaDescription"
-                    name="description"
-                    rows="5"
-                    maxlength="1000"
-                    placeholder="Explain your idea..."
-                    required
-                ></textarea>
-
-            </div>
-
-
-            <div class="ark-idea-footer">
 
                 <span
-                    class="ark-idea-status"
-                    id="arkIdeaStatus"
-                ></span>
-
-
-                <button
-                    class="ark-idea-submit"
-                    id="arkIdeaSubmit"
-                    type="submit"
+                    class="ark-community-button-action"
+                    aria-hidden="true"
                 >
-                    Submit Idea
-                </button>
+                    +
+                </span>
+
+            </button>
+
+
+            <button
+                class="ark-community-button"
+                id="arkJoinTeamButton"
+                type="button"
+                aria-expanded="false"
+                aria-controls="arkJoinTeamPanel"
+            >
+
+                <div class="ark-community-button-content">
+
+                    <span class="ark-community-button-eyebrow">
+                        CONTRIBUTE
+                    </span>
+
+                    <span class="ark-community-button-title">
+                        Join the Team
+                    </span>
+
+                    <span class="ark-community-button-description">
+                        Help develop, test, design, moderate,
+                        or support our ARK projects.
+                    </span>
+
+                </div>
+
+
+                <span
+                    class="ark-community-button-action"
+                    aria-hidden="true"
+                >
+                    +
+                </span>
+
+            </button>
+
+        </div>
+
+
+        <div
+            class="ark-community-panel"
+            id="arkIdeaPanel"
+            hidden
+        >
+
+            <div class="ark-community-panel-heading">
+
+                <span class="ark-content-eyebrow">
+                    SUGGEST AN IDEA
+                </span>
+
+                <h3>
+                    What would you like to see?
+                </h3>
+
+                <p>
+                    Submit a mod idea, feature request,
+                    improvement, or another suggestion for
+                    BPD Gaming Network ARK projects.
+                </p>
 
             </div>
 
-        </form>
 
-    </div>
+            <form
+                class="ark-idea-form"
+                id="arkIdeaForm"
+            >
 
-</details>
+                <div class="ark-idea-field">
 
+                    <label for="arkIdeaTitle">
+                        Idea Title
+                    </label>
+
+                    <input
+                        id="arkIdeaTitle"
+                        name="title"
+                        type="text"
+                        maxlength="100"
+                        placeholder="Briefly describe your idea"
+                        required
+                    >
+
+                </div>
+
+
+                <div class="ark-idea-field">
+
+                    <label for="arkIdeaDescription">
+                        Description
+                    </label>
+
+                    <textarea
+                        id="arkIdeaDescription"
+                        name="description"
+                        rows="5"
+                        maxlength="1000"
+                        placeholder="Explain your idea..."
+                        required
+                    ></textarea>
+
+                </div>
+
+
+                <div class="ark-idea-footer">
+
+                    <span
+                        class="ark-idea-status"
+                        id="arkIdeaStatus"
+                    ></span>
+
+
+                    <button
+                        class="ark-idea-submit"
+                        id="arkIdeaSubmit"
+                        type="submit"
+                    >
+                        Submit Idea
+                    </button>
+
+                </div>
+
+            </form>
+
+        </div>
+
+
+        <div
+            class="ark-community-panel"
+            id="arkJoinTeamPanel"
+            hidden
+        >
+
+            <div class="ark-community-panel-heading">
+
+                <span class="ark-content-eyebrow">
+                    JOIN THE TEAM
+                </span>
+
+                <h3>
+                    Interested in helping?
+                </h3>
+
+                <p>
+                    BPD Gaming Network projects can use help
+                    across development, testing, design, community
+                    support, and other areas.
+                </p>
+
+            </div>
+
+
+            <form
+                class="ark-team-form"
+                id="arkTeamForm"
+            >
+
+                <div class="ark-idea-field">
+
+                    <label for="arkTeamName">
+                        Display Name
+                    </label>
+
+                    <input
+                        id="arkTeamName"
+                        name="displayName"
+                        type="text"
+                        maxlength="50"
+                        placeholder="Your preferred display name"
+                        required
+                    >
+
+                </div>
+
+
+                <div class="ark-idea-field">
+
+                    <label for="arkTeamArea">
+                        How would you like to help?
+                    </label>
+
+                    <select
+                        id="arkTeamArea"
+                        name="area"
+                        required
+                    >
+
+                        <option
+                            value=""
+                            selected
+                            disabled
+                        >
+                            Select an area
+                        </option>
+
+                        <option value="development">
+                            Development
+                        </option>
+
+                        <option value="testing">
+                            Mod Testing
+                        </option>
+
+                        <option value="design">
+                            Design / Assets
+                        </option>
+
+                        <option value="community">
+                            Community Support
+                        </option>
+
+                        <option value="moderation">
+                            Moderation
+                        </option>
+
+                        <option value="other">
+                            Other
+                        </option>
+
+                    </select>
+
+                </div>
+
+
+                <div class="ark-idea-field">
+
+                    <label for="arkTeamExperience">
+                        Experience / Information
+                    </label>
+
+                    <textarea
+                        id="arkTeamExperience"
+                        name="experience"
+                        rows="5"
+                        maxlength="1000"
+                        placeholder="Tell us how you would like to help and any relevant experience..."
+                        required
+                    ></textarea>
+
+                </div>
+
+
+                <div class="ark-idea-footer">
+
+                    <span
+                        class="ark-idea-status"
+                        id="arkTeamStatus"
+                    ></span>
+
+
+                    <button
+                        class="ark-idea-submit"
+                        id="arkTeamSubmit"
+                        type="submit"
+                    >
+                        Submit Interest
+                    </button>
+
+                </div>
+
+            </form>
+
+        </div>
+
+    </section>
+
+</section>

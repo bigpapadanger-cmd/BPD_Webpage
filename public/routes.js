@@ -221,6 +221,34 @@ export const ROUTES = {
     module: 
         "/Tabs/Ark/JS/index.js",
         sitemap: true
+    },
+    "/Ark/Mods": {
+    title: "Ark Survival Ascended Mods | BPD Gaming Network",
+    body:
+        "/Tabs/Ark/HTML/mods.html",
+    header:
+        "/Framework/Shell/HTML/Header/header.html",
+    sidebar:
+        "/Framework/Shell/HTML/Sidebar/mainmenu.html",
+    footer:
+        "/Framework/Shell/HTML/Footer/footer.html",
+    module: 
+        "/Tabs/Ark/JS/mods.js",
+        sitemap: true
+    },
+    "/Ark/Announcements": {
+    title: "Ark Survival Ascended Announcements | BPD Gaming Network",
+    body:
+        "/Tabs/Ark/HTML/announcements.html",
+    header:
+        "/Framework/Shell/HTML/Header/header.html",
+    sidebar:
+        "/Framework/Shell/HTML/Sidebar/mainmenu.html",
+    footer:
+        "/Framework/Shell/HTML/Footer/footer.html",
+    module: 
+        "/Tabs/Ark/JS/mannouncements.js",
+        sitemap: true
     }
 };
 export const HEADER_MAP = {
@@ -237,7 +265,9 @@ export const HEADER_MAP = {
     "/Dashboard": true,
     "/FAQ": false,
     "/Minecraft":false,
-    "/Ark":true
+    "/Ark":true,
+    "/Ark/Mods":true,
+    "/Ark/Announcements":true
 };
 
 export const PRIORITY_MAP = {
