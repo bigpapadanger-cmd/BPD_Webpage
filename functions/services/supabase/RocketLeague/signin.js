@@ -3,19 +3,58 @@ export async function handleRocketLeagueSignin(
     env,
     sessionData
 ) {
-    return callSupabaseSignin(
-        env,
-        {
-            EpicUniqueId:
-                sessionData.EpicUniqueId,
+    try {
+        const profile =
+            await callSupabaseSignin(
+                env,
+                {
+                    EpicUniqueId:
+                        sessionData.EpicUniqueId,
 
-            EpicDisplayName:
-                sessionData.EpicDisplayName,
+                    EpicDisplayName:
+                        sessionData.EpicDisplayName,
 
-            EpicPreferredUsername:
-                sessionData.EpicPreferredUsername
-        }
-    );
+                    EpicPreferredUsername:
+                        sessionData.EpicPreferredUsername
+                }
+            );
+
+        return {
+            success:
+                true,
+
+            profileLoaded:
+                true,
+
+            profile:
+                profile,
+
+            warning:
+                null
+        };
+
+    } catch (
+        error
+    ) {
+        console.error(
+            "[ROCKET LEAGUE PROFILE] Supabase signin failed:",
+            error
+        );
+
+        return {
+            success:
+                true,
+
+            profileLoaded:
+                false,
+
+            profile:
+                null,
+
+            warning:
+                "Your Epic account is authenticated, but your BPD Gaming Network profile could not be loaded."
+        };
+    }
 }
 //.ENV variables are stored in SUPABASE, if any can be public
 //import them from /functions/api_vars.js

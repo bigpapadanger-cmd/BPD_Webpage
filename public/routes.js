@@ -102,6 +102,21 @@ export const ROUTES = {
         requiresAuth: true,
         sitemap: false
     },
+    "/RocketLeague/SubmitMatchResults": {
+        title: "Submit Match Results | BPD Gaming Network",
+        body:
+            "/ocr/HTML/submitimg.html",
+        header:
+            "/Framework/Shell/HTML/Header/header.html",
+        sidebar:
+            "/Framework/Shell/HTML/Sidebar/rocketleague.html",
+        footer:
+            "/Framework/Shell/HTML/Footer/footer.html",
+        module:
+            "",
+        requiresAuth: true,
+        sitemap: false
+    },
     
     "/Error": {
     title: "Page Not Found | BPD Gaming Network",
@@ -290,6 +305,7 @@ export const HEADER_MAP = {
     "/Error": false,
     "/RocketLeague/WeeklyMatches": false,
     "/RocketLeague/PrivateMatches": false,
+    "/RocketLeague/SubmitMatchResults": false,
     "/Dashboard": true,
     "/FAQ": false,
     "/Minecraft":true,

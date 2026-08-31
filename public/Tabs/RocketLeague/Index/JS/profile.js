@@ -5,6 +5,44 @@ import {
 import {
     renderRocketLeagueRanks
 } from "./ranks.js";
+
+function setProfileWarning(
+    visible,
+    message = ""
+) {
+    const warningElement =
+        document.getElementById(
+            "rocketLeagueProfileWarning"
+        );
+
+    if (
+        !warningElement
+    ) {
+        return;
+    }
+
+    warningElement.hidden =
+        !visible;
+
+    if (
+        visible
+        && message
+    ) {
+        const messageElement =
+            warningElement.querySelector(
+                "span"
+            );
+
+        if (
+            messageElement
+        ) {
+            messageElement.textContent =
+                message;
+        }
+    }
+}
+
+
 function getEpicDisplayName(
     authUser
 ) {
@@ -70,7 +108,7 @@ function renderRocketLeagueProfile(
         getEpicDisplayName(
             authUser
         ) ||
-        "Epic Player"
+        ""
     );
     const ranked =
         profile?.stats?.ranked ||
@@ -99,7 +137,10 @@ export async function loadRocketLeagueProfile(
         getEpicDisplayName(
             authUser
         ) ||
-        "Epic Player"
+        ""
+    );
+    setProfileWarning(
+        false
     );
     const response =
         await fetch(
@@ -121,14 +162,42 @@ export async function loadRocketLeagueProfile(
             }
         );
     if (
-        !response.ok ||
-        result.success !== true
+        !response.ok
+        || result.success !== true
     ) {
-        throw new Error(
-            result.message ||
-            "Rocket League profile could not be loaded."
+        setProfileWarning(
+            true,
+            (
+                result.message
+                || (
+                    "Your Epic account is signed in, "
+                    + "but your BPD Gaming Network profile "
+                    + "could not be loaded."
+                )
+            )
         );
+
+        renderRocketLeagueRanks(
+            {}
+        );
+
+        setRankStatus(
+            "Profile data unavailable",
+            "warning"
+        );
+
+        return {
+            profile:
+                null,
+
+            profileComplete:
+                false,
+
+            profileLoaded:
+                false
+        };
     }
+
     const profile =
         result.profile || {};
     renderRocketLeagueProfile(
@@ -137,10 +206,14 @@ export async function loadRocketLeagueProfile(
     );
     return {
         profile,
+
         profileComplete:
             isProfileComplete(
                 result,
                 profile
-            )
+            ),
+
+        profileLoaded:
+            true
     };
 }

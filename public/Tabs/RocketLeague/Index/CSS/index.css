@@ -902,3 +902,70 @@ body[data-animations="off"]
 .auth-login-button {
     animation: none;
 }
+.profile-warning {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+
+    margin: 12px 0 14px;
+    padding: 11px 13px;
+
+    border:
+        1px solid
+        rgba(
+            245,
+            158,
+            11,
+            0.34
+        );
+
+    border-radius: 10px;
+
+    background:
+        rgba(
+            245,
+            158,
+            11,
+            0.08
+        );
+
+    color: #fde68a;
+}
+
+.profile-warning[hidden] {
+    display: none;
+}
+
+.profile-warning strong {
+    color: #fbbf24;
+
+    font-size: 12px;
+    font-weight: 800;
+
+    letter-spacing: 0.5px;
+
+    text-transform: uppercase;
+}
+
+.profile-warning span {
+    color: #cbd5e1;
+
+    font-size: 13px;
+
+    line-height: 1.45;
+}
+@media (
+    max-width: 640px
+) {
+    .profile-warning {
+        margin:
+            10px 0 12px;
+
+        padding:
+            10px 11px;
+    }
+
+    .profile-warning span {
+        font-size: 12px;
+    }
+}

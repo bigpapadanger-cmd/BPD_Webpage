@@ -1,584 +1,900 @@
 "use strict";
+
 /* =========================================================
-   OCR ACCURACY TESTING
-   Owns only Accurate/Incorrect verification, the 60-second
-   response timer, and the Google Sheets verification request.
+   BPD GAMING NETWORK
+   OCR RESULT REVIEW / CONFIRMATION
    ========================================================= */
-const OCR_ACCURACY_TESTING_ENABLED=true;
-const OCR_ACCURACY_RESPONSE_SECONDS=180;
-const OCR_ACCURACY_TIMEOUT_VERDICT="accurate";
-const ocrTestingPanel=document.getElementById("ocrTestingPanel");
-const ocrTestingAccurateBtn=document.getElementById("ocrTestingAccurateBtn");
-const ocrTestingIncorrectBtn=document.getElementById("ocrTestingIncorrectBtn");
-const ocrTestingStatus=document.getElementById("ocrTestingStatus");
-let ocrTestingCurrentJobId="";
-let ocrTestingCurrentResult=null;
-let ocrTestingResponseTimer=null;
-let ocrTestingDeadline=0;
-let ocrTestingSubmitting=false;
-function getOcrTestingStorageKey(jobId){
-    return"ocrAccuracyVerification:"+String(jobId||"");
-}
-function getOcrTestingDeadlineKey(jobId){
-    return"ocrAccuracyVerificationDeadline:"+String(jobId||"");
-}
-function clearOcrTestingResponseTimer(){
-    if(ocrTestingResponseTimer!==null){
-        clearTimeout(
-            ocrTestingResponseTimer
-        );
-        ocrTestingResponseTimer=null;
+
+
+/* =========================================================
+   CONFIGURATION
+   ========================================================= */
+
+const OCR_CONFIRM_URL =
+    "/api/ocr/confirm";
+
+
+/* =========================================================
+   ELEMENTS
+   ========================================================= */
+
+const ocrTestingPanel =
+    document.getElementById(
+        "ocrTestingPanel"
+    );
+
+const ocrTestingAccurateBtn =
+    document.getElementById(
+        "ocrTestingAccurateBtn"
+    );
+
+const ocrTestingIncorrectBtn =
+    document.getElementById(
+        "ocrTestingIncorrectBtn"
+    );
+
+const ocrTestingStatus =
+    document.getElementById(
+        "ocrTestingStatus"
+    );
+
+
+/* =========================================================
+   STATE
+   ========================================================= */
+
+let ocrReviewCurrentMatchId = "";
+
+let ocrReviewCurrentResult = null;
+
+let ocrReviewSubmitting = false;
+
+
+/* =========================================================
+   CONFIGURE PANEL
+   ========================================================= */
+
+function configureReviewPanel() {
+
+    if (
+        !ocrTestingPanel
+    ) {
+        return;
     }
-}
-function setOcrTestingButtonsDisabled(disabled){
-    if(ocrTestingAccurateBtn){
-        ocrTestingAccurateBtn.disabled=
-            Boolean(
-                disabled
+
+    ocrTestingPanel.hidden =
+        true;
+
+
+    const title =
+        document.getElementById(
+            "ocrTestingTitle"
+        );
+
+    if (
+        title
+    ) {
+        title.textContent =
+            "Review & Confirm Results";
+    }
+
+
+    const label =
+        ocrTestingPanel.querySelector(
+            ".ocr-testing-label"
+        );
+
+    if (
+        label
+    ) {
+        label.textContent =
+            "RESULT REVIEW";
+    }
+
+
+    const help =
+        ocrTestingPanel.querySelector(
+            "p"
+        );
+
+    if (
+        help
+    ) {
+        help.textContent =
+            (
+                "Review the values above. "
+                + "Gray values are high confidence. "
+                + "Highlighted values need review. "
+                + "Any changed value will be recorded "
+                + "as disputed while preserving the "
+                + "original OCR evidence."
             );
     }
-    if(ocrTestingIncorrectBtn){
-        ocrTestingIncorrectBtn.disabled=
-            Boolean(
-                disabled
-            );
+
+
+    if (
+        ocrTestingAccurateBtn
+    ) {
+        ocrTestingAccurateBtn.textContent =
+            "Confirm Results";
+    }
+
+
+    if (
+        ocrTestingIncorrectBtn
+    ) {
+        ocrTestingIncorrectBtn.textContent =
+            "Reset Changes";
     }
 }
-function getOcrTestingValidationPassed(result){
-    if(
-        result?.validation?.pass!==undefined
-    ){
-        return(
-            result.validation.pass===true
-        );
-    }
-    return(
-        result?.validation?.overall==="validated"
-    );
-}
-function getOcrTestingRuntimeSeconds(result){
-    return(
-        result?.performance?.totalSeconds
-        ??result?.totalSeconds
-        ??result?.runReport?.totalSeconds
-        ??""
-    );
-}
-function buildOcrAccuracyVerificationUrl(
-    verdict,
-    reason="",
-    automatic=false
-){
-    const result=
-        ocrTestingCurrentResult
-        ||{};
-    const confidenceSummary=
-        typeof getOcrConfidenceSummary==="function"
-            ?getOcrConfidenceSummary(
-                result
-            )
-            :{
-                players:[],
-                averageConfidence:null,
-                minimumConfidence:null
-            };
-    const playerConfidences=
-        Array.isArray(
-            confidenceSummary.players
+
+
+/* =========================================================
+   REVIEW INPUTS
+   ========================================================= */
+
+function getReviewInputs() {
+
+    return Array.from(
+        document.querySelectorAll(
+            ".ocr-review-value-input"
         )
-            ?confidenceSummary.players.map(
-                function(item){
-                    return{
-                        team:String(
-                            item.player?.team
-                            ||item.team
-                            ||""
-                        ),
+    );
+}
+
+
+/* =========================================================
+   VALUE PARSING
+   ========================================================= */
+
+function parseReviewInputValue(
+    input
+) {
+
+    const field =
+        String(
+            input.dataset.field
+            || ""
+        ).trim();
+
+    const raw =
+        input.value.trim();
+
+
+    /*
+        Ping may default to zero if blank.
+    */
+
+    if (
+        raw === ""
+        && field === "ping"
+    ) {
+        return 0;
+    }
+
+
+    /*
+        Other numeric fields may not be blank.
+    */
+
+    if (
+        raw === ""
+    ) {
+        return {
+            invalid:
+                true,
+
+            raw:
+                raw
+        };
+    }
+
+
+    const numeric =
+        Number(
+            raw
+        );
+
+
+    if (
+        !Number.isInteger(
+            numeric
+        )
+        || numeric < 0
+    ) {
+        return {
+            invalid:
+                true,
+
+            raw:
+                raw
+        };
+    }
+
+
+    return numeric;
+}
+
+
+/* =========================================================
+   BUILD SUBMISSION
+   ========================================================= */
+
+function buildReviewSubmission() {
+
+    const fields = [];
+
+    const invalid = [];
+
+
+    getReviewInputs().forEach(
+        function(
+            input
+        ) {
+
+            const userValue =
+                parseReviewInputValue(
+                    input
+                );
+
+
+            if (
+                userValue
+                && typeof userValue === "object"
+                && userValue.invalid
+            ) {
+                invalid.push(
+                    {
+                        team:
+                            Number(
+                                input.dataset.team
+                            ),
+
                         player:
-                            typeof getOcrPlayerName==="function"
-                                ?getOcrPlayerName(
-                                    item.player
-                                )
-                                :String(
-                                    item.player?.matchedName
-                                    ||item.player?.username
-                                    ||item.player?.name
-                                    ||""
-                                ),
-                        confidence:
-                            typeof getOcrPlayerConfidence==="function"
-                                ?getOcrPlayerConfidence(
-                                    item.player
-                                )
-                                :(
-                                    item.player?.confidence
-                                    ??null
-                                )
-                    };
+                            input.dataset.player
+                            || "",
+
+                        field:
+                            input.dataset.field
+                            || "",
+
+                        value:
+                            userValue.raw
+                    }
+                );
+
+                return;
+            }
+
+
+            fields.push(
+                {
+                    team:
+                        Number(
+                            input.dataset.team
+                        ),
+
+                    player:
+                        input.dataset.player
+                        || "",
+
+                    field:
+                        input.dataset.field
+                        || "",
+
+                    userValue:
+                        userValue
                 }
-            )
-            :[];
-    const testingUrl=
-        new URL(
-            OCR_TRACKING_URL
-        );
-    testingUrl.searchParams.set(
-        "action",
-        "verify_ocr_accuracy"
+            );
+        }
     );
-    testingUrl.searchParams.set(
-        "jobId",
-        ocrTestingCurrentJobId
-    );
-    testingUrl.searchParams.set(
-        "verdict",
-        verdict
-    );
-    testingUrl.searchParams.set(
-        "reason",
-        String(
-            reason||""
-        )
-    );
-    testingUrl.searchParams.set(
-        "automatic",
-        String(
-            automatic===true
-        )
-    );
-    testingUrl.searchParams.set(
-        "ocrSuccess",
-        String(
-            result?.success===true
-        )
-    );
-    testingUrl.searchParams.set(
-        "validationPass",
-        String(
-            getOcrTestingValidationPassed(
-                result
-            )
-        )
-    );
-    testingUrl.searchParams.set(
-        "matchSize",
-        String(
-            result?.matchSize
-            ||matchSize?.value
-            ||""
-        )
-    );
-    testingUrl.searchParams.set(
-        "averageConfidence",
-        confidenceSummary.averageConfidence===null
-            ?""
-            :String(
-                confidenceSummary.averageConfidence
-            )
-    );
-    testingUrl.searchParams.set(
-        "minimumConfidence",
-        confidenceSummary.minimumConfidence===null
-            ?""
-            :String(
-                confidenceSummary.minimumConfidence
-            )
-    );
-    testingUrl.searchParams.set(
-        "playersNeedingReview",
-        String(
-            result?.validation?.players_needing_review
-            ??0
-        )
-    );
-    testingUrl.searchParams.set(
-        "playerConfidences",
-        JSON.stringify(
-            playerConfidences
-        )
-    );
-    testingUrl.searchParams.set(
-        "runtimeSeconds",
-        String(
-            getOcrTestingRuntimeSeconds(
-                result
-            )
-        )
-    );
-    testingUrl.searchParams.set(
-        "responseSeconds",
-        String(
-            OCR_ACCURACY_RESPONSE_SECONDS
-        )
-    );
-    return testingUrl;
+
+
+    return {
+        fields:
+            fields,
+
+        invalid:
+            invalid
+    };
 }
-async function submitOcrAccuracyVerification(
-    verdict,
-    options={}
-){
-    if(
-        !OCR_ACCURACY_TESTING_ENABLED
-        ||!ocrTestingCurrentJobId
-        ||!ocrTestingCurrentResult
-        ||ocrTestingSubmitting
-    ){
-        if(
-            !ocrTestingCurrentJobId
-            ||!ocrTestingCurrentResult
-        ){
-            if(ocrTestingStatus){
-                ocrTestingStatus.textContent=
-                    "No OCR result is available to verify.";
+
+
+/* =========================================================
+   LOCAL DISPLAY HELPERS
+   ========================================================= */
+
+function getLocalDisputeSummary() {
+
+    let disputeCount = 0;
+
+
+    getReviewInputs().forEach(
+        function(
+            input
+        ) {
+
+            const field =
+                String(
+                    input.dataset.field
+                    || ""
+                ).trim();
+
+            const originalRaw =
+                String(
+                    input.dataset.originalValue
+                    ?? ""
+                ).trim();
+
+            let originalValue = null;
+
+
+            if (
+                originalRaw === ""
+                && field === "ping"
+            ) {
+                originalValue = 0;
+
+            } else if (
+                originalRaw !== ""
+            ) {
+                const numeric =
+                    Number(
+                        originalRaw
+                    );
+
+                originalValue =
+                    Number.isInteger(
+                        numeric
+                    )
+                        ? numeric
+                        : null;
+            }
+
+
+            const userValue =
+                parseReviewInputValue(
+                    input
+                );
+
+
+            if (
+                userValue
+                && typeof userValue === "object"
+                && userValue.invalid
+            ) {
+                return;
+            }
+
+
+            if (
+                userValue
+                !== originalValue
+            ) {
+                disputeCount += 1;
             }
         }
-        return false;
-    }
-    const storageKey=
-        getOcrTestingStorageKey(
-            ocrTestingCurrentJobId
-        );
-    if(
-        sessionStorage.getItem(
-            storageKey
-        )
-    ){
-        return true;
-    }
-    const automatic=
-        options.automatic===true;
-    const reason=
-        String(
-            options.reason||""
-        );
-    ocrTestingSubmitting=true;
-    clearOcrTestingResponseTimer();
-    setOcrTestingButtonsDisabled(
-        true
     );
-    if(ocrTestingStatus){
-        ocrTestingStatus.textContent=
-            automatic
-                ?"No response received. Saving result automatically..."
-                :"Saving accuracy verification...";
+
+
+    return {
+        hasDisputes:
+            disputeCount > 0,
+
+        disputeCount:
+            disputeCount
+    };
+}
+
+
+/* =========================================================
+   RESET CHANGES
+   ========================================================= */
+
+function resetReviewChanges() {
+
+    getReviewInputs().forEach(
+        function(
+            input
+        ) {
+
+            const field =
+                String(
+                    input.dataset.field
+                    || ""
+                ).trim();
+
+            const originalValue =
+                input.dataset.originalValue
+                ?? "";
+
+
+            if (
+                originalValue === ""
+                && field === "ping"
+            ) {
+                input.value = "0";
+
+            } else {
+                input.value =
+                    originalValue;
+            }
+
+
+            input
+                .closest(
+                    "tr"
+                )
+                ?.classList
+                .remove(
+                    "ocr-review-row-disputed"
+                );
+        }
+    );
+
+
+    if (
+        ocrTestingStatus
+    ) {
+        ocrTestingStatus.textContent =
+            "Changes reset to the OCR values.";
     }
-    const testingUrl=
-        buildOcrAccuracyVerificationUrl(
-            verdict,
-            reason,
-            automatic
-        );
-        try{
+}
+
+
+/* =========================================================
+   CONFIRM RESULTS
+   ========================================================= */
+
+async function confirmReviewedResults() {
+
+    if (
+        ocrReviewSubmitting
+        || !ocrReviewCurrentResult
+    ) {
+        return;
+    }
+
+
+    if (
+        !ocrReviewCurrentMatchId
+    ) {
+        if (
+            ocrTestingStatus
+        ) {
+            ocrTestingStatus.textContent =
+                "Match ID is unavailable. Results cannot be confirmed.";
+        }
+
+        return;
+    }
+
+
+    const reviewSubmission =
+        buildReviewSubmission();
+
+
+    if (
+        reviewSubmission.invalid.length > 0
+    ) {
+        if (
+            ocrTestingStatus
+        ) {
+            ocrTestingStatus.textContent =
+                (
+                    "One or more edited values are invalid. "
+                    + "Use whole numbers greater than or equal to zero."
+                );
+        }
+
+        return;
+    }
+
+
+    if (
+        reviewSubmission.fields.length === 0
+    ) {
+        if (
+            ocrTestingStatus
+        ) {
+            ocrTestingStatus.textContent =
+                "No reviewable scoreboard values were found.";
+        }
+
+        return;
+    }
+
+
+    /*
+        Only send the values the browser is authoritative for.
+
+        Cloudflare derives:
+        - OCR value
+        - original engine evidence
+        - disputed state
+        - confirmation status
+        - dispute count
+    */
+
+    const payload = {
+        matchId:
+            ocrReviewCurrentMatchId,
+
+        fields:
+            reviewSubmission.fields
+    };
+
+
+    const localSummary =
+        getLocalDisputeSummary();
+
+
+    ocrReviewSubmitting =
+        true;
+
+
+    if (
+        ocrTestingAccurateBtn
+    ) {
+        ocrTestingAccurateBtn.disabled =
+            true;
+    }
+
+
+    if (
+        ocrTestingIncorrectBtn
+    ) {
+        ocrTestingIncorrectBtn.disabled =
+            true;
+    }
+
+
+    if (
+        ocrTestingStatus
+    ) {
+        ocrTestingStatus.textContent =
+            localSummary.hasDisputes
+                ? "Saving reviewed results..."
+                : "Confirming results...";
+    }
+
+
+    try {
+
+        const response =
             await fetch(
-                testingUrl.toString(),
+                OCR_CONFIRM_URL,
                 {
-                    method:"GET",
-                    mode:"no-cors",
-                    cache:"no-store",
-                    keepalive:true
+                    method:
+                        "POST",
+
+                    headers:
+                        {
+                            "Content-Type":
+                                "application/json"
+                        },
+
+                    body:
+                        JSON.stringify(
+                            payload
+                        ),
+
+                    cache:
+                        "no-store",
+
+                    credentials:
+                        "same-origin",
+
+                    keepalive:
+                        true
                 }
             );
-            console.log(
-                "[OCR TESTING] Verification request sent:",
-                {
-                    jobId:
-                        ocrTestingCurrentJobId,
-                    verdict:
-                        verdict,
-                    automatic:
-                        automatic
-                }
-            );
-            sessionStorage.setItem(
-                storageKey,
-                verdict
-            );
-            sessionStorage.removeItem(
-                getOcrTestingDeadlineKey(
-                    ocrTestingCurrentJobId
+
+
+        const rawText =
+            await response.text();
+
+
+        let responseData = null;
+
+
+        try {
+            responseData =
+                JSON.parse(
+                    rawText
+                );
+
+        } catch {
+            responseData =
+                null;
+        }
+
+
+        if (
+            !response.ok
+            || responseData?.success !== true
+        ) {
+            throw new Error(
+                responseData?.message
+                || (
+                    "Confirmation endpoint returned HTTP "
+                    + response.status
+                    + "."
                 )
             );
-            ocrTestingDeadline=0;
-            if(ocrTestingStatus){
-                if(automatic){
-                    ocrTestingStatus.textContent=
-                        "No response received within 60 seconds. Result was automatically accepted.";
-                }else{
-                    ocrTestingStatus.textContent=(
-                        verdict==="accurate"
-                            ?"Accuracy confirmed and sent."
-                            :"Correction requirement sent."
+        }
+
+
+        /*
+            Use the server response for the authoritative
+            dispute result rather than the local estimate.
+        */
+
+        const disputeCount =
+            Number(
+                responseData.disputeCount
+                || 0
+            );
+
+
+        if (
+            ocrTestingStatus
+        ) {
+            if (
+                responseData.hasDisputes === true
+            ) {
+                ocrTestingStatus.textContent =
+                    (
+                        "Results confirmed. "
+                        + disputeCount
+                        + " disputed value"
+                        + (
+                            disputeCount === 1
+                                ? ""
+                                : "s"
+                        )
+                        + " recorded."
+                    );
+
+            } else {
+                ocrTestingStatus.textContent =
+                    "Results confirmed.";
+            }
+        }
+
+
+        document.dispatchEvent(
+            new CustomEvent(
+                "ocr:results-confirmed",
+                {
+                    detail:
+                        {
+                            payload:
+                                payload,
+
+                            response:
+                                responseData
+                        }
+                }
+            )
+        );
+
+
+    } catch (
+        error
+    ) {
+
+        console.error(
+            "[OCR REVIEW] CONFIRM ERROR:",
+            error
+        );
+
+
+        if (
+            ocrTestingStatus
+        ) {
+            ocrTestingStatus.textContent =
+                (
+                    "The OCR result is already preserved, "
+                    + "but your confirmation could not be saved. "
+                    + "Please try Confirm Results again."
+                );
+        }
+
+
+        if (
+            ocrTestingAccurateBtn
+        ) {
+            ocrTestingAccurateBtn.disabled =
+                false;
+        }
+
+
+        if (
+            ocrTestingIncorrectBtn
+        ) {
+            ocrTestingIncorrectBtn.disabled =
+                false;
+        }
+
+
+        return;
+
+    } finally {
+
+        ocrReviewSubmitting =
+            false;
+    }
+
+
+    /*
+        Successful confirmation stays locked.
+        This prevents an accidental second submission.
+    */
+
+    if (
+        ocrTestingAccurateBtn
+    ) {
+        ocrTestingAccurateBtn.disabled =
+            true;
+
+        ocrTestingAccurateBtn.textContent =
+            "Results Confirmed";
+    }
+
+
+    if (
+        ocrTestingIncorrectBtn
+    ) {
+        ocrTestingIncorrectBtn.disabled =
+            true;
+    }
+}
+
+
+/* =========================================================
+   SHOW REVIEW
+   ========================================================= */
+
+function showOcrReview(
+    detail
+) {
+
+    if (
+        !ocrTestingPanel
+    ) {
+        return;
+    }
+
+
+    ocrReviewCurrentMatchId =
+        String(
+            detail?.matchId
+            || detail?.result?.matchId
+            || detail?.responseData?.matchId
+            || ""
+        ).trim();
+
+
+    ocrReviewCurrentResult =
+        detail?.result
+        || null;
+
+
+    ocrReviewSubmitting =
+        false;
+
+
+    ocrTestingPanel.hidden =
+        false;
+
+
+    if (
+        ocrTestingAccurateBtn
+    ) {
+        ocrTestingAccurateBtn.disabled =
+            false;
+
+        ocrTestingAccurateBtn.textContent =
+            "Confirm Results";
+    }
+
+
+    if (
+        ocrTestingIncorrectBtn
+    ) {
+        ocrTestingIncorrectBtn.disabled =
+            false;
+    }
+
+
+    if (
+        ocrTestingStatus
+    ) {
+
+        const needsReviewCount =
+            getReviewInputs().filter(
+                function(
+                    input
+                ) {
+                    return (
+                        input.dataset.requiresVerification
+                        === "true"
                     );
                 }
-            }
-            return true;
-        }catch(error){
-            console.warn(
-                "[OCR TESTING] Accuracy verification failed:",
-                error
-            );
-            ocrTestingSubmitting=false;
-            if(automatic){
-                scheduleOcrAccuracyTimeout(
-                    Date.now()+5000
+            ).length;
+
+
+        if (
+            needsReviewCount > 0
+        ) {
+            ocrTestingStatus.textContent =
+                (
+                    needsReviewCount
+                    + " value"
+                    + (
+                        needsReviewCount === 1
+                            ? ""
+                            : "s"
+                    )
+                    + " need review before confirmation."
                 );
-                if(ocrTestingStatus){
-                    ocrTestingStatus.textContent=
-                        "Automatic verification could not be sent. Retrying...";
-                }
-            }else{
-                setOcrTestingButtonsDisabled(
-                    false
+
+        } else {
+            ocrTestingStatus.textContent =
+                (
+                    "All returned values are high confidence. "
+                    + "Review them and confirm when ready."
                 );
-                if(ocrTestingStatus){
-                    ocrTestingStatus.textContent=
-                        "Accuracy verification could not be sent. Please try again.";
-                }
-            }
-            return false;
-        }finally{
-            if(
-                sessionStorage.getItem(
-                    storageKey
-                )
-            ){
-                ocrTestingSubmitting=false;
-            }
         }
-}
-function handleOcrAccuracyTimeout(){
-    if(
-        !ocrTestingCurrentJobId
-        ||!ocrTestingCurrentResult
-    ){
-        return;
-    }
-    const storageKey=
-        getOcrTestingStorageKey(
-            ocrTestingCurrentJobId
-        );
-    if(
-        sessionStorage.getItem(
-            storageKey
-        )
-    ){
-        clearOcrTestingResponseTimer();
-        return;
-    }
-    submitOcrAccuracyVerification(
-        OCR_ACCURACY_TIMEOUT_VERDICT,
-        {
-            automatic:true,
-            reason:
-                "No user response within 60 seconds."
-        }
-    );
-}
-function scheduleOcrAccuracyTimeout(deadline){
-    clearOcrTestingResponseTimer();
-    ocrTestingDeadline=
-        Number(
-            deadline
-        )
-        ||(
-            Date.now()
-            +OCR_ACCURACY_RESPONSE_SECONDS
-            *1000
-        );
-    sessionStorage.setItem(
-        getOcrTestingDeadlineKey(
-            ocrTestingCurrentJobId
-        ),
-        String(
-            ocrTestingDeadline
-        )
-    );
-    const remaining=
-        Math.max(
-            0,
-            ocrTestingDeadline
-            -Date.now()
-        );
-    if(remaining<=0){
-        handleOcrAccuracyTimeout();
-        return;
-    }
-    ocrTestingResponseTimer=
-        setTimeout(
-            handleOcrAccuracyTimeout,
-            remaining
-        );
-}
-function restoreOrStartOcrAccuracyTimeout(){
-    const deadlineKey=
-        getOcrTestingDeadlineKey(
-            ocrTestingCurrentJobId
-        );
-    const storedDeadline=
-        Number(
-            sessionStorage.getItem(
-                deadlineKey
-            )||0
-        );
-    if(storedDeadline>0){
-        scheduleOcrAccuracyTimeout(
-            storedDeadline
-        );
-        return;
-    }
-    scheduleOcrAccuracyTimeout(
-        Date.now()
-        +OCR_ACCURACY_RESPONSE_SECONDS
-        *1000
-    );
-}
-function showOcrAccuracyTesting(
-    jobId,
-    result
-){
-    if(
-        !OCR_ACCURACY_TESTING_ENABLED
-        ||!ocrTestingPanel
-    ){
-        return;
-    }
-    clearOcrTestingResponseTimer();
-    ocrTestingCurrentJobId=
-        String(
-            jobId
-            ||result?.jobId
-            ||""
-        ).trim();
-    ocrTestingCurrentResult=
-        result||null;
-    ocrTestingSubmitting=false;
-    ocrTestingPanel.hidden=false;
-    if(
-        !ocrTestingCurrentJobId
-        ||!ocrTestingCurrentResult
-    ){
-        setOcrTestingButtonsDisabled(
-            true
-        );
-        if(ocrTestingStatus){
-            ocrTestingStatus.textContent=
-                "No OCR result is available to verify.";
-        }
-        return;
-    }
-    const existingVerification=
-        sessionStorage.getItem(
-            getOcrTestingStorageKey(
-                ocrTestingCurrentJobId
-            )
-        );
-    if(existingVerification){
-        setOcrTestingButtonsDisabled(
-            true
-        );
-        if(ocrTestingStatus){
-            ocrTestingStatus.textContent=(
-                existingVerification==="accurate"
-                    ?"Accuracy confirmed for this OCR job."
-                    :"This OCR job was marked as needing correction."
-            );
-        }
-        return;
-    }
-    setOcrTestingButtonsDisabled(
-        false
-    );
-    if(ocrTestingStatus){
-        ocrTestingStatus.textContent=
-            "Please review the result. If no response is received within 60 seconds, it will be accepted automatically.";
-    }
-    restoreOrStartOcrAccuracyTimeout();
-}
-function recheckOcrAccuracyDeadline(){
-    if(
-        !ocrTestingCurrentJobId
-        ||!ocrTestingCurrentResult
-        ||sessionStorage.getItem(
-            getOcrTestingStorageKey(
-                ocrTestingCurrentJobId
-            )
-        )
-    ){
-        return;
-    }
-    const storedDeadline=
-        Number(
-            sessionStorage.getItem(
-                getOcrTestingDeadlineKey(
-                    ocrTestingCurrentJobId
-                )
-            )||0
-        );
-    if(
-        storedDeadline>0
-        &&Date.now()>=storedDeadline
-    ){
-        handleOcrAccuracyTimeout();
-        return;
-    }
-    if(
-        storedDeadline>0
-        &&ocrTestingResponseTimer===null
-    ){
-        scheduleOcrAccuracyTimeout(
-            storedDeadline
-        );
     }
 }
-if(ocrTestingPanel){
-    ocrTestingPanel.hidden=true;
-}
+
+
+/* =========================================================
+   FORCE-THROUGH BEHAVIOR
+   ========================================================= */
+
+/*
+    There is intentionally no browser auto-confirm timer.
+
+    A successful OCR result is already stored by the backend
+    before this review UI is displayed.
+
+    If the user closes the page without confirming, the
+    stored auto_accepted OCR result remains the fallback.
+*/
+
+
+/* =========================================================
+   INITIALIZATION
+   ========================================================= */
+
+configureReviewPanel();
+
+
 document.addEventListener(
     "ocrtesting:result-rendered",
-    function(event){
-        showOcrAccuracyTesting(
-            event.detail?.jobId,
-            event.detail?.result
+    function(
+        event
+    ) {
+        showOcrReview(
+            event.detail
+            || {}
         );
     }
 );
-ocrTestingAccurateBtn?.addEventListener(
-    "click",
-    function(){
-        submitOcrAccuracyVerification(
-            "accurate",
-            {
-                automatic:false,
-                reason:
-                    "User confirmed OCR result."
-            }
-        );
-    }
-);
-ocrTestingIncorrectBtn?.addEventListener(
-    "click",
-    function(){
-        submitOcrAccuracyVerification(
-            "needs_correction",
-            {
-                automatic:false,
-                reason:
-                    "User marked OCR result as needing correction."
-            }
-        );
-    }
-);
-document.addEventListener(
-    "visibilitychange",
-    function(){
-        if(
-            document.visibilityState==="visible"
-        ){
-            recheckOcrAccuracyDeadline();
-        }
-    }
-);
-window.addEventListener(
-    "pageshow",
-    recheckOcrAccuracyDeadline
-);
+
+
+ocrTestingAccurateBtn
+    ?.addEventListener(
+        "click",
+        confirmReviewedResults
+    );
+
+
+ocrTestingIncorrectBtn
+    ?.addEventListener(
+        "click",
+        resetReviewChanges
+    );
