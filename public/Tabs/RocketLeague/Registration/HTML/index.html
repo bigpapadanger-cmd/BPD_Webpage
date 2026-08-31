@@ -1,134 +1,546 @@
 <section class="rl-registration" aria-labelledby="rlRegistrationTitle">
-    <form id="rlRegistrationForm" class="rl-registration-form" novalidate>
+    <form
+        id="rlRegistrationForm"
+        class="rl-registration-form"
+        novalidate
+    >
         <header class="registration-intro">
-            <span class="registration-eyebrow">BPD GAMING NETWORK</span>
-            <h1 id="rlRegistrationTitle">Complete Your Rocket League Profile</h1>
-            <p>Confirm your account details and tell us when and how you prefer to play.</p>
+            <span class="registration-eyebrow">
+                BPD GAMING NETWORK
+            </span>
+
+            <h1 id="rlRegistrationTitle">
+                Complete Your Rocket League Profile
+            </h1>
+
+            <p>
+                Confirm your Epic account details and tell us how and when you prefer to play.
+            </p>
         </header>
 
-        <div id="registrationMessage" class="registration-message" role="status" hidden></div>
+        <div
+            id="registrationMessage"
+            class="registration-message"
+            role="status"
+            aria-live="polite"
+            hidden
+        ></div>
+
+        <div
+            id="registrationBackendWarning"
+            class="registration-warning"
+            role="status"
+            aria-live="polite"
+            hidden
+        >
+            <strong>
+                Profile service temporarily unavailable
+            </strong>
+
+            <span>
+                Your Epic sign-in is still active. You can continue filling out this form.
+                If profile storage is unavailable, your entries will be preserved in this browser
+                so you can retry later.
+            </span>
+        </div>
 
         <fieldset class="form-section epic-section">
-            <legend>Epic account</legend>
-            <p class="section-description">This information comes from your authenticated Epic Games account.</p>
+            <legend>
+                Epic account
+            </legend>
+
+            <p class="section-description">
+                These fields come from your authenticated Epic Games session.
+            </p>
+
             <div class="field-grid two-columns">
                 <label class="form-field">
-                    <span>Epic user</span>
-                    <input id="epicDisplayName" name="epicDisplayName" type="text" readonly>
+                    <span>
+                        Epic user
+                    </span>
+
+                    <input
+                        id="epicDisplayName"
+                        name="epicDisplayName"
+                        type="text"
+                        value="Loading…"
+                        readonly
+                    >
                 </label>
+
                 <label class="form-field">
-                    <span>Platform</span>
-                    <input id="epicPlatform" name="epicPlatform" type="text" readonly>
+                    <span>
+                        Platform
+                    </span>
+
+                    <input
+                        id="epicPlatform"
+                        name="epicPlatform"
+                        type="text"
+                        value="Epic Games"
+                        readonly
+                    >
+                </label>
+
+                <label class="form-field">
+                    <span>
+                        Approximate location
+                    </span>
+
+                    <input
+                        id="detectedLocation"
+                        name="detectedLocation"
+                        type="text"
+                        value="Detecting…"
+                        readonly
+                    >
+
+                    <small>
+                        Estimated from your connection location.
+                    </small>
+                </label>
+
+                <label class="form-field">
+                    <span>
+                        Time zone
+                    </span>
+
+                    <input
+                        id="timezoneDisplay"
+                        type="text"
+                        value="Detecting…"
+                        readonly
+                    >
+
+                    <input
+                        id="timezone"
+                        name="timezone"
+                        type="hidden"
+                    >
                 </label>
             </div>
         </fieldset>
 
         <fieldset class="form-section eligibility-section">
-            <legend>Eligibility</legend>
+            <legend>
+                Eligibility
+            </legend>
+
             <label class="confirmation-row">
-                <input id="ageConsent" name="ageConsent" type="checkbox" required>
-                <span>I confirm that I am 18 or older, meet the applicable league age in my place of residence, or have permission from my parent or legal guardian.</span>
+                <input
+                    id="ageConsent"
+                    name="ageConsent"
+                    type="checkbox"
+                    required
+                >
+
+                <span>
+                    I confirm that I am 18 or older, meet the applicable league age in my
+                    place of residence, or have permission from my parent or legal guardian.
+                </span>
             </label>
         </fieldset>
 
         <fieldset class="form-section">
-            <legend>Player profile</legend>
+            <legend>
+                Player profile
+            </legend>
+
             <div class="field-grid two-columns">
                 <label class="form-field">
-                    <span>Display name</span>
-                    <input id="displayName" name="displayName" type="text" maxlength="32" autocomplete="nickname" required>
-                    <small>This is the name other BPD players will see.</small>
+                    <span>
+                        Display name
+                    </span>
+
+                    <input
+                        id="displayName"
+                        name="displayName"
+                        type="text"
+                        maxlength="32"
+                        autocomplete="nickname"
+                        required
+                    >
+
+                    <small>
+                        This is the name other BPD players will see.
+                    </small>
+                </label>
+
+                <label class="form-field">
+                    <span>
+                        Current rank
+                    </span>
+
+                    <select
+                        id="currentRank"
+                        name="currentRank"
+                        required
+                    >
+                        <option value="">
+                            Select your current rank
+                        </option>
+
+                        <option value="unranked">Unranked</option>
+
+                        <option value="bronze-1">Bronze I</option>
+                        <option value="bronze-2">Bronze II</option>
+                        <option value="bronze-3">Bronze III</option>
+
+                        <option value="silver-1">Silver I</option>
+                        <option value="silver-2">Silver II</option>
+                        <option value="silver-3">Silver III</option>
+
+                        <option value="gold-1">Gold I</option>
+                        <option value="gold-2">Gold II</option>
+                        <option value="gold-3">Gold III</option>
+
+                        <option value="platinum-1">Platinum I</option>
+                        <option value="platinum-2">Platinum II</option>
+                        <option value="platinum-3">Platinum III</option>
+
+                        <option value="diamond-1">Diamond I</option>
+                        <option value="diamond-2">Diamond II</option>
+                        <option value="diamond-3">Diamond III</option>
+
+                        <option value="champion-1">Champion I</option>
+                        <option value="champion-2">Champion II</option>
+                        <option value="champion-3">Champion III</option>
+
+                        <option value="grand-champion-1">Grand Champion I</option>
+                        <option value="grand-champion-2">Grand Champion II</option>
+                        <option value="grand-champion-3">Grand Champion III</option>
+
+                        <option value="supersonic-legend">Supersonic Legend</option>
+                    </select>
+
+                    <small>
+                        Self-reported during registration. You can update it later.
+                    </small>
                 </label>
 
                 <div class="form-field toggle-field">
-                    <span>Online status</span>
-                    <label class="toggle-row" for="showOnlineStatus">
-                        <input id="showOnlineStatus" name="showOnlineStatus" type="checkbox">
-                        <span class="toggle-control" aria-hidden="true"></span>
-                        <span>Allow other players to see when I am online</span>
+                    <span>
+                        Online status
+                    </span>
+
+                    <label
+                        class="toggle-row"
+                        for="showOnlineStatus"
+                    >
+                        <input
+                            id="showOnlineStatus"
+                            name="showOnlineStatus"
+                            type="checkbox"
+                        >
+
+                        <span
+                            class="toggle-control"
+                            aria-hidden="true"
+                        ></span>
+
+                        <span>
+                            Allow other players to see when I am online
+                        </span>
                     </label>
-                    <small>Disabled by default.</small>
+
+                    <small>
+                        Disabled by default.
+                    </small>
                 </div>
             </div>
         </fieldset>
 
         <fieldset class="form-section">
-            <legend>Contact information</legend>
-            <p class="section-description">Choose how BPD Gaming Network may contact you about your matches.</p>
+            <legend>
+                Contact information
+            </legend>
 
-            <div class="choice-row" role="radiogroup" aria-label="Preferred contact method">
-                <label class="choice-card">
-                    <input name="contactMethod" type="radio" value="email" checked>
-                    <span>Email</span>
+            <p class="section-description">
+                Enter the contact methods you want available, then choose your preferred method.
+            </p>
+
+            <div class="field-grid two-columns">
+                <label class="form-field">
+                    <span>
+                        Email address
+                    </span>
+
+                    <input
+                        id="email"
+                        name="email"
+                        type="email"
+                        maxlength="254"
+                        autocomplete="email"
+                    >
                 </label>
-                <label class="choice-card">
-                    <input name="contactMethod" type="radio" value="phone">
-                    <span>Phone</span>
-                </label>
-                <label class="choice-card">
-                    <input name="contactMethod" type="radio" value="both">
-                    <span>Both</span>
+
+                <label class="form-field">
+                    <span>
+                        Phone number
+                    </span>
+
+                    <input
+                        id="phone"
+                        name="phone"
+                        type="tel"
+                        maxlength="24"
+                        autocomplete="tel"
+                        inputmode="tel"
+                    >
                 </label>
             </div>
 
-            <div class="field-grid two-columns conditional-fields">
-                <label id="emailField" class="form-field">
-                    <span>Email address</span>
-                    <input id="email" name="email" type="email" maxlength="254" autocomplete="email">
+            <span class="field-label">
+                Preferred contact method
+            </span>
+
+            <div
+                class="choice-row"
+                role="radiogroup"
+                aria-label="Preferred contact method"
+            >
+                <label class="choice-card">
+                    <input
+                        name="contactMethod"
+                        type="radio"
+                        value="email"
+                        checked
+                    >
+
+                    <span>
+                        Email
+                    </span>
                 </label>
-                <label id="phoneField" class="form-field" hidden>
-                    <span>Phone number</span>
-                    <input id="phone" name="phone" type="tel" maxlength="24" autocomplete="tel">
+
+                <label class="choice-card">
+                    <input
+                        name="contactMethod"
+                        type="radio"
+                        value="phone"
+                    >
+
+                    <span>
+                        Phone
+                    </span>
+                </label>
+
+                <label class="choice-card">
+                    <input
+                        name="contactMethod"
+                        type="radio"
+                        value="both"
+                    >
+
+                    <span>
+                        Both
+                    </span>
                 </label>
             </div>
         </fieldset>
 
         <fieldset class="form-section">
-            <legend>Preferred mode</legend>
-            <div class="choice-grid" role="radiogroup" aria-label="Preferred Rocket League mode">
-                <label class="choice-card"><input name="preferredMode" type="radio" value="1s" required><span>1s</span></label>
-                <label class="choice-card"><input name="preferredMode" type="radio" value="2s"><span>2s</span></label>
-                <label class="choice-card"><input name="preferredMode" type="radio" value="3s"><span>3s</span></label>
-                <label class="choice-card"><input name="preferredMode" type="radio" value="customs"><span>Customs</span></label>
-                <label class="choice-card"><input name="preferredMode" type="radio" value="other"><span>Other</span></label>
+            <legend>
+                Preferred mode
+            </legend>
+
+            <div
+                class="choice-grid"
+                role="radiogroup"
+                aria-label="Preferred Rocket League mode"
+            >
+                <label class="choice-card">
+                    <input
+                        name="preferredMode"
+                        type="radio"
+                        value="1s"
+                        required
+                    >
+                    <span>1s</span>
+                </label>
+
+                <label class="choice-card">
+                    <input
+                        name="preferredMode"
+                        type="radio"
+                        value="2s"
+                    >
+                    <span>2s</span>
+                </label>
+
+                <label class="choice-card">
+                    <input
+                        name="preferredMode"
+                        type="radio"
+                        value="3s"
+                    >
+                    <span>3s</span>
+                </label>
+
+                <label class="choice-card">
+                    <input
+                        name="preferredMode"
+                        type="radio"
+                        value="customs"
+                    >
+                    <span>Customs</span>
+                </label>
+
+                <label class="choice-card">
+                    <input
+                        name="preferredMode"
+                        type="radio"
+                        value="other"
+                    >
+                    <span>Other</span>
+                </label>
             </div>
-            <label id="otherModeField" class="form-field other-mode-field" hidden>
-                <span>Describe your preferred mode</span>
-                <input id="otherMode" name="otherMode" type="text" maxlength="50">
+
+            <label
+                id="otherModeField"
+                class="form-field other-mode-field"
+                hidden
+            >
+                <span>
+                    Describe your preferred mode
+                </span>
+
+                <input
+                    id="otherMode"
+                    name="otherMode"
+                    type="text"
+                    maxlength="50"
+                >
             </label>
         </fieldset>
 
         <fieldset class="form-section">
-            <legend>Weekly availability</legend>
-            <p class="section-description">Select the days and time windows you can normally play between 5:00 PM and 10:00 PM in your local time zone.</p>
-            <div class="timezone-row">
-                <span>Your time zone</span>
-                <strong id="detectedTimezone">Detecting…</strong>
-                <input id="timezone" name="timezone" type="hidden">
-            </div>
-            <div id="availabilityRows" class="availability-list"></div>
+            <legend>
+                Weekly availability
+            </legend>
+
+            <p class="section-description">
+                Select the days and normal play window for each day. Times are available
+                in 30-minute increments from 5:00 PM through 10:00 PM in your local time zone.
+            </p>
+
+            <div
+                id="availabilityRows"
+                class="availability-list"
+            ></div>
         </fieldset>
 
         <fieldset class="form-section">
-            <legend>Match reminders</legend>
-            <label class="toggle-row" for="matchReminders">
-                <input id="matchReminders" name="matchReminders" type="checkbox">
-                <span class="toggle-control" aria-hidden="true"></span>
-                <span>Send reminders for scheduled matches</span>
+            <legend>
+                Match reminders
+            </legend>
+
+            <label
+                class="toggle-row"
+                for="matchReminders"
+            >
+                <input
+                    id="matchReminders"
+                    name="matchReminders"
+                    type="checkbox"
+                >
+
+                <span
+                    class="toggle-control"
+                    aria-hidden="true"
+                ></span>
+
+                <span>
+                    Send reminders for scheduled matches
+                </span>
             </label>
-            <div id="reminderOptions" class="reminder-options" hidden>
-                <span class="field-label">When should we remind you?</span>
+
+            <div
+                id="reminderOptions"
+                class="reminder-options"
+                hidden
+            >
+                <span class="field-label">
+                    Reminder lead time
+                </span>
+
                 <div class="choice-row">
-                    <label class="choice-card"><input name="reminderTiming" type="radio" value="24-hours"><span>24 hours before</span></label>
-                    <label class="choice-card"><input name="reminderTiming" type="radio" value="1-hour"><span>1 hour before</span></label>
-                    <label class="choice-card"><input name="reminderTiming" type="radio" value="both"><span>Both</span></label>
+                    <label class="choice-card">
+                        <input
+                            name="reminderTiming"
+                            type="radio"
+                            value="24-hours"
+                        >
+
+                        <span>
+                            24 hours before
+                        </span>
+                    </label>
+
+                    <label class="choice-card">
+                        <input
+                            name="reminderTiming"
+                            type="radio"
+                            value="1-hour"
+                        >
+
+                        <span>
+                            1 hour before
+                        </span>
+                    </label>
+
+                    <label class="choice-card">
+                        <input
+                            name="reminderTiming"
+                            type="radio"
+                            value="both"
+                        >
+
+                        <span>
+                            Both
+                        </span>
+                    </label>
                 </div>
+
+                <div class="reminder-window-heading">
+                    <strong>
+                        Preferred reminder delivery times
+                    </strong>
+
+                    <span>
+                        Pick any 30-minute time slots from 5:00 PM through 10:00 PM for each day.
+                    </span>
+                </div>
+
+                <div
+                    id="reminderScheduleRows"
+                    class="reminder-schedule-list"
+                ></div>
             </div>
         </fieldset>
+
+        <aside class="post-registration-note">
+            <strong>
+                More settings are available after registration.
+            </strong>
+
+            <span>
+                Once your profile is created, open your Player Profile to configure additional
+                matchmaking, privacy, contact, reminder, and profile options.
+            </span>
+        </aside>
 
         <div class="form-actions">
-            <button id="registrationSubmit" class="primary-button" type="submit">Complete Registration</button>
-            <p>Required fields must be completed before registration can finish.</p>
+            <button
+                id="registrationSubmit"
+                class="primary-button"
+                type="submit"
+            >
+                Complete Registration
+            </button>
+
+            <p>
+                Required fields must be completed before registration can finish.
+            </p>
         </div>
     </form>
 </section>
