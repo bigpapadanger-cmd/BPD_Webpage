@@ -11,6 +11,7 @@ import {
     SESSION_IDLE_TTL_SECONDS,
     SESSION_ABSOLUTE_TTL_SECONDS
 } from "../../api_vars.js";
+
 import {
     getCookie,
     createCookie
@@ -55,13 +56,6 @@ export async function handleEpicCallback(
         url.searchParams.get(
             "state"
         );
-
-    console.info(
-        "EPIC CALLBACK: Started.",
-        {
-            debugId
-        }
-    );
 
     try {
         if (
@@ -123,20 +117,17 @@ export async function handleEpicCallback(
         }
 
         const clientId =
-            typeof env.EPIC_CLIENT_ID ===
-            "string"
+            typeof env.EPIC_CLIENT_ID === "string"
                 ? env.EPIC_CLIENT_ID.trim()
                 : "";
 
         const clientSecret =
-            typeof env.EPIC_CLIENT_SECRET ===
-            "string"
+            typeof env.EPIC_CLIENT_SECRET === "string"
                 ? env.EPIC_CLIENT_SECRET.trim()
                 : "";
 
         const redirectUri =
-            typeof env.EPIC_REDIRECT_URI ===
-            "string"
+            typeof env.EPIC_REDIRECT_URI === "string"
                 ? env.EPIC_REDIRECT_URI.trim()
                 : "";
 
@@ -231,14 +222,12 @@ export async function handleEpicCallback(
             await tokenResponse.json();
 
         const tokenAccountId =
-            typeof tokenData.account_id ===
-            "string"
+            typeof tokenData.account_id === "string"
                 ? tokenData.account_id.trim()
                 : "";
 
         const accessToken =
-            typeof tokenData.access_token ===
-            "string"
+            typeof tokenData.access_token === "string"
                 ? tokenData.access_token.trim()
                 : "";
 
@@ -326,29 +315,24 @@ export async function handleEpicCallback(
 
         const EpicUniqueId =
             (
-                typeof profile?.id ===
-                "string"
+                typeof profile?.id === "string"
                     ? profile.id
-                    : typeof profile?.sub ===
-                      "string"
+                    : typeof profile?.sub === "string"
                         ? profile.sub
                         : tokenAccountId
             ).trim();
 
         const EpicDisplayName =
             (
-                typeof profile?.displayName ===
-                "string"
+                typeof profile?.displayName === "string"
                     ? profile.displayName
-                    : typeof profile?.preferred_username ===
-                      "string"
+                    : typeof profile?.preferred_username === "string"
                         ? profile.preferred_username
                         : ""
             ).trim();
 
         const EpicPreferredUsername =
-            typeof profile?.preferred_username ===
-            "string"
+            typeof profile?.preferred_username === "string"
                 ? profile.preferred_username.trim()
                 : null;
 
@@ -441,7 +425,7 @@ export async function handleEpicCallback(
             ),
             {
                 expirationTtl:
-                    SESSION_IDLE_TTL
+                    SESSION_IDLE_TTL_SECONDS
             }
         );
 
@@ -450,7 +434,7 @@ export async function handleEpicCallback(
                 request,
                 AUTH_SESSION_COOKIE,
                 sessionId,
-                SESSION_IDLE_TTL
+                SESSION_ABSOLUTE_TTL_SECONDS
             );
 
         if (
@@ -493,13 +477,6 @@ export async function handleEpicCallback(
                 }
             );
 
-            console.info(
-                "EPIC CALLBACK: Supabase profile sync completed.",
-                {
-                    debugId
-                }
-            );
-
         } catch (
             error
         ) {
@@ -516,17 +493,6 @@ export async function handleEpicCallback(
                 }
             );
         }
-
-        console.info(
-            "EPIC CALLBACK: Authentication completed.",
-            {
-                debugId,
-                sessionIdleTtl:
-                    SESSION_IDLE_TTL,
-                sessionAbsoluteTtl:
-                    SESSION_ABSOLUTE_TTL
-            }
-        );
 
         return redirect(
             "/RocketLeague",
