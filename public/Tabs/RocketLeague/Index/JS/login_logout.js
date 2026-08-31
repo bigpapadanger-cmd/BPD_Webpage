@@ -40,7 +40,9 @@ async function handleLogout() {
                 `Logout failed: ${response.status}`
             );
         }
-
+        localStorage.removeItem(
+            "bpdRocketLeagueRegistrationAccepted"
+        );
         window.location.assign(
             "/RocketLeague"
         );

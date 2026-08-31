@@ -82,6 +82,36 @@ function setRankStatus(
     statusElement.dataset.state =
         state;
 }
+
+
+function hasRocketLeagueAccess(
+    result,
+    profile
+) {
+    if (
+        isProfileComplete(
+            result,
+            profile
+        )
+    ) {
+        return true;
+    }
+
+    if (
+        result?.registrationAccepted === true
+    ) {
+        return true;
+    }
+
+    return (
+        localStorage.getItem(
+            "bpdRocketLeagueRegistrationAccepted"
+        ) === "true"
+    );
+}
+
+
+
 function isProfileComplete(
     result,
     profile
@@ -204,14 +234,33 @@ export async function loadRocketLeagueProfile(
         authUser,
         profile
     );
+    const profileComplete =
+        isProfileComplete(
+            result,
+            profile
+        );
+
+    const rocketLeagueAccess =
+        hasRocketLeagueAccess(
+            result,
+            profile
+        );
+
     return {
         profile,
 
-        profileComplete:
-            isProfileComplete(
-                result,
-                profile
-            ),
+        profileComplete,
+
+        rocketLeagueAccess,
+
+        registrationAccepted:
+            result?.registrationAccepted === true ||
+            localStorage.getItem(
+                "bpdRocketLeagueRegistrationAccepted"
+            ) === "true",
+
+        profileSaved:
+            result?.profileSaved === true,
 
         profileLoaded:
             true

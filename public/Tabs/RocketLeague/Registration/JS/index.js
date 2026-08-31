@@ -620,6 +620,16 @@ function getAvailability() {
 function populateAvailability(
     availability
 ) {
+    const minimumTime =
+        REGISTRATION_CONFIG
+            .availability
+            .start;
+
+    const maximumTime =
+        REGISTRATION_CONFIG
+            .availability
+            .end;
+
     document
         .querySelectorAll(
             'input[name="availableDays"]'
@@ -645,7 +655,8 @@ function populateAvailability(
         (item) => {
             const day =
                 String(
-                    item?.day || ""
+                    item?.day ||
+                    ""
                 )
                     .trim()
                     .toLowerCase();
@@ -689,20 +700,32 @@ function populateAvailability(
                 );
             }
 
-            if (
-                start &&
-                item?.start
-            ) {
+            const savedStart =
+                String(
+                    item?.start ||
+                    ""
+                );
+
+            const savedEnd =
+                String(
+                    item?.end ||
+                    ""
+                );
+
+            if (start) {
                 start.value =
-                    item.start;
+                    savedStart >= minimumTime &&
+                    savedStart <= maximumTime
+                        ? savedStart
+                        : minimumTime;
             }
 
-            if (
-                end &&
-                item?.end
-            ) {
+            if (end) {
                 end.value =
-                    item.end;
+                    savedEnd >= minimumTime &&
+                    savedEnd <= maximumTime
+                        ? savedEnd
+                        : maximumTime;
             }
         }
     );
@@ -2091,6 +2114,30 @@ function validateRegistrationPayload(
         );
     }
 
+    const minimumTime =
+        REGISTRATION_CONFIG
+            .availability
+            .start;
+
+    const maximumTime =
+        REGISTRATION_CONFIG
+            .availability
+            .end;
+
+    if (
+        payload.availability.some(
+            ({ start, end }) =>
+                start < minimumTime ||
+                start > maximumTime ||
+                end < minimumTime ||
+                end > maximumTime
+        )
+    ) {
+        return (
+            "Availability must be between 5:00 PM and 11:00 PM."
+        );
+    }
+
     if (
         payload.availability.some(
             ({ start, end }) =>
@@ -2231,7 +2278,6 @@ async function submitRegistration(
 
             return;
         }
-
         if (
             !response.ok ||
             result.success !==
@@ -2239,8 +2285,37 @@ async function submitRegistration(
         ) {
             throw new Error(
                 result.message ||
-                "Profile could not be saved."
+                "Profile could not be processed."
             );
+        }
+
+        if (
+            result.profileSaved !==
+            true
+        ) {
+            saveRegistrationDraft(
+                payload
+            );
+
+            setBackendWarning(
+                true,
+                result.message ||
+                "Your registration was received, but permanent profile saving is not available yet."
+            );
+
+            showMessage(
+                "Registration received. Profile saving is not yet complete. Redirecting…",
+                "warning"
+            );
+
+            setTimeout(() => {
+                window.location.replace(
+                    result.redirectTo ||
+                    "/RocketLeague"
+                );
+            }, 1800);
+
+            return;
         }
 
         clearRegistrationDraft();
@@ -2250,24 +2325,16 @@ async function submitRegistration(
         );
 
         showMessage(
-            result.profileComplete ===
-            true
-                ? "Profile completed. Redirecting…"
-                : "Profile saved.",
+            "Profile saved. Redirecting…",
             "success"
         );
 
-        if (
-            result.profileComplete ===
-            true
-        ) {
-            window.location.replace(
-                result.redirectTo ||
-                "/RocketLeague"
-            );
+        window.location.replace(
+            result.redirectTo ||
+            "/RocketLeague"
+        );
 
-            return;
-        }
+        return;
 
     } catch (
         error
