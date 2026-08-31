@@ -1,4 +1,4 @@
-import { getStoredSession } from "../../services/common_helpers/reload_sessions.js";
+import { getStoredSession } from "../common_helpers/reload_sessions.js";
 
 export async function handleRocketLeagueSession(request, env) {
     // Load the user's auth session from KV

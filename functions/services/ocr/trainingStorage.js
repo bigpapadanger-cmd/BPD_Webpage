@@ -43,10 +43,8 @@ const CAPPED_TRAINING_CATEGORIES = new Set([
     "6",
     "7",
     "8",
-    "9",
-    "bar"
+    "9"
 ]);
-
 
 // ============================================================
 // CATEGORY HELPERS

@@ -1,0 +1,3701 @@
+------formdata-undici-097173317248
+Content-Disposition: form-data; name="metadata"
+
+{"main_module":"functionsWorker-0.5020572841309947.js"}
+------formdata-undici-097173317248
+Content-Disposition: form-data; name="functionsWorker-0.5020572841309947.js"; filename="functionsWorker-0.5020572841309947.js"
+Content-Type: application/javascript+module
+
+var __defProp = Object.defineProperty;
+var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
+
+// services/common_helpers/responses.js
+function json(data, status = 200, extraHeaders = {}) {
+  const safeStatus = Number.isInteger(status) ? status : 200;
+  const body = JSON.stringify(data ?? {});
+  const headers = {
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "no-store",
+    ...extraHeaders
+  };
+  return new Response(body, { status: safeStatus, headers });
+}
+__name(json, "json");
+function redirect(location, cookieHeaders = []) {
+  const safeLocation = typeof location === "string" ? location : "/";
+  const headers = new Headers({
+    "location": safeLocation,
+    "cache-control": "no-store"
+  });
+  for (const c of cookieHeaders) {
+    if (typeof c === "string" && c.includes("=")) headers.append("set-cookie", c);
+  }
+  return new Response(null, { status: 302, headers });
+}
+__name(redirect, "redirect");
+
+// api_vars.js
+var EPIC_AUTHORIZE_URL = "https://www.epicgames.com/id/authorize";
+var EPIC_TOKEN_URL = "https://api.epicgames.dev/epic/oauth/v2/token";
+var EPIC_USER_INFO_URL = "https://api.epicgames.dev/epic/oauth/v2/userInfo";
+var AUTH_STATE_COOKIE = "bpd_epic_state";
+var AUTH_SESSION_COOKIE = "bpd_session";
+var AUTH_STATE_MAX_AGE_SECONDS = 600;
+var SESSION_DURATION_HOURS = 24;
+var SESSION_TTL_SECONDS = SESSION_DURATION_HOURS * 3600;
+
+// services/common_helpers/reload_sessions.js
+function getCookie(request, name) {
+  const header = request.headers.get("cookie") || "";
+  if (!header.includes("=")) return "";
+  const cookies = header.split(";");
+  for (const cookie of cookies) {
+    const [n, v] = cookie.split("=").map((x) => x.trim());
+    if (n === name && typeof v === "string") {
+      try {
+        return decodeURIComponent(v);
+      } catch {
+        return "";
+      }
+    }
+  }
+  return "";
+}
+__name(getCookie, "getCookie");
+function createCookie(request, name, value, maxAgeSeconds) {
+  const safeName = typeof name === "string" ? name.trim() : "";
+  const safeValue = typeof value === "string" ? value.trim() : "";
+  const safeMaxAge = Number.isInteger(maxAgeSeconds) ? maxAgeSeconds : 0;
+  if (!safeName) return "";
+  const url = new URL(request.url);
+  const parts = [
+    `${safeName}=${encodeURIComponent(safeValue)}`,
+    "Path=/",
+    "HttpOnly",
+    "SameSite=Lax",
+    `Max-Age=${safeMaxAge}`
+  ];
+  if (url.protocol === "https:") {
+    parts.push("Secure");
+  }
+  return parts.join("; ");
+}
+__name(createCookie, "createCookie");
+async function getStoredSession(request, env) {
+  const sessionId = getCookie(request, "bpd_session");
+  if (!sessionId || sessionId.length < 5) {
+    return null;
+  }
+  const key = `session:${sessionId}`;
+  const data = await env.AUTH_SESSIONS.get(key, "json");
+  if (!data || typeof data !== "object") {
+    return null;
+  }
+  return {
+    sessionId,
+    sessionData: data
+  };
+}
+__name(getStoredSession, "getStoredSession");
+var SESSION_TTL = SESSION_TTL_SECONDS;
+
+// services/epic/logout.js
+async function handleLogout(request, env) {
+  const debugId = crypto.randomUUID();
+  console.info(
+    "LOGOUT SERVICE: Started.",
+    {
+      debugId,
+      method: request.method
+    }
+  );
+  try {
+    const sessionId = getCookie(
+      request,
+      AUTH_SESSION_COOKIE
+    );
+    if (sessionId) {
+      if (!env.AUTH_SESSIONS) {
+        console.warn(
+          "LOGOUT SERVICE: AUTH_SESSIONS binding unavailable.",
+          {
+            debugId
+          }
+        );
+      } else {
+        await env.AUTH_SESSIONS.delete(
+          `session:${sessionId}`
+        );
+        console.info(
+          "LOGOUT SERVICE: Cloudflare session deleted.",
+          {
+            debugId,
+            sessionDeleted: true
+          }
+        );
+      }
+    }
+    const sessionCookie = createCookie(
+      request,
+      AUTH_SESSION_COOKIE,
+      "",
+      0
+    );
+    const stateCookie = createCookie(
+      request,
+      AUTH_STATE_COOKIE,
+      "",
+      0
+    );
+    console.info(
+      "LOGOUT SERVICE: Completed.",
+      {
+        debugId,
+        hadSession: Boolean(sessionId)
+      }
+    );
+    return redirect(
+      "/RocketLeague",
+      [
+        sessionCookie,
+        stateCookie
+      ]
+    );
+  } catch (error) {
+    console.error(
+      "LOGOUT SERVICE: Failed.",
+      {
+        debugId,
+        name: error?.name || "Error",
+        message: error?.message || "Unknown error",
+        stack: error?.stack || null
+      }
+    );
+    return json(
+      {
+        success: false,
+        message: "Logout failed.",
+        debugId
+      },
+      500
+    );
+  }
+}
+__name(handleLogout, "handleLogout");
+
+// api/auth/epic/epic_logout.js
+async function onRequestPost(context) {
+  return handleLogout(
+    context.request,
+    context.env
+  );
+}
+__name(onRequestPost, "onRequestPost");
+function onRequestGet() {
+  return Response.json(
+    {
+      success: false,
+      message: "Logout requires a POST request."
+    },
+    {
+      status: 405,
+      headers: {
+        "Allow": "POST"
+      }
+    }
+  );
+}
+__name(onRequestGet, "onRequestGet");
+
+// services/supabase/RocketLeague/signin.js
+async function handleRocketLeagueSignin(env, sessionData) {
+  try {
+    const profile = await callSupabaseSignin(
+      env,
+      {
+        EpicUniqueId: sessionData.EpicUniqueId,
+        EpicDisplayName: sessionData.EpicDisplayName,
+        EpicPreferredUsername: sessionData.EpicPreferredUsername
+      }
+    );
+    return {
+      success: true,
+      profileLoaded: true,
+      profile,
+      warning: null
+    };
+  } catch (error) {
+    console.error(
+      "[ROCKET LEAGUE PROFILE] Supabase signin failed:",
+      error
+    );
+    return {
+      success: true,
+      profileLoaded: false,
+      profile: null,
+      warning: "Your Epic account is authenticated, but your BPD Gaming Network profile could not be loaded."
+    };
+  }
+}
+__name(handleRocketLeagueSignin, "handleRocketLeagueSignin");
+async function callSupabaseSignin(env, epicData) {
+  if (!env.SUPABASE_URL) {
+    throw new Error(
+      "SUPABASE_URL is not configured."
+    );
+  }
+  if (!env.SUPA2CLOUDFLARE_AUTH) {
+    throw new Error(
+      "SUPA2CLOUDFLARE_AUTH is not configured."
+    );
+  }
+  const response = await fetch(
+    `${env.SUPABASE_URL}rpc/rocketleague_signin`,
+    {
+      method: "POST",
+      headers: {
+        "apikey": env.SUPA2CLOUDFLARE_AUTH,
+        "Authorization": `Bearer ${env.SUPA2CLOUDFLARE_AUTH}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        epic_unique_id: epicData.EpicUniqueId,
+        epic_display_name: epicData.EpicDisplayName,
+        epic_preferred_username: epicData.EpicPreferredUsername
+      })
+    }
+  );
+  if (!response.ok) {
+    throw new Error(
+      `Supabase signin failed: ${response.status}`
+    );
+  }
+  return response.json();
+}
+__name(callSupabaseSignin, "callSupabaseSignin");
+
+// services/epic/callback.js
+function limitMessage(value) {
+  return String(
+    value || ""
+  ).replace(
+    /\s+/g,
+    " "
+  ).slice(
+    0,
+    300
+  );
+}
+__name(limitMessage, "limitMessage");
+async function handleEpicCallback(request, env) {
+  const debugId = crypto.randomUUID();
+  const url = new URL(
+    request.url
+  );
+  const code = url.searchParams.get(
+    "code"
+  );
+  const state = url.searchParams.get(
+    "state"
+  );
+  console.info(
+    "EPIC CALLBACK: Started.",
+    {
+      debugId
+    }
+  );
+  try {
+    if (!code || !state) {
+      console.error(
+        "EPIC CALLBACK: OAuth parameters missing.",
+        {
+          debugId,
+          hasCode: Boolean(code),
+          hasState: Boolean(state),
+          hasOAuthError: url.searchParams.has(
+            "error"
+          )
+        }
+      );
+      return json(
+        {
+          success: false,
+          message: "Missing OAuth parameters.",
+          debugId
+        },
+        400
+      );
+    }
+    const storedState = getCookie(
+      request,
+      AUTH_STATE_COOKIE
+    );
+    if (!storedState || storedState !== state) {
+      console.error(
+        "EPIC CALLBACK: OAuth state invalid.",
+        {
+          debugId
+        }
+      );
+      return json(
+        {
+          success: false,
+          message: "Invalid OAuth state.",
+          debugId
+        },
+        400
+      );
+    }
+    const clientId = typeof env.EPIC_CLIENT_ID === "string" ? env.EPIC_CLIENT_ID.trim() : "";
+    const clientSecret = typeof env.EPIC_CLIENT_SECRET === "string" ? env.EPIC_CLIENT_SECRET.trim() : "";
+    const redirectUri = typeof env.EPIC_REDIRECT_URI === "string" ? env.EPIC_REDIRECT_URI.trim() : "";
+    if (!clientId || !clientSecret || !redirectUri) {
+      console.error(
+        "EPIC CALLBACK: Configuration invalid.",
+        {
+          debugId,
+          hasClientId: Boolean(clientId),
+          hasClientSecret: Boolean(clientSecret),
+          hasRedirectUri: Boolean(redirectUri)
+        }
+      );
+      return json(
+        {
+          success: false,
+          message: "Epic callback configuration invalid.",
+          debugId
+        },
+        500
+      );
+    }
+    const tokenResponse = await fetch(
+      EPIC_TOKEN_URL,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "Authorization": "Basic " + btoa(
+            `${clientId}:${clientSecret}`
+          )
+        },
+        body: new URLSearchParams({
+          grant_type: "authorization_code",
+          code,
+          redirect_uri: redirectUri
+        })
+      }
+    );
+    if (!tokenResponse.ok) {
+      const tokenError = await tokenResponse.text();
+      console.error(
+        "EPIC CALLBACK: Token exchange failed.",
+        {
+          debugId,
+          status: tokenResponse.status,
+          response: limitMessage(
+            tokenError
+          )
+        }
+      );
+      return json(
+        {
+          success: false,
+          message: "Token exchange failed.",
+          upstreamStatus: tokenResponse.status,
+          debugId
+        },
+        502
+      );
+    }
+    const tokenData = await tokenResponse.json();
+    const tokenAccountId = typeof tokenData.account_id === "string" ? tokenData.account_id.trim() : "";
+    const accessToken = typeof tokenData.access_token === "string" ? tokenData.access_token.trim() : "";
+    const EpicTokenExpiresIn = Number.isFinite(
+      Number(
+        tokenData.expires_in
+      )
+    ) ? Number(
+      tokenData.expires_in
+    ) : null;
+    if (!accessToken) {
+      console.error(
+        "EPIC CALLBACK: Access token missing.",
+        {
+          debugId
+        }
+      );
+      return json(
+        {
+          success: false,
+          message: "Epic returned no access token.",
+          debugId
+        },
+        502
+      );
+    }
+    const profileResponse = await fetch(
+      EPIC_USER_INFO_URL,
+      {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${accessToken}`,
+          "Accept": "application/json"
+        }
+      }
+    );
+    if (!profileResponse.ok) {
+      const profileError = await profileResponse.text();
+      console.error(
+        "EPIC CALLBACK: Profile request failed.",
+        {
+          debugId,
+          status: profileResponse.status,
+          response: limitMessage(
+            profileError
+          )
+        }
+      );
+      return json(
+        {
+          success: false,
+          message: "Failed to fetch Epic profile.",
+          upstreamStatus: profileResponse.status,
+          debugId
+        },
+        502
+      );
+    }
+    const profile = await profileResponse.json();
+    const EpicUniqueId = (typeof profile?.id === "string" ? profile.id : typeof profile?.sub === "string" ? profile.sub : tokenAccountId).trim();
+    const EpicDisplayName = (typeof profile?.displayName === "string" ? profile.displayName : typeof profile?.preferred_username === "string" ? profile.preferred_username : "").trim();
+    const EpicPreferredUsername = typeof profile?.preferred_username === "string" ? profile.preferred_username.trim() : null;
+    if (!EpicUniqueId) {
+      console.error(
+        "EPIC CALLBACK: Valid Epic identity missing.",
+        {
+          debugId
+        }
+      );
+      return json(
+        {
+          success: false,
+          message: "Epic authentication returned no account identity.",
+          debugId
+        },
+        502
+      );
+    }
+    if (!env.AUTH_SESSIONS) {
+      console.error(
+        "EPIC CALLBACK: Session storage unavailable.",
+        {
+          debugId
+        }
+      );
+      return json(
+        {
+          success: false,
+          message: "Session storage is unavailable.",
+          debugId
+        },
+        500
+      );
+    }
+    const sessionId = crypto.randomUUID();
+    const sessionKey = `session:${sessionId}`;
+    const sessionData = {
+      EpicUniqueId,
+      EpicDisplayName: EpicDisplayName || null,
+      EpicPreferredUsername,
+      EpicTokenExpiresIn,
+      AuthenticatedAt: Date.now(),
+      EpicStatus: "Unknown",
+      EpicStatusUpdatedAt: null
+    };
+    await env.AUTH_SESSIONS.put(
+      sessionKey,
+      JSON.stringify(
+        sessionData
+      ),
+      {
+        expirationTtl: SESSION_TTL
+      }
+    );
+    const cookie = createCookie(
+      request,
+      AUTH_SESSION_COOKIE,
+      sessionId,
+      SESSION_TTL
+    );
+    if (!cookie) {
+      await env.AUTH_SESSIONS.delete(
+        sessionKey
+      );
+      console.error(
+        "EPIC CALLBACK: Session cookie creation failed.",
+        {
+          debugId
+        }
+      );
+      return json(
+        {
+          success: false,
+          message: "Failed to create login session.",
+          debugId
+        },
+        500
+      );
+    }
+    await handleRocketLeagueSignin(
+      env,
+      {
+        EpicUniqueId: sessionData.EpicUniqueId,
+        EpicDisplayName: sessionData.EpicDisplayName,
+        EpicPreferredUsername: sessionData.EpicPreferredUsername
+      }
+    );
+    return redirect(
+      "/RocketLeague",
+      [
+        cookie
+      ]
+    );
+  } catch (error) {
+    console.error(
+      "EPIC CALLBACK: Unexpected failure.",
+      {
+        debugId,
+        name: error?.name || "Error",
+        message: error?.message || "Unknown error"
+      }
+    );
+    return json(
+      {
+        success: false,
+        message: "Epic callback failed unexpectedly.",
+        debugId
+      },
+      500
+    );
+  }
+}
+__name(handleEpicCallback, "handleEpicCallback");
+
+// api/auth/epic/callback.js
+async function onRequest(context) {
+  const debugId = crypto.randomUUID();
+  const requestUrl = new URL(context.request.url);
+  console.info(
+    "EPIC CALLBACK ROUTE: Request received.",
+    {
+      debugId,
+      method: context.request.method,
+      pathname: requestUrl.pathname,
+      hasCode: requestUrl.searchParams.has("code"),
+      hasState: requestUrl.searchParams.has("state"),
+      hasError: requestUrl.searchParams.has("error")
+    }
+  );
+  try {
+    const response = await handleEpicCallback(
+      context.request,
+      context.env
+    );
+    console.info(
+      "EPIC CALLBACK ROUTE: Request completed.",
+      {
+        debugId,
+        status: response.status,
+        location: response.headers.get("location")
+      }
+    );
+    return response;
+  } catch (error) {
+    console.error(
+      "EPIC CALLBACK ROUTE: Unexpected failure.",
+      {
+        debugId,
+        name: error?.name || "Error",
+        message: error?.message || "Unknown error",
+        stack: error?.stack || null
+      }
+    );
+    return Response.json(
+      {
+        success: false,
+        message: "Epic callback failed unexpectedly.",
+        debugId
+      },
+      {
+        status: 500
+      }
+    );
+  }
+}
+__name(onRequest, "onRequest");
+
+// services/common_helpers/utils.js
+function createRandomState() {
+  return crypto.randomUUID();
+}
+__name(createRandomState, "createRandomState");
+function getMissingAuthConfiguration(env) {
+  const missing = [];
+  if (!env.EPIC_CLIENT_ID) missing.push("EPIC_CLIENT_ID");
+  if (!env.EPIC_CLIENT_SECRET) missing.push("EPIC_CLIENT_SECRET");
+  if (!env.EPIC_REDIRECT_URI) missing.push("EPIC_REDIRECT_URI");
+  return missing;
+}
+__name(getMissingAuthConfiguration, "getMissingAuthConfiguration");
+
+// services/epic/login.js
+function maskClientId(clientId) {
+  if (!clientId || clientId.length < 10) {
+    return "missing-or-invalid";
+  }
+  return `${clientId.slice(0, 6)}...${clientId.slice(-4)}`;
+}
+__name(maskClientId, "maskClientId");
+async function handleEpicLogin(request, env) {
+  const debugId = crypto.randomUUID();
+  console.info(
+    "EPIC LOGIN SERVICE: Started.",
+    {
+      debugId,
+      method: request.method,
+      pathname: new URL(request.url).pathname
+    }
+  );
+  try {
+    const missing = getMissingAuthConfiguration(env);
+    console.info(
+      "EPIC LOGIN SERVICE: Configuration checked.",
+      {
+        debugId,
+        missing: Array.isArray(missing) ? missing : []
+      }
+    );
+    if (Array.isArray(missing) && missing.length > 0) {
+      console.error(
+        "EPIC LOGIN SERVICE: Configuration missing.",
+        {
+          debugId,
+          missing
+        }
+      );
+      return json(
+        {
+          success: false,
+          message: "Epic OAuth configuration is incomplete.",
+          missing,
+          debugId
+        },
+        503
+      );
+    }
+    const clientId = typeof env.EPIC_CLIENT_ID === "string" ? env.EPIC_CLIENT_ID.trim() : "";
+    const redirectUri = typeof env.EPIC_REDIRECT_URI === "string" ? env.EPIC_REDIRECT_URI.trim() : "";
+    console.info(
+      "EPIC LOGIN SERVICE: OAuth values loaded.",
+      {
+        debugId,
+        clientId: maskClientId(clientId),
+        redirectUri,
+        authorizeUrl: EPIC_AUTHORIZE_URL,
+        stateCookie: AUTH_STATE_COOKIE,
+        stateMaxAge: AUTH_STATE_MAX_AGE_SECONDS
+      }
+    );
+    if (!clientId || !redirectUri) {
+      console.error(
+        "EPIC LOGIN SERVICE: OAuth values invalid.",
+        {
+          debugId,
+          hasClientId: Boolean(clientId),
+          hasRedirectUri: Boolean(redirectUri)
+        }
+      );
+      return json(
+        {
+          success: false,
+          message: "Epic OAuth configuration invalid.",
+          debugId
+        },
+        500
+      );
+    }
+    let parsedRedirectUri;
+    try {
+      parsedRedirectUri = new URL(redirectUri);
+    } catch (error) {
+      console.error(
+        "EPIC LOGIN SERVICE: Redirect URI invalid.",
+        {
+          debugId,
+          redirectUri,
+          message: error.message
+        }
+      );
+      return json(
+        {
+          success: false,
+          message: "Epic OAuth redirect URI is invalid.",
+          debugId
+        },
+        500
+      );
+    }
+    const state = createRandomState();
+    if (!state || typeof state !== "string") {
+      console.error(
+        "EPIC LOGIN SERVICE: State generation failed.",
+        {
+          debugId
+        }
+      );
+      return json(
+        {
+          success: false,
+          message: "Failed to generate OAuth state.",
+          debugId
+        },
+        500
+      );
+    }
+    console.info(
+      "EPIC LOGIN SERVICE: State generated.",
+      {
+        debugId,
+        stateLength: state.length
+      }
+    );
+    const url = new URL(EPIC_AUTHORIZE_URL);
+    url.searchParams.set(
+      "client_id",
+      clientId
+    );
+    url.searchParams.set(
+      "response_type",
+      "code"
+    );
+    url.searchParams.set(
+      "redirect_uri",
+      redirectUri
+    );
+    url.searchParams.set(
+      "scope",
+      "basic_profile presence"
+    );
+    url.searchParams.set(
+      "state",
+      state
+    );
+    console.info(
+      "EPIC LOGIN SERVICE: Redirect prepared.",
+      {
+        debugId,
+        epicOrigin: url.origin,
+        epicPathname: url.pathname,
+        clientId: maskClientId(clientId),
+        redirectOrigin: parsedRedirectUri.origin,
+        redirectPathname: parsedRedirectUri.pathname,
+        scope: url.searchParams.get("scope")
+      }
+    );
+    const cookie = createCookie(
+      request,
+      AUTH_STATE_COOKIE,
+      state,
+      AUTH_STATE_MAX_AGE_SECONDS
+    );
+    console.info(
+      "EPIC LOGIN SERVICE: Redirecting to Epic.",
+      {
+        debugId,
+        cookieCreated: Boolean(cookie)
+      }
+    );
+    return redirect(
+      url.toString(),
+      [cookie]
+    );
+  } catch (error) {
+    console.error(
+      "EPIC LOGIN SERVICE: Unexpected failure.",
+      {
+        debugId,
+        name: error?.name || "Error",
+        message: error?.message || "Unknown error",
+        stack: error?.stack || null
+      }
+    );
+    return json(
+      {
+        success: false,
+        message: "Epic login initialization failed.",
+        debugId
+      },
+      500
+    );
+  }
+}
+__name(handleEpicLogin, "handleEpicLogin");
+
+// api/auth/epic/epic_login.js
+async function onRequest2(context) {
+  const debugId = crypto.randomUUID();
+  const requestUrl = new URL(context.request.url);
+  console.info(
+    "EPIC LOGIN ROUTE: Request received.",
+    {
+      debugId,
+      method: context.request.method,
+      pathname: requestUrl.pathname
+    }
+  );
+  try {
+    const response = await handleEpicLogin(
+      context.request,
+      context.env
+    );
+    console.info(
+      "EPIC LOGIN ROUTE: Request completed.",
+      {
+        debugId,
+        status: response.status,
+        hasLocation: response.headers.has(
+          "location"
+        ),
+        locationOrigin: getLocationOrigin(
+          response.headers.get(
+            "location"
+          )
+        )
+      }
+    );
+    return response;
+  } catch (error) {
+    console.error(
+      "EPIC LOGIN ROUTE: Unexpected failure.",
+      {
+        debugId,
+        name: error?.name || "Error",
+        message: error?.message || "Unknown error",
+        stack: error?.stack || null
+      }
+    );
+    return Response.json(
+      {
+        success: false,
+        message: "Epic login failed unexpectedly.",
+        debugId
+      },
+      {
+        status: 500
+      }
+    );
+  }
+}
+__name(onRequest2, "onRequest");
+function getLocationOrigin(location) {
+  if (!location) {
+    return null;
+  }
+  try {
+    return new URL(location).origin;
+  } catch {
+    return "invalid-location";
+  }
+}
+__name(getLocationOrigin, "getLocationOrigin");
+
+// services/supabase/RocketLeague/rocketleague_profile.js
+async function getRocketLeagueProfileByEpicId(env, EpicUniqueId) {
+  return {
+    profileComplete: false,
+    displayName: "...",
+    ranked: {
+      duel: {
+        tier: "Unranked",
+        division: "",
+        mmr: null
+      },
+      double: {
+        tier: "Unranked",
+        division: "",
+        mmr: null
+      },
+      standard: {
+        tier: "Unranked",
+        division: "",
+        mmr: null
+      }
+    }
+  };
+}
+__name(getRocketLeagueProfileByEpicId, "getRocketLeagueProfileByEpicId");
+
+// services/RL/profile.js
+async function handleRocketLeagueProfile(request, env) {
+  try {
+    const storedSession = await getStoredSession(
+      request,
+      env
+    );
+    if (!storedSession) {
+      return json(
+        {
+          success: false,
+          authenticated: false,
+          message: "Login is required to load Rocket League profile."
+        },
+        401
+      );
+    }
+    const sessionData = storedSession.sessionData || {};
+    const EpicUniqueId = String(
+      sessionData.EpicUniqueId || ""
+    ).trim();
+    const EpicDisplayName = String(
+      sessionData.EpicDisplayName || sessionData.EpicPreferredUsername || ""
+    ).trim();
+    if (!EpicUniqueId) {
+      return json(
+        {
+          success: false,
+          authenticated: true,
+          message: "Epic account identity is missing from the session."
+        },
+        400
+      );
+    }
+    const databaseProfile = await getRocketLeagueProfileByEpicId(
+      env,
+      EpicUniqueId
+    );
+    if (!databaseProfile) {
+      return json(
+        {
+          success: true,
+          authenticated: true,
+          profileComplete: false,
+          profile: {
+            username: EpicDisplayName || "Epic Player",
+            stats: {
+              ranked: {}
+            }
+          }
+        },
+        200
+      );
+    }
+    return json(
+      {
+        success: true,
+        authenticated: true,
+        profileComplete: databaseProfile.profileComplete === true,
+        profile: {
+          username: databaseProfile.displayName || EpicDisplayName || "Epic Player",
+          stats: {
+            ranked: databaseProfile.ranked || {}
+          }
+        }
+      },
+      200
+    );
+  } catch (error) {
+    console.error(
+      "ROCKET LEAGUE PROFILE: Unexpected failure.",
+      {
+        name: error?.name || "Error",
+        message: error?.message || "Unknown error"
+      }
+    );
+    return json(
+      {
+        success: false,
+        authenticated: true,
+        message: "Rocket League profile failed to load."
+      },
+      500
+    );
+  }
+}
+__name(handleRocketLeagueProfile, "handleRocketLeagueProfile");
+
+// api/auth/rocketleague/profile.js
+async function onRequest3(context) {
+  return handleRocketLeagueProfile(context.request, context.env);
+}
+__name(onRequest3, "onRequest");
+
+// services/RL/session.js
+async function handleRocketLeagueSession(request, env) {
+  const session = await getStoredSession(request, env);
+  if (!session) {
+    return new Response(
+      JSON.stringify({
+        authenticated: false,
+        user: null
+      }),
+      {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      }
+    );
+  }
+  const user = session.sessionData?.user || null;
+  return new Response(
+    JSON.stringify({
+      authenticated: true,
+      user
+    }),
+    {
+      status: 200,
+      headers: { "Content-Type": "application/json" }
+    }
+  );
+}
+__name(handleRocketLeagueSession, "handleRocketLeagueSession");
+
+// api/auth/rocketleague/session.js
+async function onRequest4(context) {
+  return handleRocketLeagueSession(context.request, context.env);
+}
+__name(onRequest4, "onRequest");
+
+// api/curseforge/mods.js
+var MODS = {
+  ark: [
+    1103705,
+    980486,
+    1067188
+  ],
+  minecraft: [
+    1289031,
+    1548453,
+    1541785,
+    1511421,
+    1225894,
+    1572622,
+    1518330,
+    1535188,
+    1521346,
+    1547536,
+    1512650,
+    1258974
+  ]
+};
+async function onRequestGet2(context) {
+  const {
+    request,
+    env
+  } = context;
+  const url = new URL(
+    request.url
+  );
+  const game = String(
+    url.searchParams.get(
+      "game"
+    ) || ""
+  ).trim().toLowerCase();
+  if (!Object.prototype.hasOwnProperty.call(
+    MODS,
+    game
+  )) {
+    return Response.json(
+      {
+        success: false,
+        message: "Invalid game."
+      },
+      {
+        status: 400
+      }
+    );
+  }
+  try {
+    const modIds = MODS[game];
+    const results = await Promise.allSettled(
+      modIds.map(
+        (modId) => fetchCurseForgeMod(
+          env,
+          modId,
+          game
+        )
+      )
+    );
+    const mods = [];
+    const errors = [];
+    results.forEach(
+      (result, index) => {
+        if (result.status === "fulfilled") {
+          mods.push(
+            result.value
+          );
+          return;
+        }
+        errors.push(
+          {
+            modId: modIds[index],
+            message: result.reason?.message || String(
+              result.reason
+            )
+          }
+        );
+      }
+    );
+    return Response.json(
+      {
+        success: true,
+        game,
+        mods,
+        errors
+      }
+    );
+  } catch (error) {
+    console.error(
+      "CurseForge mods error:",
+      error
+    );
+    return Response.json(
+      {
+        success: false,
+        message: "Unable to load CurseForge mods."
+      },
+      {
+        status: 500
+      }
+    );
+  }
+}
+__name(onRequestGet2, "onRequestGet");
+async function fetchCurseForgeMod(env, modId, game) {
+  const response = await fetch(
+    `https://api.curseforge.com/v1/mods/${modId}`,
+    {
+      headers: {
+        "x-api-key": env.CURSEFORGE_API_KEY
+      }
+    }
+  );
+  if (!response.ok) {
+    throw new Error(
+      `CurseForge mod ${modId} returned ${response.status}`
+    );
+  }
+  const result = await response.json();
+  const mod = result.data;
+  const latestFile = mod.latestFiles?.find(
+    (file) => file.id === mod.mainFileId
+  ) || mod.latestFiles?.[0] || null;
+  const fileName = latestFile?.displayName || latestFile?.fileName || null;
+  const modVersion = game === "minecraft" ? extractMinecraftModVersion(
+    fileName
+  ) : null;
+  const ue5Version = game === "ark" ? cleanArkVersion(
+    fileName
+  ) : null;
+  return {
+    id: mod.id,
+    name: mod.name,
+    slug: mod.slug,
+    summary: mod.summary,
+    downloads: mod.downloadCount,
+    lastUpdated: mod.dateModified,
+    modVersion,
+    ue5Version,
+    fileName,
+    gameVersions: latestFile?.gameVersions || [],
+    mainFileId: mod.mainFileId,
+    logo: mod.logo,
+    links: mod.links
+  };
+}
+__name(fetchCurseForgeMod, "fetchCurseForgeMod");
+function extractMinecraftModVersion(value) {
+  const text = String(
+    value || ""
+  ).trim();
+  if (!text) {
+    return null;
+  }
+  const match2 = text.match(
+    /v?(\d+(?:\.\d+)+)/i
+  );
+  if (!match2) {
+    return null;
+  }
+  return match2[1];
+}
+__name(extractMinecraftModVersion, "extractMinecraftModVersion");
+function cleanArkVersion(value) {
+  const text = String(
+    value || ""
+  ).trim();
+  if (!text) {
+    return null;
+  }
+  const decimalMatch = text.match(
+    /(\d+(?:\.\d+)+)/
+  );
+  if (decimalMatch) {
+    return decimalMatch[1];
+  }
+  const trailingNumberMatch = text.match(
+    /(?:^|[\s_-])(\d+)(?=\.(?:zip|rar|7z)$|[\s_-]*$)/i
+  );
+  if (trailingNumberMatch) {
+    return trailingNumberMatch[1];
+  }
+  return text;
+}
+__name(cleanArkVersion, "cleanArkVersion");
+
+// services/ocr/storage.js
+var OCR_STORAGE_VERSION = "ocr-storage-1.0";
+async function putMatchImage(bucket, {
+  matchId,
+  image,
+  contentType = "image/png",
+  metadata = {}
+}) {
+  if (!bucket) {
+    throw new Error(
+      "OCR_STORAGE R2 bucket is unavailable."
+    );
+  }
+  if (!image) {
+    throw new Error(
+      "Match image is required."
+    );
+  }
+  const objectKey = `match-images/${matchId}.png`;
+  await bucket.put(
+    objectKey,
+    image,
+    {
+      httpMetadata: {
+        contentType
+      },
+      customMetadata: {
+        matchId: String(
+          matchId
+        ),
+        storageVersion: OCR_STORAGE_VERSION,
+        ...Object.fromEntries(
+          Object.entries(
+            metadata || {}
+          ).map(
+            ([
+              key,
+              value
+            ]) => [
+              key,
+              String(
+                value ?? ""
+              )
+            ]
+          )
+        )
+      }
+    }
+  );
+  return {
+    success: true,
+    matchId,
+    objectKey
+  };
+}
+__name(putMatchImage, "putMatchImage");
+async function putMatchReport(bucket, {
+  matchId,
+  report
+}) {
+  if (!bucket) {
+    throw new Error(
+      "OCR_STORAGE R2 bucket is unavailable."
+    );
+  }
+  if (!report || typeof report !== "object") {
+    throw new Error(
+      "Match report is required."
+    );
+  }
+  const objectKey = `match-reports/${matchId}.json`;
+  const payload = {
+    ...report,
+    matchId,
+    imageKey: `match-images/${matchId}.png`,
+    reportKey: objectKey,
+    storageVersion: OCR_STORAGE_VERSION
+  };
+  await bucket.put(
+    objectKey,
+    JSON.stringify(
+      payload,
+      null,
+      2
+    ),
+    {
+      httpMetadata: {
+        contentType: "application/json"
+      },
+      customMetadata: {
+        matchId: String(
+          matchId
+        ),
+        storageVersion: OCR_STORAGE_VERSION
+      }
+    }
+  );
+  return {
+    success: true,
+    matchId,
+    objectKey,
+    report: payload
+  };
+}
+__name(putMatchReport, "putMatchReport");
+
+// services/ocr/confirm.js
+var ALLOWED_REVIEW_FIELDS = /* @__PURE__ */ new Set([
+  "score",
+  "goals",
+  "assists",
+  "demos",
+  "saves",
+  "shots",
+  "damage",
+  "ping"
+]);
+function jsonResponse(body, status = 200) {
+  return new Response(
+    JSON.stringify(
+      body
+    ),
+    {
+      status,
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "no-store"
+      }
+    }
+  );
+}
+__name(jsonResponse, "jsonResponse");
+async function createOwnerHash(epicUniqueId, secret) {
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(
+      String(
+        secret
+      )
+    ),
+    {
+      name: "HMAC",
+      hash: "SHA-256"
+    },
+    false,
+    [
+      "sign"
+    ]
+  );
+  const signature = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    encoder.encode(
+      String(
+        epicUniqueId
+      )
+    )
+  );
+  return Array.from(
+    new Uint8Array(
+      signature
+    )
+  ).map(
+    function(byte) {
+      return byte.toString(
+        16
+      ).padStart(
+        2,
+        "0"
+      );
+    }
+  ).join(
+    ""
+  );
+}
+__name(createOwnerHash, "createOwnerHash");
+function normalizeString(value) {
+  const normalized = String(
+    value ?? ""
+  ).trim();
+  return normalized || null;
+}
+__name(normalizeString, "normalizeString");
+function normalizeInteger(value) {
+  const numeric = Number(
+    value
+  );
+  if (!Number.isInteger(
+    numeric
+  ) || numeric < 0) {
+    return null;
+  }
+  return numeric;
+}
+__name(normalizeInteger, "normalizeInteger");
+function normalizeMatchId(value) {
+  return String(
+    value ?? ""
+  ).trim().toUpperCase();
+}
+__name(normalizeMatchId, "normalizeMatchId");
+function validMatchId(value) {
+  return /^[A-Z0-9]{16}$/.test(
+    value
+  );
+}
+__name(validMatchId, "validMatchId");
+function normalizePlayerName(value) {
+  return String(
+    value ?? ""
+  ).trim().toUpperCase();
+}
+__name(normalizePlayerName, "normalizePlayerName");
+function normalizeFieldEntry(entry) {
+  if (!entry || typeof entry !== "object" || Array.isArray(
+    entry
+  )) {
+    return null;
+  }
+  const team = normalizeInteger(
+    entry.team
+  );
+  const player = normalizeString(
+    entry.player
+  );
+  const field = normalizeString(
+    entry.field
+  );
+  if (team !== 1 && team !== 2) {
+    return null;
+  }
+  if (!player) {
+    return null;
+  }
+  if (!field || !ALLOWED_REVIEW_FIELDS.has(
+    field
+  )) {
+    return null;
+  }
+  const userValue = entry.userValue === null || typeof entry.userValue === "undefined" || String(
+    entry.userValue
+  ).trim() === "" ? field === "ping" ? 0 : null : normalizeInteger(
+    entry.userValue
+  );
+  if (userValue === null) {
+    return null;
+  }
+  return {
+    team,
+    player,
+    field,
+    userValue
+  };
+}
+__name(normalizeFieldEntry, "normalizeFieldEntry");
+function findStoredTeam(teams, requestedTeam) {
+  return teams.find(
+    function(candidate) {
+      return Number(
+        candidate?.team ?? candidate?.teamIndex ?? 0
+      ) === requestedTeam;
+    }
+  ) || null;
+}
+__name(findStoredTeam, "findStoredTeam");
+function findStoredPlayer(team, requestedPlayer) {
+  if (!team || !Array.isArray(
+    team.players
+  )) {
+    return null;
+  }
+  const normalizedRequestedPlayer = normalizePlayerName(
+    requestedPlayer
+  );
+  return team.players.find(
+    function(candidate) {
+      const storedName = normalizePlayerName(
+        candidate?.player || candidate?.matchedName || candidate?.username || ""
+      );
+      return storedName === normalizedRequestedPlayer;
+    }
+  ) || null;
+}
+__name(findStoredPlayer, "findStoredPlayer");
+async function handleOcrConfirmation({
+  request,
+  env
+}) {
+  try {
+    if (request.method !== "POST") {
+      return jsonResponse(
+        {
+          success: false,
+          message: "Method not allowed."
+        },
+        405
+      );
+    }
+    if (!env.OCR_STORAGE) {
+      return jsonResponse(
+        {
+          success: false,
+          message: "OCR storage binding is not configured."
+        },
+        503
+      );
+    }
+    const session = await getStoredSession(
+      request,
+      env
+    );
+    if (!session || !session.sessionData) {
+      return jsonResponse(
+        {
+          success: false,
+          message: "Authentication required."
+        },
+        401
+      );
+    }
+    const epicUniqueId = String(
+      session.sessionData.EpicUniqueId || ""
+    ).trim();
+    if (!epicUniqueId) {
+      return jsonResponse(
+        {
+          success: false,
+          message: "Authenticated account is missing an EpicUniqueId."
+        },
+        401
+      );
+    }
+    const ownerSecret = String(
+      env.OCR_OWNER_SECRET || ""
+    ).trim();
+    if (!ownerSecret) {
+      return jsonResponse(
+        {
+          success: false,
+          message: "OCR owner hashing is not configured."
+        },
+        503
+      );
+    }
+    const authenticatedOwnerId = await createOwnerHash(
+      epicUniqueId,
+      ownerSecret
+    );
+    let body = null;
+    try {
+      body = await request.json();
+    } catch {
+      return jsonResponse(
+        {
+          success: false,
+          message: "Invalid JSON body."
+        },
+        400
+      );
+    }
+    const matchId = normalizeMatchId(
+      body?.matchId
+    );
+    if (!validMatchId(
+      matchId
+    )) {
+      return jsonResponse(
+        {
+          success: false,
+          message: "A valid 16-character matchId is required."
+        },
+        400
+      );
+    }
+    const rawFields = Array.isArray(
+      body?.fields
+    ) ? body.fields : [];
+    if (rawFields.length === 0) {
+      return jsonResponse(
+        {
+          success: false,
+          message: "At least one reviewed field is required."
+        },
+        400
+      );
+    }
+    const fields = rawFields.map(
+      normalizeFieldEntry
+    ).filter(
+      Boolean
+    );
+    if (fields.length !== rawFields.length) {
+      return jsonResponse(
+        {
+          success: false,
+          message: "One or more confirmation fields are invalid."
+        },
+        400
+      );
+    }
+    const submittedFieldKeys = /* @__PURE__ */ new Set();
+    for (const entry of fields) {
+      const key = [
+        entry.team,
+        normalizePlayerName(
+          entry.player
+        ),
+        entry.field
+      ].join(
+        "|"
+      );
+      if (submittedFieldKeys.has(
+        key
+      )) {
+        return jsonResponse(
+          {
+            success: false,
+            message: "Duplicate review fields were submitted."
+          },
+          400
+        );
+      }
+      submittedFieldKeys.add(
+        key
+      );
+    }
+    const reportKey = `match-reports/${matchId}.json`;
+    const existingObject = await env.OCR_STORAGE.get(
+      reportKey
+    );
+    if (!existingObject) {
+      return jsonResponse(
+        {
+          success: false,
+          message: "Stored match report was not found."
+        },
+        404
+      );
+    }
+    let existingReport = null;
+    try {
+      existingReport = JSON.parse(
+        await existingObject.text()
+      );
+    } catch {
+      return jsonResponse(
+        {
+          success: false,
+          message: "Stored match report is invalid."
+        },
+        500
+      );
+    }
+    if (normalizeMatchId(
+      existingReport?.matchId
+    ) !== matchId) {
+      return jsonResponse(
+        {
+          success: false,
+          message: "Stored match report ID does not match the request."
+        },
+        409
+      );
+    }
+    const submittedBy = String(
+      existingReport?.submittedBy || ""
+    ).trim();
+    if (!submittedBy) {
+      return jsonResponse(
+        {
+          success: false,
+          message: "Stored match report has no owner."
+        },
+        409
+      );
+    }
+    if (submittedBy !== authenticatedOwnerId) {
+      return jsonResponse(
+        {
+          success: false,
+          message: "You are not authorized to confirm this match."
+        },
+        403
+      );
+    }
+    const teams = Array.isArray(
+      existingReport?.teams
+    ) ? existingReport.teams : [];
+    if (teams.length === 0) {
+      return jsonResponse(
+        {
+          success: false,
+          message: "Stored match report contains no teams."
+        },
+        409
+      );
+    }
+    const expectedFieldKeys = /* @__PURE__ */ new Set();
+    for (let teamArrayIndex = 0; teamArrayIndex < teams.length; teamArrayIndex += 1) {
+      const team = teams[teamArrayIndex];
+      const teamIndex = Number(
+        team?.team ?? team?.teamIndex ?? teamArrayIndex + 1
+      );
+      const players = Array.isArray(
+        team?.players
+      ) ? team.players : [];
+      for (const player of players) {
+        const playerName = normalizePlayerName(
+          player?.player || player?.matchedName || player?.username || ""
+        );
+        if (!playerName) {
+          continue;
+        }
+        const reviewFields = player?.reviewFields && typeof player.reviewFields === "object" && !Array.isArray(
+          player.reviewFields
+        ) ? player.reviewFields : {};
+        for (const fieldName of Object.keys(
+          reviewFields
+        )) {
+          if (!ALLOWED_REVIEW_FIELDS.has(
+            fieldName
+          )) {
+            continue;
+          }
+          expectedFieldKeys.add(
+            [
+              teamIndex,
+              playerName,
+              fieldName
+            ].join(
+              "|"
+            )
+          );
+        }
+      }
+    }
+    if (expectedFieldKeys.size === 0) {
+      return jsonResponse(
+        {
+          success: false,
+          message: "Stored match report contains no reviewable fields."
+        },
+        409
+      );
+    }
+    if (submittedFieldKeys.size !== expectedFieldKeys.size) {
+      return jsonResponse(
+        {
+          success: false,
+          message: "All scoreboard fields must be reviewed before confirmation."
+        },
+        400
+      );
+    }
+    for (const expectedKey of expectedFieldKeys) {
+      if (!submittedFieldKeys.has(
+        expectedKey
+      )) {
+        return jsonResponse(
+          {
+            success: false,
+            message: "All scoreboard fields must be reviewed before confirmation."
+          },
+          400
+        );
+      }
+    }
+    const authoritativeFields = [];
+    for (const entry of fields) {
+      const team = findStoredTeam(
+        teams,
+        entry.team
+      );
+      if (!team) {
+        return jsonResponse(
+          {
+            success: false,
+            message: `Stored team could not be matched for team ${entry.team}.`
+          },
+          409
+        );
+      }
+      const player = findStoredPlayer(
+        team,
+        entry.player
+      );
+      if (!player) {
+        return jsonResponse(
+          {
+            success: false,
+            message: "Stored player could not be matched: " + entry.player
+          },
+          409
+        );
+      }
+      const reviewField = player?.reviewFields?.[entry.field];
+      if (!reviewField || typeof reviewField !== "object" || Array.isArray(
+        reviewField
+      )) {
+        return jsonResponse(
+          {
+            success: false,
+            message: `Stored OCR review evidence is missing for ${entry.player} / ${entry.field}.`
+          },
+          409
+        );
+      }
+      const storedOcrValue = reviewField.value ?? player?.[entry.field] ?? null;
+      const ocrValue = storedOcrValue === null || typeof storedOcrValue === "undefined" ? entry.field === "ping" ? 0 : null : normalizeInteger(
+        storedOcrValue
+      );
+      if (ocrValue === null) {
+        return jsonResponse(
+          {
+            success: false,
+            message: `Stored OCR value is invalid for ${entry.player} / ${entry.field}.`
+          },
+          409
+        );
+      }
+      let userValue = entry.userValue;
+      if (entry.field === "ping" && (userValue === null || typeof userValue === "undefined")) {
+        userValue = 0;
+      }
+      const disputed = userValue !== ocrValue;
+      const authoritativeEntry = {
+        team: entry.team,
+        player: String(
+          player?.player || entry.player
+        ),
+        field: entry.field,
+        ocrValue,
+        userValue,
+        finalValue: userValue,
+        disputed,
+        requiresVerification: reviewField.requiresVerification === true,
+        ocrEvidence: {
+          selectedValue: reviewField.value ?? null,
+          selectedEngine: reviewField.engine ?? null,
+          confidence: reviewField.confidence ?? null,
+          template: reviewField.template ?? null,
+          tesseract: reviewField.tesseract ?? null,
+          paddle: reviewField.paddle ?? null
+        }
+      };
+      authoritativeFields.push(
+        authoritativeEntry
+      );
+      player[entry.field] = userValue;
+    }
+    const disputes = authoritativeFields.filter(
+      function(entry) {
+        return entry.disputed === true;
+      }
+    );
+    const confirmationStatus = disputes.length > 0 ? "confirmed_with_disputes" : "confirmed";
+    const confirmedAt = (/* @__PURE__ */ new Date()).toISOString();
+    existingReport.confirmationStatus = confirmationStatus;
+    existingReport.hasDisputes = disputes.length > 0;
+    existingReport.disputeCount = disputes.length;
+    existingReport.confirmation = {
+      status: confirmationStatus,
+      confirmedAt,
+      hasDisputes: disputes.length > 0,
+      disputeCount: disputes.length,
+      fields: authoritativeFields,
+      disputes
+    };
+    const storageResult = await putMatchReport(
+      env.OCR_STORAGE,
+      {
+        matchId,
+        report: existingReport
+      }
+    );
+    return jsonResponse(
+      {
+        success: true,
+        matchId,
+        confirmationStatus,
+        confirmedAt,
+        hasDisputes: disputes.length > 0,
+        disputeCount: disputes.length,
+        reportKey: storageResult.objectKey
+      },
+      200
+    );
+  } catch (error) {
+    return jsonResponse(
+      {
+        success: false,
+        message: "OCR result confirmation failed.",
+        error: String(
+          error?.message || error
+        )
+      },
+      500
+    );
+  }
+}
+__name(handleOcrConfirmation, "handleOcrConfirmation");
+
+// api/ocr/confirm.js
+async function onRequest5(context) {
+  return handleOcrConfirmation(
+    context
+  );
+}
+__name(onRequest5, "onRequest");
+
+// services/ocr/localize.js
+async function handleOCRLocalize(request, env) {
+  try {
+    const formData = await request.formData();
+    const file = formData.get("file");
+    if (!file) {
+      return new Response(
+        JSON.stringify({ error: "Missing file upload" }),
+        { status: 400, headers: { "Content-Type": "application/json" } }
+      );
+    }
+    const buffer = await file.arrayBuffer();
+    const localizeResponse = await fetch(env.OCR_LOCALIZE_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/octet-stream",
+        "x-api-key": env.OCR_API_KEY
+      },
+      body: buffer
+    });
+    if (!localizeResponse.ok) {
+      return new Response(
+        JSON.stringify({ error: "Localization provider failed" }),
+        { status: 500, headers: { "Content-Type": "application/json" } }
+      );
+    }
+    const result = await localizeResponse.json();
+    return new Response(JSON.stringify(result), {
+      status: 200,
+      headers: { "Content-Type": "application/json" }
+    });
+  } catch (err) {
+    return new Response(
+      JSON.stringify({ error: "Localization failed", details: err.message }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
+    );
+  }
+}
+__name(handleOCRLocalize, "handleOCRLocalize");
+
+// api/ocr/localize.js
+async function onRequest6(context) {
+  return handleOCRLocalize(context.request, context.env);
+}
+__name(onRequest6, "onRequest");
+
+// api/ocr/localTracking.js
+async function onRequest7({ request, env }) {
+  const body = await request.text();
+  const response = await fetch(env.OCR_TRACKING_URL, {
+    method: "POST",
+    body,
+    headers: { "Content-Type": "application/json" }
+  });
+  return response;
+}
+__name(onRequest7, "onRequest");
+
+// services/ocr/storeMatch.js
+var STORE_MATCH_VERSION = "ocr-store-match-1.0";
+function jsonResponse2(body, status = 200) {
+  return new Response(
+    JSON.stringify(
+      body
+    ),
+    {
+      status,
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "no-store"
+      }
+    }
+  );
+}
+__name(jsonResponse2, "jsonResponse");
+function getBearerToken(request) {
+  const authorization = String(
+    request.headers.get(
+      "Authorization"
+    ) || ""
+  ).trim();
+  if (!authorization.startsWith(
+    "Bearer "
+  )) {
+    return "";
+  }
+  return authorization.slice(
+    7
+  ).trim();
+}
+__name(getBearerToken, "getBearerToken");
+function constantTimeEqual(first, second) {
+  const a = new TextEncoder().encode(
+    String(
+      first || ""
+    )
+  );
+  const b = new TextEncoder().encode(
+    String(
+      second || ""
+    )
+  );
+  if (a.length !== b.length) {
+    return false;
+  }
+  let result = 0;
+  for (let index = 0; index < a.length; index += 1) {
+    result |= a[index] ^ b[index];
+  }
+  return result === 0;
+}
+__name(constantTimeEqual, "constantTimeEqual");
+function validateInternalRequest(request, env) {
+  const expectedToken = String(
+    env.OCR_STORAGE_TOKEN || ""
+  ).trim();
+  if (!expectedToken) {
+    return {
+      valid: false,
+      status: 503,
+      reason: "OCR storage authentication is not configured."
+    };
+  }
+  const receivedToken = getBearerToken(
+    request
+  );
+  if (!receivedToken || !constantTimeEqual(
+    receivedToken,
+    expectedToken
+  )) {
+    return {
+      valid: false,
+      status: 401,
+      reason: "Unauthorized."
+    };
+  }
+  return {
+    valid: true
+  };
+}
+__name(validateInternalRequest, "validateInternalRequest");
+function normalizeMatchId2(value) {
+  return String(
+    value || ""
+  ).trim().toUpperCase();
+}
+__name(normalizeMatchId2, "normalizeMatchId");
+function validMatchId2(value) {
+  return /^[A-Z0-9]{16}$/.test(
+    value
+  );
+}
+__name(validMatchId2, "validMatchId");
+function parseMatchReport(rawValue) {
+  if (rawValue === null || typeof rawValue === "undefined") {
+    return null;
+  }
+  if (typeof rawValue === "object" && typeof rawValue.arrayBuffer !== "function") {
+    return rawValue;
+  }
+  try {
+    const parsed = JSON.parse(
+      String(
+        rawValue
+      )
+    );
+    if (parsed && typeof parsed === "object" && !Array.isArray(
+      parsed
+    )) {
+      return parsed;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+__name(parseMatchReport, "parseMatchReport");
+async function handleStoreMatch(request, env) {
+  try {
+    if (request.method !== "POST") {
+      return jsonResponse2(
+        {
+          success: false,
+          message: "Method not allowed."
+        },
+        405
+      );
+    }
+    const authentication = validateInternalRequest(
+      request,
+      env
+    );
+    if (!authentication.valid) {
+      return jsonResponse2(
+        {
+          success: false,
+          message: authentication.reason
+        },
+        authentication.status
+      );
+    }
+    if (!env.OCR_STORAGE) {
+      return jsonResponse2(
+        {
+          success: false,
+          message: "OCR_STORAGE R2 binding is unavailable."
+        },
+        503
+      );
+    }
+    const formData = await request.formData();
+    const image = formData.get(
+      "image"
+    );
+    const matchId = normalizeMatchId2(
+      formData.get(
+        "matchId"
+      )
+    );
+    const matchReport = parseMatchReport(
+      formData.get(
+        "matchReport"
+      )
+    );
+    if (!validMatchId2(
+      matchId
+    )) {
+      return jsonResponse2(
+        {
+          success: false,
+          message: "matchId must be a 16-character alphanumeric ID."
+        },
+        400
+      );
+    }
+    if (!image || typeof image.arrayBuffer !== "function") {
+      return jsonResponse2(
+        {
+          success: false,
+          message: "Match image is required."
+        },
+        400
+      );
+    }
+    if (!matchReport) {
+      return jsonResponse2(
+        {
+          success: false,
+          message: "matchReport must contain valid JSON."
+        },
+        400
+      );
+    }
+    if (matchReport.matchId && normalizeMatchId2(
+      matchReport.matchId
+    ) !== matchId) {
+      return jsonResponse2(
+        {
+          success: false,
+          message: "matchReport.matchId does not match matchId."
+        },
+        400
+      );
+    }
+    const imageBytes = await image.arrayBuffer();
+    if (!imageBytes || imageBytes.byteLength === 0) {
+      return jsonResponse2(
+        {
+          success: false,
+          message: "Match image is empty."
+        },
+        400
+      );
+    }
+    const contentType = String(
+      image.type || "image/png"
+    );
+    const imageResult = await putMatchImage(
+      env.OCR_STORAGE,
+      {
+        matchId,
+        image: imageBytes,
+        contentType,
+        metadata: {
+          submittedBy: matchReport.submittedBy || "",
+          matchType: matchReport.matchType || "",
+          matchSeason: matchReport.matchSeason || "",
+          ocrVersion: matchReport.ocrVersion || ""
+        }
+      }
+    );
+    const reportResult = await putMatchReport(
+      env.OCR_STORAGE,
+      {
+        matchId,
+        report: matchReport
+      }
+    );
+    return jsonResponse2(
+      {
+        success: true,
+        stored: true,
+        matchId,
+        imageKey: imageResult.objectKey,
+        reportKey: reportResult.objectKey,
+        version: STORE_MATCH_VERSION
+      },
+      200
+    );
+  } catch (error) {
+    return jsonResponse2(
+      {
+        success: false,
+        message: "Match storage failed.",
+        error: String(
+          error?.message || error
+        ),
+        version: STORE_MATCH_VERSION
+      },
+      500
+    );
+  }
+}
+__name(handleStoreMatch, "handleStoreMatch");
+
+// api/ocr/storeMatch.js
+async function onRequest8(context) {
+  return handleStoreMatch(
+    context.request,
+    context.env
+  );
+}
+__name(onRequest8, "onRequest");
+
+// services/ocr/trainingStorage.js
+var TRAINING_STORAGE_VERSION = "ocr-training-storage-1.0";
+var TRAINING_TARGET_PER_CLASS = 200;
+var TRAINING_ID_LENGTH = 8;
+var TRAINING_ID_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
+var TRAINING_CATEGORIES = /* @__PURE__ */ new Set([
+  "0",
+  "1",
+  "2",
+  "3",
+  "4",
+  "5",
+  "6",
+  "7",
+  "8",
+  "9",
+  "bar",
+  "undetermined"
+]);
+var CAPPED_TRAINING_CATEGORIES = /* @__PURE__ */ new Set([
+  "0",
+  "1",
+  "2",
+  "3",
+  "4",
+  "5",
+  "6",
+  "7",
+  "8",
+  "9"
+]);
+function normalizeTrainingCategory(category) {
+  const normalized = String(
+    category ?? ""
+  ).trim().toLowerCase();
+  if (TRAINING_CATEGORIES.has(
+    normalized
+  )) {
+    return normalized;
+  }
+  return "undetermined";
+}
+__name(normalizeTrainingCategory, "normalizeTrainingCategory");
+function isCappedTrainingCategory(category) {
+  return CAPPED_TRAINING_CATEGORIES.has(
+    normalizeTrainingCategory(
+      category
+    )
+  );
+}
+__name(isCappedTrainingCategory, "isCappedTrainingCategory");
+function randomAlphabetCharacter() {
+  const randomValues = new Uint32Array(
+    1
+  );
+  crypto.getRandomValues(
+    randomValues
+  );
+  const index = randomValues[0] % TRAINING_ID_ALPHABET.length;
+  return TRAINING_ID_ALPHABET[index];
+}
+__name(randomAlphabetCharacter, "randomAlphabetCharacter");
+function generateTrainingId(length = TRAINING_ID_LENGTH) {
+  let value = "";
+  for (let index = 0; index < length; index += 1) {
+    value += randomAlphabetCharacter();
+  }
+  return value;
+}
+__name(generateTrainingId, "generateTrainingId");
+function normalizeMatchId3(matchId) {
+  return String(
+    matchId ?? ""
+  ).trim().toUpperCase().replace(
+    /[^A-Z0-9]/g,
+    ""
+  );
+}
+__name(normalizeMatchId3, "normalizeMatchId");
+function getMatchPrefix(matchId) {
+  const normalized = normalizeMatchId3(
+    matchId
+  );
+  if (normalized.length < 8) {
+    throw new Error(
+      "matchId must contain at least 8 alphanumeric characters."
+    );
+  }
+  return normalized.slice(
+    0,
+    8
+  );
+}
+__name(getMatchPrefix, "getMatchPrefix");
+function buildTrainingObjectKey(matchId, category, trainingId) {
+  const normalizedCategory = normalizeTrainingCategory(
+    category
+  );
+  const matchPrefix = getMatchPrefix(
+    matchId
+  );
+  const normalizedTrainingId = String(
+    trainingId ?? ""
+  ).trim().toUpperCase();
+  return `${normalizedCategory}/${matchPrefix}_${normalizedTrainingId}.png`;
+}
+__name(buildTrainingObjectKey, "buildTrainingObjectKey");
+async function getTrainingCategoryCount(bucket, category) {
+  if (!bucket) {
+    throw new Error(
+      "OCR training R2 bucket is unavailable."
+    );
+  }
+  const normalizedCategory = normalizeTrainingCategory(
+    category
+  );
+  const prefix = `${normalizedCategory}/`;
+  let cursor = void 0;
+  let count = 0;
+  do {
+    const result = await bucket.list({
+      prefix,
+      cursor,
+      limit: TRAINING_TARGET_PER_CLASS
+    });
+    count += result.objects.length;
+    if (count >= TRAINING_TARGET_PER_CLASS) {
+      return count;
+    }
+    cursor = result.truncated ? result.cursor : void 0;
+  } while (cursor);
+  return count;
+}
+__name(getTrainingCategoryCount, "getTrainingCategoryCount");
+async function getTrainingCategoryStatus(bucket, category) {
+  const normalizedCategory = normalizeTrainingCategory(
+    category
+  );
+  if (!isCappedTrainingCategory(
+    normalizedCategory
+  )) {
+    return {
+      category: normalizedCategory,
+      capped: false,
+      currentCount: null,
+      targetCount: null,
+      accepting: true
+    };
+  }
+  const currentCount = await getTrainingCategoryCount(
+    bucket,
+    normalizedCategory
+  );
+  return {
+    category: normalizedCategory,
+    capped: true,
+    currentCount,
+    targetCount: TRAINING_TARGET_PER_CLASS,
+    accepting: currentCount < TRAINING_TARGET_PER_CLASS
+  };
+}
+__name(getTrainingCategoryStatus, "getTrainingCategoryStatus");
+async function createUniqueTrainingObjectKey(bucket, matchId, category) {
+  const maximumAttempts = 10;
+  for (let attempt = 0; attempt < maximumAttempts; attempt += 1) {
+    const trainingId = generateTrainingId();
+    const objectKey = buildTrainingObjectKey(
+      matchId,
+      category,
+      trainingId
+    );
+    const existing = await bucket.head(
+      objectKey
+    );
+    if (!existing) {
+      return {
+        trainingId,
+        objectKey
+      };
+    }
+  }
+  throw new Error(
+    "Could not generate a unique training object key."
+  );
+}
+__name(createUniqueTrainingObjectKey, "createUniqueTrainingObjectKey");
+function normalizeMetadataValue(value) {
+  if (value === null || value === void 0) {
+    return "";
+  }
+  if (typeof value === "object") {
+    return JSON.stringify(
+      value
+    );
+  }
+  return String(
+    value
+  );
+}
+__name(normalizeMetadataValue, "normalizeMetadataValue");
+function buildTrainingMetadata({
+  matchId,
+  trainingId,
+  category,
+  field = null,
+  team = null,
+  playerIndex = null,
+  confidence = null,
+  engine = null,
+  approval = null,
+  ocrVersion = null,
+  additionalMetadata = null
+}) {
+  const metadata = {
+    matchId: normalizeMetadataValue(
+      matchId
+    ),
+    trainingId: normalizeMetadataValue(
+      trainingId
+    ),
+    category: normalizeMetadataValue(
+      category
+    ),
+    field: normalizeMetadataValue(
+      field
+    ),
+    team: normalizeMetadataValue(
+      team
+    ),
+    playerIndex: normalizeMetadataValue(
+      playerIndex
+    ),
+    confidence: normalizeMetadataValue(
+      confidence
+    ),
+    engine: normalizeMetadataValue(
+      engine
+    ),
+    approval: normalizeMetadataValue(
+      approval
+    ),
+    ocrVersion: normalizeMetadataValue(
+      ocrVersion
+    ),
+    storageVersion: TRAINING_STORAGE_VERSION
+  };
+  if (additionalMetadata && typeof additionalMetadata === "object") {
+    for (const [
+      key,
+      value
+    ] of Object.entries(
+      additionalMetadata
+    )) {
+      metadata[String(
+        key
+      )] = normalizeMetadataValue(
+        value
+      );
+    }
+  }
+  return metadata;
+}
+__name(buildTrainingMetadata, "buildTrainingMetadata");
+async function putTrainingImage(bucket, {
+  image,
+  matchId,
+  category = "undetermined",
+  field = null,
+  team = null,
+  playerIndex = null,
+  confidence = null,
+  engine = null,
+  approval = null,
+  ocrVersion = null,
+  additionalMetadata = null
+}) {
+  if (!bucket) {
+    throw new Error(
+      "OCR training R2 bucket is unavailable."
+    );
+  }
+  if (!image) {
+    throw new Error(
+      "Training image is required."
+    );
+  }
+  const normalizedCategory = normalizeTrainingCategory(
+    category
+  );
+  const categoryStatus = await getTrainingCategoryStatus(
+    bucket,
+    normalizedCategory
+  );
+  if (!categoryStatus.accepting) {
+    return {
+      success: true,
+      stored: false,
+      category: normalizedCategory,
+      reason: "training_category_complete",
+      currentCount: categoryStatus.currentCount,
+      targetCount: categoryStatus.targetCount
+    };
+  }
+  const {
+    trainingId,
+    objectKey
+  } = await createUniqueTrainingObjectKey(
+    bucket,
+    matchId,
+    normalizedCategory
+  );
+  const customMetadata = buildTrainingMetadata({
+    matchId,
+    trainingId,
+    category: normalizedCategory,
+    field,
+    team,
+    playerIndex,
+    confidence,
+    engine,
+    approval,
+    ocrVersion,
+    additionalMetadata
+  });
+  await bucket.put(
+    objectKey,
+    image,
+    {
+      httpMetadata: {
+        contentType: "image/png"
+      },
+      customMetadata
+    }
+  );
+  return {
+    success: true,
+    stored: true,
+    category: normalizedCategory,
+    matchId: normalizeMatchId3(
+      matchId
+    ),
+    matchPrefix: getMatchPrefix(
+      matchId
+    ),
+    trainingId,
+    objectKey,
+    currentCount: categoryStatus.currentCount === null ? null : categoryStatus.currentCount + 1,
+    targetCount: categoryStatus.targetCount,
+    metadata: customMetadata
+  };
+}
+__name(putTrainingImage, "putTrainingImage");
+
+// services/ocr/training.js
+var TRAINING_SERVICE_VERSION = "ocr-training-service-1.0";
+function jsonResponse3(body, status = 200) {
+  return new Response(
+    JSON.stringify(
+      body
+    ),
+    {
+      status,
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "no-store"
+      }
+    }
+  );
+}
+__name(jsonResponse3, "jsonResponse");
+function normalizeText(value) {
+  return String(
+    value ?? ""
+  ).trim();
+}
+__name(normalizeText, "normalizeText");
+function normalizeInteger2(value) {
+  if (value === null || value === void 0 || value === "") {
+    return null;
+  }
+  const parsed = Number.parseInt(
+    String(
+      value
+    ),
+    10
+  );
+  return Number.isFinite(
+    parsed
+  ) ? parsed : null;
+}
+__name(normalizeInteger2, "normalizeInteger");
+function normalizeNumber(value) {
+  if (value === null || value === void 0 || value === "") {
+    return null;
+  }
+  const parsed = Number(
+    value
+  );
+  return Number.isFinite(
+    parsed
+  ) ? parsed : null;
+}
+__name(normalizeNumber, "normalizeNumber");
+function isValidUpload(value) {
+  return value && typeof value.arrayBuffer === "function";
+}
+__name(isValidUpload, "isValidUpload");
+async function handleOCRTrainingUpload(request, env) {
+  try {
+    if (request.method !== "POST") {
+      return jsonResponse3(
+        {
+          success: false,
+          message: "Method not allowed."
+        },
+        405
+      );
+    }
+    if (!env.OCR_TRAINING) {
+      return jsonResponse3(
+        {
+          success: false,
+          message: "OCR training bucket is not configured."
+        },
+        500
+      );
+    }
+    const contentType = request.headers.get(
+      "content-type"
+    ) || "";
+    if (!contentType.toLowerCase().includes(
+      "multipart/form-data"
+    )) {
+      return jsonResponse3(
+        {
+          success: false,
+          message: "Expected multipart/form-data."
+        },
+        400
+      );
+    }
+    const formData = await request.formData();
+    const imageFile = formData.get(
+      "image"
+    ) || formData.get(
+      "file"
+    );
+    if (!isValidUpload(
+      imageFile
+    )) {
+      return jsonResponse3(
+        {
+          success: false,
+          message: "Training image is required."
+        },
+        400
+      );
+    }
+    const matchId = normalizeText(
+      formData.get(
+        "matchId"
+      )
+    );
+    if (matchId.length < 8) {
+      return jsonResponse3(
+        {
+          success: false,
+          message: "A valid matchId is required."
+        },
+        400
+      );
+    }
+    const category = normalizeTrainingCategory(
+      formData.get(
+        "category"
+      )
+    );
+    const field = normalizeText(
+      formData.get(
+        "field"
+      )
+    ) || null;
+    const team = normalizeInteger2(
+      formData.get(
+        "team"
+      )
+    );
+    const playerIndex = normalizeInteger2(
+      formData.get(
+        "playerIndex"
+      )
+    );
+    const confidence = normalizeNumber(
+      formData.get(
+        "confidence"
+      )
+    );
+    const engine = normalizeText(
+      formData.get(
+        "engine"
+      )
+    ) || null;
+    const approval = normalizeText(
+      formData.get(
+        "approval"
+      )
+    ) || null;
+    const ocrVersion = normalizeText(
+      formData.get(
+        "ocrVersion"
+      )
+    ) || null;
+    let additionalMetadata = null;
+    const rawAdditionalMetadata = formData.get(
+      "metadata"
+    );
+    if (rawAdditionalMetadata) {
+      try {
+        const parsed = JSON.parse(
+          String(
+            rawAdditionalMetadata
+          )
+        );
+        if (parsed && typeof parsed === "object" && !Array.isArray(
+          parsed
+        )) {
+          additionalMetadata = parsed;
+        }
+      } catch {
+        additionalMetadata = null;
+      }
+    }
+    const image = await imageFile.arrayBuffer();
+    const result = await putTrainingImage(
+      env.OCR_TRAINING,
+      {
+        image,
+        matchId,
+        category,
+        field,
+        team,
+        playerIndex,
+        confidence,
+        engine,
+        approval,
+        ocrVersion,
+        additionalMetadata: {
+          trainingServiceVersion: TRAINING_SERVICE_VERSION,
+          ...additionalMetadata || {}
+        }
+      }
+    );
+    if (result?.stored === false) {
+      return jsonResponse3(
+        {
+          success: true,
+          stored: false,
+          category: result.category,
+          reason: result.reason,
+          currentCount: result.currentCount ?? null,
+          targetCount: result.targetCount ?? null
+        }
+      );
+    }
+    return jsonResponse3(
+      {
+        success: true,
+        stored: true,
+        category: result.category,
+        matchId: result.matchId,
+        trainingId: result.trainingId,
+        objectKey: result.objectKey,
+        currentCount: result.currentCount ?? null,
+        targetCount: result.targetCount ?? null
+      }
+    );
+  } catch (error) {
+    console.error(
+      "OCR training upload failed:",
+      error
+    );
+    return jsonResponse3(
+      {
+        success: false,
+        message: error?.message || "OCR training upload failed."
+      },
+      500
+    );
+  }
+}
+__name(handleOCRTrainingUpload, "handleOCRTrainingUpload");
+
+// api/ocr/training.js
+async function onRequest9(context) {
+  return handleOCRTrainingUpload(
+    context.request,
+    context.env
+  );
+}
+__name(onRequest9, "onRequest");
+
+// services/ocr/handler.js
+var OCR_HANDLER_VERSION = "ocr-handler-2.0";
+async function createOwnerHash2(epicUniqueId, secret) {
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(
+      String(
+        secret
+      )
+    ),
+    {
+      name: "HMAC",
+      hash: "SHA-256"
+    },
+    false,
+    [
+      "sign"
+    ]
+  );
+  const signature = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    encoder.encode(
+      String(
+        epicUniqueId
+      )
+    )
+  );
+  return Array.from(
+    new Uint8Array(
+      signature
+    )
+  ).map(
+    function(byte) {
+      return byte.toString(
+        16
+      ).padStart(
+        2,
+        "0"
+      );
+    }
+  ).join(
+    ""
+  );
+}
+__name(createOwnerHash2, "createOwnerHash");
+function jsonResponse4(body, status = 200) {
+  return new Response(
+    JSON.stringify(
+      body
+    ),
+    {
+      status,
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "no-store"
+      }
+    }
+  );
+}
+__name(jsonResponse4, "jsonResponse");
+async function handleOCRRequest(request, env) {
+  try {
+    if (request.method !== "POST") {
+      return jsonResponse4(
+        {
+          success: false,
+          error: "Method not allowed."
+        },
+        405
+      );
+    }
+    if (!env.OCR_API_URL) {
+      return jsonResponse4(
+        {
+          success: false,
+          error: "OCR API URL is not configured."
+        },
+        503
+      );
+    }
+    if (!env.OCR_API_KEY) {
+      return jsonResponse4(
+        {
+          success: false,
+          error: "OCR API authentication is not configured."
+        },
+        503
+      );
+    }
+    if (!env.OCR_OWNER_SECRET) {
+      return jsonResponse4(
+        {
+          success: false,
+          error: "OCR owner hashing is not configured."
+        },
+        503
+      );
+    }
+    const contentType = String(
+      request.headers.get(
+        "Content-Type"
+      ) || ""
+    );
+    if (!contentType.toLowerCase().includes(
+      "multipart/form-data"
+    )) {
+      return jsonResponse4(
+        {
+          success: false,
+          error: "OCR requests must use multipart/form-data."
+        },
+        400
+      );
+    }
+    const session = await getStoredSession(
+      request,
+      env
+    );
+    if (!session || !session.sessionData) {
+      return jsonResponse4(
+        {
+          success: false,
+          message: "Authentication required."
+        },
+        401
+      );
+    }
+    const epicUniqueId = String(
+      session.sessionData.EpicUniqueId || ""
+    ).trim();
+    if (!epicUniqueId) {
+      return jsonResponse4(
+        {
+          success: false,
+          message: "Authenticated account is missing an EpicUniqueId."
+        },
+        401
+      );
+    }
+    const ownerSecret = String(
+      env.OCR_OWNER_SECRET || ""
+    ).trim();
+    if (!ownerSecret) {
+      return jsonResponse4(
+        {
+          success: false,
+          message: "OCR owner hashing is not configured."
+        },
+        503
+      );
+    }
+    const submittedBy = await createOwnerHash2(
+      epicUniqueId,
+      ownerSecret
+    );
+    const formData = await request.formData();
+    const file = formData.get(
+      "file"
+    ) || formData.get(
+      "image"
+    );
+    if (!file || typeof file.arrayBuffer !== "function") {
+      return jsonResponse4(
+        {
+          success: false,
+          error: "Missing file upload."
+        },
+        400
+      );
+    }
+    if (file.size !== void 0 && file.size <= 0) {
+      return jsonResponse4(
+        {
+          success: false,
+          error: "Uploaded image is empty."
+        },
+        400
+      );
+    }
+    formData.set(
+      "submittedBy",
+      submittedBy
+    );
+    const upstreamHeaders = new Headers();
+    upstreamHeaders.set(
+      "X-API-Key",
+      env.OCR_API_KEY
+    );
+    upstreamHeaders.set(
+      "X-BPD-OCR-Handler-Version",
+      OCR_HANDLER_VERSION
+    );
+    const ocrResponse = await fetch(
+      env.OCR_API_URL,
+      {
+        method: "POST",
+        headers: upstreamHeaders,
+        body: formData
+      }
+    );
+    const responseContentType = String(
+      ocrResponse.headers.get(
+        "Content-Type"
+      ) || ""
+    );
+    let result;
+    if (responseContentType.toLowerCase().includes(
+      "application/json"
+    )) {
+      try {
+        result = await ocrResponse.json();
+      } catch {
+        result = {
+          success: false,
+          error: "OCR provider returned invalid JSON."
+        };
+      }
+    } else {
+      const text = await ocrResponse.text();
+      result = {
+        success: ocrResponse.ok,
+        message: text || (ocrResponse.ok ? "OCR request completed." : "OCR provider failed.")
+      };
+    }
+    return jsonResponse4(
+      {
+        ...typeof result === "object" && result !== null ? result : {
+          result
+        },
+        handlerVersion: OCR_HANDLER_VERSION
+      },
+      ocrResponse.status
+    );
+  } catch (error) {
+    return jsonResponse4(
+      {
+        success: false,
+        error: "OCR request failed.",
+        details: String(
+          error?.message || error
+        ),
+        handlerVersion: OCR_HANDLER_VERSION
+      },
+      500
+    );
+  }
+}
+__name(handleOCRRequest, "handleOCRRequest");
+
+// api/ocr/index.js
+async function onRequest10(context) {
+  return handleOCRRequest(context.request, context.env);
+}
+__name(onRequest10, "onRequest");
+
+// ../.wrangler/tmp/pages-QBqwXj/functionsRoutes-0.20871789501165217.mjs
+var routes = [
+  {
+    routePath: "/api/auth/epic/epic_logout",
+    mountPath: "/api/auth/epic",
+    method: "GET",
+    middlewares: [],
+    modules: [onRequestGet]
+  },
+  {
+    routePath: "/api/auth/epic/epic_logout",
+    mountPath: "/api/auth/epic",
+    method: "POST",
+    middlewares: [],
+    modules: [onRequestPost]
+  },
+  {
+    routePath: "/api/auth/epic/callback",
+    mountPath: "/api/auth/epic",
+    method: "",
+    middlewares: [],
+    modules: [onRequest]
+  },
+  {
+    routePath: "/api/auth/epic/epic_login",
+    mountPath: "/api/auth/epic",
+    method: "",
+    middlewares: [],
+    modules: [onRequest2]
+  },
+  {
+    routePath: "/api/auth/rocketleague/profile",
+    mountPath: "/api/auth/rocketleague",
+    method: "",
+    middlewares: [],
+    modules: [onRequest3]
+  },
+  {
+    routePath: "/api/auth/rocketleague/session",
+    mountPath: "/api/auth/rocketleague",
+    method: "",
+    middlewares: [],
+    modules: [onRequest4]
+  },
+  {
+    routePath: "/api/curseforge/mods",
+    mountPath: "/api/curseforge",
+    method: "GET",
+    middlewares: [],
+    modules: [onRequestGet2]
+  },
+  {
+    routePath: "/api/ocr/confirm",
+    mountPath: "/api/ocr",
+    method: "",
+    middlewares: [],
+    modules: [onRequest5]
+  },
+  {
+    routePath: "/api/ocr/localize",
+    mountPath: "/api/ocr",
+    method: "",
+    middlewares: [],
+    modules: [onRequest6]
+  },
+  {
+    routePath: "/api/ocr/localTracking",
+    mountPath: "/api/ocr",
+    method: "",
+    middlewares: [],
+    modules: [onRequest7]
+  },
+  {
+    routePath: "/api/ocr/storeMatch",
+    mountPath: "/api/ocr",
+    method: "",
+    middlewares: [],
+    modules: [onRequest8]
+  },
+  {
+    routePath: "/api/ocr/training",
+    mountPath: "/api/ocr",
+    method: "",
+    middlewares: [],
+    modules: [onRequest9]
+  },
+  {
+    routePath: "/api/ocr",
+    mountPath: "/api/ocr",
+    method: "",
+    middlewares: [],
+    modules: [onRequest10]
+  }
+];
+
+// ../../../AppData/Local/npm-cache/_npx/32026684e21afda6/node_modules/path-to-regexp/dist.es2015/index.js
+function lexer(str) {
+  var tokens = [];
+  var i = 0;
+  while (i < str.length) {
+    var char = str[i];
+    if (char === "*" || char === "+" || char === "?") {
+      tokens.push({ type: "MODIFIER", index: i, value: str[i++] });
+      continue;
+    }
+    if (char === "\\") {
+      tokens.push({ type: "ESCAPED_CHAR", index: i++, value: str[i++] });
+      continue;
+    }
+    if (char === "{") {
+      tokens.push({ type: "OPEN", index: i, value: str[i++] });
+      continue;
+    }
+    if (char === "}") {
+      tokens.push({ type: "CLOSE", index: i, value: str[i++] });
+      continue;
+    }
+    if (char === ":") {
+      var name = "";
+      var j = i + 1;
+      while (j < str.length) {
+        var code = str.charCodeAt(j);
+        if (
+          // `0-9`
+          code >= 48 && code <= 57 || // `A-Z`
+          code >= 65 && code <= 90 || // `a-z`
+          code >= 97 && code <= 122 || // `_`
+          code === 95
+        ) {
+          name += str[j++];
+          continue;
+        }
+        break;
+      }
+      if (!name)
+        throw new TypeError("Missing parameter name at ".concat(i));
+      tokens.push({ type: "NAME", index: i, value: name });
+      i = j;
+      continue;
+    }
+    if (char === "(") {
+      var count = 1;
+      var pattern = "";
+      var j = i + 1;
+      if (str[j] === "?") {
+        throw new TypeError('Pattern cannot start with "?" at '.concat(j));
+      }
+      while (j < str.length) {
+        if (str[j] === "\\") {
+          pattern += str[j++] + str[j++];
+          continue;
+        }
+        if (str[j] === ")") {
+          count--;
+          if (count === 0) {
+            j++;
+            break;
+          }
+        } else if (str[j] === "(") {
+          count++;
+          if (str[j + 1] !== "?") {
+            throw new TypeError("Capturing groups are not allowed at ".concat(j));
+          }
+        }
+        pattern += str[j++];
+      }
+      if (count)
+        throw new TypeError("Unbalanced pattern at ".concat(i));
+      if (!pattern)
+        throw new TypeError("Missing pattern at ".concat(i));
+      tokens.push({ type: "PATTERN", index: i, value: pattern });
+      i = j;
+      continue;
+    }
+    tokens.push({ type: "CHAR", index: i, value: str[i++] });
+  }
+  tokens.push({ type: "END", index: i, value: "" });
+  return tokens;
+}
+__name(lexer, "lexer");
+function parse(str, options) {
+  if (options === void 0) {
+    options = {};
+  }
+  var tokens = lexer(str);
+  var _a = options.prefixes, prefixes = _a === void 0 ? "./" : _a, _b = options.delimiter, delimiter = _b === void 0 ? "/#?" : _b;
+  var result = [];
+  var key = 0;
+  var i = 0;
+  var path = "";
+  var tryConsume = /* @__PURE__ */ __name(function(type) {
+    if (i < tokens.length && tokens[i].type === type)
+      return tokens[i++].value;
+  }, "tryConsume");
+  var mustConsume = /* @__PURE__ */ __name(function(type) {
+    var value2 = tryConsume(type);
+    if (value2 !== void 0)
+      return value2;
+    var _a2 = tokens[i], nextType = _a2.type, index = _a2.index;
+    throw new TypeError("Unexpected ".concat(nextType, " at ").concat(index, ", expected ").concat(type));
+  }, "mustConsume");
+  var consumeText = /* @__PURE__ */ __name(function() {
+    var result2 = "";
+    var value2;
+    while (value2 = tryConsume("CHAR") || tryConsume("ESCAPED_CHAR")) {
+      result2 += value2;
+    }
+    return result2;
+  }, "consumeText");
+  var isSafe = /* @__PURE__ */ __name(function(value2) {
+    for (var _i = 0, delimiter_1 = delimiter; _i < delimiter_1.length; _i++) {
+      var char2 = delimiter_1[_i];
+      if (value2.indexOf(char2) > -1)
+        return true;
+    }
+    return false;
+  }, "isSafe");
+  var safePattern = /* @__PURE__ */ __name(function(prefix2) {
+    var prev = result[result.length - 1];
+    var prevText = prefix2 || (prev && typeof prev === "string" ? prev : "");
+    if (prev && !prevText) {
+      throw new TypeError('Must have text between two parameters, missing text after "'.concat(prev.name, '"'));
+    }
+    if (!prevText || isSafe(prevText))
+      return "[^".concat(escapeString(delimiter), "]+?");
+    return "(?:(?!".concat(escapeString(prevText), ")[^").concat(escapeString(delimiter), "])+?");
+  }, "safePattern");
+  while (i < tokens.length) {
+    var char = tryConsume("CHAR");
+    var name = tryConsume("NAME");
+    var pattern = tryConsume("PATTERN");
+    if (name || pattern) {
+      var prefix = char || "";
+      if (prefixes.indexOf(prefix) === -1) {
+        path += prefix;
+        prefix = "";
+      }
+      if (path) {
+        result.push(path);
+        path = "";
+      }
+      result.push({
+        name: name || key++,
+        prefix,
+        suffix: "",
+        pattern: pattern || safePattern(prefix),
+        modifier: tryConsume("MODIFIER") || ""
+      });
+      continue;
+    }
+    var value = char || tryConsume("ESCAPED_CHAR");
+    if (value) {
+      path += value;
+      continue;
+    }
+    if (path) {
+      result.push(path);
+      path = "";
+    }
+    var open = tryConsume("OPEN");
+    if (open) {
+      var prefix = consumeText();
+      var name_1 = tryConsume("NAME") || "";
+      var pattern_1 = tryConsume("PATTERN") || "";
+      var suffix = consumeText();
+      mustConsume("CLOSE");
+      result.push({
+        name: name_1 || (pattern_1 ? key++ : ""),
+        pattern: name_1 && !pattern_1 ? safePattern(prefix) : pattern_1,
+        prefix,
+        suffix,
+        modifier: tryConsume("MODIFIER") || ""
+      });
+      continue;
+    }
+    mustConsume("END");
+  }
+  return result;
+}
+__name(parse, "parse");
+function match(str, options) {
+  var keys = [];
+  var re = pathToRegexp(str, keys, options);
+  return regexpToFunction(re, keys, options);
+}
+__name(match, "match");
+function regexpToFunction(re, keys, options) {
+  if (options === void 0) {
+    options = {};
+  }
+  var _a = options.decode, decode = _a === void 0 ? function(x) {
+    return x;
+  } : _a;
+  return function(pathname) {
+    var m = re.exec(pathname);
+    if (!m)
+      return false;
+    var path = m[0], index = m.index;
+    var params = /* @__PURE__ */ Object.create(null);
+    var _loop_1 = /* @__PURE__ */ __name(function(i2) {
+      if (m[i2] === void 0)
+        return "continue";
+      var key = keys[i2 - 1];
+      if (key.modifier === "*" || key.modifier === "+") {
+        params[key.name] = m[i2].split(key.prefix + key.suffix).map(function(value) {
+          return decode(value, key);
+        });
+      } else {
+        params[key.name] = decode(m[i2], key);
+      }
+    }, "_loop_1");
+    for (var i = 1; i < m.length; i++) {
+      _loop_1(i);
+    }
+    return { path, index, params };
+  };
+}
+__name(regexpToFunction, "regexpToFunction");
+function escapeString(str) {
+  return str.replace(/([.+*?=^!:${}()[\]|/\\])/g, "\\$1");
+}
+__name(escapeString, "escapeString");
+function flags(options) {
+  return options && options.sensitive ? "" : "i";
+}
+__name(flags, "flags");
+function regexpToRegexp(path, keys) {
+  if (!keys)
+    return path;
+  var groupsRegex = /\((?:\?<(.*?)>)?(?!\?)/g;
+  var index = 0;
+  var execResult = groupsRegex.exec(path.source);
+  while (execResult) {
+    keys.push({
+      // Use parenthesized substring match if available, index otherwise
+      name: execResult[1] || index++,
+      prefix: "",
+      suffix: "",
+      modifier: "",
+      pattern: ""
+    });
+    execResult = groupsRegex.exec(path.source);
+  }
+  return path;
+}
+__name(regexpToRegexp, "regexpToRegexp");
+function arrayToRegexp(paths, keys, options) {
+  var parts = paths.map(function(path) {
+    return pathToRegexp(path, keys, options).source;
+  });
+  return new RegExp("(?:".concat(parts.join("|"), ")"), flags(options));
+}
+__name(arrayToRegexp, "arrayToRegexp");
+function stringToRegexp(path, keys, options) {
+  return tokensToRegexp(parse(path, options), keys, options);
+}
+__name(stringToRegexp, "stringToRegexp");
+function tokensToRegexp(tokens, keys, options) {
+  if (options === void 0) {
+    options = {};
+  }
+  var _a = options.strict, strict = _a === void 0 ? false : _a, _b = options.start, start = _b === void 0 ? true : _b, _c = options.end, end = _c === void 0 ? true : _c, _d = options.encode, encode = _d === void 0 ? function(x) {
+    return x;
+  } : _d, _e = options.delimiter, delimiter = _e === void 0 ? "/#?" : _e, _f = options.endsWith, endsWith = _f === void 0 ? "" : _f;
+  var endsWithRe = "[".concat(escapeString(endsWith), "]|$");
+  var delimiterRe = "[".concat(escapeString(delimiter), "]");
+  var route = start ? "^" : "";
+  for (var _i = 0, tokens_1 = tokens; _i < tokens_1.length; _i++) {
+    var token = tokens_1[_i];
+    if (typeof token === "string") {
+      route += escapeString(encode(token));
+    } else {
+      var prefix = escapeString(encode(token.prefix));
+      var suffix = escapeString(encode(token.suffix));
+      if (token.pattern) {
+        if (keys)
+          keys.push(token);
+        if (prefix || suffix) {
+          if (token.modifier === "+" || token.modifier === "*") {
+            var mod = token.modifier === "*" ? "?" : "";
+            route += "(?:".concat(prefix, "((?:").concat(token.pattern, ")(?:").concat(suffix).concat(prefix, "(?:").concat(token.pattern, "))*)").concat(suffix, ")").concat(mod);
+          } else {
+            route += "(?:".concat(prefix, "(").concat(token.pattern, ")").concat(suffix, ")").concat(token.modifier);
+          }
+        } else {
+          if (token.modifier === "+" || token.modifier === "*") {
+            throw new TypeError('Can not repeat "'.concat(token.name, '" without a prefix and suffix'));
+          }
+          route += "(".concat(token.pattern, ")").concat(token.modifier);
+        }
+      } else {
+        route += "(?:".concat(prefix).concat(suffix, ")").concat(token.modifier);
+      }
+    }
+  }
+  if (end) {
+    if (!strict)
+      route += "".concat(delimiterRe, "?");
+    route += !options.endsWith ? "$" : "(?=".concat(endsWithRe, ")");
+  } else {
+    var endToken = tokens[tokens.length - 1];
+    var isEndDelimited = typeof endToken === "string" ? delimiterRe.indexOf(endToken[endToken.length - 1]) > -1 : endToken === void 0;
+    if (!strict) {
+      route += "(?:".concat(delimiterRe, "(?=").concat(endsWithRe, "))?");
+    }
+    if (!isEndDelimited) {
+      route += "(?=".concat(delimiterRe, "|").concat(endsWithRe, ")");
+    }
+  }
+  return new RegExp(route, flags(options));
+}
+__name(tokensToRegexp, "tokensToRegexp");
+function pathToRegexp(path, keys, options) {
+  if (path instanceof RegExp)
+    return regexpToRegexp(path, keys);
+  if (Array.isArray(path))
+    return arrayToRegexp(path, keys, options);
+  return stringToRegexp(path, keys, options);
+}
+__name(pathToRegexp, "pathToRegexp");
+
+// ../../../AppData/Local/npm-cache/_npx/32026684e21afda6/node_modules/wrangler/templates/pages-template-worker.ts
+var escapeRegex = /[.+?^${}()|[\]\\]/g;
+function* executeRequest(request) {
+  const requestPath = new URL(request.url).pathname;
+  for (const route of [...routes].reverse()) {
+    if (route.method && route.method !== request.method) {
+      continue;
+    }
+    const routeMatcher = match(route.routePath.replace(escapeRegex, "\\$&"), {
+      end: false
+    });
+    const mountMatcher = match(route.mountPath.replace(escapeRegex, "\\$&"), {
+      end: false
+    });
+    const matchResult = routeMatcher(requestPath);
+    const mountMatchResult = mountMatcher(requestPath);
+    if (matchResult && mountMatchResult) {
+      for (const handler of route.middlewares.flat()) {
+        yield {
+          handler,
+          params: matchResult.params,
+          path: mountMatchResult.path
+        };
+      }
+    }
+  }
+  for (const route of routes) {
+    if (route.method && route.method !== request.method) {
+      continue;
+    }
+    const routeMatcher = match(route.routePath.replace(escapeRegex, "\\$&"), {
+      end: true
+    });
+    const mountMatcher = match(route.mountPath.replace(escapeRegex, "\\$&"), {
+      end: false
+    });
+    const matchResult = routeMatcher(requestPath);
+    const mountMatchResult = mountMatcher(requestPath);
+    if (matchResult && mountMatchResult && route.modules.length) {
+      for (const handler of route.modules.flat()) {
+        yield {
+          handler,
+          params: matchResult.params,
+          path: matchResult.path
+        };
+      }
+      break;
+    }
+  }
+}
+__name(executeRequest, "executeRequest");
+var pages_template_worker_default = {
+  async fetch(originalRequest, env, workerContext) {
+    let request = originalRequest;
+    const handlerIterator = executeRequest(request);
+    let data = {};
+    let isFailOpen = false;
+    const next = /* @__PURE__ */ __name(async (input, init) => {
+      if (input !== void 0) {
+        let url = input;
+        if (typeof input === "string") {
+          url = new URL(input, request.url).toString();
+        }
+        request = new Request(url, init);
+      }
+      const result = handlerIterator.next();
+      if (result.done === false) {
+        const { handler, params, path } = result.value;
+        const context = {
+          request: new Request(request.clone()),
+          functionPath: path,
+          next,
+          params,
+          get data() {
+            return data;
+          },
+          set data(value) {
+            if (typeof value !== "object" || value === null) {
+              throw new Error("context.data must be an object");
+            }
+            data = value;
+          },
+          env,
+          waitUntil: workerContext.waitUntil.bind(workerContext),
+          passThroughOnException: /* @__PURE__ */ __name(() => {
+            isFailOpen = true;
+          }, "passThroughOnException")
+        };
+        const response = await handler(context);
+        if (!(response instanceof Response)) {
+          throw new Error("Your Pages function should return a Response");
+        }
+        return cloneResponse(response);
+      } else if ("ASSETS") {
+        const response = await env["ASSETS"].fetch(request);
+        return cloneResponse(response);
+      } else {
+        const response = await fetch(request);
+        return cloneResponse(response);
+      }
+    }, "next");
+    try {
+      return await next();
+    } catch (error) {
+      if (isFailOpen) {
+        const response = await env["ASSETS"].fetch(request);
+        return cloneResponse(response);
+      }
+      throw error;
+    }
+  }
+};
+var cloneResponse = /* @__PURE__ */ __name((response) => (
+  // https://fetch.spec.whatwg.org/#null-body-status
+  new Response(
+    [101, 204, 205, 304].includes(response.status) ? null : response.body,
+    response
+  )
+), "cloneResponse");
+export {
+  pages_template_worker_default as default
+};
+
+------formdata-undici-097173317248--
