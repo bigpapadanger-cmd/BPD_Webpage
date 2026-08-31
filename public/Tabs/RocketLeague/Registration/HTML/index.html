@@ -5,17 +5,11 @@
         novalidate
     >
         <header class="registration-intro">
-            <span class="registration-eyebrow">
-                BPD GAMING NETWORK
-            </span>
+            <span class="registration-eyebrow" data-copy="eyebrow"></span>
 
-            <h1 id="rlRegistrationTitle">
-                Complete Your Rocket League Profile
-            </h1>
+            <h1 id="rlRegistrationTitle" data-copy="title"></h1>
 
-            <p>
-                Confirm your Epic account details and tell us how and when you prefer to play.
-            </p>
+            <p data-copy="intro"></p>
         </header>
 
         <div
@@ -33,82 +27,60 @@
             aria-live="polite"
             hidden
         >
-            <strong>
-                Profile service temporarily unavailable
-            </strong>
-
-            <span>
-                Your Epic sign-in is still active. You can continue filling out this form.
-                If profile storage is unavailable, your entries will be preserved in this browser
-                so you can retry later.
-            </span>
+            <strong data-copy="backendWarningTitle"></strong>
+            <span data-copy="backendWarningBody"></span>
         </div>
 
         <fieldset class="form-section epic-section">
-            <legend>
-                Epic account
-            </legend>
+            <legend data-copy="epicLegend"></legend>
 
-            <p class="section-description">
-                These fields come from your authenticated Epic Games session.
-            </p>
+            <p class="section-description" data-copy="epicDescription"></p>
 
             <div class="field-grid two-columns">
                 <label class="form-field">
                     <span>
-                        Epic user
+                        <span data-copy="epicUserLabel"></span>
+                        <span class="required-mark" aria-hidden="true">*</span>
                     </span>
 
                     <input
                         id="epicDisplayName"
                         name="epicDisplayName"
                         type="text"
-                        value="Loading…"
                         readonly
                     >
                 </label>
 
                 <label class="form-field">
-                    <span>
-                        Platform
-                    </span>
+                    <span data-copy="platformLabel"></span>
 
                     <input
                         id="epicPlatform"
                         name="epicPlatform"
                         type="text"
-                        value="Epic Games"
                         readonly
                     >
                 </label>
 
                 <label class="form-field">
-                    <span>
-                        Approximate location
-                    </span>
+                    <span data-copy="locationLabel"></span>
 
                     <input
                         id="detectedLocation"
                         name="detectedLocation"
                         type="text"
-                        value="Detecting…"
                         readonly
                     >
 
-                    <small>
-                        Estimated from your connection location.
-                    </small>
+                    <small data-copy="locationHelp"></small>
                 </label>
 
                 <label class="form-field">
-                    <span>
-                        Time zone
-                    </span>
+                    <span data-copy="timezoneLabel"></span>
 
                     <input
                         id="timezoneDisplay"
                         type="text"
-                        value="Detecting…"
                         readonly
                     >
 
@@ -122,9 +94,7 @@
         </fieldset>
 
         <fieldset class="form-section eligibility-section">
-            <legend>
-                Eligibility
-            </legend>
+            <legend data-copy="eligibilityLegend"></legend>
 
             <label class="confirmation-row">
                 <input
@@ -135,21 +105,20 @@
                 >
 
                 <span>
-                    I confirm that I am 18 or older, meet the applicable league age in my
-                    place of residence, or have permission from my parent or legal guardian.
+                    <span data-copy="eligibilityText"></span>
+                    <span class="required-mark" aria-hidden="true">*</span>
                 </span>
             </label>
         </fieldset>
 
         <fieldset class="form-section">
-            <legend>
-                Player profile
-            </legend>
+            <legend data-copy="playerProfileLegend"></legend>
 
             <div class="field-grid two-columns">
                 <label class="form-field">
                     <span>
-                        Display name
+                        <span data-copy="displayNameLabel"></span>
+                        <span class="required-mark" aria-hidden="true">*</span>
                     </span>
 
                     <input
@@ -161,14 +130,13 @@
                         required
                     >
 
-                    <small>
-                        This is the name other BPD players will see.
-                    </small>
+                    <small data-copy="displayNameHelp"></small>
                 </label>
 
                 <label class="form-field">
                     <span>
-                        Current rank
+                        <span data-copy="rankLabel"></span>
+                        <span class="required-mark" aria-hidden="true">*</span>
                     </span>
 
                     <select
@@ -176,52 +144,37 @@
                         name="currentRank"
                         required
                     >
-                        <option value="">
-                            Select your current rank
-                        </option>
-
+                        <option value="" data-copy-option="rankPlaceholder"></option>
                         <option value="unranked">Unranked</option>
-
                         <option value="bronze-1">Bronze I</option>
                         <option value="bronze-2">Bronze II</option>
                         <option value="bronze-3">Bronze III</option>
-
                         <option value="silver-1">Silver I</option>
                         <option value="silver-2">Silver II</option>
                         <option value="silver-3">Silver III</option>
-
                         <option value="gold-1">Gold I</option>
                         <option value="gold-2">Gold II</option>
                         <option value="gold-3">Gold III</option>
-
                         <option value="platinum-1">Platinum I</option>
                         <option value="platinum-2">Platinum II</option>
                         <option value="platinum-3">Platinum III</option>
-
                         <option value="diamond-1">Diamond I</option>
                         <option value="diamond-2">Diamond II</option>
                         <option value="diamond-3">Diamond III</option>
-
                         <option value="champion-1">Champion I</option>
                         <option value="champion-2">Champion II</option>
                         <option value="champion-3">Champion III</option>
-
                         <option value="grand-champion-1">Grand Champion I</option>
                         <option value="grand-champion-2">Grand Champion II</option>
                         <option value="grand-champion-3">Grand Champion III</option>
-
                         <option value="supersonic-legend">Supersonic Legend</option>
                     </select>
 
-                    <small>
-                        Self-reported during registration. You can update it later.
-                    </small>
+                    <small data-copy="rankHelp"></small>
                 </label>
 
                 <div class="form-field toggle-field">
-                    <span>
-                        Online status
-                    </span>
+                    <span data-copy="onlineStatusLabel"></span>
 
                     <label
                         class="toggle-row"
@@ -233,36 +186,30 @@
                             type="checkbox"
                         >
 
-                        <span
-                            class="toggle-control"
-                            aria-hidden="true"
-                        ></span>
+                        <span class="toggle-control" aria-hidden="true"></span>
 
-                        <span>
-                            Allow other players to see when I am online
-                        </span>
+                        <span data-copy="onlineStatusText"></span>
                     </label>
 
-                    <small>
-                        Disabled by default.
-                    </small>
+                    <small data-copy="onlineStatusHelp"></small>
                 </div>
             </div>
         </fieldset>
 
         <fieldset class="form-section">
-            <legend>
-                Contact information
-            </legend>
+            <legend data-copy="contactLegend"></legend>
 
-            <p class="section-description">
-                Enter the contact methods you want available, then choose your preferred method.
-            </p>
+            <p class="section-description" data-copy="contactDescription"></p>
 
             <div class="field-grid two-columns">
                 <label class="form-field">
                     <span>
-                        Email address
+                        <span data-copy="emailLabel"></span>
+                        <span
+                            id="emailRequiredMark"
+                            class="required-mark"
+                            aria-hidden="true"
+                        >*</span>
                     </span>
 
                     <input
@@ -276,7 +223,13 @@
 
                 <label class="form-field">
                     <span>
-                        Phone number
+                        <span data-copy="phoneLabel"></span>
+                        <span
+                            id="phoneRequiredMark"
+                            class="required-mark"
+                            aria-hidden="true"
+                            hidden
+                        >*</span>
                     </span>
 
                     <input
@@ -291,57 +244,52 @@
             </div>
 
             <span class="field-label">
-                Preferred contact method
+                <span data-copy="contactMethodLabel"></span>
+                <span class="required-mark" aria-hidden="true">*</span>
             </span>
 
             <div
-                class="choice-row"
+                class="choice-row contact-method-row"
                 role="radiogroup"
                 aria-label="Preferred contact method"
             >
-                <label class="choice-card">
+                <label class="choice-card" data-choice-value="email">
                     <input
                         name="contactMethod"
                         type="radio"
                         value="email"
                         checked
                     >
-
-                    <span>
-                        Email
-                    </span>
+                    <span data-copy="contactEmail"></span>
                 </label>
 
-                <label class="choice-card">
+                <label class="choice-card" data-choice-value="phone">
                     <input
                         name="contactMethod"
                         type="radio"
                         value="phone"
                     >
-
-                    <span>
-                        Phone
-                    </span>
+                    <span data-copy="contactPhone"></span>
                 </label>
 
-                <label class="choice-card">
+                <label class="choice-card" data-choice-value="both">
                     <input
                         name="contactMethod"
                         type="radio"
                         value="both"
                     >
-
-                    <span>
-                        Both
-                    </span>
+                    <span data-copy="contactBoth"></span>
                 </label>
             </div>
         </fieldset>
 
         <fieldset class="form-section">
-            <legend>
-                Preferred mode
-            </legend>
+            <legend data-copy="modeLegend"></legend>
+
+            <span class="field-label inline-required">
+                <span data-copy="modeLabel"></span>
+                <span class="required-mark" aria-hidden="true">*</span>
+            </span>
 
             <div
                 class="choice-grid"
@@ -349,49 +297,28 @@
                 aria-label="Preferred Rocket League mode"
             >
                 <label class="choice-card">
-                    <input
-                        name="preferredMode"
-                        type="radio"
-                        value="1s"
-                        required
-                    >
+                    <input name="preferredMode" type="radio" value="1s" required>
                     <span>1s</span>
                 </label>
 
                 <label class="choice-card">
-                    <input
-                        name="preferredMode"
-                        type="radio"
-                        value="2s"
-                    >
+                    <input name="preferredMode" type="radio" value="2s">
                     <span>2s</span>
                 </label>
 
                 <label class="choice-card">
-                    <input
-                        name="preferredMode"
-                        type="radio"
-                        value="3s"
-                    >
+                    <input name="preferredMode" type="radio" value="3s">
                     <span>3s</span>
                 </label>
 
                 <label class="choice-card">
-                    <input
-                        name="preferredMode"
-                        type="radio"
-                        value="customs"
-                    >
-                    <span>Customs</span>
+                    <input name="preferredMode" type="radio" value="customs">
+                    <span data-copy="modeCustoms"></span>
                 </label>
 
                 <label class="choice-card">
-                    <input
-                        name="preferredMode"
-                        type="radio"
-                        value="other"
-                    >
-                    <span>Other</span>
+                    <input name="preferredMode" type="radio" value="other">
+                    <span data-copy="modeOther"></span>
                 </label>
             </div>
 
@@ -401,7 +328,8 @@
                 hidden
             >
                 <span>
-                    Describe your preferred mode
+                    <span data-copy="otherModeLabel"></span>
+                    <span class="required-mark" aria-hidden="true">*</span>
                 </span>
 
                 <input
@@ -414,13 +342,11 @@
         </fieldset>
 
         <fieldset class="form-section">
-            <legend>
-                Weekly availability
-            </legend>
+            <legend data-copy="availabilityLegend"></legend>
 
             <p class="section-description">
-                Select the days and normal play window for each day. Times are available
-                in 30-minute increments from 5:00 PM through 10:00 PM in your local time zone.
+                <span data-copy="availabilityDescription"></span>
+                <span class="required-mark" aria-hidden="true">*</span>
             </p>
 
             <div
@@ -430,103 +356,130 @@
         </fieldset>
 
         <fieldset class="form-section">
-            <legend>
-                Match reminders
-            </legend>
+            <legend data-copy="notificationsLegend"></legend>
 
-            <label
-                class="toggle-row"
-                for="matchReminders"
-            >
-                <input
-                    id="matchReminders"
-                    name="matchReminders"
-                    type="checkbox"
-                >
-
-                <span
-                    class="toggle-control"
-                    aria-hidden="true"
-                ></span>
-
-                <span>
-                    Send reminders for scheduled matches
+            <div class="notification-setting">
+                <span class="field-label">
+                    <span data-copy="notificationsLabel"></span>
+                    <span class="required-mark" aria-hidden="true">*</span>
                 </span>
-            </label>
+
+                <div
+                    class="choice-row notification-choice-row"
+                    role="radiogroup"
+                    aria-label="Match notifications"
+                >
+                    <label class="choice-card">
+                        <input
+                            name="notificationsEnabled"
+                            type="radio"
+                            value="true"
+                            checked
+                            required
+                        >
+                        <span data-copy="notificationsOn"></span>
+                    </label>
+
+                    <label class="choice-card warning-choice">
+                        <input
+                            name="notificationsEnabled"
+                            type="radio"
+                            value="false"
+                        >
+                        <span data-copy="notificationsOff"></span>
+                    </label>
+                </div>
+            </div>
+
+            <div
+                id="notificationOptOutWarning"
+                class="inline-warning"
+                role="alert"
+                hidden
+            >
+                <strong data-copy="notificationOptOutTitle"></strong>
+                <span data-copy="notificationOptOutBody"></span>
+            </div>
 
             <div
                 id="reminderOptions"
                 class="reminder-options"
-                hidden
             >
                 <span class="field-label">
-                    Reminder lead time
+                    <span data-copy="reminderModeLabel"></span>
+                    <span class="required-mark" aria-hidden="true">*</span>
                 </span>
 
-                <div class="choice-row">
+                <div
+                    class="choice-row reminder-mode-row"
+                    role="radiogroup"
+                    aria-label="Reminder timing"
+                >
                     <label class="choice-card">
                         <input
-                            name="reminderTiming"
+                            name="reminderMode"
                             type="radio"
                             value="24-hours"
+                            checked
+                            required
                         >
-
-                        <span>
-                            24 hours before
-                        </span>
+                        <span data-copy="reminder24"></span>
                     </label>
 
                     <label class="choice-card">
                         <input
-                            name="reminderTiming"
+                            name="reminderMode"
                             type="radio"
                             value="1-hour"
                         >
-
-                        <span>
-                            1 hour before
-                        </span>
+                        <span data-copy="reminder1"></span>
                     </label>
 
                     <label class="choice-card">
                         <input
-                            name="reminderTiming"
+                            name="reminderMode"
                             type="radio"
                             value="both"
                         >
+                        <span data-copy="reminderBoth"></span>
+                    </label>
 
-                        <span>
-                            Both
-                        </span>
+                    <label class="choice-card">
+                        <input
+                            name="reminderMode"
+                            type="radio"
+                            value="specific-times"
+                        >
+                        <span data-copy="reminderSpecific"></span>
                     </label>
                 </div>
 
-                <div class="reminder-window-heading">
-                    <strong>
-                        Preferred reminder delivery times
-                    </strong>
+                <div
+                    id="specificReminderTimes"
+                    class="specific-reminder-times"
+                    hidden
+                >
+                    <div class="reminder-window-heading">
+                        <strong data-copy="specificTimesTitle"></strong>
+                        <span data-copy="specificTimesBody"></span>
+                    </div>
 
-                    <span>
-                        Pick any 30-minute time slots from 5:00 PM through 10:00 PM for each day.
-                    </span>
+                    <div
+                        id="reminderTimeSlots"
+                        class="reminder-slot-grid reminder-slot-grid-24h"
+                    ></div>
                 </div>
 
-                <div
-                    id="reminderScheduleRows"
-                    class="reminder-schedule-list"
-                ></div>
+                <div class="reminder-note">
+                    <strong data-copy="reminderNoteTitle"></strong>
+                    <span data-copy="reminderNoteBody"></span>
+                </div>
             </div>
         </fieldset>
 
         <aside class="post-registration-note">
-            <strong>
-                More settings are available after registration.
-            </strong>
-
-            <span>
-                Once your profile is created, open your Player Profile to configure additional
-                matchmaking, privacy, contact, reminder, and profile options.
-            </span>
+            <strong data-copy="moreSettingsTitle"></strong>
+            <span data-copy="moreSettingsBody"></span>
         </aside>
 
         <div class="form-actions">
@@ -534,13 +487,46 @@
                 id="registrationSubmit"
                 class="primary-button"
                 type="submit"
-            >
-                Complete Registration
-            </button>
+                data-copy="submitButton"
+            ></button>
 
-            <p>
-                Required fields must be completed before registration can finish.
-            </p>
+            <p data-copy="requiredFooter"></p>
         </div>
     </form>
+
+    <div
+        id="notificationOptOutModal"
+        class="registration-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="notificationOptOutModalTitle"
+        hidden
+    >
+        <div class="registration-modal-backdrop" data-modal-close></div>
+
+        <div class="registration-modal-card">
+            <strong
+                id="notificationOptOutModalTitle"
+                data-copy="notificationModalTitle"
+            ></strong>
+
+            <p data-copy="notificationModalBody"></p>
+
+            <div class="registration-modal-actions">
+                <button
+                    id="keepNotificationsButton"
+                    class="secondary-button"
+                    type="button"
+                    data-copy="keepNotificationsButton"
+                ></button>
+
+                <button
+                    id="confirmNotificationsOffButton"
+                    class="danger-button"
+                    type="button"
+                    data-copy="confirmNotificationsOffButton"
+                ></button>
+            </div>
+        </div>
+    </div>
 </section>

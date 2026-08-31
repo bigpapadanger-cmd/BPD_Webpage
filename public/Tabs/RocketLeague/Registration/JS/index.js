@@ -1,13 +1,84 @@
 "use strict";
 
-const ROCKET_LEAGUE_PROFILE_URL =
-    "/api/auth/rocketleague/profile";
+const ROCKET_LEAGUE_PROFILE_URL = "/api/auth/rocketleague/profile";
+const ROCKET_LEAGUE_PROFILE_UPDATE_URL = "/api/auth/rocketleague/profile";
+const REGISTRATION_DRAFT_KEY = "bpdRocketLeagueRegistrationDraft";
 
-const ROCKET_LEAGUE_PROFILE_UPDATE_URL =
-    "/api/auth/rocketleague/profile";
-
-const REGISTRATION_DRAFT_KEY =
-    "bpdRocketLeagueRegistrationDraft";
+const REGISTRATION_CONFIG = {
+    copy: {
+        eyebrow: "BPD GAMING NETWORK",
+        title: "Complete Your Rocket League Profile",
+        intro: "Confirm your Epic account details and tell us how and when you prefer to play.",
+        backendWarningTitle: "Profile service temporarily unavailable",
+        backendWarningBody: "Your Epic sign-in is still active. You can continue filling out this form. If profile storage is unavailable, your entries will be preserved in this browser so you can retry later.",
+        epicLegend: "Epic account",
+        epicDescription: "These fields come from your authenticated Epic Games session.",
+        epicUserLabel: "Epic user",
+        platformLabel: "Platform",
+        locationLabel: "Approximate location",
+        locationHelp: "Estimated from your connection location.",
+        timezoneLabel: "Time zone",
+        eligibilityLegend: "Eligibility",
+        eligibilityText: "I confirm that I am 18 or older, meet the applicable league age in my place of residence, or have permission from my parent or legal guardian.",
+        playerProfileLegend: "Player profile",
+        displayNameLabel: "Display name",
+        displayNameHelp: "This is the name other BPD players will see.",
+        rankLabel: "Current rank",
+        rankPlaceholder: "Select your current rank",
+        rankHelp: "Self-reported during registration. You can update it later.",
+        onlineStatusLabel: "Online status",
+        onlineStatusText: "Allow other players to see when I am online",
+        onlineStatusHelp: "Disabled by default.",
+        contactLegend: "Contact information",
+        contactDescription: "Enter the contact methods you want available, then choose your preferred method.",
+        emailLabel: "Email address",
+        phoneLabel: "Phone number",
+        contactMethodLabel: "Preferred contact method",
+        contactEmail: "Email",
+        contactPhone: "Phone",
+        contactBoth: "Both",
+        modeLegend: "Preferred mode",
+        modeLabel: "Choose a preferred mode",
+        modeCustoms: "Customs",
+        modeOther: "Other",
+        otherModeLabel: "Describe your preferred mode",
+        availabilityLegend: "Weekly availability",
+        availabilityDescription: "Select at least one day and a normal play window. Times are available in 30-minute increments from 5:00 PM through 11:00 PM in your local time zone.",
+        notificationsLegend: "Match notifications & reminders",
+        notificationsLabel: "Match notifications",
+        notificationsOn: "Opt in",
+        notificationsOff: "Opt out",
+        notificationOptOutTitle: "Notifications are disabled",
+        notificationOptOutBody: "WARNING: By opting out of match notifications, you are still responsible for joined matches and may be removed from joined matches after missing too many scheduled matches.",
+        reminderModeLabel: "Reminder preference",
+        reminder24: "24 hours before",
+        reminder1: "1 hour before",
+        reminderBoth: "Both",
+        reminderSpecific: "Specific times",
+        specificTimesTitle: "Specific reminder times",
+        specificTimesBody: "Select one or more times from the 24-hour clock. Times are available every 30 minutes.",
+        reminderNoteTitle: "Scheduling note",
+        reminderNoteBody: "Automatic reminders normally run the day before a scheduled match. For Monday matches, the reminder may run earlier to account for weekend scheduling.",
+        moreSettingsTitle: "More settings are available after registration.",
+        moreSettingsBody: "Once your profile is created, open your Player Profile to configure additional matchmaking, privacy, contact, notification, reminder, and profile options.",
+        submitButton: "Complete Registration",
+        requiredFooter: "* Required information must be completed before registration can finish.",
+        notificationModalTitle: "Turn off match notifications?",
+        notificationModalBody: "WARNING: If you opt out, you remain responsible for joined matches. Missing too many scheduled matches may result in removal from joined matches.",
+        keepNotificationsButton: "Keep notifications on",
+        confirmNotificationsOffButton: "Turn notifications off"
+    },
+    availability: {
+        start: "14:30",
+        end: "23:00",
+        incrementMinutes: 30
+    },
+    reminderTimes: {
+        start: "00:00",
+        end: "23:30",
+        incrementMinutes: 30
+    }
+};
 
 const DAYS = [
     "Monday",
@@ -19,20 +90,6 @@ const DAYS = [
     "Sunday"
 ];
 
-const TIME_OPTIONS = [
-    ["17:00", "5:00 PM"],
-    ["17:30", "5:30 PM"],
-    ["18:00", "6:00 PM"],
-    ["18:30", "6:30 PM"],
-    ["19:00", "7:00 PM"],
-    ["19:30", "7:30 PM"],
-    ["20:00", "8:00 PM"],
-    ["20:30", "8:30 PM"],
-    ["21:00", "9:00 PM"],
-    ["21:30", "9:30 PM"],
-    ["22:00", "10:00 PM"]
-];
-
 let currentLocation = {
     city: "",
     region: "",
@@ -41,18 +98,121 @@ let currentLocation = {
     timezone: ""
 };
 
-function createTimeOptions(
-    selectedValue
-) {
-    return TIME_OPTIONS
+let notificationsOptOutConfirmed = false;
+
+// ============================================================
+// DYNAMIC COPY
+// ============================================================
+
+function applyDynamicCopy() {
+    document.querySelectorAll("[data-copy]").forEach((element) => {
+        const key = element.dataset.copy;
+        if (
+            key &&
+            Object.prototype.hasOwnProperty.call(
+                REGISTRATION_CONFIG.copy,
+                key
+            )
+        ) {
+            element.textContent = REGISTRATION_CONFIG.copy[key];
+        }
+    });
+
+    document.querySelectorAll("[data-copy-option]").forEach((element) => {
+        const key = element.dataset.copyOption;
+        if (
+            key &&
+            Object.prototype.hasOwnProperty.call(
+                REGISTRATION_CONFIG.copy,
+                key
+            )
+        ) {
+            element.textContent = REGISTRATION_CONFIG.copy[key];
+        }
+    });
+}
+
+// ============================================================
+// TIME HELPERS
+// ============================================================
+
+function timeToMinutes(value) {
+    const [hours, minutes] = String(value).split(":").map(Number);
+    return (hours * 60) + minutes;
+}
+
+function minutesToTime(totalMinutes) {
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+
+    return (
+        String(hours).padStart(2, "0") +
+        ":" +
+        String(minutes).padStart(2, "0")
+    );
+}
+
+function formatTimeLabel(value) {
+    const [hourValue, minuteValue] = String(value).split(":").map(Number);
+
+    const suffix = hourValue >= 12
+        ? "PM"
+        : "AM";
+
+    const displayHour = hourValue % 12 === 0
+        ? 12
+        : hourValue % 12;
+
+    return (
+        `${displayHour}:` +
+        String(minuteValue).padStart(2, "0") +
+        ` ${suffix}`
+    );
+}
+
+function buildTimeOptions(start, end, incrementMinutes) {
+    const options = [];
+    const startMinutes = timeToMinutes(start);
+    const endMinutes = timeToMinutes(end);
+
+    for (
+        let minute = startMinutes;
+        minute <= endMinutes;
+        minute += incrementMinutes
+    ) {
+        const value = minutesToTime(minute);
+
+        options.push([
+            value,
+            formatTimeLabel(value)
+        ]);
+    }
+
+    return options;
+}
+
+function getAvailabilityTimeOptions() {
+    return buildTimeOptions(
+        REGISTRATION_CONFIG.availability.start,
+        REGISTRATION_CONFIG.availability.end,
+        REGISTRATION_CONFIG.availability.incrementMinutes
+    );
+}
+
+function getReminderTimeOptions() {
+    return buildTimeOptions(
+        REGISTRATION_CONFIG.reminderTimes.start,
+        REGISTRATION_CONFIG.reminderTimes.end,
+        REGISTRATION_CONFIG.reminderTimes.incrementMinutes
+    );
+}
+
+function createTimeOptions(options, selectedValue) {
+    return options
         .map(([value, label]) => `
             <option
                 value="${value}"
-                ${
-                    value === selectedValue
-                        ? "selected"
-                        : ""
-                }
+                ${value === selectedValue ? "selected" : ""}
             >
                 ${label}
             </option>
@@ -60,91 +220,83 @@ function createTimeOptions(
         .join("");
 }
 
+// ============================================================
+// AVAILABILITY
+// ============================================================
+
 function renderAvailabilityRows() {
-    const container =
-        document.getElementById(
-            "availabilityRows"
-        );
+    const container = document.getElementById("availabilityRows");
 
     if (!container) {
         return;
     }
 
-    container.innerHTML =
-        DAYS
-            .map((day) => {
-                const key =
-                    day.toLowerCase();
+    const timeOptions = getAvailabilityTimeOptions();
+    const defaultStart = REGISTRATION_CONFIG.availability.start;
+    const defaultEnd = REGISTRATION_CONFIG.availability.end;
 
-                return `
-                    <div
-                        class="availability-row"
-                        data-day="${key}"
+    container.innerHTML = DAYS.map((day) => {
+        const key = day.toLowerCase();
+
+        return `
+            <div
+                class="availability-row"
+                data-day="${key}"
+            >
+                <label class="availability-day">
+                    <input
+                        type="checkbox"
+                        name="availableDays"
+                        value="${key}"
                     >
-                        <label class="availability-day">
-                            <input
-                                type="checkbox"
-                                name="availableDays"
-                                value="${key}"
-                            >
-                            <span>
-                                ${day}
-                            </span>
-                        </label>
+                    <span>
+                        ${day}
+                    </span>
+                </label>
 
-                        <select
-                            class="availability-time"
-                            name="${key}Start"
-                            aria-label="${day} start time"
-                            disabled
-                        >
-                            ${createTimeOptions(
-                                "17:00"
-                            )}
-                        </select>
+                <select
+                    class="availability-time"
+                    name="${key}Start"
+                    aria-label="${day} start time"
+                    disabled
+                >
+                    ${createTimeOptions(
+                        timeOptions,
+                        defaultStart
+                    )}
+                </select>
 
-                        <span class="availability-separator">
-                            to
-                        </span>
+                <span class="availability-separator">
+                    to
+                </span>
 
-                        <select
-                            class="availability-time"
-                            name="${key}End"
-                            aria-label="${day} end time"
-                            disabled
-                        >
-                            ${createTimeOptions(
-                                "22:00"
-                            )}
-                        </select>
-                    </div>
-                `;
-            })
-            .join("");
+                <select
+                    class="availability-time"
+                    name="${key}End"
+                    aria-label="${day} end time"
+                    disabled
+                >
+                    ${createTimeOptions(
+                        timeOptions,
+                        defaultEnd
+                    )}
+                </select>
+            </div>
+        `;
+    }).join("");
 
     container
-        .querySelectorAll(
-            'input[name="availableDays"]'
-        )
+        .querySelectorAll('input[name="availableDays"]')
         .forEach((checkbox) => {
             checkbox.addEventListener(
                 "change",
-                () => {
-                    updateAvailabilityRow(
-                        checkbox
-                    );
-                }
+                () => updateAvailabilityRow(checkbox)
             );
         });
 }
 
-function updateAvailabilityRow(
-    checkbox
-) {
-    const row =
-        checkbox.closest(
-            ".availability-row"
-        );
+function updateAvailabilityRow(checkbox) {
+    const row = checkbox.closest(".availability-row");
 
     if (!row) {
         return;
@@ -155,95 +307,168 @@ function updateAvailabilityRow(
         checkbox.checked
     );
 
-    row
-        .querySelectorAll(
-            "select"
-        )
-        .forEach((select) => {
-            select.disabled =
-                !checkbox.checked;
-        });
+    row.querySelectorAll("select").forEach((select) => {
+        select.disabled = !checkbox.checked;
+    });
 }
 
-function renderReminderScheduleRows() {
-    const container =
-        document.getElementById(
-            "reminderScheduleRows"
-        );
+function getAvailability() {
+    return [
+        ...document.querySelectorAll(
+            ".availability-row.enabled"
+        )
+    ].map((row) => ({
+        day: row.dataset.day,
+        start:
+            row.querySelector(
+                'select[name$="Start"]'
+            )?.value || "",
+        end:
+            row.querySelector(
+                'select[name$="End"]'
+            )?.value || ""
+    }));
+}
 
-    if (!container) {
+function populateAvailability(availability) {
+    document
+        .querySelectorAll(
+            'input[name="availableDays"]'
+        )
+        .forEach((checkbox) => {
+            checkbox.checked = false;
+            updateAvailabilityRow(checkbox);
+        });
+
+    if (!Array.isArray(availability)) {
         return;
     }
 
-    container.innerHTML =
-        DAYS
-            .map((day) => {
-                const key =
-                    day.toLowerCase();
+    availability.forEach((item) => {
+        const day = String(
+            item?.day || ""
+        )
+            .trim()
+            .toLowerCase();
 
-                const slots =
-                    TIME_OPTIONS
-                        .map(([value, label]) => `
-                            <label class="reminder-slot">
-                                <input
-                                    type="checkbox"
-                                    name="reminderSlot"
-                                    value="${key}|${value}"
-                                >
-                                <span>
-                                    ${label}
-                                </span>
-                            </label>
-                        `)
-                        .join("");
+        if (!day) {
+            return;
+        }
 
-                return `
-                    <div
-                        class="reminder-day-row"
-                        data-reminder-day="${key}"
-                    >
-                        <strong>
-                            ${day}
-                        </strong>
+        const row = document.querySelector(
+            `.availability-row[data-day="${CSS.escape(day)}"]`
+        );
 
-                        <div class="reminder-slot-grid">
-                            ${slots}
-                        </div>
-                    </div>
-                `;
-            })
-            .join("");
+        if (!row) {
+            return;
+        }
+
+        const checkbox = row.querySelector(
+            'input[name="availableDays"]'
+        );
+
+        const start = row.querySelector(
+            'select[name$="Start"]'
+        );
+
+        const end = row.querySelector(
+            'select[name$="End"]'
+        );
+
+        if (checkbox) {
+            checkbox.checked = true;
+            updateAvailabilityRow(checkbox);
+        }
+
+        if (
+            start &&
+            item?.start
+        ) {
+            start.value = item.start;
+        }
+
+        if (
+            end &&
+            item?.end
+        ) {
+            end.value = item.end;
+        }
+    });
 }
+
+// ============================================================
+// CONTACT METHOD
+// ============================================================
 
 function updateContactFields() {
     const method =
         document.querySelector(
             'input[name="contactMethod"]:checked'
-        )?.value ||
-        "email";
+        )?.value || "email";
 
-    const email =
+    const email = document.getElementById("email");
+    const phone = document.getElementById("phone");
+
+    const emailMark =
         document.getElementById(
-            "email"
+            "emailRequiredMark"
         );
 
-    const phone =
+    const phoneMark =
         document.getElementById(
-            "phone"
+            "phoneRequiredMark"
         );
+
+    const emailRequired =
+        method === "email" ||
+        method === "both";
+
+    const phoneRequired =
+        method === "phone" ||
+        method === "both";
 
     if (email) {
-        email.required =
-            method === "email" ||
-            method === "both";
+        email.required = emailRequired;
     }
 
     if (phone) {
-        phone.required =
-            method === "phone" ||
-            method === "both";
+        phone.required = phoneRequired;
+    }
+
+    if (emailMark) {
+        emailMark.hidden = !emailRequired;
+    }
+
+    if (phoneMark) {
+        phoneMark.hidden = !phoneRequired;
+    }
+
+    document
+        .querySelectorAll(
+            ".contact-method-row .choice-card"
+        )
+        .forEach((card) => {
+            card.classList.remove(
+                "related-selected"
+            );
+        });
+
+    if (method === "both") {
+        document
+            .querySelectorAll(
+                ".contact-method-row .choice-card"
+            )
+            .forEach((card) => {
+                card.classList.add(
+                    "related-selected"
+                );
+            });
     }
 }
+
+// ============================================================
+// MODE
+// ============================================================
 
 function updateModeField() {
     const mode =
@@ -265,146 +490,202 @@ function updateModeField() {
         mode === "other";
 
     if (field) {
-        field.hidden =
-            !isOther;
+        field.hidden = !isOther;
     }
 
     if (input) {
-        input.required =
-            isOther;
+        input.required = isOther;
 
         if (!isOther) {
-            input.value =
-                "";
+            input.value = "";
         }
     }
 }
 
-function updateReminderOptions() {
-    const checkbox =
+// ============================================================
+// NOTIFICATIONS
+// ============================================================
+
+function getNotificationsEnabled() {
+    return (
+        document.querySelector(
+            'input[name="notificationsEnabled"]:checked'
+        )?.value !== "false"
+    );
+}
+
+function openNotificationOptOutModal() {
+    const modal =
         document.getElementById(
-            "matchReminders"
+            "notificationOptOutModal"
         );
 
-    const options =
+    if (!modal) {
+        return;
+    }
+
+    modal.hidden = false;
+
+    document.body.classList.add(
+        "registration-modal-open"
+    );
+}
+
+function closeNotificationOptOutModal() {
+    const modal =
+        document.getElementById(
+            "notificationOptOutModal"
+        );
+
+    if (!modal) {
+        return;
+    }
+
+    modal.hidden = true;
+
+    document.body.classList.remove(
+        "registration-modal-open"
+    );
+}
+
+function setNotificationsEnabled(enabled) {
+    const value = enabled
+        ? "true"
+        : "false";
+
+    const input = document.querySelector(
+        `input[name="notificationsEnabled"][value="${value}"]`
+    );
+
+    if (input) {
+        input.checked = true;
+    }
+
+    updateNotificationState();
+}
+
+function updateNotificationState() {
+    const enabled =
+        getNotificationsEnabled();
+
+    const warning =
+        document.getElementById(
+            "notificationOptOutWarning"
+        );
+
+    const reminderOptions =
         document.getElementById(
             "reminderOptions"
         );
 
-    if (
-        !checkbox ||
-        !options
-    ) {
-        return;
+    if (warning) {
+        warning.hidden = enabled;
     }
 
-    const enabled =
-        checkbox.checked;
+    if (reminderOptions) {
+        reminderOptions.classList.toggle(
+            "notifications-disabled",
+            !enabled
+        );
 
-    options.hidden =
-        !enabled;
-
-    options
-        .querySelectorAll(
-            'input[name="reminderTiming"]'
-        )
-        .forEach((input) => {
-            input.required =
-                enabled;
-        });
-
-    if (!enabled) {
-        options
-            .querySelectorAll(
-                'input[type="radio"], input[type="checkbox"]'
-            )
+        reminderOptions
+            .querySelectorAll("input")
             .forEach((input) => {
-                input.checked =
-                    false;
+                input.disabled = !enabled;
             });
     }
 }
 
-function getAvailability() {
+function handleNotificationChoiceChange(event) {
+    const input =
+        event.currentTarget;
+
+    if (
+        input.value === "false" &&
+        input.checked &&
+        !notificationsOptOutConfirmed
+    ) {
+        setNotificationsEnabled(true);
+        openNotificationOptOutModal();
+        return;
+    }
+
+    updateNotificationState();
+}
+
+// ============================================================
+// REMINDERS
+// ============================================================
+
+function renderReminderTimeSlots() {
+    const container =
+        document.getElementById(
+            "reminderTimeSlots"
+        );
+
+    if (!container) {
+        return;
+    }
+
+    container.innerHTML =
+        getReminderTimeOptions()
+            .map(([value, label]) => `
+                <label class="reminder-slot">
+                    <input
+                        type="checkbox"
+                        name="specificReminderTime"
+                        value="${value}"
+                    >
+                    <span>
+                        ${label}
+                    </span>
+                </label>
+            `)
+            .join("");
+}
+
+function updateReminderMode() {
+    const mode =
+        document.querySelector(
+            'input[name="reminderMode"]:checked'
+        )?.value || "24-hours";
+
+    const specificTimes =
+        document.getElementById(
+            "specificReminderTimes"
+        );
+
+    if (specificTimes) {
+        specificTimes.hidden =
+            mode !== "specific-times";
+    }
+}
+
+function getSpecificReminderTimes() {
     return [
         ...document.querySelectorAll(
-            ".availability-row.enabled"
+            'input[name="specificReminderTime"]:checked'
         )
-    ].map((row) => ({
-        day:
-            row.dataset.day,
-
-        start:
-            row.querySelector(
-                'select[name$="Start"]'
-            )?.value ||
-            "",
-
-        end:
-            row.querySelector(
-                'select[name$="End"]'
-            )?.value ||
-            ""
-    }));
+    ].map((input) => input.value);
 }
 
-function getReminderSchedule() {
-    const grouped =
-        new Map();
-
+function populateSpecificReminderTimes(times) {
     document
         .querySelectorAll(
-            'input[name="reminderSlot"]:checked'
+            'input[name="specificReminderTime"]'
         )
         .forEach((input) => {
-            const [
-                day,
-                time
-            ] =
-                String(
-                    input.value ||
-                    ""
-                ).split("|");
-
-            if (
-                !day ||
-                !time
-            ) {
-                return;
-            }
-
-            if (
-                !grouped.has(
-                    day
-                )
-            ) {
-                grouped.set(
-                    day,
-                    []
-                );
-            }
-
-            grouped
-                .get(
-                    day
-                )
-                .push(
-                    time
-                );
+            input.checked =
+                Array.isArray(times) &&
+                times.includes(input.value);
         });
-
-    return [
-        ...grouped.entries()
-    ].map(([day, times]) => ({
-        day,
-        times
-    }));
 }
 
-function showMessage(
-    message,
-    state
-) {
+// ============================================================
+// UI HELPERS
+// ============================================================
+
+function showMessage(message, state) {
     const element =
         document.getElementById(
             "registrationMessage"
@@ -414,21 +695,13 @@ function showMessage(
         return;
     }
 
-    element.textContent =
-        message;
-
-    element.dataset.state =
-        state;
-
-    element.hidden =
-        false;
+    element.textContent = message;
+    element.dataset.state = state;
+    element.hidden = false;
 
     element.scrollIntoView({
-        behavior:
-            "smooth",
-
-        block:
-            "center"
+        behavior: "smooth",
+        block: "center"
     });
 }
 
@@ -442,14 +715,9 @@ function hideMessage() {
         return;
     }
 
-    element.hidden =
-        true;
-
-    element.textContent =
-        "";
-
-    element.dataset.state =
-        "";
+    element.hidden = true;
+    element.textContent = "";
+    element.dataset.state = "";
 }
 
 function setBackendWarning(
@@ -465,17 +733,14 @@ function setBackendWarning(
         return;
     }
 
-    element.hidden =
-        !visible;
+    element.hidden = !visible;
 
     if (
         visible &&
         message
     ) {
         const messageElement =
-            element.querySelector(
-                "span"
-            );
+            element.querySelector("span");
 
         if (messageElement) {
             messageElement.textContent =
@@ -484,32 +749,18 @@ function setBackendWarning(
     }
 }
 
-function setInputValue(
-    id,
-    value
-) {
+function setInputValue(id, value) {
     const element =
-        document.getElementById(
-            id
-        );
+        document.getElementById(id);
 
-    if (!element) {
-        return;
+    if (element) {
+        element.value = value ?? "";
     }
-
-    element.value =
-        value ??
-        "";
 }
 
-function setSelectValue(
-    id,
-    value
-) {
+function setSelectValue(id, value) {
     const element =
-        document.getElementById(
-            id
-        );
+        document.getElementById(id);
 
     if (
         !element ||
@@ -520,33 +771,20 @@ function setSelectValue(
         return;
     }
 
-    element.value =
-        String(
-            value
-        );
+    element.value = String(value);
 }
 
-function setCheckboxValue(
-    id,
-    value
-) {
+function setCheckboxValue(id, value) {
     const element =
-        document.getElementById(
-            id
-        );
+        document.getElementById(id);
 
-    if (!element) {
-        return;
+    if (element) {
+        element.checked =
+            value === true;
     }
-
-    element.checked =
-        value === true;
 }
 
-function setRadioValue(
-    name,
-    value
-) {
+function setRadioValue(name, value) {
     if (
         value === null ||
         value === undefined ||
@@ -558,169 +796,18 @@ function setRadioValue(
     const input =
         document.querySelector(
             `input[name="${name}"][value="${CSS.escape(
-                String(
-                    value
-                )
+                String(value)
             )}"]`
         );
 
     if (input) {
-        input.checked =
-            true;
+        input.checked = true;
     }
 }
 
-function clearAvailability() {
-    document
-        .querySelectorAll(
-            'input[name="availableDays"]'
-        )
-        .forEach((checkbox) => {
-            checkbox.checked =
-                false;
-
-            updateAvailabilityRow(
-                checkbox
-            );
-        });
-}
-
-function populateAvailability(
-    availability
-) {
-    clearAvailability();
-
-    if (
-        !Array.isArray(
-            availability
-        )
-    ) {
-        return;
-    }
-
-    availability.forEach(
-        (item) => {
-            const day =
-                String(
-                    item?.day ||
-                    ""
-                )
-                    .trim()
-                    .toLowerCase();
-
-            if (!day) {
-                return;
-            }
-
-            const row =
-                document.querySelector(
-                    `.availability-row[data-day="${CSS.escape(
-                        day
-                    )}"]`
-                );
-
-            if (!row) {
-                return;
-            }
-
-            const checkbox =
-                row.querySelector(
-                    'input[name="availableDays"]'
-                );
-
-            const start =
-                row.querySelector(
-                    'select[name$="Start"]'
-                );
-
-            const end =
-                row.querySelector(
-                    'select[name$="End"]'
-                );
-
-            if (checkbox) {
-                checkbox.checked =
-                    true;
-
-                updateAvailabilityRow(
-                    checkbox
-                );
-            }
-
-            if (
-                start &&
-                item?.start
-            ) {
-                start.value =
-                    item.start;
-            }
-
-            if (
-                end &&
-                item?.end
-            ) {
-                end.value =
-                    item.end;
-            }
-        }
-    );
-}
-
-function populateReminderSchedule(
-    schedule
-) {
-    document
-        .querySelectorAll(
-            'input[name="reminderSlot"]'
-        )
-        .forEach((input) => {
-            input.checked =
-                false;
-        });
-
-    if (
-        !Array.isArray(
-            schedule
-        )
-    ) {
-        return;
-    }
-
-    schedule.forEach(
-        (item) => {
-            const day =
-                String(
-                    item?.day ||
-                    ""
-                )
-                    .trim()
-                    .toLowerCase();
-
-            const times =
-                Array.isArray(
-                    item?.times
-                )
-                    ? item.times
-                    : [];
-
-            times.forEach(
-                (time) => {
-                    const input =
-                        document.querySelector(
-                            `input[name="reminderSlot"][value="${CSS.escape(
-                                `${day}|${time}`
-                            )}"]`
-                        );
-
-                    if (input) {
-                        input.checked =
-                            true;
-                    }
-                }
-            );
-        }
-    );
-}
+// ============================================================
+// LOCATION + PROFILE NORMALIZATION
+// ============================================================
 
 function normalizeLocation(
     result,
@@ -769,8 +856,7 @@ function normalizeProfile(
 ) {
     const profile =
         result?.profile &&
-        typeof result.profile ===
-            "object"
+        typeof result.profile === "object"
             ? result.profile
             : {};
 
@@ -861,100 +947,73 @@ function normalizeProfile(
                 : [],
 
         showOnlineStatus:
-            profile.showOnlineStatus ===
-            true ||
-            profile.show_online_status ===
-            true,
+            profile.showOnlineStatus === true ||
+            profile.show_online_status === true,
 
-        matchReminders:
-            profile.matchReminders ===
-            true ||
-            profile.match_reminders ===
-            true,
+        notificationsEnabled:
+            profile.notificationsEnabled !== false &&
+            profile.notifications_enabled !== false,
 
-        reminderTiming:
+        reminderMode:
+            profile.reminderMode ||
+            profile.reminder_mode ||
             profile.reminderTiming ||
             profile.reminder_timing ||
-            null,
+            "24-hours",
 
-        reminderSchedule:
+        specificReminderTimes:
             Array.isArray(
-                profile.reminderSchedule
+                profile.specificReminderTimes
             )
-                ? profile.reminderSchedule
+                ? profile.specificReminderTimes
                 : Array.isArray(
-                    profile.reminder_schedule
+                    profile.specific_reminder_times
                 )
-                    ? profile.reminder_schedule
+                    ? profile.specific_reminder_times
                     : [],
 
         ageConsent:
-            profile.ageConsent ===
-            true ||
-            profile.age_consent ===
-            true,
+            profile.ageConsent === true ||
+            profile.age_consent === true,
 
         profileComplete:
-            result?.profileComplete ===
-            true ||
-            profile.profileComplete ===
-            true ||
-            profile.profile_complete ===
-            true
+            result?.profileComplete === true ||
+            profile.profileComplete === true ||
+            profile.profile_complete === true
     };
 }
 
-function formatLocation(
-    location
-) {
-    const values =
-        [
-            location?.city,
-            location?.region,
-            location?.country ||
-            location?.countryCode
-        ]
-            .map(
-                (value) =>
-                    String(
-                        value ||
-                        ""
-                    ).trim()
-            )
-            .filter(
-                Boolean
-            );
+function formatLocation(location) {
+    const values = [
+        location?.city,
+        location?.region,
+        location?.country ||
+        location?.countryCode
+    ]
+        .map((value) =>
+            String(
+                value || ""
+            ).trim()
+        )
+        .filter(Boolean);
 
     return values.length > 0
-        ? values.join(
-            ", "
-        )
+        ? values.join(", ")
         : "Location unavailable";
 }
 
-function applyLocation(
-    location
-) {
+function applyLocation(location) {
     currentLocation = {
         city:
-            location?.city ||
-            "",
-
+            location?.city || "",
         region:
-            location?.region ||
-            "",
-
+            location?.region || "",
         country:
-            location?.country ||
-            "",
-
+            location?.country || "",
         countryCode:
-            location?.countryCode ||
-            "",
-
+            location?.countryCode || "",
         timezone:
-            location?.timezone ||
-            ""
+            location?.timezone || ""
     };
 
     setInputValue(
@@ -965,9 +1024,7 @@ function applyLocation(
     );
 }
 
-function applyTimezone(
-    timezone
-) {
+function applyTimezone(timezone) {
     const browserTimezone =
         Intl
             .DateTimeFormat()
@@ -991,9 +1048,7 @@ function applyTimezone(
     );
 }
 
-function populateProfileForm(
-    profile
-) {
+function populateProfileForm(profile) {
     setInputValue(
         "epicDisplayName",
         profile.EpicDisplayName ||
@@ -1010,6 +1065,7 @@ function populateProfileForm(
         "displayName",
         profile.displayName ||
         profile.EpicDisplayName ||
+        profile.EpicPreferredUsername ||
         ""
     );
 
@@ -1033,9 +1089,7 @@ function populateProfileForm(
         profile.phone
     );
 
-    if (
-        profile.preferredMode
-    ) {
+    if (profile.preferredMode) {
         setRadioValue(
             "preferredMode",
             profile.preferredMode
@@ -1052,24 +1106,25 @@ function populateProfileForm(
         profile.showOnlineStatus
     );
 
-    setCheckboxValue(
-        "matchReminders",
-        profile.matchReminders
+    setRadioValue(
+        "notificationsEnabled",
+        profile.notificationsEnabled
+            ? "true"
+            : "false"
+    );
+
+    notificationsOptOutConfirmed =
+        profile.notificationsEnabled === false;
+
+    setRadioValue(
+        "reminderMode",
+        profile.reminderMode
     );
 
     setCheckboxValue(
         "ageConsent",
         profile.ageConsent
     );
-
-    if (
-        profile.reminderTiming
-    ) {
-        setRadioValue(
-            "reminderTiming",
-            profile.reminderTiming
-        );
-    }
 
     applyLocation(
         profile.location
@@ -1083,14 +1138,19 @@ function populateProfileForm(
         profile.availability
     );
 
-    populateReminderSchedule(
-        profile.reminderSchedule
+    populateSpecificReminderTimes(
+        profile.specificReminderTimes
     );
 
     updateContactFields();
     updateModeField();
-    updateReminderOptions();
+    updateNotificationState();
+    updateReminderMode();
 }
+
+// ============================================================
+// AUTH + PROFILE LOAD
+// ============================================================
 
 async function getAuthenticatedEpicUser() {
     try {
@@ -1109,9 +1169,7 @@ async function getAuthenticatedEpicUser() {
                 null
             );
         }
-    } catch (
-        error
-    ) {
+    } catch (error) {
         console.warn(
             "Could not read Epic session from BPDAuth:",
             error
@@ -1119,162 +1177,6 @@ async function getAuthenticatedEpicUser() {
     }
 
     return null;
-}
-
-function readRegistrationDraft() {
-    try {
-        const raw =
-            localStorage.getItem(
-                REGISTRATION_DRAFT_KEY
-            );
-
-        if (!raw) {
-            return null;
-        }
-
-        const parsed =
-            JSON.parse(
-                raw
-            );
-
-        return (
-            parsed &&
-            typeof parsed ===
-                "object"
-        )
-            ? parsed
-            : null;
-
-    } catch {
-        return null;
-    }
-}
-
-function saveRegistrationDraft(
-    payload
-) {
-    try {
-        localStorage.setItem(
-            REGISTRATION_DRAFT_KEY,
-            JSON.stringify(
-                payload
-            )
-        );
-    } catch (
-        error
-    ) {
-        console.warn(
-            "Could not save registration draft:",
-            error
-        );
-    }
-}
-
-function clearRegistrationDraft() {
-    try {
-        localStorage.removeItem(
-            REGISTRATION_DRAFT_KEY
-        );
-    } catch {
-        // No action required.
-    }
-}
-
-function populateDraft(
-    draft
-) {
-    if (
-        !draft ||
-        typeof draft !==
-            "object"
-    ) {
-        return;
-    }
-
-    setInputValue(
-        "displayName",
-        draft.displayName
-    );
-
-    setSelectValue(
-        "currentRank",
-        draft.currentRank
-    );
-
-    setRadioValue(
-        "contactMethod",
-        draft.contactMethod
-    );
-
-    setInputValue(
-        "email",
-        draft.email
-    );
-
-    setInputValue(
-        "phone",
-        draft.phone
-    );
-
-    setRadioValue(
-        "preferredMode",
-        draft.preferredMode
-    );
-
-    setInputValue(
-        "otherMode",
-        draft.otherMode
-    );
-
-    setCheckboxValue(
-        "showOnlineStatus",
-        draft.showOnlineStatus
-    );
-
-    setCheckboxValue(
-        "matchReminders",
-        draft.matchReminders
-    );
-
-    setCheckboxValue(
-        "ageConsent",
-        draft.ageConsent
-    );
-
-    setRadioValue(
-        "reminderTiming",
-        draft.reminderTiming
-    );
-
-    if (
-        draft.location &&
-        typeof draft.location ===
-            "object"
-    ) {
-        applyLocation(
-            draft.location
-        );
-    }
-
-    if (
-        draft.timezone
-    ) {
-        applyTimezone(
-            draft.timezone
-        );
-    }
-
-    populateAvailability(
-        draft.availability
-    );
-
-    populateReminderSchedule(
-        draft.reminderSchedule
-    );
-
-    updateContactFields();
-    updateModeField();
-    updateReminderOptions();
 }
 
 async function loadRocketLeagueProfile() {
@@ -1285,8 +1187,7 @@ async function loadRocketLeagueProfile() {
         const authProfile =
             normalizeProfile(
                 {
-                    user:
-                        authUser
+                    user: authUser
                 },
                 authUser
             );
@@ -1323,15 +1224,9 @@ async function loadRocketLeagueProfile() {
             await fetch(
                 ROCKET_LEAGUE_PROFILE_URL,
                 {
-                    method:
-                        "GET",
-
-                    credentials:
-                        "same-origin",
-
-                    cache:
-                        "no-store",
-
+                    method: "GET",
+                    credentials: "same-origin",
+                    cache: "no-store",
                     headers: {
                         "accept":
                             "application/json"
@@ -1339,15 +1234,12 @@ async function loadRocketLeagueProfile() {
                 }
             );
 
-    } catch (
-        error
-    ) {
+    } catch {
         return {
             profile:
                 normalizeProfile(
                     {
-                        user:
-                            authUser
+                        user: authUser
                     },
                     authUser
                 ),
@@ -1356,10 +1248,9 @@ async function loadRocketLeagueProfile() {
                 false,
 
             warning:
-                (
-                    "Your Epic sign-in is active, but the saved profile service "
-                    + "could not be reached. You can continue filling out this form."
-                )
+                REGISTRATION_CONFIG
+                    .copy
+                    .backendWarningBody
         };
     }
 
@@ -1371,8 +1262,7 @@ async function loadRocketLeagueProfile() {
             );
 
     if (
-        response.status ===
-        401
+        response.status === 401
     ) {
         window.location.replace(
             "/RocketLeague"
@@ -1389,8 +1279,7 @@ async function loadRocketLeagueProfile() {
 
     if (
         !response.ok ||
-        result.success !==
-            true
+        result.success !== true
     ) {
         return {
             profile:
@@ -1401,10 +1290,9 @@ async function loadRocketLeagueProfile() {
 
             warning:
                 result.message ||
-                (
-                    "Your Epic sign-in is active, but your saved BPD profile "
-                    + "could not be loaded. You can continue filling out this form."
-                )
+                REGISTRATION_CONFIG
+                    .copy
+                    .backendWarningBody
         };
     }
 
@@ -1413,56 +1301,100 @@ async function loadRocketLeagueProfile() {
             normalized,
 
         profileLoaded:
-            result.profileLoaded !==
-            false,
+            result.profileLoaded !== false,
 
         warning:
-            result.profileLoaded ===
-            false
-                ? (
-                    result.warning ||
-                    "Your Epic account loaded, but saved profile data is temporarily unavailable."
-                )
-                : null
+            result.warning || null
     };
 }
 
-function buildRegistrationPayload(
-    form
-) {
-    const data =
-        new FormData(
-            form
+// ============================================================
+// LOCAL DRAFT
+// ============================================================
+
+function readRegistrationDraft() {
+    try {
+        const raw =
+            localStorage.getItem(
+                REGISTRATION_DRAFT_KEY
+            );
+
+        if (!raw) {
+            return null;
+        }
+
+        const parsed =
+            JSON.parse(raw);
+
+        return (
+            parsed &&
+            typeof parsed === "object"
+        )
+            ? parsed
+            : null;
+
+    } catch {
+        return null;
+    }
+}
+
+function saveRegistrationDraft(payload) {
+    try {
+        localStorage.setItem(
+            REGISTRATION_DRAFT_KEY,
+            JSON.stringify(payload)
         );
+
+    } catch (error) {
+        console.warn(
+            "Could not save registration draft:",
+            error
+        );
+    }
+}
+
+function clearRegistrationDraft() {
+    try {
+        localStorage.removeItem(
+            REGISTRATION_DRAFT_KEY
+        );
+    } catch {
+        // No action required.
+    }
+}
+
+// ============================================================
+// PAYLOAD
+// ============================================================
+
+function buildRegistrationPayload(form) {
+    const data =
+        new FormData(form);
 
     return {
         ageConsent:
             data.get(
                 "ageConsent"
-            ) ===
-            "on",
+            ) === "on",
 
         displayName:
             String(
                 data.get(
                     "displayName"
-                ) ||
-                ""
+                ) || ""
             ).trim(),
 
         currentRank:
             String(
                 data.get(
                     "currentRank"
-                ) ||
-                ""
+                ) || ""
             ).trim(),
 
         showOnlineStatus:
             data.get(
                 "showOnlineStatus"
-            ) ===
-            "on",
+            ) === "on",
 
         contactMethod:
             data.get(
@@ -1473,16 +1405,14 @@ function buildRegistrationPayload(
             String(
                 data.get(
                     "email"
-                ) ||
-                ""
+                ) || ""
             ).trim(),
 
         phone:
             String(
                 data.get(
                     "phone"
-                ) ||
-                ""
+                ) || ""
             ).trim(),
 
         preferredMode:
@@ -1494,16 +1424,14 @@ function buildRegistrationPayload(
             String(
                 data.get(
                     "otherMode"
-                ) ||
-                ""
+                ) || ""
             ).trim(),
 
         timezone:
             String(
                 data.get(
                     "timezone"
-                ) ||
-                ""
+                ) || ""
             ).trim(),
 
         location: {
@@ -1513,32 +1441,25 @@ function buildRegistrationPayload(
         availability:
             getAvailability(),
 
-        matchReminders:
-            data.get(
-                "matchReminders"
-            ) ===
-            "on",
+        notificationsEnabled:
+            getNotificationsEnabled(),
 
-        reminderTiming:
+        reminderMode:
             data.get(
-                "reminderTiming"
-            ) ||
-            null,
+                "reminderMode"
+            ) || "24-hours",
 
-        reminderSchedule:
-            getReminderSchedule()
+        specificReminderTimes:
+            getSpecificReminderTimes()
     };
 }
 
-function validateRegistrationPayload(
-    payload
-) {
+function validateRegistrationPayload(payload) {
     if (
         !Array.isArray(
             payload.availability
         ) ||
-        payload.availability.length ===
-            0
+        payload.availability.length === 0
     ) {
         return (
             "Select at least one day when you are available."
@@ -1557,35 +1478,29 @@ function validateRegistrationPayload(
     }
 
     if (
-        payload.matchReminders &&
-        !payload.reminderTiming
-    ) {
-        return (
-            "Choose when scheduled-match reminders should be sent."
-        );
-    }
-
-    if (
-        payload.matchReminders &&
+        payload.notificationsEnabled &&
+        payload.reminderMode ===
+            "specific-times" &&
         (
             !Array.isArray(
-                payload.reminderSchedule
+                payload.specificReminderTimes
             ) ||
-            payload.reminderSchedule.length ===
-                0
+            payload.specificReminderTimes.length === 0
         )
     ) {
         return (
-            "Choose at least one preferred reminder day and time."
+            "Select at least one specific reminder time."
         );
     }
 
     return null;
 }
 
-async function submitRegistration(
-    event
-) {
+// ============================================================
+// SUBMIT
+// ============================================================
+
+async function submitRegistration(event) {
     event.preventDefault();
 
     hideMessage();
@@ -1595,11 +1510,10 @@ async function submitRegistration(
 
     updateContactFields();
     updateModeField();
-    updateReminderOptions();
+    updateNotificationState();
+    updateReminderMode();
 
-    if (
-        !form.reportValidity()
-    ) {
+    if (!form.reportValidity()) {
         return;
     }
 
@@ -1613,9 +1527,7 @@ async function submitRegistration(
             payload
         );
 
-    if (
-        validationError
-    ) {
+    if (validationError) {
         showMessage(
             validationError,
             "error"
@@ -1630,9 +1542,7 @@ async function submitRegistration(
         );
 
     if (submitButton) {
-        submitButton.disabled =
-            true;
-
+        submitButton.disabled = true;
         submitButton.textContent =
             "Saving…";
     }
@@ -1642,23 +1552,15 @@ async function submitRegistration(
             await fetch(
                 ROCKET_LEAGUE_PROFILE_UPDATE_URL,
                 {
-                    method:
-                        "POST",
-
-                    credentials:
-                        "same-origin",
-
-                    cache:
-                        "no-store",
-
+                    method: "POST",
+                    credentials: "same-origin",
+                    cache: "no-store",
                     headers: {
                         "Content-Type":
                             "application/json",
-
                         "accept":
                             "application/json"
                     },
-
                     body:
                         JSON.stringify(
                             payload
@@ -1674,8 +1576,7 @@ async function submitRegistration(
                 );
 
         if (
-            response.status ===
-            401
+            response.status === 401
         ) {
             window.location.replace(
                 "/RocketLeague"
@@ -1686,8 +1587,7 @@ async function submitRegistration(
 
         if (
             !response.ok ||
-            result.success !==
-                true
+            result.success !== true
         ) {
             throw new Error(
                 result.message ||
@@ -1702,16 +1602,14 @@ async function submitRegistration(
         );
 
         showMessage(
-            result.profileComplete ===
-            true
+            result.profileComplete === true
                 ? "Profile completed. Redirecting…"
                 : "Profile saved.",
             "success"
         );
 
         if (
-            result.profileComplete ===
-            true
+            result.profileComplete === true
         ) {
             window.location.replace(
                 result.redirectTo ||
@@ -1721,28 +1619,24 @@ async function submitRegistration(
             return;
         }
 
-    } catch (
-        error
-    ) {
+    } catch (error) {
         saveRegistrationDraft(
             payload
         );
 
         setBackendWarning(
             true,
-            (
-                "Your Epic sign-in is still active, but the BPD profile service "
-                + "could not save this form yet. Your entries have been preserved "
-                + "in this browser so you can retry."
-            )
+            REGISTRATION_CONFIG
+                .copy
+                .backendWarningBody
         );
 
         showMessage(
             (
                 error?.message ||
                 "Profile could not be saved."
-            )
-            + " Your form has been preserved locally.",
+            ) +
+            " Your form has been preserved locally.",
             "warning"
         );
 
@@ -1752,12 +1646,18 @@ async function submitRegistration(
                 false;
 
             submitButton.textContent =
-                "Complete Registration";
+                REGISTRATION_CONFIG
+                    .copy
+                    .submitButton;
         }
     }
 }
 
-export async function  initializePage() {
+// ============================================================
+// INITIALIZE
+// ============================================================
+
+export async function initializePage() {
     const form =
         document.getElementById(
             "rlRegistrationForm"
@@ -1765,26 +1665,33 @@ export async function  initializePage() {
 
     if (
         !form ||
-        form.dataset.initialized ===
-            "true"
+        form.dataset.initialized === "true"
     ) {
         return;
     }
 
-    form.dataset.initialized =
-        "true";
+    form.dataset.initialized = "true";
 
+    applyDynamicCopy();
     renderAvailabilityRows();
-    renderReminderScheduleRows();
+    renderReminderTimeSlots();
 
-    applyTimezone(
-        ""
+    setInputValue(
+        "epicDisplayName",
+        "Loading…"
     );
 
     setInputValue(
         "epicPlatform",
         "Epic Games"
     );
+
+    setInputValue(
+        "detectedLocation",
+        "Detecting…"
+    );
+
+    applyTimezone("");
 
     document
         .querySelectorAll(
@@ -1808,17 +1715,83 @@ export async function  initializePage() {
             );
         });
 
-    const matchReminders =
-        document.getElementById(
-            "matchReminders"
+    document
+        .querySelectorAll(
+            'input[name="notificationsEnabled"]'
+        )
+        .forEach((input) => {
+            input.addEventListener(
+                "change",
+                handleNotificationChoiceChange
+            );
+        });
+
+    document
+        .querySelectorAll(
+            'input[name="reminderMode"]'
+        )
+        .forEach((input) => {
+            input.addEventListener(
+                "change",
+                updateReminderMode
+            );
+        });
+
+    document
+        .querySelectorAll(
+            "[data-modal-close]"
+        )
+        .forEach((element) => {
+            element.addEventListener(
+                "click",
+                () => {
+                    notificationsOptOutConfirmed =
+                        false;
+
+                    setNotificationsEnabled(
+                        true
+                    );
+
+                    closeNotificationOptOutModal();
+                }
+            );
+        });
+
+    document
+        .getElementById(
+            "keepNotificationsButton"
+        )
+        ?.addEventListener(
+            "click",
+            () => {
+                notificationsOptOutConfirmed =
+                    false;
+
+                setNotificationsEnabled(
+                    true
+                );
+
+                closeNotificationOptOutModal();
+            }
         );
 
-    if (matchReminders) {
-        matchReminders.addEventListener(
-            "change",
-            updateReminderOptions
+    document
+        .getElementById(
+            "confirmNotificationsOffButton"
+        )
+        ?.addEventListener(
+            "click",
+            () => {
+                notificationsOptOutConfirmed =
+                    true;
+
+                setNotificationsEnabled(
+                    false
+                );
+
+                closeNotificationOptOutModal();
+            }
         );
-    }
 
     form.addEventListener(
         "submit",
@@ -1827,7 +1800,8 @@ export async function  initializePage() {
 
     updateContactFields();
     updateModeField();
-    updateReminderOptions();
+    updateNotificationState();
+    updateReminderMode();
 
     const profileResult =
         await loadRocketLeagueProfile();
@@ -1841,8 +1815,7 @@ export async function  initializePage() {
     );
 
     if (
-        profileResult.profileLoaded ===
-        false
+        profileResult.profileLoaded === false
     ) {
         setBackendWarning(
             true,
@@ -1853,16 +1826,15 @@ export async function  initializePage() {
             readRegistrationDraft();
 
         if (draft) {
-            populateDraft(
-                draft
+            populateProfileForm(
+                normalizeProfile({
+                    profile:
+                        draft
+                })
             );
 
             showMessage(
-                (
-                    "Saved profile data is unavailable, "
-                    + "so your locally saved registration "
-                    + "draft has been restored."
-                ),
+                "Saved profile data is unavailable, so your locally saved registration draft has been restored.",
                 "warning"
             );
         }
