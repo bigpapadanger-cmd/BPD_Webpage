@@ -18,14 +18,6 @@ import {
     getMissingAuthConfiguration
 } from "../common_helpers/utils.js";
 
-function maskClientId(clientId) {
-    if (!clientId || clientId.length < 10) {
-        return "missing-or-invalid";
-    }
-
-    return `${clientId.slice(0, 6)}...${clientId.slice(-4)}`;
-}
-
 export async function handleEpicLogin(
     request,
     env
@@ -33,38 +25,16 @@ export async function handleEpicLogin(
     const debugId =
         crypto.randomUUID();
 
-    console.info(
-        "EPIC LOGIN SERVICE: Started.",
-        {
-            debugId,
-            method:
-                request.method,
-            pathname:
-                new URL(request.url).pathname
-        }
-    );
-
     try {
         const missing =
             getMissingAuthConfiguration(env);
-
-        console.info(
-            "EPIC LOGIN SERVICE: Configuration checked.",
-            {
-                debugId,
-                missing:
-                    Array.isArray(missing)
-                        ? missing
-                        : []
-            }
-        );
 
         if (
             Array.isArray(missing) &&
             missing.length > 0
         ) {
             console.error(
-                "EPIC LOGIN SERVICE: Configuration missing.",
+                "EPIC LOGIN: Configuration missing.",
                 {
                     debugId,
                     missing
@@ -93,25 +63,12 @@ export async function handleEpicLogin(
                 ? env.EPIC_REDIRECT_URI.trim()
                 : "";
 
-        console.info(
-            "EPIC LOGIN SERVICE: OAuth values loaded.",
-            {
-                debugId,
-                clientId:
-                    maskClientId(clientId),
-                redirectUri,
-                authorizeUrl:
-                    EPIC_AUTHORIZE_URL,
-                stateCookie:
-                    AUTH_STATE_COOKIE,
-                stateMaxAge:
-                    AUTH_STATE_MAX_AGE_SECONDS
-            }
-        );
-
-        if (!clientId || !redirectUri) {
+        if (
+            !clientId ||
+            !redirectUri
+        ) {
             console.error(
-                "EPIC LOGIN SERVICE: OAuth values invalid.",
+                "EPIC LOGIN: OAuth configuration invalid.",
                 {
                     debugId,
                     hasClientId:
@@ -132,19 +89,21 @@ export async function handleEpicLogin(
             );
         }
 
-        let parsedRedirectUri;
-
         try {
-            parsedRedirectUri =
-                new URL(redirectUri);
-        } catch (error) {
+            new URL(
+                redirectUri
+            );
+
+        } catch (
+            error
+        ) {
             console.error(
-                "EPIC LOGIN SERVICE: Redirect URI invalid.",
+                "EPIC LOGIN: Redirect URI invalid.",
                 {
                     debugId,
-                    redirectUri,
                     message:
-                        error.message
+                        error?.message ||
+                        "Unknown error"
                 }
             );
 
@@ -167,7 +126,7 @@ export async function handleEpicLogin(
             typeof state !== "string"
         ) {
             console.error(
-                "EPIC LOGIN SERVICE: State generation failed.",
+                "EPIC LOGIN: State generation failed.",
                 {
                     debugId
                 }
@@ -184,17 +143,10 @@ export async function handleEpicLogin(
             );
         }
 
-        console.info(
-            "EPIC LOGIN SERVICE: State generated.",
-            {
-                debugId,
-                stateLength:
-                    state.length
-            }
-        );
-
         const url =
-            new URL(EPIC_AUTHORIZE_URL);
+            new URL(
+                EPIC_AUTHORIZE_URL
+            );
 
         url.searchParams.set(
             "client_id",
@@ -221,25 +173,6 @@ export async function handleEpicLogin(
             state
         );
 
-        console.info(
-            "EPIC LOGIN SERVICE: Redirect prepared.",
-            {
-                debugId,
-                epicOrigin:
-                    url.origin,
-                epicPathname:
-                    url.pathname,
-                clientId:
-                    maskClientId(clientId),
-                redirectOrigin:
-                    parsedRedirectUri.origin,
-                redirectPathname:
-                    parsedRedirectUri.pathname,
-                scope:
-                    url.searchParams.get("scope")
-            }
-        );
-
         const cookie =
             createCookie(
                 request,
@@ -248,30 +181,48 @@ export async function handleEpicLogin(
                 AUTH_STATE_MAX_AGE_SECONDS
             );
 
-        console.info(
-            "EPIC LOGIN SERVICE: Redirecting to Epic.",
-            {
-                debugId,
-                cookieCreated:
-                    Boolean(cookie)
-            }
-        );
+        if (!cookie) {
+            console.error(
+                "EPIC LOGIN: Failed to create OAuth state cookie.",
+                {
+                    debugId
+                }
+            );
+
+            return json(
+                {
+                    success: false,
+                    message:
+                        "Failed to create OAuth state cookie.",
+                    debugId
+                },
+                500
+            );
+        }
 
         return redirect(
             url.toString(),
-            [cookie]
+            [
+                cookie
+            ]
         );
-    } catch (error) {
+
+    } catch (
+        error
+    ) {
         console.error(
-            "EPIC LOGIN SERVICE: Unexpected failure.",
+            "EPIC LOGIN: Unexpected failure.",
             {
                 debugId,
                 name:
-                    error?.name || "Error",
+                    error?.name ||
+                    "Error",
                 message:
-                    error?.message || "Unknown error",
+                    error?.message ||
+                    "Unknown error",
                 stack:
-                    error?.stack || null
+                    error?.stack ||
+                    null
             }
         );
 

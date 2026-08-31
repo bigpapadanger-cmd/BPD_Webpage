@@ -2,18 +2,24 @@ import {
     json,
     redirect
 } from "../common_helpers/responses.js";
+
 import {
     EPIC_TOKEN_URL,
     EPIC_USER_INFO_URL,
     AUTH_STATE_COOKIE,
-    AUTH_SESSION_COOKIE
+    AUTH_SESSION_COOKIE,
+    SESSION_IDLE_TTL_SECONDS,
+    SESSION_ABSOLUTE_TTL_SECONDS
 } from "../../api_vars.js";
 import {
     getCookie,
-    createCookie,
-    SESSION_TTL
+    createCookie
 } from "../common_helpers/reload_sessions.js";
-import { handleRocketLeagueSignin } from "../supabase/rocketleague/signin.js";
+
+import {
+    handleRocketLeagueSignin
+} from "../supabase/rocketleague/signin.js";
+
 function limitMessage(value) {
     return String(
         value || ""
@@ -27,30 +33,36 @@ function limitMessage(value) {
             300
         );
 }
+
 export async function handleEpicCallback(
     request,
     env
 ) {
     const debugId =
         crypto.randomUUID();
+
     const url =
         new URL(
             request.url
         );
+
     const code =
         url.searchParams.get(
             "code"
         );
+
     const state =
         url.searchParams.get(
             "state"
         );
+
     console.info(
         "EPIC CALLBACK: Started.",
         {
             debugId
         }
     );
+
     try {
         if (
             !code ||
@@ -70,6 +82,7 @@ export async function handleEpicCallback(
                         )
                 }
             );
+
             return json(
                 {
                     success: false,
@@ -80,11 +93,13 @@ export async function handleEpicCallback(
                 400
             );
         }
+
         const storedState =
             getCookie(
                 request,
                 AUTH_STATE_COOKIE
             );
+
         if (
             !storedState ||
             storedState !== state
@@ -95,6 +110,7 @@ export async function handleEpicCallback(
                     debugId
                 }
             );
+
             return json(
                 {
                     success: false,
@@ -105,21 +121,25 @@ export async function handleEpicCallback(
                 400
             );
         }
+
         const clientId =
             typeof env.EPIC_CLIENT_ID ===
             "string"
                 ? env.EPIC_CLIENT_ID.trim()
                 : "";
+
         const clientSecret =
             typeof env.EPIC_CLIENT_SECRET ===
             "string"
                 ? env.EPIC_CLIENT_SECRET.trim()
                 : "";
+
         const redirectUri =
             typeof env.EPIC_REDIRECT_URI ===
             "string"
                 ? env.EPIC_REDIRECT_URI.trim()
                 : "";
+
         if (
             !clientId ||
             !clientSecret ||
@@ -137,6 +157,7 @@ export async function handleEpicCallback(
                         Boolean(redirectUri)
                 }
             );
+
             return json(
                 {
                     success: false,
@@ -147,6 +168,7 @@ export async function handleEpicCallback(
                 500
             );
         }
+
         const tokenResponse =
             await fetch(
                 EPIC_TOKEN_URL,
@@ -172,11 +194,13 @@ export async function handleEpicCallback(
                         })
                 }
             );
+
         if (
             !tokenResponse.ok
         ) {
             const tokenError =
                 await tokenResponse.text();
+
             console.error(
                 "EPIC CALLBACK: Token exchange failed.",
                 {
@@ -189,6 +213,7 @@ export async function handleEpicCallback(
                         )
                 }
             );
+
             return json(
                 {
                     success: false,
@@ -201,18 +226,22 @@ export async function handleEpicCallback(
                 502
             );
         }
+
         const tokenData =
             await tokenResponse.json();
+
         const tokenAccountId =
             typeof tokenData.account_id ===
             "string"
                 ? tokenData.account_id.trim()
                 : "";
+
         const accessToken =
             typeof tokenData.access_token ===
             "string"
                 ? tokenData.access_token.trim()
                 : "";
+
         const EpicTokenExpiresIn =
             Number.isFinite(
                 Number(
@@ -223,6 +252,7 @@ export async function handleEpicCallback(
                     tokenData.expires_in
                 )
                 : null;
+
         if (
             !accessToken
         ) {
@@ -232,6 +262,7 @@ export async function handleEpicCallback(
                     debugId
                 }
             );
+
             return json(
                 {
                     success: false,
@@ -242,6 +273,7 @@ export async function handleEpicCallback(
                 502
             );
         }
+
         const profileResponse =
             await fetch(
                 EPIC_USER_INFO_URL,
@@ -256,11 +288,13 @@ export async function handleEpicCallback(
                     }
                 }
             );
+
         if (
             !profileResponse.ok
         ) {
             const profileError =
                 await profileResponse.text();
+
             console.error(
                 "EPIC CALLBACK: Profile request failed.",
                 {
@@ -273,6 +307,7 @@ export async function handleEpicCallback(
                         )
                 }
             );
+
             return json(
                 {
                     success: false,
@@ -285,6 +320,7 @@ export async function handleEpicCallback(
                 502
             );
         }
+
         const profile =
             await profileResponse.json();
 
@@ -298,6 +334,7 @@ export async function handleEpicCallback(
                         ? profile.sub
                         : tokenAccountId
             ).trim();
+
         const EpicDisplayName =
             (
                 typeof profile?.displayName ===
@@ -308,11 +345,13 @@ export async function handleEpicCallback(
                         ? profile.preferred_username
                         : ""
             ).trim();
+
         const EpicPreferredUsername =
             typeof profile?.preferred_username ===
             "string"
                 ? profile.preferred_username.trim()
                 : null;
+
         if (
             !EpicUniqueId
         ) {
@@ -322,6 +361,7 @@ export async function handleEpicCallback(
                     debugId
                 }
             );
+
             return json(
                 {
                     success: false,
@@ -332,6 +372,7 @@ export async function handleEpicCallback(
                 502
             );
         }
+
         if (
             !env.AUTH_SESSIONS
         ) {
@@ -341,6 +382,7 @@ export async function handleEpicCallback(
                     debugId
                 }
             );
+
             return json(
                 {
                     success: false,
@@ -351,24 +393,47 @@ export async function handleEpicCallback(
                 500
             );
         }
+
         const sessionId =
             crypto.randomUUID();
+
         const sessionKey =
             `session:${sessionId}`;
+
+        const now =
+            Date.now();
+
         const sessionData = {
             EpicUniqueId,
+
             EpicDisplayName:
                 EpicDisplayName ||
                 null,
+
             EpicPreferredUsername,
+
             EpicTokenExpiresIn,
+
             AuthenticatedAt:
-                Date.now(),
+                now,
+
+            LastSeenAt:
+                now,
+
+            AbsoluteExpiresAt:
+                now +
+                (
+                    SESSION_ABSOLUTE_TTL_SECONDS *
+                    1000
+                ),
+
             EpicStatus:
                 "Unknown",
+
             EpicStatusUpdatedAt:
                 null
         };
+
         await env.AUTH_SESSIONS.put(
             sessionKey,
             JSON.stringify(
@@ -376,28 +441,32 @@ export async function handleEpicCallback(
             ),
             {
                 expirationTtl:
-                    SESSION_TTL
+                    SESSION_IDLE_TTL
             }
         );
+
         const cookie =
             createCookie(
                 request,
                 AUTH_SESSION_COOKIE,
                 sessionId,
-                SESSION_TTL
+                SESSION_IDLE_TTL
             );
+
         if (
             !cookie
         ) {
             await env.AUTH_SESSIONS.delete(
                 sessionKey
             );
+
             console.error(
                 "EPIC CALLBACK: Session cookie creation failed.",
                 {
                     debugId
                 }
             );
+
             return json(
                 {
                     success: false,
@@ -409,30 +478,66 @@ export async function handleEpicCallback(
             );
         }
 
-        //////////////////////////////////////////////////
-        // ***ADD SUPABASE CALL HERE                    //
-        // ***USE sessionData for passed minimum vars   //
-        // ***/supabase/RocketLeague/signin.js          //
-        // ***Above Fn will pass minimum data           //
-        //////////////////////////////////////////////////
-        await handleRocketLeagueSignin(
-            env,
+        try {
+            await handleRocketLeagueSignin(
+                env,
+                {
+                    EpicUniqueId:
+                        sessionData.EpicUniqueId,
+
+                    EpicDisplayName:
+                        sessionData.EpicDisplayName,
+
+                    EpicPreferredUsername:
+                        sessionData.EpicPreferredUsername
+                }
+            );
+
+            console.info(
+                "EPIC CALLBACK: Supabase profile sync completed.",
+                {
+                    debugId
+                }
+            );
+
+        } catch (
+            error
+        ) {
+            console.error(
+                "EPIC CALLBACK: Supabase profile sync failed.",
+                {
+                    debugId,
+                    name:
+                        error?.name ||
+                        "Error",
+                    message:
+                        error?.message ||
+                        "Unknown error"
+                }
+            );
+        }
+
+        console.info(
+            "EPIC CALLBACK: Authentication completed.",
             {
-                EpicUniqueId:
-                    sessionData.EpicUniqueId,
-                EpicDisplayName:
-                    sessionData.EpicDisplayName,
-                EpicPreferredUsername:
-                    sessionData.EpicPreferredUsername
+                debugId,
+                sessionIdleTtl:
+                    SESSION_IDLE_TTL,
+                sessionAbsoluteTtl:
+                    SESSION_ABSOLUTE_TTL
             }
         );
+
         return redirect(
             "/RocketLeague",
             [
                 cookie
             ]
         );
-    } catch (error) {
+
+    } catch (
+        error
+    ) {
         console.error(
             "EPIC CALLBACK: Unexpected failure.",
             {
@@ -445,6 +550,7 @@ export async function handleEpicCallback(
                     "Unknown error"
             }
         );
+
         return json(
             {
                 success: false,

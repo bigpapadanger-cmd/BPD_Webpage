@@ -11,6 +11,20 @@ export const AUTH_STATE_COOKIE = "bpd_epic_state";
 export const AUTH_SESSION_COOKIE = "bpd_session";
 export const AUTH_STATE_MAX_AGE_SECONDS = 600;
 export const AUTH_SESSION_KEY_PREFIX = "session:";
-export const SESSION_DURATION_HOURS = 24; 
-export const SESSION_TTL_SECONDS = SESSION_DURATION_HOURS * 3600; // example: 24 hours
+export const SESSION_IDLE_DURATION_DAYS =
+    10;
 
+export const SESSION_ABSOLUTE_DURATION_DAYS =
+    28;
+
+export const SESSION_IDLE_TTL_SECONDS =
+    SESSION_IDLE_DURATION_DAYS *
+    24 *
+    60 *
+    60;
+
+export const SESSION_ABSOLUTE_TTL_SECONDS =
+    SESSION_ABSOLUTE_DURATION_DAYS *
+    24 *
+    60 *
+    60;

@@ -5,14 +5,13 @@ import {
 
 import {
     getCookie,
-    createCookie
+    clearCookie
 } from "../common_helpers/reload_sessions.js";
 
 import {
     AUTH_SESSION_COOKIE,
     AUTH_STATE_COOKIE
 } from "../../api_vars.js";
-
 
 export async function handleLogout(
     request,
@@ -37,7 +36,6 @@ export async function handleLogout(
                 AUTH_SESSION_COOKIE
             );
 
-
         /*
         =========================================================
         DELETE SERVER-SIDE SESSION
@@ -45,7 +43,6 @@ export async function handleLogout(
         */
 
         if (sessionId) {
-
             if (!env.AUTH_SESSIONS) {
                 console.warn(
                     "LOGOUT SERVICE: AUTH_SESSIONS binding unavailable.",
@@ -54,22 +51,23 @@ export async function handleLogout(
                     }
                 );
             } else {
-                await env.AUTH_SESSIONS.delete(
-                    `session:${sessionId}`
-                );
-
-                console.info(
-                    "LOGOUT SERVICE: Cloudflare session deleted.",
-                    {
-                        debugId,
-                        sessionDeleted:
-                            true
-                    }
-                );
+                try {
+                    await env.AUTH_SESSIONS.delete(
+                        `session:${sessionId}`
+                    );
+                } catch (error) {
+                    console.error(
+                        "LOGOUT SERVICE: Session deletion failed.",
+                        {
+                            debugId,
+                            message:
+                                error?.message ||
+                                "Unknown error"
+                        }
+                    );
+                }
             }
-
         }
-
 
         /*
         =========================================================
@@ -78,21 +76,16 @@ export async function handleLogout(
         */
 
         const sessionCookie =
-            createCookie(
+            clearCookie(
                 request,
-                AUTH_SESSION_COOKIE,
-                "",
-                0
+                AUTH_SESSION_COOKIE
             );
 
         const stateCookie =
-            createCookie(
+            clearCookie(
                 request,
-                AUTH_STATE_COOKIE,
-                "",
-                0
+                AUTH_STATE_COOKIE
             );
-
 
         console.info(
             "LOGOUT SERVICE: Completed.",
@@ -102,7 +95,6 @@ export async function handleLogout(
                     Boolean(sessionId)
             }
         );
-
 
         /*
         =========================================================
@@ -119,7 +111,6 @@ export async function handleLogout(
         );
 
     } catch (error) {
-
         console.error(
             "LOGOUT SERVICE: Failed.",
             {
