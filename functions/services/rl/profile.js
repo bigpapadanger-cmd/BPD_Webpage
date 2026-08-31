@@ -838,6 +838,11 @@ async function handleProfileGet(
         );
     }
 
+    if (!databaseProfile) {
+        profileLoaded =
+            false;
+    }
+
     const profile =
         databaseProfile
             ? normalizeDatabaseProfile(

@@ -2312,12 +2312,20 @@ async function submitRegistration(
         }
 
         if (
-            result.profileSaved !==
-            true
+            result.profileSaved !== true
         ) {
             saveRegistrationDraft(
                 payload
             );
+
+            if (
+                result.registrationAccepted === true
+            ) {
+                localStorage.setItem(
+                    "bpdRocketLeagueRegistrationAccepted",
+                    "true"
+                );
+            }
 
             setBackendWarning(
                 true,

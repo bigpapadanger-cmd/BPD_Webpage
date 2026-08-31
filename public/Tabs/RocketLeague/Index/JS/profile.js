@@ -111,7 +111,6 @@ function hasRocketLeagueAccess(
 }
 
 
-
 function isProfileComplete(
     result,
     profile
@@ -160,6 +159,7 @@ function renderRocketLeagueProfile(
             : "empty"
     );
 }
+
 export async function loadRocketLeagueProfile(
     authUser
 ) {
@@ -169,40 +169,52 @@ export async function loadRocketLeagueProfile(
         ) ||
         ""
     );
+
     setProfileWarning(
         false
     );
+
     const response =
         await fetch(
             ROCKET_LEAGUE_PROFILE_URL,
             {
-                method: "GET",
-                credentials: "same-origin",
-                cache: "no-store",
+                method:
+                    "GET",
+
+                credentials:
+                    "same-origin",
+
+                cache:
+                    "no-store",
+
                 headers: {
                     "accept":
                         "application/json"
                 }
             }
         );
+
     const result =
-        await response.json().catch(
-            function() {
-                return {};
-            }
-        );
+        await response
+            .json()
+            .catch(
+                function() {
+                    return {};
+                }
+            );
+
     if (
-        !response.ok
-        || result.success !== true
+        !response.ok ||
+        result.success !== true
     ) {
         setProfileWarning(
             true,
             (
-                result.message
-                || (
-                    "Your Epic account is signed in, "
-                    + "but your BPD Gaming Network profile "
-                    + "could not be loaded."
+                result.message ||
+                (
+                    "Your Epic account is signed in, " +
+                    "but your BPD Gaming Network profile " +
+                    "could not be loaded."
                 )
             )
         );
@@ -223,41 +235,53 @@ export async function loadRocketLeagueProfile(
             profileComplete:
                 false,
 
+            registrationAccepted:
+                false,
+
+            rocketLeagueAccess:
+                false,
+
+            profileSaved:
+                false,
+
             profileLoaded:
                 false
         };
     }
 
     const profile =
-        result.profile || {};
+        result.profile ||
+        {};
+
     renderRocketLeagueProfile(
         authUser,
         profile
     );
+
     const profileComplete =
         isProfileComplete(
             result,
             profile
         );
 
+    const registrationAccepted =
+        result?.registrationAccepted === true ||
+        localStorage.getItem(
+            "bpdRocketLeagueRegistrationAccepted"
+        ) === "true";
+
     const rocketLeagueAccess =
-        hasRocketLeagueAccess(
-            result,
-            profile
-        );
+        profileComplete ||
+        registrationAccepted;
 
     return {
         profile,
 
         profileComplete,
 
-        rocketLeagueAccess,
+        registrationAccepted,
 
-        registrationAccepted:
-            result?.registrationAccepted === true ||
-            localStorage.getItem(
-                "bpdRocketLeagueRegistrationAccepted"
-            ) === "true",
+        rocketLeagueAccess,
 
         profileSaved:
             result?.profileSaved === true,
