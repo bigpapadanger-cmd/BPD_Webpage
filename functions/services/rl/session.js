@@ -1,10 +1,6 @@
-import { getStoredSession } from "../common_helpers/reload_sessions.js";
-
 export async function handleRocketLeagueSession(request, env) {
-    // Load the user's auth session from KV
     const session = await getStoredSession(request, env);
 
-    // No session → user is logged out
     if (!session) {
         return new Response(
             JSON.stringify({
@@ -13,14 +9,25 @@ export async function handleRocketLeagueSession(request, env) {
             }),
             {
                 status: 200,
-                headers: { "Content-Type": "application/json" }
+                headers: {
+                    "Content-Type": "application/json"
+                }
             }
         );
     }
 
-    // Valid session → return user info
-    // Your frontend expects: { authenticated: true, user: {...} }
-    const user = session.sessionData?.user || null;
+    const sessionData = session.sessionData || {};
+
+    const user = {
+        EpicUniqueId:
+            sessionData.EpicUniqueId || null,
+
+        EpicDisplayName:
+            sessionData.EpicDisplayName || null,
+
+        EpicPreferredUsername:
+            sessionData.EpicPreferredUsername || null
+    };
 
     return new Response(
         JSON.stringify({
@@ -29,7 +36,9 @@ export async function handleRocketLeagueSession(request, env) {
         }),
         {
             status: 200,
-            headers: { "Content-Type": "application/json" }
+            headers: {
+                "Content-Type": "application/json"
+            }
         }
     );
 }
