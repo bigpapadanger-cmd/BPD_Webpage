@@ -1,9 +1,9 @@
-------formdata-undici-097173317248
+------formdata-undici-017870336804
 Content-Disposition: form-data; name="metadata"
 
-{"main_module":"functionsWorker-0.5020572841309947.js"}
-------formdata-undici-097173317248
-Content-Disposition: form-data; name="functionsWorker-0.5020572841309947.js"; filename="functionsWorker-0.5020572841309947.js"
+{"main_module":"functionsWorker-0.7603963447814042.js"}
+------formdata-undici-017870336804
+Content-Disposition: form-data; name="functionsWorker-0.7603963447814042.js"; filename="functionsWorker-0.7603963447814042.js"
 Content-Type: application/javascript+module
 
 var __defProp = Object.defineProperty;
@@ -207,7 +207,7 @@ function onRequestGet() {
 }
 __name(onRequestGet, "onRequestGet");
 
-// services/supabase/RocketLeague/signin.js
+// services/supabase/rocketleague/signin.js
 async function handleRocketLeagueSignin(env, sessionData) {
   try {
     const profile = await callSupabaseSignin(
@@ -909,7 +909,7 @@ function getLocationOrigin(location) {
 }
 __name(getLocationOrigin, "getLocationOrigin");
 
-// services/supabase/RocketLeague/rocketleague_profile.js
+// services/supabase/rocketleague/rocketleague_profile.js
 async function getRocketLeagueProfileByEpicId(env, EpicUniqueId) {
   return {
     profileComplete: false,
@@ -935,7 +935,7 @@ async function getRocketLeagueProfileByEpicId(env, EpicUniqueId) {
 }
 __name(getRocketLeagueProfileByEpicId, "getRocketLeagueProfileByEpicId");
 
-// services/RL/profile.js
+// services/rl/profile.js
 async function handleRocketLeagueProfile(request, env) {
   try {
     const storedSession = await getStoredSession(
@@ -1029,7 +1029,7 @@ async function onRequest3(context) {
 }
 __name(onRequest3, "onRequest");
 
-// services/RL/session.js
+// services/rl/session.js
 async function handleRocketLeagueSession(request, env) {
   const session = await getStoredSession(request, env);
   if (!session) {
@@ -3154,7 +3154,7 @@ async function onRequest10(context) {
 }
 __name(onRequest10, "onRequest");
 
-// ../.wrangler/tmp/pages-QBqwXj/functionsRoutes-0.20871789501165217.mjs
+// ../.wrangler/tmp/pages-azNgZl/functionsRoutes-0.5384828901408221.mjs
 var routes = [
   {
     routePath: "/api/auth/epic/epic_logout",
@@ -3698,4 +3698,4 @@ export {
   pages_template_worker_default as default
 };
 
-------formdata-undici-097173317248--
+------formdata-undici-017870336804--

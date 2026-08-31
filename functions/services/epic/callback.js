@@ -13,7 +13,7 @@ import {
     createCookie,
     SESSION_TTL
 } from "../common_helpers/reload_sessions.js";
-import { handleRocketLeagueSignin } from "../supabase/RocketLeague/signin.js";
+import { handleRocketLeagueSignin } from "../supabase/rocketleague/signin.js";
 function limitMessage(value) {
     return String(
         value || ""
