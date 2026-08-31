@@ -306,6 +306,7 @@ export const HEADER_MAP = {
     "/RocketLeague/WeeklyMatches": false,
     "/RocketLeague/PrivateMatches": false,
     "/RocketLeague/SubmitMatchResults": false,
+    "/RocketLeague/Profile": false,
     "/Dashboard": true,
     "/FAQ": false,
     "/Minecraft":true,

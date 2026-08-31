@@ -1757,7 +1757,7 @@ async function submitRegistration(
     }
 }
 
-export async function initializeRegistrationPage() {
+export async function  initializePage() {
     const form =
         document.getElementById(
             "rlRegistrationForm"
