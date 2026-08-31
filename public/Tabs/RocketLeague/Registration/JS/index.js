@@ -1,5 +1,5 @@
 "use strict";
-
+import {TIMEZONE_DISPLAY_ALIASES} from "./timezone.js"
 const ROCKET_LEAGUE_PROFILE_URL =
     "/api/auth/rocketleague/profile";
 
@@ -239,6 +239,27 @@ let currentLocation = {
 let notificationsOptOutConfirmed =
     false;
 
+
+function getTimezoneDisplayName(
+    timezone
+) {
+    const value =
+        String(
+            timezone ||
+            ""
+        ).trim();
+
+    if (!value) {
+        return "";
+    }
+
+    return (
+        TIMEZONE_DISPLAY_ALIASES[
+            value
+        ] ||
+        value
+    );
+}
 // ============================================================
 // DYNAMIC COPY
 // ============================================================
@@ -1423,7 +1444,6 @@ function formatLocation(
 ) {
     const values =
         [
-            location?.city,
             location?.region,
             location?.country ||
             location?.countryCode
@@ -1500,7 +1520,9 @@ function applyTimezone(
 
     setInputValue(
         "timezoneDisplay",
-        resolvedTimezone
+        getTimezoneDisplayName(
+            resolvedTimezone
+        )
     );
 }
 
