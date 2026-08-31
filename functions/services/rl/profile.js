@@ -6,7 +6,7 @@ import {
 } from "../common_helpers/reload_sessions.js";
 import {
     getRocketLeagueProfileByEpicId
-} from "../supabase/RL/rocketleague_profile.js";
+} from "../supabase/rl/rocketleague_profile.js";
 
 export async function handleRocketLeagueProfile(
     request,
