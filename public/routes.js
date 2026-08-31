@@ -55,6 +55,21 @@ export const ROUTES = {
 
         
     },
+    "/RocketLeague/SubmitMatchResults": {
+        title: "Submit Match Results | BPD Gaming Network",
+        body:
+            "/ocr/HTML/submitimg.html",
+        header:
+            "/Framework/Shell/HTML/Header/header.html",
+        sidebar:
+            "/Framework/Shell/HTML/Sidebar/rl_AuthSidebar.html",
+        footer:
+            "/Framework/Shell/HTML/Footer/footer.html",
+        module:
+            "/ocr/JS/index.js",
+        requiresAuth: true,
+        sitemap: false
+    },
     "/RocketLeague/ImageScanning": {
         title: "Rocket League | BPD Gaming Network",
         body:
@@ -99,21 +114,6 @@ export const ROUTES = {
             "/Framework/Shell/HTML/Footer/footer.html",
         module:
             "/Tabs/RocketLeague/MatchResults/JS/index.js",
-        requiresAuth: true,
-        sitemap: false
-    },
-    "/RocketLeague/SubmitMatchResults": {
-        title: "Submit Match Results | BPD Gaming Network",
-        body:
-            "/ocr/HTML/submitimg.html",
-        header:
-            "/Framework/Shell/HTML/Header/header.html",
-        sidebar:
-            "/Framework/Shell/HTML/Sidebar/rocketleague.html",
-        footer:
-            "/Framework/Shell/HTML/Footer/footer.html",
-        module:
-            "",
         requiresAuth: true,
         sitemap: false
     },
