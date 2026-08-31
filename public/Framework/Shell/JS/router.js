@@ -360,48 +360,55 @@ async function fetchHTML(
 }
 
 async function loadRouterAuthSession() {
+    let result;
+
     if (
         window.BPDAuth &&
         typeof window.BPDAuth.getSession ===
             "function"
     ) {
-        return window.BPDAuth.getSession();
-    }
-
-    const response =
-        await fetch(
-            BPD_AUTH_SESSION_URL,
-            {
-                method: "GET",
-                credentials: "same-origin",
-                cache: "no-store",
-                headers: {
-                    "accept":
-                        "application/json"
+        result =
+            await window.BPDAuth.getSession();
+    } else {
+        const response =
+            await fetch(
+                BPD_AUTH_SESSION_URL,
+                {
+                    method: "GET",
+                    credentials: "same-origin",
+                    cache: "no-store",
+                    headers: {
+                        "accept":
+                            "application/json"
+                    }
                 }
-            }
-        );
+            );
 
-    if (!response.ok) {
-        return {
-            authenticated: false,
-            user: null
-        };
+        if (!response.ok) {
+            return {
+                authenticated: false,
+                user: null
+            };
+        }
+
+        result =
+            await response.json().catch(
+                function() {
+                    return {};
+                }
+            );
     }
-
-    const result =
-        await response.json().catch(
-            function() {
-                return {};
-            }
-        );
 
     return {
         ...result,
+
         authenticated:
             result?.authenticated === true,
+
         user:
-            result?.user || null
+            result?.user ||
+            result?.sessionData ||
+            null
     };
 }
 
