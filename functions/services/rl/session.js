@@ -1,3 +1,8 @@
+import {
+    getStoredSession
+} from "../common_helpers/reload_sessions.js";
+
+
 export async function handleRocketLeagueSession(request, env) {
     const session = await getStoredSession(request, env);
 

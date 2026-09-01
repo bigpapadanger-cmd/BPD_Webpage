@@ -280,14 +280,15 @@ ANSWER
 }
 
 
-/*
-=========================================================
-SUGGESTION
-=========================================================
-*/
+/* =========================================================
+   SUGGESTION
+   ========================================================= */
 
 .faq-suggestion {
+    width: 100%;
+    max-width: 100%;
     margin-top: 36px;
+    box-sizing: border-box;
 }
 
 .faq-suggestion-content {
@@ -295,46 +296,63 @@ SUGGESTION
     align-items: center;
     justify-content: space-between;
     gap: 24px;
+
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+
     padding: 24px;
-    border:
-        1px solid
-        var(--faq-border);
+    box-sizing: border-box;
+
+    border: 1px solid var(--faq-border);
     border-radius: 16px;
+
     background:
         linear-gradient(
             135deg,
-            rgba(
-                139,
-                92,
-                246,
-                0.08
-            ),
+            rgba(139, 92, 246, 0.08),
             var(--faq-surface)
         );
+
+    overflow: hidden;
+}
+
+.faq-suggestion-content > div {
+    flex: 1 1 auto;
+    min-width: 0;
 }
 
 .faq-suggestion h2 {
     margin: 0;
     font-size: 1.1rem;
+    overflow-wrap: anywhere;
 }
 
 .faq-suggestion p {
     margin: 6px 0 0;
     color: var(--faq-muted);
     font-size: 0.9rem;
+    overflow-wrap: anywhere;
 }
 
 .faq-suggestion-button {
     flex: 0 0 auto;
+    max-width: 100%;
+
     padding: 11px 17px;
+    box-sizing: border-box;
+
     cursor: pointer;
-    border:
-        1px solid
-        var(--faq-purple);
+
+    border: 1px solid var(--faq-purple);
     border-radius: 9px;
+
     background: var(--faq-purple);
     color: #ffffff;
+
     font-weight: 700;
+    white-space: nowrap;
+
     transition:
         background 0.2s ease,
         transform 0.15s ease;
@@ -492,12 +510,20 @@ MOBILE
             73px;
     }
 
-    .faq-suggestion-content {
+    .faq-suggestion-content > div {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+     .faq-suggestion-content {
         flex-direction: column;
         align-items: stretch;
+        gap: 18px;
+        padding: 20px;
     }
 
     .faq-suggestion-button {
         width: 100%;
+        white-space: normal;
     }
 }

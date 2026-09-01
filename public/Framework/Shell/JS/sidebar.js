@@ -9,6 +9,10 @@ login control on the Rocket League page.
 =========================================================
 */
 
+const SIDEBAR_AUTO_COLLAPSE_WIDTH = 900;
+let sidebarResizeInitialized = false;
+
+
 /*
 =========================================================
 INITIALIZE SIDEBAR
@@ -17,14 +21,15 @@ Call after sidebar HTML and hover HTML are loaded.
 */
 
 export function initializeSidebar() {
-
     applyGlobalSettings();
+    applyAutomaticSidebarState();
     setupSidebarToggle();
     setupActiveNavigation();
     setupDisabledNavigation();
     setupSidebarTooltips();
-
+    setupSidebarResize();
 }
+
 
 /*
 =========================================================
@@ -33,21 +38,17 @@ LOAD HOVER TOOLTIP HTML
 */
 
 export async function loadSidebarHover() {
-
     const hoverFile =
         "/Framework/Shell/HTML/Sidebar/hover.html";
 
     try {
-
         const response =
             await fetch(hoverFile);
 
         if (!response.ok) {
-
             throw new Error(
                 `Hover failed: ${response.status}`
             );
-
         }
 
         const hoverHTML =
@@ -69,35 +70,31 @@ export async function loadSidebarHover() {
             hoverHTML;
 
         while (container.firstElementChild) {
-
             document.body.appendChild(
                 container.firstElementChild
             );
-
         }
-
     } catch (error) {
-
         console.error(
             "SIDEBAR HOVER LOAD FAILED:",
             error
         );
-
     }
-
 }
+
 
 /*
 =========================================================
 GLOBAL SETTINGS
-Theme, animations and collapsed state.
+Theme, animations and saved sidebar state.
 =========================================================
 */
 
 function applyGlobalSettings() {
-
     const sidebar =
-        document.getElementById("sidebar");
+        document.getElementById(
+            "sidebar"
+        );
 
     const sidebarToggle =
         document.getElementById(
@@ -109,50 +106,28 @@ function applyGlobalSettings() {
     }
 
     const savedSidebar =
-        localStorage.getItem("bpdSidebar")
-        || "open";
+        localStorage.getItem(
+            "bpdSidebar"
+        ) || "open";
 
     const savedTheme =
-        localStorage.getItem("bpdTheme")
-        || "blue";
+        localStorage.getItem(
+            "bpdTheme"
+        ) || "blue";
 
     const savedAnimations =
-        localStorage.getItem("bpdAnimations")
-        || "on";
+        localStorage.getItem(
+            "bpdAnimations"
+        ) || "on";
 
-    if (savedSidebar === "collapsed") {
+    const shouldCollapse =
+        savedSidebar === "collapsed";
 
-        sidebar.classList.add(
-            "collapsed"
-        );
-
-        document.body.classList.add(
-            "sidebar-collapsed"
-        );
-
-    } else {
-
-        sidebar.classList.remove(
-            "collapsed"
-        );
-
-        document.body.classList.remove(
-            "sidebar-collapsed"
-        );
-
-    }
-
-    if (sidebarToggle) {
-
-        sidebarToggle.setAttribute(
-            "aria-expanded",
-            String(
-                savedSidebar
-                !== "collapsed"
-            )
-        );
-
-    }
+    setSidebarCollapsed(
+        sidebar,
+        sidebarToggle,
+        shouldCollapse
+    );
 
     document.body.dataset.theme =
         savedTheme;
@@ -164,8 +139,85 @@ function applyGlobalSettings() {
         "animations-off",
         savedAnimations === "off"
     );
-
 }
+
+
+/*
+=========================================================
+AUTOMATIC SIDEBAR STATE
+Force collapse where screen space is limited.
+=========================================================
+*/
+
+function shouldAutoCollapseSidebar() {
+    return (
+        window.innerWidth <=
+        SIDEBAR_AUTO_COLLAPSE_WIDTH
+    );
+}
+
+function applyAutomaticSidebarState() {
+    if (!shouldAutoCollapseSidebar()) {
+        return;
+    }
+
+    const sidebar =
+        document.getElementById(
+            "sidebar"
+        );
+
+    const sidebarToggle =
+        document.getElementById(
+            "sidebarToggle"
+        );
+
+    if (!sidebar) {
+        return;
+    }
+
+    setSidebarCollapsed(
+        sidebar,
+        sidebarToggle,
+        true
+    );
+
+    hideSidebarTooltip();
+}
+
+
+/*
+=========================================================
+SET SIDEBAR STATE
+=========================================================
+*/
+
+function setSidebarCollapsed(
+    sidebar,
+    sidebarToggle,
+    collapsed
+) {
+    if (!sidebar) {
+        return;
+    }
+
+    sidebar.classList.toggle(
+        "collapsed",
+        collapsed
+    );
+
+    document.body.classList.toggle(
+        "sidebar-collapsed",
+        collapsed
+    );
+
+    if (sidebarToggle) {
+        sidebarToggle.setAttribute(
+            "aria-expanded",
+            String(!collapsed)
+        );
+    }
+}
+
 
 /*
 =========================================================
@@ -178,17 +230,19 @@ function setupSidebarToggle() {
         document.getElementById(
             "sidebar"
         );
+
     const sidebarToggle =
         document.getElementById(
             "sidebarToggle"
         );
+
     if (
-        !sidebar
-        || !sidebarToggle
+        !sidebar ||
+        !sidebarToggle
     ) {
         return;
     }
-    const minimumExpandWidth = 701;
+
     sidebarToggle.addEventListener(
         "click",
         function() {
@@ -196,27 +250,33 @@ function setupSidebarToggle() {
                 sidebar.classList.contains(
                     "collapsed"
                 );
+
             const expansionBlocked =
-                isCollapsed
-                && window.innerWidth
-                    < minimumExpandWidth;
+                isCollapsed &&
+                shouldAutoCollapseSidebar();
+
             if (expansionBlocked) {
                 sidebarToggle.classList.remove(
                     "expand-denied"
                 );
+
                 void sidebarToggle.offsetWidth;
+
                 sidebarToggle.classList.add(
                     "expand-denied"
                 );
+
                 sidebarToggle.setAttribute(
                     "aria-label",
                     "Navigation cannot expand at this screen size"
                 );
+
                 window.setTimeout(
                     function() {
                         sidebarToggle.classList.remove(
                             "expand-denied"
                         );
+
                         sidebarToggle.setAttribute(
                             "aria-label",
                             "Toggle navigation"
@@ -224,34 +284,96 @@ function setupSidebarToggle() {
                     },
                     500
                 );
+
                 return;
             }
+
             const willCollapse =
                 !isCollapsed;
-            sidebar.classList.toggle(
-                "collapsed",
+
+            setSidebarCollapsed(
+                sidebar,
+                sidebarToggle,
                 willCollapse
             );
-            document.body.classList.toggle(
-                "sidebar-collapsed",
-                willCollapse
-            );
+
             localStorage.setItem(
                 "bpdSidebar",
                 willCollapse
                     ? "collapsed"
                     : "open"
             );
-            sidebarToggle.setAttribute(
-                "aria-expanded",
-                String(!willCollapse)
-            );
+
             if (!willCollapse) {
                 hideSidebarTooltip();
             }
         }
     );
 }
+
+
+/*
+=========================================================
+WINDOW RESIZE
+Automatically collapse when entering a narrow viewport.
+
+The saved desktop preference is not overwritten.
+=========================================================
+*/
+
+function setupSidebarResize() {
+    if (sidebarResizeInitialized) {
+        return;
+    }
+
+    sidebarResizeInitialized = true;
+
+    window.addEventListener(
+        "resize",
+        handleSidebarResize
+    );
+}
+
+function handleSidebarResize() {
+    const sidebar =
+        document.getElementById(
+            "sidebar"
+        );
+
+    const sidebarToggle =
+        document.getElementById(
+            "sidebarToggle"
+        );
+
+    if (!sidebar) {
+        return;
+    }
+
+    if (shouldAutoCollapseSidebar()) {
+        setSidebarCollapsed(
+            sidebar,
+            sidebarToggle,
+            true
+        );
+
+        hideSidebarTooltip();
+
+        return;
+    }
+
+    const savedSidebar =
+        localStorage.getItem(
+            "bpdSidebar"
+        ) || "open";
+
+    setSidebarCollapsed(
+        sidebar,
+        sidebarToggle,
+        savedSidebar === "collapsed"
+    );
+}
+
+
 /*
 =========================================================
 TOOLTIP SYSTEM
@@ -259,9 +381,10 @@ TOOLTIP SYSTEM
 */
 
 function setupSidebarTooltips() {
-
     const sidebar =
-        document.getElementById("sidebar");
+        document.getElementById(
+            "sidebar"
+        );
 
     const tooltip =
         document.getElementById(
@@ -274,9 +397,9 @@ function setupSidebarTooltips() {
         );
 
     if (
-        !sidebar
-        || !tooltip
-        || !tooltipText
+        !sidebar ||
+        !tooltip ||
+        !tooltipText
     ) {
         return;
     }
@@ -288,20 +411,16 @@ function setupSidebarTooltips() {
 
     tooltipItems.forEach(
         function(item) {
-
             item.addEventListener(
                 "mouseenter",
                 function(event) {
-
                     if (
                         !sidebar.classList.contains(
                             "collapsed"
                         )
                     ) {
-
                         hideSidebarTooltip();
                         return;
-
                     }
 
                     const text =
@@ -317,14 +436,12 @@ function setupSidebarTooltips() {
                         event,
                         text
                     );
-
                 }
             );
 
             item.addEventListener(
                 "mousemove",
                 function(event) {
-
                     if (
                         !sidebar.classList.contains(
                             "collapsed"
@@ -346,7 +463,6 @@ function setupSidebarTooltips() {
                         event,
                         text
                     );
-
                 }
             );
 
@@ -354,7 +470,6 @@ function setupSidebarTooltips() {
                 "mouseleave",
                 hideSidebarTooltip
             );
-
         }
     );
 
@@ -367,8 +482,8 @@ function setupSidebarTooltips() {
         "scroll",
         hideSidebarTooltip
     );
-
 }
+
 
 /*
 =========================================================
@@ -382,7 +497,6 @@ function showSidebarTooltip(
     event,
     text
 ) {
-
     tooltipText.textContent =
         text;
 
@@ -400,8 +514,8 @@ function showSidebarTooltip(
         "aria-hidden",
         "false"
     );
-
 }
+
 
 /*
 =========================================================
@@ -410,7 +524,6 @@ HIDE TOOLTIP
 */
 
 function hideSidebarTooltip() {
-
     const tooltip =
         document.getElementById(
             "sidebarHover"
@@ -428,8 +541,8 @@ function hideSidebarTooltip() {
         "aria-hidden",
         "true"
     );
-
 }
+
 
 /*
 =========================================================
@@ -438,7 +551,6 @@ ACTIVE NAVIGATION
 */
 
 function setupActiveNavigation() {
-
     const currentPath =
         normalizePath(
             window.location.pathname
@@ -451,7 +563,6 @@ function setupActiveNavigation() {
 
     navItems.forEach(
         function(item) {
-
             const route =
                 normalizePath(
                     item.dataset.navRoute
@@ -461,8 +572,8 @@ function setupActiveNavigation() {
                 currentPath === route;
 
             const childMatch =
-                route !== "/"
-                && currentPath.startsWith(
+                route !== "/" &&
+                currentPath.startsWith(
                     `${route}/`
                 );
 
@@ -470,11 +581,10 @@ function setupActiveNavigation() {
                 "active",
                 exactMatch || childMatch
             );
-
         }
     );
-
 }
+
 
 /*
 =========================================================
@@ -483,7 +593,6 @@ NORMALIZE PATH
 */
 
 function normalizePath(path) {
-
     if (!path) {
         return "/";
     }
@@ -492,27 +601,26 @@ function normalizePath(path) {
         String(path);
 
     if (
-        normalizedPath.length > 1
-        && normalizedPath.endsWith("/")
+        normalizedPath.length > 1 &&
+        normalizedPath.endsWith("/")
     ) {
-
         normalizedPath =
-            normalizedPath.slice(0, -1);
-
+            normalizedPath.slice(
+                0,
+                -1
+            );
     }
 
     if (
-        normalizedPath
-        === "/index.html"
+        normalizedPath ===
+        "/index.html"
     ) {
-
         return "/";
-
     }
 
     return normalizedPath;
-
 }
+
 
 /*
 =========================================================
@@ -521,7 +629,6 @@ DISABLED NAVIGATION
 */
 
 function setupDisabledNavigation() {
-
     const disabledItems =
         document.querySelectorAll(
             ".nav-item.disabled"
@@ -529,13 +636,10 @@ function setupDisabledNavigation() {
 
     disabledItems.forEach(
         function(item) {
-
             item.addEventListener(
                 "click",
                 function(event) {
-
                     event.preventDefault();
-
                 }
             );
 
@@ -543,8 +647,6 @@ function setupDisabledNavigation() {
                 "aria-disabled",
                 "true"
             );
-
         }
     );
-
 }

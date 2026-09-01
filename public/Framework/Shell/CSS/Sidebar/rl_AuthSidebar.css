@@ -15,14 +15,14 @@ Global structure is controlled by:
     min-height: 0;
 }
 
+
 /*
 =========================================================
 GROUPS
 =========================================================
 */
 
-.sidebar-view-rocketleague
-.sidebar-group {
+.sidebar-view-rocketleague .sidebar-group {
     display: flex;
     flex: 0 0 auto;
     flex-direction: column;
@@ -30,27 +30,29 @@ GROUPS
     min-width: 0;
 }
 
-.sidebar-view-rocketleague
-.sidebar-group-label {
+.sidebar-view-rocketleague .sidebar-group-label {
     display: block;
     padding: 4px 12px 6px;
     overflow: hidden;
+
     color: #70798b;
+
     font-size: 0.65rem;
     font-weight: 700;
     letter-spacing: 0.12em;
     text-transform: uppercase;
+
     white-space: nowrap;
 }
 
-.sidebar-view-rocketleague
-.sidebar-authenticated {
+.sidebar-view-rocketleague .sidebar-authenticated {
     display: flex;
     flex: 0 0 auto;
     flex-direction: column;
     width: 100%;
     min-width: 0;
 }
+
 
 /*
 =========================================================
@@ -58,21 +60,23 @@ DIVIDERS
 =========================================================
 */
 
-.sidebar-view-rocketleague
-.nav-divider {
+.sidebar-view-rocketleague .nav-divider {
     flex: 0 0 auto;
+
     width: calc(100% - 18px);
     height: 1px;
+
     margin: 9px;
+
     background:
         rgba(255, 255, 255, 0.09);
 }
 
-.sidebar-view-rocketleague
-.sidebar-bottom-divider {
+.sidebar-view-rocketleague .sidebar-bottom-divider {
     margin-top: 8px;
     margin-bottom: 6px;
 }
+
 
 /*
 =========================================================
@@ -80,14 +84,12 @@ SPACER AND SETTINGS
 =========================================================
 */
 
-.sidebar-view-rocketleague
-.sidebar-navigation-spacer {
+.sidebar-view-rocketleague .sidebar-navigation-spacer {
     flex: 1 0 16px;
     min-height: 16px;
 }
 
-.sidebar-view-rocketleague
-.sidebar-bottom {
+.sidebar-view-rocketleague .sidebar-bottom {
     display: flex;
     flex: 0 0 auto;
     flex-direction: column;
@@ -95,39 +97,41 @@ SPACER AND SETTINGS
     min-width: 0;
 }
 
+
 /*
 =========================================================
 AUTHENTICATION BUTTONS
 =========================================================
 */
 
-.sidebar-view-rocketleague
-.sidebar-auth-button {
+.sidebar-view-rocketleague .sidebar-auth-button {
     font: inherit;
     appearance: none;
     cursor: pointer;
 }
 
-.sidebar-view-rocketleague
-.sidebar-auth-button:disabled {
+.sidebar-view-rocketleague .sidebar-auth-button:disabled {
     cursor: wait;
     opacity: 0.65;
 }
 
+
 /*
 =========================================================
-LOGIN PULSE
+LOGIN BUTTON
 =========================================================
 */
 
-.sidebar-view-rocketleague
-#sidebarLoginButton {
+.sidebar-view-rocketleague #sidebarLoginButton {
     border:
         1px solid
         rgba(124, 92, 255, 0.38);
+
     background:
         rgba(124, 92, 255, 0.1);
+
     color: #d7ceff;
+
     animation:
         sidebarLoginPulse
         2.2s
@@ -135,13 +139,13 @@ LOGIN PULSE
         infinite;
 }
 
-.sidebar-view-rocketleague
-#sidebarLoginButton
-.nav-icon {
+.sidebar-view-rocketleague #sidebarLoginButton .nav-icon {
     color: #d7ceff;
+
     text-shadow:
         0 0 8px
         rgba(124, 92, 255, 0.65);
+
     animation:
         sidebarLoginIconPulse
         2.2s
@@ -149,32 +153,32 @@ LOGIN PULSE
         infinite;
 }
 
-.sidebar-view-rocketleague
-#sidebarLoginButton:hover,
-.sidebar-view-rocketleague
-#sidebarLoginButton:focus-visible {
+.sidebar-view-rocketleague #sidebarLoginButton:hover,
+.sidebar-view-rocketleague #sidebarLoginButton:focus-visible {
     border-color:
         rgba(169, 152, 255, 0.8);
+
     background:
         rgba(124, 92, 255, 0.18);
+
     box-shadow:
         0 0 22px
         rgba(124, 92, 255, 0.48);
+
     animation-play-state: paused;
 }
 
-.sidebar-view-rocketleague
-#sidebarLoginButton:hover
-.nav-icon,
-.sidebar-view-rocketleague
-#sidebarLoginButton:focus-visible
-.nav-icon {
+.sidebar-view-rocketleague #sidebarLoginButton:hover .nav-icon,
+.sidebar-view-rocketleague #sidebarLoginButton:focus-visible .nav-icon {
     color: #ffffff;
+
     text-shadow:
         0 0 14px
         rgba(169, 152, 255, 0.95);
+
     animation-play-state: paused;
 }
+
 
 /*
 =========================================================
@@ -182,50 +186,54 @@ LOGOUT BUTTON
 =========================================================
 */
 
-.sidebar-view-rocketleague
-#sidebarLogoutButton {
+.sidebar-view-rocketleague #sidebarLogoutButton {
     border:
         1px solid
         transparent;
+
     background: transparent;
     color: #aeb5c3;
 }
 
-.sidebar-view-rocketleague
-#sidebarLogoutButton:hover,
-.sidebar-view-rocketleague
-#sidebarLogoutButton:focus-visible {
+.sidebar-view-rocketleague #sidebarLogoutButton:hover,
+.sidebar-view-rocketleague #sidebarLogoutButton:focus-visible {
     border-color:
         rgba(255, 92, 110, 0.35);
+
     background:
         rgba(255, 92, 110, 0.12);
+
     color: #ff9ba8;
 }
 
+
 /*
 =========================================================
-SUBMENU
+SUBMENUS
 =========================================================
 */
 
-.sidebar-view-rocketleague
-.sidebar-menu {
+.sidebar-view-rocketleague .sidebar-menu {
+    display: flex;
     flex: 0 0 auto;
+    flex-direction: column;
+
     width: 100%;
     min-width: 0;
 }
 
-.sidebar-view-rocketleague
-.sidebar-menu-toggle {
+.sidebar-view-rocketleague .sidebar-menu-toggle {
     position: relative;
 }
 
-.sidebar-view-rocketleague
-.submenu-arrow {
+.sidebar-view-rocketleague .submenu-arrow {
     flex: 0 0 auto;
+
     margin-left: auto;
     padding-right: 12px;
+
     color: #81899a;
+
     transition:
         color 0.2s ease,
         transform 0.2s ease;
@@ -238,56 +246,63 @@ SUBMENU
     transform: rotate(90deg);
 }
 
-.sidebar-view-rocketleague
-.sidebar-submenu {
+.sidebar-view-rocketleague .sidebar-submenu {
     display: flex;
     flex: 0 0 auto;
     flex-direction: column;
-    margin: 3px 5px 6px;
+
+    margin: 3px 5px 7px;
     padding: 4px;
+
     border-left:
         2px solid
         rgba(139, 92, 246, 0.5);
-    border-radius: 0 8px 8px 0;
+
+    border-radius:
+        0 8px 8px 0;
+
     background:
         rgba(0, 0, 0, 0.18);
 }
 
-.sidebar-view-rocketleague
-.sidebar-submenu[hidden] {
+.sidebar-view-rocketleague .sidebar-submenu[hidden] {
     display: none;
 }
 
-.sidebar-view-rocketleague
-.submenu-item {
+.sidebar-view-rocketleague .submenu-item {
     display: block;
+
     padding: 9px 10px 9px 16px;
+
     border-radius: 6px;
+
     color: #aeb5c3;
+
     font-size: 0.8rem;
     line-height: 1.3;
+
     text-decoration: none;
     white-space: nowrap;
 }
 
-.sidebar-view-rocketleague
-.submenu-item:hover,
-.sidebar-view-rocketleague
-.submenu-item:focus-visible,
-.sidebar-view-rocketleague
-.submenu-item.active,
-.sidebar-view-rocketleague
-.submenu-item[aria-current="page"] {
+.sidebar-view-rocketleague .submenu-item:hover,
+.sidebar-view-rocketleague .submenu-item:focus-visible,
+.sidebar-view-rocketleague .submenu-item.active,
+.sidebar-view-rocketleague .submenu-item[aria-current="page"] {
     color: #ffffff;
+
     background:
         rgba(139, 92, 246, 0.16);
 }
 
-.sidebar-view-rocketleague
-.submenu-item:focus-visible {
-    outline: 2px solid #8b5cf6;
+.sidebar-view-rocketleague .submenu-item:focus-visible {
+    outline:
+        2px solid
+        #8b5cf6;
+
     outline-offset: -2px;
 }
+
 
 /*
 =========================================================
@@ -295,10 +310,10 @@ AUTH VISIBILITY
 =========================================================
 */
 
-.sidebar-view-rocketleague
-[hidden] {
+.sidebar-view-rocketleague [hidden] {
     display: none !important;
 }
+
 
 /*
 =========================================================
@@ -309,18 +324,21 @@ COLLAPSED STATE
 body.sidebar-collapsed
 .sidebar-view-rocketleague
 .sidebar-group-label,
+
 body.sidebar-collapsed
 .sidebar-view-rocketleague
 .submenu-arrow,
+
 body.sidebar-collapsed
 .sidebar-view-rocketleague
 .sidebar-submenu {
     display: none;
 }
 
+
 /*
 =========================================================
-ANIMATIONS
+LOGIN ANIMATIONS
 =========================================================
 */
 
@@ -329,6 +347,7 @@ ANIMATIONS
     100% {
         border-color:
             rgba(124, 92, 255, 0.32);
+
         box-shadow:
             0 0 0
             rgba(124, 92, 255, 0);
@@ -337,6 +356,7 @@ ANIMATIONS
     50% {
         border-color:
             rgba(169, 152, 255, 0.78);
+
         box-shadow:
             0 0 18px
             rgba(124, 92, 255, 0.42);
@@ -347,6 +367,7 @@ ANIMATIONS
     0%,
     100% {
         color: #d7ceff;
+
         text-shadow:
             0 0 5px
             rgba(124, 92, 255, 0.35);
@@ -354,40 +375,42 @@ ANIMATIONS
 
     50% {
         color: #ffffff;
+
         text-shadow:
             0 0 14px
             rgba(169, 152, 255, 0.95);
     }
 }
 
+
 /*
 =========================================================
-MOBILE AND ACCESSIBILITY
+TABLET / MOBILE
 =========================================================
 */
 
-@media (max-width: 700px) {
-    .sidebar-view-rocketleague
-    .sidebar-group-label,
-    .sidebar-view-rocketleague
-    .submenu-arrow,
-    .sidebar-view-rocketleague
-    .sidebar-submenu {
+@media (max-width: 900px) {
+    .sidebar-view-rocketleague .sidebar-group-label,
+    .sidebar-view-rocketleague .submenu-arrow,
+    .sidebar-view-rocketleague .sidebar-submenu {
         display: none;
     }
 }
 
+
+/*
+=========================================================
+ACCESSIBILITY / ANIMATION SETTINGS
+=========================================================
+*/
+
 @media (prefers-reduced-motion: reduce) {
-    .sidebar-view-rocketleague
-    #sidebarLoginButton,
-    .sidebar-view-rocketleague
-    #sidebarLoginButton
-    .nav-icon {
+    .sidebar-view-rocketleague #sidebarLoginButton,
+    .sidebar-view-rocketleague #sidebarLoginButton .nav-icon {
         animation: none;
     }
 
-    .sidebar-view-rocketleague
-    .submenu-arrow {
+    .sidebar-view-rocketleague .submenu-arrow {
         transition: none;
     }
 }
@@ -395,120 +418,10 @@ MOBILE AND ACCESSIBILITY
 body[data-animations="off"]
 .sidebar-view-rocketleague
 #sidebarLoginButton,
+
 body[data-animations="off"]
 .sidebar-view-rocketleague
 #sidebarLoginButton
 .nav-icon {
     animation: none;
-}
-/*
-=========================================================
-ROCKET LEAGUE SIDEBAR SUBMENUS
-=========================================================
-*/
-
-.sidebar-view-rocketleague
-.sidebar-menu {
-    display: flex;
-    flex: 0 0 auto;
-    flex-direction: column;
-    width: 100%;
-    min-width: 0;
-}
-
-.sidebar-view-rocketleague
-.sidebar-menu-toggle {
-    position: relative;
-}
-
-.sidebar-view-rocketleague
-.submenu-arrow {
-    flex: 0 0 auto;
-    margin-left: auto;
-    padding-right: 12px;
-    color: #81899a;
-    transition:
-        color 0.2s ease,
-        transform 0.2s ease;
-}
-
-.sidebar-view-rocketleague
-.sidebar-menu-toggle[aria-expanded="true"]
-.submenu-arrow {
-    color: #a998ff;
-    transform: rotate(90deg);
-}
-
-.sidebar-view-rocketleague
-.sidebar-submenu {
-    display: flex;
-    flex: 0 0 auto;
-    flex-direction: column;
-    margin: 3px 5px 7px;
-    padding: 4px;
-    border-left:
-        2px solid
-        rgba(139, 92, 246, 0.5);
-    border-radius:
-        0 8px 8px 0;
-    background:
-        rgba(0, 0, 0, 0.18);
-}
-
-.sidebar-view-rocketleague
-.sidebar-submenu[hidden] {
-    display: none;
-}
-
-.sidebar-view-rocketleague
-.submenu-item {
-    display: block;
-    padding: 9px 10px 9px 16px;
-    border-radius: 6px;
-    color: #aeb5c3;
-    font-size: 0.8rem;
-    line-height: 1.3;
-    text-decoration: none;
-    white-space: nowrap;
-}
-
-.sidebar-view-rocketleague
-.submenu-item:hover,
-.sidebar-view-rocketleague
-.submenu-item:focus-visible,
-.sidebar-view-rocketleague
-.submenu-item.active,
-.sidebar-view-rocketleague
-.submenu-item[aria-current="page"] {
-    color: #ffffff;
-    background:
-        rgba(139, 92, 246, 0.16);
-}
-
-.sidebar-view-rocketleague
-.submenu-item:focus-visible {
-    outline:
-        2px solid
-        #8b5cf6;
-    outline-offset: -2px;
-}
-
-/* Hide submenu contents while collapsed */
-
-body.sidebar-collapsed
-.sidebar-view-rocketleague
-.submenu-arrow,
-body.sidebar-collapsed
-.sidebar-view-rocketleague
-.sidebar-submenu {
-    display: none;
-}
-
-
-
-@media (prefers-reduced-motion: reduce) {
-    .sidebar-view-rocketleague
-    .submenu-arrow {
-        transition: none;
-    }
 }

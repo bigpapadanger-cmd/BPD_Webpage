@@ -1,37 +1,18 @@
 /* BPD GAMING NETWORK - FLOATING SIDEBAR */
+
 :root {
-    --sidebar-width:
-        clamp(
-            250px,
-            22vw,
-            360px
-        );
-
-    --sidebar-collapsed-width:
-        clamp(
-            68px,
-            5vw,
-            82px
-        );
-
-    --sidebar-content-gap:
-        clamp(
-            10px,
-            1.2vw,
-            20px
-        );
-
-    --sidebar-icon-width:
-        var(--sidebar-collapsed-width);
+    --sidebar-width: 300px;
+    --sidebar-collapsed-width: 76px;
+    --sidebar-content-gap: 14px;
+    --sidebar-icon-width: var(--sidebar-collapsed-width);
 }
-.sidebar-navigation-top{
-    display: flex;
-    flex: 0 0 auto;
-    flex-direction: column;
-    height: fit-content;
-    min-width: 0;
-    gap: 2px;
-}
+
+
+/* =========================================================
+   SIDEBAR NAVIGATION GROUPS
+   ========================================================= */
+
+.sidebar-navigation-top,
 .sidebar-navigation-bottom {
     display: flex;
     flex: 0 0 auto;
@@ -44,39 +25,17 @@
 .sidebar-navigation-bottom {
     margin-top: auto;
     padding-top: 8px;
-    border-top:
-        1px solid
-        rgba(255, 255, 255, 0.08);
-}
-html,
-body {
-    margin: 0;
-    background: #0d0f13;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.site-shell,
-.site-page,
-.site-content {
-    background-color: transparent;
-}
 
-/*
-=========================================================
-SIDEBAR POSITIONING CONTAINER
-=========================================================
-*/
-
-:root {
-    --sidebar-width: 300px;
-    --sidebar-collapsed-width: 76px;
-    --sidebar-content-gap: 14px;
-    --sidebar-icon-width: var(--sidebar-collapsed-width);
-}
+/* =========================================================
+   SIDEBAR POSITIONING CONTAINER
+   ========================================================= */
 
 .site-sidebar {
     position: fixed;
     top: 41.5%;
-    bottom: auto;
     left: 6px;
     z-index: 100;
 
@@ -85,10 +44,9 @@ SIDEBAR POSITIONING CONTAINER
     max-width: var(--sidebar-width);
 
     height: 620px;
-    min-height: fit-content;
-    max-height: auto;
+    min-height: 0;
 
-    overflow: auto;
+    overflow: visible;
 
     border: 0;
     background: transparent;
@@ -97,10 +55,10 @@ SIDEBAR POSITIONING CONTAINER
     transform: translateY(-50%);
 
     transition:
-        width 0.33s ease;
+        width 0.33s ease,
+        min-width 0.33s ease,
+        max-width 0.33s ease;
 }
-
-
 
 body.sidebar-collapsed .site-sidebar {
     width: var(--sidebar-collapsed-width);
@@ -114,58 +72,63 @@ body.sidebar-collapsed .site-sidebar {
     content: none;
 }
 
-/*
-=========================================================
-SEPARATE TOGGLE BOX
-=========================================================
-*/
+
+/* =========================================================
+   TOGGLE BOX
+   ========================================================= */
 
 .sidebar-toggle-box {
     position: absolute;
-    inset-inline-start: 0px;
-    inset-block-start: 0px;
+    top: 0;
+    left: 0;
     z-index: 110;
+
     display: flex;
     align-items: center;
     justify-content: center;
-    width:
-        var(--sidebar-collapsed-width);
-    height:
-        var(--sidebar-collapsed-width);
+
+    width: var(--sidebar-collapsed-width);
+    height: var(--sidebar-collapsed-width);
+
     border: 2px solid #303541;
     border-radius: 14px;
+
     background:
         linear-gradient(
             180deg,
             #000c24,
             #00028f
         );
+
     box-shadow:
-        0 8px 24px
-        rgba(0, 0, 0, 0.5),
-        0 0 14px
-        rgba(139, 92, 246, 0.1);
+        0 8px 24px rgba(0, 0, 0, 0.5),
+        0 0 14px rgba(139, 92, 246, 0.1);
 }
 
 .sidebar-toggle {
     position: relative;
+
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     gap: 3px;
+
     width: 32px;
     height: 32px;
     padding: 0;
+
     cursor: pointer;
+
     border: 2px solid #353b48;
     border-radius: 8px;
+
     background: #1b1e25;
+
     box-shadow:
-        0 6px 18px
-        rgba(0, 0, 0, 0.45),
-        0 0 8px
-        rgba(139, 92, 246, 0.18);
+        0 6px 18px rgba(0, 0, 0, 0.45),
+        0 0 8px rgba(139, 92, 246, 0.18);
+
     transition:
         transform 0.2s ease,
         border-color 0.2s ease,
@@ -175,9 +138,12 @@ SEPARATE TOGGLE BOX
 
 .sidebar-toggle span {
     display: block;
+
     width: 15px;
     height: 2px;
+
     border-radius: 2px;
+
     background: #ffffff;
 }
 
@@ -185,45 +151,52 @@ SEPARATE TOGGLE BOX
     transform:
         translateY(-2px)
         scale(1.04);
+
     border-color: #8b5cf6;
     background: #211936;
+
     box-shadow:
-        0 8px 22px
-        rgba(0, 0, 0, 0.5),
-        0 0 14px
-        rgba(139, 92, 246, 0.65);
+        0 8px 22px rgba(0, 0, 0, 0.5),
+        0 0 14px rgba(139, 92, 246, 0.65);
 }
 
 .sidebar-toggle:active {
     transform: scale(0.98);
 }
 
-/*
-=========================================================
-SEPARATE NAVIGATION BODY
-=========================================================
-*/
+
+/* =========================================================
+   NAVIGATION BODY
+   ========================================================= */
 
 .sidebar-navigation {
-    justify-content: flex-start;
-    gap: 2px;
     position: absolute;
     top:
         calc(
             var(--sidebar-collapsed-width)
             + 8px
         );
+    right: 0;
     bottom: 0;
     left: 0;
+
     display: flex;
     flex-direction: column;
+    justify-content: flex-start;
+    gap: 2px;
+
     width: 100%;
+    min-width: 0;
     min-height: 0;
+
     padding: 6px 3px 8px;
+
     overflow-x: hidden;
     overflow-y: auto;
+
     border: 2px solid #303541;
     border-radius: 18px;
+
     background:
         linear-gradient(
             180deg,
@@ -247,96 +220,109 @@ SEPARATE NAVIGATION BODY
 
 .sidebar-navigation::-webkit-scrollbar-thumb {
     border-radius: 999px;
-    background:
-        rgba(139, 92, 246, 0.45);
+    background: rgba(139, 92, 246, 0.45);
 }
 
-/*
-=========================================================
-NAVIGATION ITEMS
-=========================================================
-*/
 
-.site-sidebar
-.nav-item {
+/* =========================================================
+   NAVIGATION ITEMS
+   ========================================================= */
+
+.site-sidebar .nav-item {
     display: flex;
     flex: 0 0 auto;
     align-items: center;
+
     width: 100%;
     min-width: 0;
-    min-height: 10px;
+    min-height: 40px;
     padding: 0;
+
     overflow: hidden;
+
     border: 0;
     border-radius: 8px;
+
     background: transparent;
+
     color: #aeb5c3;
+
     font: inherit;
     text-align: left;
     text-decoration: none;
+
     appearance: none;
+
     cursor: pointer;
     white-space: nowrap;
+
+    transition:
+        color 0.2s ease,
+        background 0.2s ease;
 }
 
-.site-sidebar
-.nav-item:hover,
-.site-sidebar
-.nav-item:focus-visible,
-.site-sidebar
-.nav-item.active,
-.site-sidebar
-.nav-item[aria-current="page"] {
+.site-sidebar .nav-item:hover,
+.site-sidebar .nav-item:focus-visible,
+.site-sidebar .nav-item.active,
+.site-sidebar .nav-item[aria-current="page"] {
     color: #ffffff;
     background: #24202f;
 }
 
-.site-sidebar
-.nav-item:focus-visible {
+.site-sidebar .nav-item:focus-visible {
     outline: 2px solid #8b5cf6;
     outline-offset: -2px;
 }
 
-.site-sidebar
-.nav-icon {
+
+/* =========================================================
+   NAVIGATION ICON
+   ========================================================= */
+
+.site-sidebar .nav-icon {
     display: grid;
-    flex-basis:
-        0 0
-        var(--sidebar-icon-width);
+    flex: 0 0 var(--sidebar-icon-width);
+
     align-items: center;
     justify-content: center;
-    width:
-        var(--sidebar-icon-width);
-    min-width:
-        auto;
+
+    width: var(--sidebar-icon-width);
+    min-width: var(--sidebar-icon-width);
 }
 
-.site-sidebar
-.nav-label {
-    min-width:
-        auto;
-    display: inline flow-root;
-    max-width: auto;
+
+/* =========================================================
+   NAVIGATION LABEL
+   ========================================================= */
+
+.site-sidebar .nav-label {
+    display: inline-block;
+
+    flex: 1 1 auto;
+
+    min-width: 0;
+    max-width: 220px;
+
     overflow: hidden;
+
     white-space: nowrap;
+
     opacity: 1;
+
     transition:
         max-width 0.2s ease,
         opacity 0.2s ease;
 }
 
-body.sidebar-collapsed
-.site-sidebar
-.nav-label {
+body.sidebar-collapsed .site-sidebar .nav-label {
     max-width: 0;
     opacity: 0;
 }
 
-/*
-=========================================================
-EXPANSION DENIED
-=========================================================
-*/
+
+/* =========================================================
+   EXPANSION DENIED
+   ========================================================= */
 
 .sidebar-toggle.expand-denied {
     animation:
@@ -365,21 +351,39 @@ EXPANSION DENIED
     }
 }
 
-/*
-=========================================================
-MOBILE
-=========================================================
-*/
+
+/* =========================================================
+   TABLET / MOBILE AUTO-COLLAPSE APPEARANCE
+   ========================================================= */
+
+@media (max-width: 900px) {
+    .site-sidebar {
+        width: var(--sidebar-collapsed-width);
+        min-width: var(--sidebar-collapsed-width);
+        max-width: var(--sidebar-collapsed-width);
+    }
+
+    .site-sidebar .nav-label {
+        max-width: 0;
+        opacity: 0;
+    }
+}
+
+
+/* =========================================================
+   SMALL MOBILE
+   ========================================================= */
 
 @media (max-width: 700px) {
     .site-sidebar {
-        width:
-            var(--sidebar-collapsed-width);
+        left: 4px;
     }
 
-    .site-sidebar
-    .nav-label {
-        max-width: 0;
-        opacity: 0;
+    .sidebar-toggle-box {
+        border-radius: 12px;
+    }
+
+    .sidebar-navigation {
+        border-radius: 14px;
     }
 }
