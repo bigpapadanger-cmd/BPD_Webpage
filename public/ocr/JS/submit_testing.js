@@ -15,8 +15,7 @@
    CONFIGURATION
    ========================================================= */
 
-const OCR_CONFIRM_URL =
-    "/api/ocr/confirm";
+import {OCR_CONFIRM_URL} from "../../scripts/apiRoutes";
 
 
 /* =========================================================

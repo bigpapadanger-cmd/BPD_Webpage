@@ -22,9 +22,8 @@
 /* =========================================================
    CONFIGURATION
    ========================================================= */
+import { OCR_API_URL } from "../../scripts/apiRoutes";
 
-const OCR_API_URL =
-    "/api/ocr";
 
 const OCR_RESULT_FIELD_ORDER = [
     "score",
