@@ -3,45 +3,20 @@
 /* =========================================================
    BPD GAMING NETWORK
    OCR ON-PAGE UI
-
-   Owns:
-   - example panel
-   - result-modal closing
-   - crop-fallback presentation
-
-   SPA lifecycle:
-   - initializeOcrOnPageItems() may be called after each
-     fresh OCR page injection.
-   - element listeners are bound once per injected element.
-   - document-level OCR listeners are bound once globally.
    ========================================================= */
 
-
-/* =========================================================
-   CURRENT PAGE ELEMENTS
-   ========================================================= */
-
-let exampleToggle =
-    null;
-
-let exampleContent =
-    null;
-
-let exampleToggleIcon =
-    null;
-
-let cropFallback =
-    null;
-
-let cropHelp =
-    null;
+let exampleToggle = null;
+let exampleContent = null;
+let exampleToggleIcon = null;
+let cropFallback = null;
+let cropHelp = null;
 
 let ocrOnPageDocumentEventsBound =
     false;
 
 
 /* =========================================================
-   RESOLVE CURRENT DOM
+   DOM
    ========================================================= */
 
 function resolveOcrOnPageElements() {
@@ -73,7 +48,7 @@ function resolveOcrOnPageElements() {
 
 
 /* =========================================================
-   EXAMPLE PANEL
+   EXAMPLE
    ========================================================= */
 
 function handleExampleToggle() {
@@ -93,9 +68,7 @@ function handleExampleToggle() {
 
     exampleToggle.setAttribute(
         "aria-expanded",
-        String(
-            !isOpen
-        )
+        String(!isOpen)
     );
 
     exampleToggleIcon.textContent =
@@ -103,7 +76,6 @@ function handleExampleToggle() {
             ? "▼"
             : "▲";
 }
-
 
 function bindExampleToggle() {
     if (
@@ -158,7 +130,6 @@ function closeResultsModal() {
     );
 }
 
-
 function handleResultsBackdropClick(
     event
 ) {
@@ -169,7 +140,6 @@ function handleResultsBackdropClick(
         closeResultsModal();
     }
 }
-
 
 function bindResultsModal() {
     if (
@@ -207,7 +177,7 @@ function bindResultsModal() {
 
 
 /* =========================================================
-   INITIAL CROP FALLBACK STATE
+   CROP UI
    ========================================================= */
 
 function configureCropFallbackState() {
@@ -245,11 +215,6 @@ function configureCropFallbackState() {
     }
 }
 
-
-/* =========================================================
-   CROP FALLBACK SHOWN
-   ========================================================= */
-
 function handleCropFallbackShown() {
     resolveOcrOnPageElements();
 
@@ -272,11 +237,6 @@ function handleCropFallbackShown() {
     }
 }
 
-
-/* =========================================================
-   SUCCESS
-   ========================================================= */
-
 function handleOcrSuccessfulResult() {
     resolveOcrOnPageElements();
 
@@ -298,67 +258,35 @@ function handleOcrSuccessfulResult() {
 
 
 /* =========================================================
-   DOCUMENT EVENTS
-   ========================================================= */
-
-function bindOcrOnPageDocumentEvents() {
-    if (
-        ocrOnPageDocumentEventsBound
-    ) {
-        return;
-    }
-
-    document.addEventListener(
-        "ocr:crop-fallback-shown",
-        handleCropFallbackShown
-    );
-
-    document.addEventListener(
-        "ocr:successful-result",
-        handleOcrSuccessfulResult
-    );
-
-    ocrOnPageDocumentEventsBound =
-        true;
-}
-
-
-/* =========================================================
-   INITIALIZE ON-PAGE UI
-
-   Safe to call every time the SPA injects a fresh OCR page.
+   INITIALIZATION
    ========================================================= */
 
 function initializeOcrOnPageItems() {
     resolveOcrOnPageElements();
 
     bindExampleToggle();
-
     bindResultsModal();
-
-    bindOcrOnPageDocumentEvents();
-
     configureCropFallbackState();
+
+    if (
+        !ocrOnPageDocumentEventsBound
+    ) {
+        document.addEventListener(
+            "ocr:crop-fallback-shown",
+            handleCropFallbackShown
+        );
+
+        document.addEventListener(
+            "ocr:successful-result",
+            handleOcrSuccessfulResult
+        );
+
+        ocrOnPageDocumentEventsBound =
+            true;
+    }
 
     return true;
 }
 
-
-/* =========================================================
-   EXPOSE INITIALIZER
-
-   Final /ocr/JS/index.js will call this after the other OCR
-   systems have initialized.
-   ========================================================= */
-
 window.initializeOcrOnPageItems =
     initializeOcrOnPageItems;
-
-
-/* =========================================================
-   TEMPORARY LEGACY INITIALIZATION
-
-   Keep until /ocr/JS/index.js becomes the only
-   initialization owner.
-   ========================================================= */
-

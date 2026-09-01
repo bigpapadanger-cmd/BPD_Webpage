@@ -3,57 +3,26 @@
 /* =========================================================
    BPD GAMING NETWORK
    OCR RESULT REVIEW / CONFIRMATION
-
-   SPA lifecycle:
-   - DOM references are refreshed by initializeOcrTesting()
-   - element listeners are bound once per injected element
-   - document-level OCR result listener is bound once globally
    ========================================================= */
 
+const OCR_CONFIRM_URL =
+    "/api/ocr/confirm";
 
-/* =========================================================
-   CONFIGURATION
-   ========================================================= */
+let ocrTestingPanel = null;
+let ocrTestingAccurateBtn = null;
+let ocrTestingIncorrectBtn = null;
+let ocrTestingStatus = null;
 
-import {OCR_CONFIRM_URL} from "../../scripts/apiRoutes";
-
-
-/* =========================================================
-   CURRENT PAGE ELEMENTS
-   ========================================================= */
-
-let ocrTestingPanel =
-    null;
-
-let ocrTestingAccurateBtn =
-    null;
-
-let ocrTestingIncorrectBtn =
-    null;
-
-let ocrTestingStatus =
-    null;
-
-
-/* =========================================================
-   STATE
-   ========================================================= */
-
-let ocrReviewCurrentMatchId =
-    "";
-
-let ocrReviewCurrentResult =
-    null;
-
-let ocrReviewSubmitting =
-    false;
+let ocrReviewCurrentMatchId = "";
+let ocrReviewCurrentResult = null;
+let ocrReviewSubmitting = false;
 
 let ocrTestingDocumentEventsBound =
     false;
 
 
 /* =========================================================
-   RESOLVE CURRENT DOM
+   DOM
    ========================================================= */
 
 function resolveOcrTestingElements() {
@@ -78,11 +47,6 @@ function resolveOcrTestingElements() {
         );
 }
 
-
-/* =========================================================
-   CONFIGURE PANEL
-   ========================================================= */
-
 function configureReviewPanel() {
     if (!ocrTestingPanel) {
         return false;
@@ -90,7 +54,6 @@ function configureReviewPanel() {
 
     ocrTestingPanel.hidden =
         true;
-
 
     const title =
         document.getElementById(
@@ -102,7 +65,6 @@ function configureReviewPanel() {
             "Review & Confirm Results";
     }
 
-
     const label =
         ocrTestingPanel.querySelector(
             ".ocr-testing-label"
@@ -112,7 +74,6 @@ function configureReviewPanel() {
         label.textContent =
             "RESULT REVIEW";
     }
-
 
     const help =
         ocrTestingPanel.querySelector(
@@ -131,7 +92,6 @@ function configureReviewPanel() {
             );
     }
 
-
     if (ocrTestingAccurateBtn) {
         ocrTestingAccurateBtn.textContent =
             "Confirm Results";
@@ -139,7 +99,6 @@ function configureReviewPanel() {
         ocrTestingAccurateBtn.disabled =
             false;
     }
-
 
     if (ocrTestingIncorrectBtn) {
         ocrTestingIncorrectBtn.textContent =
@@ -149,37 +108,26 @@ function configureReviewPanel() {
             false;
     }
 
-
     if (ocrTestingStatus) {
         ocrTestingStatus.textContent =
             "";
     }
-
 
     return true;
 }
 
 
 /* =========================================================
-   REVIEW INPUTS
+   REVIEW VALUES
    ========================================================= */
 
 function getReviewInputs() {
-    if (!ocrTestingPanel) {
-        return [];
-    }
-
     return Array.from(
         document.querySelectorAll(
             ".ocr-review-value-input"
         )
     );
 }
-
-
-/* =========================================================
-   VALUE PARSING
-   ========================================================= */
 
 function parseReviewInputValue(
     input
@@ -193,22 +141,12 @@ function parseReviewInputValue(
     const raw =
         input.value.trim();
 
-
-    /*
-        Ping may default to zero if blank.
-    */
-
     if (
         raw === "" &&
         field === "ping"
     ) {
         return 0;
     }
-
-
-    /*
-        Other numeric fields may not be blank.
-    */
 
     if (raw === "") {
         return {
@@ -217,12 +155,8 @@ function parseReviewInputValue(
         };
     }
 
-
     const numeric =
-        Number(
-            raw
-        );
-
+        Number(raw);
 
     if (
         !Number.isInteger(
@@ -236,22 +170,12 @@ function parseReviewInputValue(
         };
     }
 
-
     return numeric;
 }
 
-
-/* =========================================================
-   BUILD SUBMISSION
-   ========================================================= */
-
 function buildReviewSubmission() {
-    const fields =
-        [];
-
-    const invalid =
-        [];
-
+    const fields = [];
+    const invalid = [];
 
     getReviewInputs().forEach(
         function(input) {
@@ -260,39 +184,13 @@ function buildReviewSubmission() {
                     input
                 );
 
-
             if (
                 userValue &&
                 typeof userValue ===
                     "object" &&
                 userValue.invalid
             ) {
-                invalid.push(
-                    {
-                        team:
-                            Number(
-                                input.dataset.team
-                            ),
-
-                        player:
-                            input.dataset.player ||
-                            "",
-
-                        field:
-                            input.dataset.field ||
-                            "",
-
-                        value:
-                            userValue.raw
-                    }
-                );
-
-                return;
-            }
-
-
-            fields.push(
-                {
+                invalid.push({
                     team:
                         Number(
                             input.dataset.team
@@ -306,12 +204,31 @@ function buildReviewSubmission() {
                         input.dataset.field ||
                         "",
 
-                    userValue
-                }
-            );
+                    value:
+                        userValue.raw
+                });
+
+                return;
+            }
+
+            fields.push({
+                team:
+                    Number(
+                        input.dataset.team
+                    ),
+
+                player:
+                    input.dataset.player ||
+                    "",
+
+                field:
+                    input.dataset.field ||
+                    "",
+
+                userValue
+            });
         }
     );
-
 
     return {
         fields,
@@ -319,15 +236,8 @@ function buildReviewSubmission() {
     };
 }
 
-
-/* =========================================================
-   LOCAL DISPLAY HELPERS
-   ========================================================= */
-
 function getLocalDisputeSummary() {
-    let disputeCount =
-        0;
-
+    let disputeCount = 0;
 
     getReviewInputs().forEach(
         function(input) {
@@ -339,28 +249,23 @@ function getLocalDisputeSummary() {
 
             const originalRaw =
                 String(
-                    input.dataset.originalValue ??
+                    input.dataset
+                        .originalValue ??
                     ""
                 ).trim();
 
-            let originalValue =
-                null;
-
+            let originalValue = null;
 
             if (
                 originalRaw === "" &&
                 field === "ping"
             ) {
-                originalValue =
-                    0;
-
+                originalValue = 0;
             } else if (
                 originalRaw !== ""
             ) {
                 const numeric =
-                    Number(
-                        originalRaw
-                    );
+                    Number(originalRaw);
 
                 originalValue =
                     Number.isInteger(
@@ -370,12 +275,10 @@ function getLocalDisputeSummary() {
                         : null;
             }
 
-
             const userValue =
                 parseReviewInputValue(
                     input
                 );
-
 
             if (
                 userValue &&
@@ -386,29 +289,25 @@ function getLocalDisputeSummary() {
                 return;
             }
 
-
             if (
                 userValue !==
                 originalValue
             ) {
-                disputeCount +=
-                    1;
+                disputeCount += 1;
             }
         }
     );
 
-
     return {
         hasDisputes:
             disputeCount > 0,
-
         disputeCount
     };
 }
 
 
 /* =========================================================
-   RESET CHANGES
+   RESET
    ========================================================= */
 
 function resetReviewChanges() {
@@ -421,33 +320,28 @@ function resetReviewChanges() {
                 ).trim();
 
             const originalValue =
-                input.dataset.originalValue ??
+                input.dataset
+                    .originalValue ??
                 "";
-
 
             if (
                 originalValue === "" &&
                 field === "ping"
             ) {
-                input.value =
-                    "0";
+                input.value = "0";
             } else {
                 input.value =
                     originalValue;
             }
 
-
             input
-                .closest(
-                    "tr"
-                )
+                .closest("tr")
                 ?.classList
                 .remove(
                     "ocr-review-row-disputed"
                 );
         }
     );
-
 
     if (ocrTestingStatus) {
         ocrTestingStatus.textContent =
@@ -457,7 +351,7 @@ function resetReviewChanges() {
 
 
 /* =========================================================
-   CONFIRM RESULTS
+   CONFIRM
    ========================================================= */
 
 async function confirmReviewedResults() {
@@ -468,7 +362,6 @@ async function confirmReviewedResults() {
         return;
     }
 
-
     if (!ocrReviewCurrentMatchId) {
         if (ocrTestingStatus) {
             ocrTestingStatus.textContent =
@@ -478,10 +371,8 @@ async function confirmReviewedResults() {
         return;
     }
 
-
     const reviewSubmission =
         buildReviewSubmission();
-
 
     if (
         reviewSubmission
@@ -490,15 +381,11 @@ async function confirmReviewedResults() {
     ) {
         if (ocrTestingStatus) {
             ocrTestingStatus.textContent =
-                (
-                    "One or more edited values are invalid. "
-                    + "Use whole numbers greater than or equal to zero."
-                );
+                "One or more edited values are invalid. Use whole numbers greater than or equal to zero.";
         }
 
         return;
     }
-
 
     if (
         reviewSubmission
@@ -513,35 +400,28 @@ async function confirmReviewedResults() {
         return;
     }
 
-
     const payload = {
         matchId:
             ocrReviewCurrentMatchId,
-
         fields:
             reviewSubmission.fields
     };
 
-
     const localSummary =
         getLocalDisputeSummary();
 
-
     ocrReviewSubmitting =
         true;
-
 
     if (ocrTestingAccurateBtn) {
         ocrTestingAccurateBtn.disabled =
             true;
     }
 
-
     if (ocrTestingIncorrectBtn) {
         ocrTestingIncorrectBtn.disabled =
             true;
     }
-
 
     if (ocrTestingStatus) {
         ocrTestingStatus.textContent =
@@ -549,7 +429,6 @@ async function confirmReviewedResults() {
                 ? "Saving reviewed results..."
                 : "Confirming results...";
     }
-
 
     try {
         const response =
@@ -580,25 +459,17 @@ async function confirmReviewedResults() {
                 }
             );
 
-
         const rawText =
             await response.text();
 
-
-        let responseData =
-            null;
-
+        let responseData = null;
 
         try {
             responseData =
-                JSON.parse(
-                    rawText
-                );
-        } catch (error) {
-            responseData =
-                null;
+                JSON.parse(rawText);
+        } catch {
+            responseData = null;
         }
-
 
         if (
             !response.ok ||
@@ -615,14 +486,12 @@ async function confirmReviewedResults() {
             );
         }
 
-
         const disputeCount =
             Number(
                 responseData
                     .disputeCount ||
                 0
             );
-
 
         if (ocrTestingStatus) {
             if (
@@ -648,7 +517,6 @@ async function confirmReviewedResults() {
             }
         }
 
-
         document.dispatchEvent(
             new CustomEvent(
                 "ocr:results-confirmed",
@@ -661,48 +529,32 @@ async function confirmReviewedResults() {
                 }
             )
         );
-
     } catch (error) {
         console.error(
             "[OCR REVIEW] CONFIRM ERROR:",
             error
         );
 
-
         if (ocrTestingStatus) {
             ocrTestingStatus.textContent =
-                (
-                    "The OCR result is already preserved, "
-                    + "but your confirmation could not be saved. "
-                    + "Please try Confirm Results again."
-                );
+                "The OCR result is already preserved, but your confirmation could not be saved. Please try Confirm Results again.";
         }
-
 
         if (ocrTestingAccurateBtn) {
             ocrTestingAccurateBtn.disabled =
                 false;
         }
 
-
         if (ocrTestingIncorrectBtn) {
             ocrTestingIncorrectBtn.disabled =
                 false;
         }
 
-
         return;
-
     } finally {
         ocrReviewSubmitting =
             false;
     }
-
-
-    /*
-        Successful confirmation stays locked.
-        This prevents an accidental second submission.
-    */
 
     if (ocrTestingAccurateBtn) {
         ocrTestingAccurateBtn.disabled =
@@ -711,7 +563,6 @@ async function confirmReviewedResults() {
         ocrTestingAccurateBtn.textContent =
             "Results Confirmed";
     }
-
 
     if (ocrTestingIncorrectBtn) {
         ocrTestingIncorrectBtn.disabled =
@@ -724,19 +575,8 @@ async function confirmReviewedResults() {
    SHOW REVIEW
    ========================================================= */
 
-function showOcrReview(
-    detail
-) {
-    if (!ocrTestingPanel) {
-        /*
-        SPA may have injected a fresh OCR page since the
-        document event listener was originally installed.
-        Refresh the references before giving up.
-        */
-
-        resolveOcrTestingElements();
-    }
-
+function showOcrReview(detail) {
+    resolveOcrTestingElements();
 
     if (!ocrTestingPanel) {
         console.error(
@@ -745,7 +585,6 @@ function showOcrReview(
 
         return;
     }
-
 
     ocrReviewCurrentMatchId =
         String(
@@ -757,19 +596,15 @@ function showOcrReview(
             ""
         ).trim();
 
-
     ocrReviewCurrentResult =
         detail?.result ||
         null;
 
-
     ocrReviewSubmitting =
         false;
 
-
     ocrTestingPanel.hidden =
         false;
-
 
     if (ocrTestingAccurateBtn) {
         ocrTestingAccurateBtn.disabled =
@@ -779,7 +614,6 @@ function showOcrReview(
             "Confirm Results";
     }
 
-
     if (ocrTestingIncorrectBtn) {
         ocrTestingIncorrectBtn.disabled =
             false;
@@ -787,7 +621,6 @@ function showOcrReview(
         ocrTestingIncorrectBtn.textContent =
             "Reset Changes";
     }
-
 
     if (ocrTestingStatus) {
         const needsReviewCount =
@@ -803,10 +636,8 @@ function showOcrReview(
                 )
                 .length;
 
-
         if (
-            needsReviewCount >
-            0
+            needsReviewCount > 0
         ) {
             ocrTestingStatus.textContent =
                 (
@@ -822,107 +653,26 @@ function showOcrReview(
                 );
         } else {
             ocrTestingStatus.textContent =
-                (
-                    "All returned values are high confidence. "
-                    + "Review them and confirm when ready."
-                );
+                "All returned values are high confidence. Review them and confirm when ready.";
         }
     }
 }
-
-
-/* =========================================================
-   RESULT EVENT
-   ========================================================= */
 
 function handleOcrResultRendered(
     event
 ) {
     showOcrReview(
-        event.detail ||
-        {}
+        event.detail || {}
     );
 }
 
 
 /* =========================================================
-   ELEMENT EVENT BINDING
-   ========================================================= */
-
-function bindOcrTestingElementEvents() {
-    if (ocrTestingAccurateBtn) {
-        if (
-            ocrTestingAccurateBtn
-                .dataset
-                .ocrTestingConfirmInitialized !==
-            "true"
-        ) {
-            ocrTestingAccurateBtn
-                .addEventListener(
-                    "click",
-                    confirmReviewedResults
-                );
-
-            ocrTestingAccurateBtn
-                .dataset
-                .ocrTestingConfirmInitialized =
-                "true";
-        }
-    }
-
-
-    if (ocrTestingIncorrectBtn) {
-        if (
-            ocrTestingIncorrectBtn
-                .dataset
-                .ocrTestingResetInitialized !==
-            "true"
-        ) {
-            ocrTestingIncorrectBtn
-                .addEventListener(
-                    "click",
-                    resetReviewChanges
-                );
-
-            ocrTestingIncorrectBtn
-                .dataset
-                .ocrTestingResetInitialized =
-                "true";
-        }
-    }
-}
-
-
-/* =========================================================
-   DOCUMENT EVENT BINDING
-   ========================================================= */
-
-function bindOcrTestingDocumentEvents() {
-    if (
-        ocrTestingDocumentEventsBound
-    ) {
-        return;
-    }
-
-    document.addEventListener(
-        "ocrtesting:result-rendered",
-        handleOcrResultRendered
-    );
-
-    ocrTestingDocumentEventsBound =
-        true;
-}
-
-
-/* =========================================================
-   INITIALIZE TESTING / REVIEW
-
-   Safe to call every time the SPA injects a fresh OCR page.
+   INITIALIZATION
    ========================================================= */
 
 function initializeOcrTesting() {
     resolveOcrTestingElements();
-
 
     if (!ocrTestingPanel) {
         console.error(
@@ -932,42 +682,64 @@ function initializeOcrTesting() {
         return false;
     }
 
-
-    ocrReviewCurrentMatchId =
-        "";
-
-    ocrReviewCurrentResult =
-        null;
-
-    ocrReviewSubmitting =
-        false;
-
+    ocrReviewCurrentMatchId = "";
+    ocrReviewCurrentResult = null;
+    ocrReviewSubmitting = false;
 
     configureReviewPanel();
 
-    bindOcrTestingElementEvents();
+    if (
+        ocrTestingAccurateBtn &&
+        ocrTestingAccurateBtn
+            .dataset
+            .ocrTestingConfirmInitialized !==
+            "true"
+    ) {
+        ocrTestingAccurateBtn
+            .addEventListener(
+                "click",
+                confirmReviewedResults
+            );
 
-    bindOcrTestingDocumentEvents();
+        ocrTestingAccurateBtn
+            .dataset
+            .ocrTestingConfirmInitialized =
+            "true";
+    }
 
+    if (
+        ocrTestingIncorrectBtn &&
+        ocrTestingIncorrectBtn
+            .dataset
+            .ocrTestingResetInitialized !==
+            "true"
+    ) {
+        ocrTestingIncorrectBtn
+            .addEventListener(
+                "click",
+                resetReviewChanges
+            );
+
+        ocrTestingIncorrectBtn
+            .dataset
+            .ocrTestingResetInitialized =
+            "true";
+    }
+
+    if (
+        !ocrTestingDocumentEventsBound
+    ) {
+        document.addEventListener(
+            "ocrtesting:result-rendered",
+            handleOcrResultRendered
+        );
+
+        ocrTestingDocumentEventsBound =
+            true;
+    }
 
     return true;
 }
 
-
-/* =========================================================
-   EXPOSE INITIALIZER
-
-   Final /ocr/JS/index.js will call this after the OCR
-   submission module has initialized.
-   ========================================================= */
-
 window.initializeOcrTesting =
     initializeOcrTesting;
-
-
-/* =========================================================
-   TEMPORARY LEGACY INITIALIZATION
-
-   Keep until all OCR files are converted and
-   /ocr/JS/index.js becomes the only initialization owner.
-   ========================================================= */

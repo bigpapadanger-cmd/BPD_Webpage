@@ -3,25 +3,6 @@
 /* =========================================================
    BPD GAMING NETWORK
    OCR CLIENT CORE
-
-   Owns:
-   - shared page state
-   - player-name inputs
-   - uploaded image
-   - preview canvas
-   - crop fallback UI
-   - image/crop blob creation
-   - control locking
-
-   SPA lifecycle:
-   - DOM references are refreshed by initializeOcrCore()
-   - element listeners are bound once per injected element
-   - window listener is bound once globally
-   ========================================================= */
-
-
-/* =========================================================
-   CONFIGURATION
    ========================================================= */
 
 const OCR_STATE_KEY =
@@ -45,9 +26,6 @@ const OCR_MIN_SOURCE_CROP_HEIGHT =
 
 /* =========================================================
    CURRENT PAGE ELEMENTS
-
-   These are intentionally reassigned whenever the SPA
-   injects a new OCR page.
    ========================================================= */
 
 let imageInput = null;
@@ -67,29 +45,19 @@ let ctx = null;
 
 
 /* =========================================================
-   SHARED OCR STATE
+   STATE
    ========================================================= */
 
 let sourceImage = null;
 let sourceFile = null;
+let sourceFileName = "scoreboard.png";
 
-let sourceFileName =
-    "scoreboard.png";
+let displayScale = 1;
+let ocrControlsLocked = false;
+let cropFallbackVisible = false;
 
-let displayScale =
-    1;
-
-let ocrControlsLocked =
-    false;
-
-let cropFallbackVisible =
-    false;
-
-let dragMode =
-    null;
-
-let dragStart =
-    null;
+let dragMode = null;
+let dragStart = null;
 
 let crop = {
     x: 0,
@@ -98,15 +66,12 @@ let crop = {
     height: 0
 };
 
-let OCR_CORE_READY =
-    false;
-
-let ocrCoreWindowEventsBound =
-    false;
+let OCR_CORE_READY = false;
+let ocrCoreWindowEventsBound = false;
 
 
 /* =========================================================
-   RESOLVE CURRENT DOM
+   DOM
    ========================================================= */
 
 function resolveOcrCoreElements() {
@@ -192,9 +157,7 @@ function setStatus(message) {
     }
 
     statusBox.textContent =
-        String(
-            message || ""
-        );
+        String(message || "");
 }
 
 
@@ -213,7 +176,6 @@ function getPlayerNameInputs() {
         )
     );
 }
-
 
 function setOcrControlsLocked(locked) {
     ocrControlsLocked =
@@ -256,9 +218,7 @@ function setOcrControlsLocked(locked) {
     if (canvas) {
         canvas.setAttribute(
             "aria-disabled",
-            String(
-                ocrControlsLocked
-            )
+            String(ocrControlsLocked)
         );
 
         canvas.style.cursor =
@@ -270,24 +230,18 @@ function setOcrControlsLocked(locked) {
     }
 
     if (ocrControlsLocked) {
-        dragMode =
-            null;
-
-        dragStart =
-            null;
+        dragMode = null;
+        dragStart = null;
     }
 }
 
-
 function getPlayerNameState() {
-    return getPlayerNameInputs()
-        .map(
-            function(input) {
-                return input.value;
-            }
-        );
+    return getPlayerNameInputs().map(
+        function(input) {
+            return input.value;
+        }
+    );
 }
-
 
 function buildPlayerNameInputs(
     savedNames = null
@@ -300,9 +254,7 @@ function buildPlayerNameInputs(
     }
 
     const playersPerTeam =
-        Number(
-            matchSize.value
-        );
+        Number(matchSize.value);
 
     const previousNames =
         Array.isArray(savedNames)
@@ -312,8 +264,7 @@ function buildPlayerNameInputs(
     playerNamesContainer
         .replaceChildren();
 
-    let globalIndex =
-        0;
+    let globalIndex = 0;
 
     for (
         let teamIndex = 1;
@@ -328,7 +279,6 @@ function buildPlayerNameInputs(
         teamGroup.className =
             "player-team-group";
 
-
         const teamTitle =
             document.createElement(
                 "div"
@@ -340,11 +290,9 @@ function buildPlayerNameInputs(
         teamTitle.textContent =
             `Team ${teamIndex}`;
 
-
         teamGroup.appendChild(
             teamTitle
         );
-
 
         for (
             let playerIndex = 1;
@@ -356,8 +304,7 @@ function buildPlayerNameInputs(
                     "input"
                 );
 
-            input.type =
-                "text";
+            input.type = "text";
 
             input.className =
                 "player-name-input";
@@ -423,8 +370,7 @@ function buildPlayerNameInputs(
                 input
             );
 
-            globalIndex +=
-                1;
+            globalIndex += 1;
         }
 
         playerNamesContainer
@@ -433,7 +379,6 @@ function buildPlayerNameInputs(
             );
     }
 }
-
 
 function getExpectedPlayerNames() {
     return getPlayerNameInputs()
@@ -447,7 +392,6 @@ function getExpectedPlayerNames() {
         .filter(Boolean);
 }
 
-
 function validateExpectedPlayerNames() {
     if (!matchSize) {
         return {
@@ -459,9 +403,7 @@ function validateExpectedPlayerNames() {
     }
 
     const playersPerTeam =
-        Number(
-            matchSize.value
-        );
+        Number(matchSize.value);
 
     const expectedPlayers =
         playersPerTeam * 2;
@@ -475,9 +417,7 @@ function validateExpectedPlayerNames() {
     ) {
         return {
             valid: false,
-
             names,
-
             message:
                 "Enter all " +
                 expectedPlayers +
@@ -495,9 +435,7 @@ function validateExpectedPlayerNames() {
     ) {
         return {
             valid: false,
-
             names,
-
             message:
                 "Each expected player name must be unique."
         };
@@ -511,7 +449,7 @@ function validateExpectedPlayerNames() {
 
 
 /* =========================================================
-   CROP STATE
+   PAGE STATE
    ========================================================= */
 
 function getNormalizedCrop() {
@@ -541,11 +479,6 @@ function getNormalizedCrop() {
             canvas.height
     };
 }
-
-
-/* =========================================================
-   PAGE STATE
-   ========================================================= */
 
 function savePageState() {
     if (!sourceImage) {
@@ -578,9 +511,7 @@ function savePageState() {
     try {
         sessionStorage.setItem(
             OCR_STATE_KEY,
-            JSON.stringify(
-                state
-            )
+            JSON.stringify(state)
         );
     } catch (error) {
         console.error(
@@ -589,7 +520,6 @@ function savePageState() {
         );
     }
 }
-
 
 function clearPageState() {
     try {
@@ -603,7 +533,6 @@ function clearPageState() {
         );
     }
 }
-
 
 function restoreNormalizedCrop(
     normalizedCrop
@@ -656,10 +585,8 @@ function restoreNormalizedCrop(
     return true;
 }
 
-
 function restorePageState() {
-    let state =
-        null;
+    let state = null;
 
     try {
         state =
@@ -670,7 +597,6 @@ function restorePageState() {
             );
     } catch {
         clearPageState();
-
         return false;
     }
 
@@ -702,11 +628,8 @@ function restorePageState() {
 
     image.onload =
         function() {
-            sourceImage =
-                image;
-
-            sourceFile =
-                null;
+            sourceImage = image;
+            sourceFile = null;
 
             fitCanvasToImage();
 
@@ -725,9 +648,7 @@ function restorePageState() {
                     state.cropFallbackVisible
                 );
 
-            if (
-                cropFallbackVisible
-            ) {
+            if (cropFallbackVisible) {
                 if (
                     !restoreNormalizedCrop(
                         state.normalizedCrop
@@ -764,11 +685,8 @@ function restorePageState() {
         function() {
             clearPageState();
 
-            sourceImage =
-                null;
-
-            sourceFile =
-                null;
+            sourceImage = null;
+            sourceFile = null;
 
             buildPlayerNameInputs(
                 state.playerNames ||
@@ -792,7 +710,7 @@ function restorePageState() {
 
 
 /* =========================================================
-   CANVAS SIZING
+   CANVAS
    ========================================================= */
 
 function fitCanvasToImage() {
@@ -817,10 +735,8 @@ function fitCanvasToImage() {
     const cssScale =
         Math.min(
             1,
-
             maximumCssWidth /
                 sourceImage.naturalWidth,
-
             maximumCssHeight /
                 sourceImage.naturalHeight
         );
@@ -828,7 +744,6 @@ function fitCanvasToImage() {
     const pixelRatio =
         Math.min(
             3,
-
             Math.max(
                 1,
                 window.devicePixelRatio ||
@@ -868,11 +783,6 @@ function fitCanvasToImage() {
         ) + "px";
 }
 
-
-/* =========================================================
-   CROP
-   ========================================================= */
-
 function clampCrop() {
     if (!canvas) {
         return;
@@ -881,7 +791,6 @@ function clampCrop() {
     crop.width =
         Math.max(
             OCR_MIN_CROP_WIDTH,
-
             Math.min(
                 canvas.width,
                 crop.width
@@ -891,7 +800,6 @@ function clampCrop() {
     crop.height =
         Math.max(
             OCR_MIN_CROP_HEIGHT,
-
             Math.min(
                 canvas.height,
                 crop.height
@@ -901,11 +809,9 @@ function clampCrop() {
     crop.x =
         Math.max(
             0,
-
             Math.min(
                 canvas.width -
                     crop.width,
-
                 crop.x
             )
         );
@@ -913,16 +819,13 @@ function clampCrop() {
     crop.y =
         Math.max(
             0,
-
             Math.min(
                 canvas.height -
                     crop.height,
-
                 crop.y
             )
         );
 }
-
 
 function resetCrop() {
     if (
@@ -933,12 +836,10 @@ function resetCrop() {
     }
 
     crop.width =
-        canvas.width *
-        0.96;
+        canvas.width * 0.96;
 
     crop.height =
-        canvas.height *
-        0.72;
+        canvas.height * 0.72;
 
     crop.x =
         (
@@ -956,7 +857,6 @@ function resetCrop() {
     draw();
     savePageState();
 }
-
 
 function showCropFallback(
     message = null
@@ -997,7 +897,6 @@ function showCropFallback(
     );
 }
 
-
 function hideCropFallback() {
     cropFallbackVisible =
         false;
@@ -1022,11 +921,6 @@ function hideCropFallback() {
     draw();
     savePageState();
 }
-
-
-/* =========================================================
-   CROP DRAWING
-   ========================================================= */
 
 function getHandlePoints() {
     const left =
@@ -1056,44 +950,36 @@ function getHandlePoints() {
             x: left,
             y: top
         },
-
         n: {
             x: centerX,
             y: top
         },
-
         ne: {
             x: right,
             y: top
         },
-
         e: {
             x: right,
             y: centerY
         },
-
         se: {
             x: right,
             y: bottom
         },
-
         s: {
             x: centerX,
             y: bottom
         },
-
         sw: {
             x: left,
             y: bottom
         },
-
         w: {
             x: left,
             y: centerY
         }
     };
 }
-
 
 function drawHandles() {
     if (
@@ -1109,24 +995,19 @@ function drawHandles() {
     ctx.fillStyle =
         "#00ff66";
 
-    Object.values(
-        points
-    ).forEach(
+    Object.values(points).forEach(
         function(point) {
             ctx.fillRect(
                 point.x -
                     OCR_HANDLE_SIZE / 2,
-
                 point.y -
                     OCR_HANDLE_SIZE / 2,
-
                 OCR_HANDLE_SIZE,
                 OCR_HANDLE_SIZE
             );
         }
     );
 }
-
 
 function draw() {
     if (
@@ -1183,19 +1064,14 @@ function draw() {
 
     ctx.drawImage(
         sourceImage,
-
         crop.x /
             displayScale,
-
         crop.y /
             displayScale,
-
         crop.width /
             displayScale,
-
         crop.height /
             displayScale,
-
         crop.x,
         crop.y,
         crop.width,
@@ -1222,7 +1098,7 @@ function draw() {
 
 
 /* =========================================================
-   POINTER POSITION
+   POINTERS
    ========================================================= */
 
 function getPointerPosition(event) {
@@ -1269,32 +1145,21 @@ function getPointerPosition(event) {
     };
 }
 
-
-function hitTestHandle(
-    x,
-    y
-) {
+function hitTestHandle(x, y) {
     const points =
         getHandlePoints();
 
     for (
-        const [
-            name,
-            point
-        ]
-        of Object.entries(
-            points
-        )
+        const [name, point]
+        of Object.entries(points)
     ) {
         if (
             Math.abs(
-                x -
-                point.x
+                x - point.x
             ) <=
                 OCR_HANDLE_SIZE &&
             Math.abs(
-                y -
-                point.y
+                y - point.y
             ) <=
                 OCR_HANDLE_SIZE
         ) {
@@ -1305,11 +1170,7 @@ function hitTestHandle(
     return null;
 }
 
-
-function pointInsideCrop(
-    x,
-    y
-) {
+function pointInsideCrop(x, y) {
     return (
         x >= crop.x &&
         x <=
@@ -1321,11 +1182,6 @@ function pointInsideCrop(
             crop.height
     );
 }
-
-
-/* =========================================================
-   POINTER EVENTS
-   ========================================================= */
 
 function handleCanvasPointerDown(
     event
@@ -1340,9 +1196,7 @@ function handleCanvasPointerDown(
     }
 
     const point =
-        getPointerPosition(
-            event
-        );
+        getPointerPosition(event);
 
     const handle =
         hitTestHandle(
@@ -1351,11 +1205,9 @@ function handleCanvasPointerDown(
         );
 
     if (handle) {
-        dragMode =
-            handle;
+        dragMode = handle;
     } else {
-        dragMode =
-            "move";
+        dragMode = "move";
 
         if (
             !pointInsideCrop(
@@ -1376,12 +1228,8 @@ function handleCanvasPointerDown(
     }
 
     dragStart = {
-        x:
-            point.x,
-
-        y:
-            point.y,
-
+        x: point.x,
+        y: point.y,
         crop: {
             ...crop
         }
@@ -1393,7 +1241,6 @@ function handleCanvasPointerDown(
 
     draw();
 }
-
 
 function handleCanvasPointerMove(
     event
@@ -1408,9 +1255,7 @@ function handleCanvasPointerMove(
     }
 
     const point =
-        getPointerPosition(
-            event
-        );
+        getPointerPosition(event);
 
     const dx =
         point.x -
@@ -1423,70 +1268,46 @@ function handleCanvasPointerMove(
     const start =
         dragStart.crop;
 
-
-    if (
-        dragMode ===
-        "move"
-    ) {
+    if (dragMode === "move") {
         crop.x =
-            start.x +
-            dx;
+            start.x + dx;
 
         crop.y =
-            start.y +
-            dy;
+            start.y + dy;
     } else {
-        let left =
-            start.x;
-
+        let left = start.x;
         let right =
             start.x +
             start.width;
 
-        let top =
-            start.y;
-
+        let top = start.y;
         let bottom =
             start.y +
             start.height;
 
-
         if (
-            dragMode.includes(
-                "w"
-            )
+            dragMode.includes("w")
         ) {
-            left +=
-                dx;
+            left += dx;
         }
 
         if (
-            dragMode.includes(
-                "e"
-            )
+            dragMode.includes("e")
         ) {
-            right +=
-                dx;
+            right += dx;
         }
 
         if (
-            dragMode.includes(
-                "n"
-            )
+            dragMode.includes("n")
         ) {
-            top +=
-                dy;
+            top += dy;
         }
 
         if (
-            dragMode.includes(
-                "s"
-            )
+            dragMode.includes("s")
         ) {
-            bottom +=
-                dy;
+            bottom += dy;
         }
-
 
         if (
             right -
@@ -1494,9 +1315,7 @@ function handleCanvasPointerMove(
             OCR_MIN_CROP_WIDTH
         ) {
             if (
-                dragMode.includes(
-                    "w"
-                )
+                dragMode.includes("w")
             ) {
                 left =
                     right -
@@ -1508,16 +1327,13 @@ function handleCanvasPointerMove(
             }
         }
 
-
         if (
             bottom -
             top <
             OCR_MIN_CROP_HEIGHT
         ) {
             if (
-                dragMode.includes(
-                    "n"
-                )
+                dragMode.includes("n")
             ) {
                 top =
                     bottom -
@@ -1529,35 +1345,25 @@ function handleCanvasPointerMove(
             }
         }
 
-
-        crop.x =
-            left;
-
-        crop.y =
-            top;
+        crop.x = left;
+        crop.y = top;
 
         crop.width =
-            right -
-            left;
+            right - left;
 
         crop.height =
-            bottom -
-            top;
+            bottom - top;
     }
 
     clampCrop();
     draw();
 }
 
-
 function handleCanvasPointerUp(
     event
 ) {
-    dragMode =
-        null;
-
-    dragStart =
-        null;
+    dragMode = null;
+    dragStart = null;
 
     if (
         canvas &&
@@ -1573,15 +1379,11 @@ function handleCanvasPointerUp(
     savePageState();
 }
 
-
 function handleCanvasPointerCancel(
     event
 ) {
-    dragMode =
-        null;
-
-    dragStart =
-        null;
+    dragMode = null;
+    dragStart = null;
 
     if (
         canvas &&
@@ -1597,7 +1399,7 @@ function handleCanvasPointerCancel(
 
 
 /* =========================================================
-   IMAGE BLOB
+   IMAGE OUTPUT
    ========================================================= */
 
 function getOriginalImageBlob() {
@@ -1608,10 +1410,7 @@ function getOriginalImageBlob() {
     }
 
     return new Promise(
-        function(
-            resolve,
-            reject
-        ) {
+        function(resolve, reject) {
             if (!sourceImage) {
                 reject(
                     new Error(
@@ -1669,9 +1468,7 @@ function getOriginalImageBlob() {
                         return;
                     }
 
-                    resolve(
-                        blob
-                    );
+                    resolve(blob);
                 },
                 "image/png"
             );
@@ -1679,17 +1476,9 @@ function getOriginalImageBlob() {
     );
 }
 
-
-/* =========================================================
-   CROPPED IMAGE BLOB
-   ========================================================= */
-
 function createScoreboardCropBlob() {
     return new Promise(
-        function(
-            resolve,
-            reject
-        ) {
+        function(resolve, reject) {
             if (!sourceImage) {
                 reject(
                     new Error(
@@ -1732,7 +1521,6 @@ function createScoreboardCropBlob() {
             const sourceLeft =
                 Math.max(
                     0,
-
                     Math.floor(
                         normalized.x *
                         naturalWidth
@@ -1742,7 +1530,6 @@ function createScoreboardCropBlob() {
             const sourceTop =
                 Math.max(
                     0,
-
                     Math.floor(
                         normalized.y *
                         naturalHeight
@@ -1752,7 +1539,6 @@ function createScoreboardCropBlob() {
             const sourceRight =
                 Math.min(
                     naturalWidth,
-
                     Math.ceil(
                         (
                             normalized.x +
@@ -1765,7 +1551,6 @@ function createScoreboardCropBlob() {
             const sourceBottom =
                 Math.min(
                     naturalHeight,
-
                     Math.ceil(
                         (
                             normalized.y +
@@ -1783,7 +1568,6 @@ function createScoreboardCropBlob() {
                 sourceBottom -
                 sourceTop;
 
-
             if (
                 sourceWidth <
                     OCR_MIN_SOURCE_CROP_WIDTH ||
@@ -1799,7 +1583,6 @@ function createScoreboardCropBlob() {
                 return;
             }
 
-
             const outputCanvas =
                 document.createElement(
                     "canvas"
@@ -1810,7 +1593,6 @@ function createScoreboardCropBlob() {
 
             outputCanvas.height =
                 sourceHeight;
-
 
             const outputContext =
                 outputCanvas.getContext(
@@ -1830,21 +1612,17 @@ function createScoreboardCropBlob() {
                 return;
             }
 
-
             outputContext.drawImage(
                 sourceImage,
-
                 sourceLeft,
                 sourceTop,
                 sourceWidth,
                 sourceHeight,
-
                 0,
                 0,
                 sourceWidth,
                 sourceHeight
             );
-
 
             outputCanvas.toBlob(
                 function(blob) {
@@ -1858,9 +1636,7 @@ function createScoreboardCropBlob() {
                         return;
                     }
 
-                    resolve(
-                        blob
-                    );
+                    resolve(blob);
                 },
                 "image/png"
             );
@@ -1881,17 +1657,14 @@ function loadImageFile(file) {
         return;
     }
 
-    sourceFile =
-        file;
+    sourceFile = file;
 
     sourceFileName =
         file.name ||
         "scoreboard.png";
 
-
     const reader =
         new FileReader();
-
 
     reader.onload =
         function(event) {
@@ -1900,8 +1673,7 @@ function loadImageFile(file) {
 
             image.onload =
                 function() {
-                    sourceImage =
-                        image;
+                    sourceImage = image;
 
                     fitCanvasToImage();
 
@@ -1950,7 +1722,6 @@ function loadImageFile(file) {
                 "";
         };
 
-
     reader.onerror =
         function() {
             setStatus(
@@ -1958,15 +1729,12 @@ function loadImageFile(file) {
             );
         };
 
-
-    reader.readAsDataURL(
-        file
-    );
+    reader.readAsDataURL(file);
 }
 
 
 /* =========================================================
-   CORE EVENTS
+   EVENTS
    ========================================================= */
 
 function handleImageInputChange() {
@@ -1982,7 +1750,6 @@ function handleImageInputChange() {
     );
 }
 
-
 function handleMatchSizeChange() {
     if (ocrControlsLocked) {
         return;
@@ -1991,17 +1758,12 @@ function handleMatchSizeChange() {
     const names =
         getPlayerNameState();
 
-    buildPlayerNameInputs(
-        names
-    );
+    buildPlayerNameInputs(names);
 
     savePageState();
 }
 
-
-function handleResetCropClick(
-    event
-) {
+function handleResetCropClick(event) {
     event.preventDefault();
 
     if (
@@ -2018,7 +1780,6 @@ function handleResetCropClick(
         "Crop reset. Adjust the green box around the scoreboard."
     );
 }
-
 
 function handleWindowResize() {
     if (
@@ -2049,11 +1810,6 @@ function handleWindowResize() {
     savePageState();
 }
 
-
-/* =========================================================
-   EVENT BINDING
-   ========================================================= */
-
 function bindElementEventOnce(
     element,
     eventName,
@@ -2082,10 +1838,8 @@ function bindElementEventOnce(
 
     element.dataset[
         datasetKey
-    ] =
-        "true";
+    ] = "true";
 }
-
 
 function bindCoreEvents() {
     bindElementEventOnce(
@@ -2137,7 +1891,6 @@ function bindCoreEvents() {
         "ResetCrop"
     );
 
-
     if (
         !ocrCoreWindowEventsBound
     ) {
@@ -2153,10 +1906,7 @@ function bindCoreEvents() {
 
 
 /* =========================================================
-   INITIALIZE CORE
-
-   May safely be called again after the SPA injects a
-   fresh OCR page.
+   INITIALIZE
    ========================================================= */
 
 function initializeOcrCore() {
@@ -2186,19 +1936,13 @@ function initializeOcrCore() {
             }
         )
         .map(
-            function(
-                [name]
-            ) {
+            function([name]) {
                 return name;
             }
         );
 
-    if (
-        missing.length >
-        0
-    ) {
-        OCR_CORE_READY =
-            false;
+    if (missing.length > 0) {
+        OCR_CORE_READY = false;
 
         console.error(
             "[OCR] Missing required HTML elements:",
@@ -2210,39 +1954,17 @@ function initializeOcrCore() {
 
     bindCoreEvents();
 
-
-    /*
-    ---------------------------------------------------------
-    Restore existing state when available.
-
-    Otherwise initialize the newly injected page normally.
-    ---------------------------------------------------------
-    */
-
     if (!restorePageState()) {
-        sourceImage =
-            null;
-
-        sourceFile =
-            null;
-
+        sourceImage = null;
+        sourceFile = null;
         sourceFileName =
             "scoreboard.png";
 
-        displayScale =
-            1;
-
-        ocrControlsLocked =
-            false;
-
-        cropFallbackVisible =
-            false;
-
-        dragMode =
-            null;
-
-        dragStart =
-            null;
+        displayScale = 1;
+        ocrControlsLocked = false;
+        cropFallbackVisible = false;
+        dragMode = null;
+        dragStart = null;
 
         crop = {
             x: 0,
@@ -2268,22 +1990,10 @@ function initializeOcrCore() {
         }
     }
 
-    OCR_CORE_READY =
-        true;
+    OCR_CORE_READY = true;
 
     return true;
 }
 
-
-/* =========================================================
-   TEMPORARY LEGACY INITIALIZATION
-
-   Keep this while submit_img.js, submit_testing.js and
-   submit_onpage_items.js are still legacy scripts.
-
-   Once all four files expose explicit initialization,
-   /ocr/JS/index.js will call initializeOcrCore() directly
-   and this line can be removed.
-   ========================================================= */
 window.initializeOcrCore =
     initializeOcrCore;
