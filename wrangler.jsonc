@@ -17,7 +17,7 @@
     ],
 
     "vars": {
-        "OCR_API_URL": "https://bpd-ocr-y5wgeempka-uc.a.run.app"
+        "OCR_API_URL": "https://bpd-ocr-y5wgeempka-uc.a.run.app/api/ocr"
     },
 
     "r2_buckets": [
