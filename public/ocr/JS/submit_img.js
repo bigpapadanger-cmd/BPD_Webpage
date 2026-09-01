@@ -1168,7 +1168,7 @@ async function submitScoreboard(
             uploadFile
         );
 
-        console.error(
+        console.log(
             "[OCR CLIENT] IMAGE BEFORE FETCH:",
             {
                 originalConstructor:
