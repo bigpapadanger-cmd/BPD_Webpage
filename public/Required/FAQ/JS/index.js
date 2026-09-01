@@ -1,56 +1,79 @@
-/* BPD GAMING NETWORK - FAQ */
+/*
+=========================================================
+BPD GAMING NETWORK
+FAQ PAGE
+=========================================================
+*/
 
-const FAQ_API_URL = "/api/faq";
-const FAQ_UPVOTE_URL = "/api/faq/upvote";
-const FAQ_SUGGEST_URL = "/faq/suggest";
+import {
+    BPD_AUTH_SESSION_URL
+} from "/scripts/apiRoutes.js";
 
-const faqList =
-    document.getElementById("faqList");
 
-const faqSuggestionButton =
-    document.getElementById(
-        "faqSuggestionButton"
-    );
+const FAQ_API_URL =
+    "/api/faq";
 
-const faqLoginModal =
-    document.getElementById(
-        "faqLoginModal"
-    );
+const FAQ_UPVOTE_URL =
+    "/api/faq/upvote";
 
-const faqLoginMessage =
-    document.getElementById(
-        "faqLoginMessage"
-    );
+const FAQ_SUGGEST_URL =
+    "/faq/suggest";
 
-const faqLoginButton =
-    document.getElementById(
-        "faqLoginButton"
-    );
 
+let faqList = null;
+let faqSuggestionButton = null;
+let faqLoginModal = null;
+let faqLoginMessage = null;
+let faqLoginButton = null;
 
 let pendingAuthAction = null;
 
 
 /*
 =========================================================
-INITIALIZE
+INITIALIZE PAGE
+Called by SPA route initialization.
 =========================================================
 */
 
-document.addEventListener(
-    "DOMContentLoaded",
-    initializeFaqPage
-);
+export async function initializePage() {
+    faqList =
+        document.getElementById(
+            "faqList"
+        );
 
+    faqSuggestionButton =
+        document.getElementById(
+            "faqSuggestionButton"
+        );
 
-async function initializeFaqPage() {
+    faqLoginModal =
+        document.getElementById(
+            "faqLoginModal"
+        );
 
-    await loadFaqs();
+    faqLoginMessage =
+        document.getElementById(
+            "faqLoginMessage"
+        );
+
+    faqLoginButton =
+        document.getElementById(
+            "faqLoginButton"
+        );
+
+    if (!faqList) {
+        console.error(
+            "FAQ: FAQ list container was not found."
+        );
+
+        return;
+    }
 
     bindFaqSuggestion();
-
     bindLoginModal();
 
+    await loadFaqs();
 }
 
 
@@ -61,56 +84,53 @@ LOAD FAQ DATA
 */
 
 async function loadFaqs() {
-
     try {
-
         const response =
             await fetch(
                 FAQ_API_URL,
                 {
                     credentials:
-                        "include",
+                        "same-origin",
+
                     cache:
-                        "no-store"
+                        "no-store",
+
+                    headers: {
+                        "accept":
+                            "application/json"
+                    }
                 }
             );
 
-
         if (!response.ok) {
-
-            faqList.replaceChildren();
-
-            return;
-
+            throw new Error(
+                `FAQ request failed: ${response.status}`
+            );
         }
-
 
         const result =
             await response.json();
 
-
         const faqs =
             Array.isArray(result)
                 ? result
-                : Array.isArray(result.faqs)
+                : Array.isArray(
+                    result?.faqs
+                )
                     ? result.faqs
                     : [];
 
-
-        renderFaqs(faqs);
-
-    }
-    catch (error) {
-
+        renderFaqs(
+            faqs
+        );
+    } catch (error) {
         console.error(
-            "Unable to load FAQs:",
+            "FAQ: Unable to load FAQs.",
             error
         );
 
-        faqList.replaceChildren();
-
+        renderFaqs([]);
     }
-
 }
 
 
@@ -121,42 +141,89 @@ RENDER FAQ DATA
 */
 
 function renderFaqs(faqs) {
+    if (!faqList) {
+        return;
+    }
 
     faqList.replaceChildren();
-
 
     if (
         !Array.isArray(faqs) ||
         faqs.length === 0
     ) {
+        renderEmptyFaqState();
 
         return;
-
     }
-
 
     const fragment =
         document.createDocumentFragment();
 
-
     faqs.forEach(
-        faq => {
-
+        function(faq) {
             const faqElement =
-                createFaqElement(faq);
+                createFaqElement(
+                    faq
+                );
 
             fragment.appendChild(
                 faqElement
             );
-
         }
     );
-
 
     faqList.appendChild(
         fragment
     );
+}
 
+
+/*
+=========================================================
+EMPTY STATE
+=========================================================
+*/
+
+function renderEmptyFaqState() {
+    if (!faqList) {
+        return;
+    }
+
+    const emptyState =
+        document.createElement(
+            "div"
+        );
+
+    emptyState.className =
+        "faq-empty-state";
+
+
+    const heading =
+        document.createElement(
+            "h2"
+        );
+
+    heading.textContent =
+        "No FAQs yet";
+
+
+    const description =
+        document.createElement(
+            "p"
+        );
+
+    description.textContent =
+        "Frequently asked questions will appear here as they are added.";
+
+
+    emptyState.append(
+        heading,
+        description
+    );
+
+    faqList.appendChild(
+        emptyState
+    );
 }
 
 
@@ -167,35 +234,48 @@ CREATE FAQ ITEM
 */
 
 function createFaqElement(faq) {
-
     const item =
-        document.createElement("article");
+        document.createElement(
+            "article"
+        );
 
     item.className =
         "faq-item";
 
     item.dataset.faqId =
         String(
-            faq.id ?? ""
+            faq?.id ?? ""
         );
 
 
     const main =
-        document.createElement("div");
+        document.createElement(
+            "div"
+        );
 
     main.className =
         "faq-item-main";
 
 
+    /*
+    =====================================================
+    UPVOTE
+    =====================================================
+    */
+
     const voteContainer =
-        document.createElement("div");
+        document.createElement(
+            "div"
+        );
 
     voteContainer.className =
         "faq-vote";
 
 
     const upvoteButton =
-        document.createElement("button");
+        document.createElement(
+            "button"
+        );
 
     upvoteButton.type =
         "button";
@@ -205,31 +285,36 @@ function createFaqElement(faq) {
 
     upvoteButton.setAttribute(
         "aria-label",
-        `Upvote ${faq.question || "FAQ"}`
+        `Upvote ${
+            faq?.question ||
+            "FAQ"
+        }`
     );
 
     upvoteButton.textContent =
         "▲";
 
 
-    if (faq.userUpvoted === true) {
-
+    if (
+        faq?.userUpvoted === true
+    ) {
         upvoteButton.classList.add(
             "voted"
         );
-
     }
 
 
     const voteCount =
-        document.createElement("span");
+        document.createElement(
+            "span"
+        );
 
     voteCount.className =
         "faq-upvote-count";
 
     voteCount.textContent =
         formatVoteCount(
-            faq.upvotes
+            faq?.upvotes
         );
 
 
@@ -239,8 +324,16 @@ function createFaqElement(faq) {
     );
 
 
+    /*
+    =====================================================
+    QUESTION
+    =====================================================
+    */
+
     const questionButton =
-        document.createElement("button");
+        document.createElement(
+            "button"
+        );
 
     questionButton.type =
         "button";
@@ -255,30 +348,36 @@ function createFaqElement(faq) {
 
 
     const questionContent =
-        document.createElement("div");
+        document.createElement(
+            "div"
+        );
 
     questionContent.className =
         "faq-question-content";
 
 
     const question =
-        document.createElement("h2");
+        document.createElement(
+            "h2"
+        );
 
     question.className =
         "faq-question";
 
     question.textContent =
-        faq.question || "";
+        faq?.question || "";
 
 
     const summary =
-        document.createElement("p");
+        document.createElement(
+            "p"
+        );
 
     summary.className =
         "faq-summary";
 
     summary.textContent =
-        faq.summary || "";
+        faq?.summary || "";
 
 
     questionContent.append(
@@ -288,7 +387,9 @@ function createFaqElement(faq) {
 
 
     const chevron =
-        document.createElement("span");
+        document.createElement(
+            "span"
+        );
 
     chevron.className =
         "faq-chevron";
@@ -314,18 +415,28 @@ function createFaqElement(faq) {
     );
 
 
+    /*
+    =====================================================
+    ANSWER
+    =====================================================
+    */
+
     const answer =
-        document.createElement("div");
+        document.createElement(
+            "div"
+        );
 
     answer.className =
         "faq-answer";
 
 
     const answerText =
-        document.createElement("p");
+        document.createElement(
+            "p"
+        );
 
     answerText.textContent =
-        faq.answer || "";
+        faq?.answer || "";
 
 
     answer.appendChild(
@@ -339,23 +450,26 @@ function createFaqElement(faq) {
     );
 
 
+    /*
+    =====================================================
+    EVENTS
+    =====================================================
+    */
+
     questionButton.addEventListener(
         "click",
-        () => {
-
+        function() {
             toggleFaqItem(
                 item,
                 questionButton
             );
-
         }
     );
 
 
     upvoteButton.addEventListener(
         "click",
-        async event => {
-
+        async function(event) {
             event.stopPropagation();
 
             await handleFaqUpvote(
@@ -363,13 +477,11 @@ function createFaqElement(faq) {
                 upvoteButton,
                 voteCount
             );
-
         }
     );
 
 
     return item;
-
 }
 
 
@@ -383,18 +495,15 @@ function toggleFaqItem(
     item,
     button
 ) {
-
     const expanded =
         item.classList.toggle(
             "expanded"
         );
 
-
     button.setAttribute(
         "aria-expanded",
         String(expanded)
     );
-
 }
 
 
@@ -409,42 +518,32 @@ async function handleFaqUpvote(
     button,
     voteCount
 ) {
+    if (button.disabled) {
+        return;
+    }
 
     const session =
         await getCurrentSession();
 
-
     if (!session) {
-
         showLoginPrompt(
-            "Log in to upvote this FAQ.",
+            "Sign in is required to upvote an FAQ.",
             {
                 type:
                     "upvote",
 
                 faqId:
-                    faq.id
+                    faq?.id
             }
         );
 
         return;
-
     }
-
-
-    if (button.disabled) {
-
-        return;
-
-    }
-
 
     button.disabled =
         true;
 
-
     try {
-
         const response =
             await fetch(
                 FAQ_UPVOTE_URL,
@@ -453,7 +552,7 @@ async function handleFaqUpvote(
                         "POST",
 
                     credentials:
-                        "include",
+                        "same-origin",
 
                     headers: {
                         "Content-Type":
@@ -464,74 +563,58 @@ async function handleFaqUpvote(
                         JSON.stringify(
                             {
                                 faqId:
-                                    faq.id
+                                    faq?.id
                             }
                         )
                 }
             );
 
-
         if (
             response.status === 401 ||
             response.status === 403
         ) {
-
             showLoginPrompt(
-                "Log in to upvote this FAQ.",
+                "Sign in is required to upvote an FAQ.",
                 {
                     type:
                         "upvote",
 
                     faqId:
-                        faq.id
+                        faq?.id
                 }
             );
 
             return;
-
         }
 
-
         if (!response.ok) {
-
             throw new Error(
                 `FAQ upvote failed: ${response.status}`
             );
-
         }
-
 
         const result =
             await response.json();
 
-
         voteCount.textContent =
             formatVoteCount(
-                result.upvotes
+                result?.upvotes
             );
-
 
         button.classList.toggle(
             "voted",
-            result.userUpvoted === true
+            result?.userUpvoted ===
+                true
         );
-
-    }
-    catch (error) {
-
+    } catch (error) {
         console.error(
-            "Unable to update FAQ vote:",
+            "FAQ: Unable to update vote.",
             error
         );
-
-    }
-    finally {
-
+    } finally {
         button.disabled =
             false;
-
     }
-
 }
 
 
@@ -542,43 +625,64 @@ SUGGEST FAQ
 */
 
 function bindFaqSuggestion() {
+    if (!faqSuggestionButton) {
+        return;
+    }
+
+    if (
+        faqSuggestionButton
+            .dataset.initialized ===
+        "true"
+    ) {
+        return;
+    }
 
     faqSuggestionButton.addEventListener(
         "click",
-        async () => {
-
-            const session =
-                await getCurrentSession();
-
-
-            if (!session) {
-
-                showLoginPrompt(
-                    "Log in before submitting an FAQ suggestion.",
-                    {
-                        type:
-                            "suggestion"
-                    }
-                );
-
-                return;
-
-            }
-
-
-            openSuggestionPage();
-
-        }
+        handleFaqSuggestion
     );
 
+    faqSuggestionButton.dataset.initialized =
+        "true";
+}
+
+
+async function handleFaqSuggestion() {
+    const session =
+        await getCurrentSession();
+
+    if (!session) {
+        showLoginPrompt(
+            "Sign in is required before submitting an FAQ suggestion.",
+            {
+                type:
+                    "suggestion"
+            }
+        );
+
+        return;
+    }
+
+    openSuggestionPage();
 }
 
 
 function openSuggestionPage() {
+    if (
+        window.BPDRouter &&
+        typeof window.BPDRouter.navigate ===
+            "function"
+    ) {
+        window.BPDRouter.navigate(
+            FAQ_SUGGEST_URL
+        );
 
-    window.location.href =
-        FAQ_SUGGEST_URL;
+        return;
+    }
 
+    window.location.assign(
+        FAQ_SUGGEST_URL
+    );
 }
 
 
@@ -589,66 +693,65 @@ AUTHENTICATION
 */
 
 async function getCurrentSession() {
-
     try {
-
         if (
             window.BPDAuth &&
-            typeof window.BPDAuth.getSession
-                === "function"
+            typeof window.BPDAuth.getSession ===
+                "function"
         ) {
-
             const session =
                 await window.BPDAuth.getSession();
 
-            return session || null;
+            if (
+                session?.authenticated !==
+                true
+            ) {
+                return null;
+            }
 
+            return session;
         }
-
 
         const response =
             await fetch(
-                "/api/auth/session",
+                BPD_AUTH_SESSION_URL,
                 {
                     credentials:
-                        "include",
+                        "same-origin",
 
                     cache:
-                        "no-store"
+                        "no-store",
+
+                    headers: {
+                        "accept":
+                            "application/json"
+                    }
                 }
             );
 
-
         if (!response.ok) {
-
             return null;
-
         }
-
 
         const session =
             await response.json();
 
-
         if (
-            !session ||
-            session.authenticated !== true
+            session?.authenticated !==
+            true
         ) {
-
             return null;
-
         }
 
-
         return session;
-
-    }
-    catch {
+    } catch (error) {
+        console.error(
+            "FAQ: Authentication check failed.",
+            error
+        );
 
         return null;
-
     }
-
 }
 
 
@@ -662,41 +765,52 @@ function showLoginPrompt(
     message,
     action
 ) {
+    if (
+        !faqLoginModal ||
+        !faqLoginMessage
+    ) {
+        console.error(
+            "FAQ: Login modal elements were not found."
+        );
+
+        return;
+    }
 
     pendingAuthAction =
         action || null;
 
-
     faqLoginMessage.textContent =
         message;
-
 
     faqLoginModal.hidden =
         false;
 
-
     document.body.style.overflow =
         "hidden";
 
+    resetLoginButton();
 
-    faqLoginButton.focus();
-
+    if (faqLoginButton) {
+        faqLoginButton.focus();
+    }
 }
 
 
 function closeLoginPrompt() {
+    if (!faqLoginModal) {
+        return;
+    }
 
     faqLoginModal.hidden =
         true;
 
-
     document.body.style.overflow =
         "";
-
 
     pendingAuthAction =
         null;
 
+    resetLoginButton();
 }
 
 
@@ -707,85 +821,96 @@ LOGIN MODAL EVENTS
 */
 
 function bindLoginModal() {
+    if (!faqLoginModal) {
+        return;
+    }
 
-    document
+    if (
+        faqLoginModal
+            .dataset.initialized ===
+        "true"
+    ) {
+        return;
+    }
+
+    faqLoginModal
         .querySelectorAll(
             "[data-close-login]"
         )
         .forEach(
-            element => {
-
+            function(element) {
                 element.addEventListener(
                     "click",
                     closeLoginPrompt
                 );
-
             }
         );
 
+    if (faqLoginButton) {
+        faqLoginButton.addEventListener(
+            "click",
+            beginLogin
+        );
+    }
 
-    faqLoginButton.addEventListener(
-        "click",
-        () => {
-
-            beginLogin();
-
-        }
-    );
-
-
-    document.addEventListener(
+    faqLoginModal.addEventListener(
         "keydown",
-        event => {
-
+        function(event) {
             if (
-                event.key === "Escape" &&
-                !faqLoginModal.hidden
+                event.key ===
+                "Escape"
             ) {
-
                 closeLoginPrompt();
-
             }
-
         }
     );
 
+    faqLoginModal.dataset.initialized =
+        "true";
 }
 
 
 /*
 =========================================================
 START LOGIN
+Shared FAQ sign-in flow has not been developed yet.
 =========================================================
 */
 
 function beginLogin() {
-
-    const returnUrl =
-        window.location.pathname +
-        window.location.search;
-
-
-    const action =
-        pendingAuthAction;
-
-
-    if (action) {
-
-        sessionStorage.setItem(
-            "faqPendingAction",
-            JSON.stringify(action)
-        );
-
+    if (!faqLoginMessage) {
+        return;
     }
 
+    faqLoginMessage.textContent =
+        "Sign-in from the FAQ is not available yet. Authentication for this feature will be added as the account system is developed.";
 
-    window.location.href =
-        "/login?return=" +
-        encodeURIComponent(
-            returnUrl
-        );
+    if (faqLoginButton) {
+        faqLoginButton.disabled =
+            true;
 
+        faqLoginButton.textContent =
+            "Sign In Unavailable";
+    }
+}
+
+
+/*
+=========================================================
+RESET LOGIN BUTTON
+=========================================================
+*/
+
+function resetLoginButton() {
+    if (!faqLoginButton) {
+        return;
+    }
+
+    faqLoginButton.disabled =
+        false;
+
+    faqLoginButton.textContent =
+        "Sign In";
 }
 
 
@@ -796,21 +921,15 @@ UTILITIES
 */
 
 function formatVoteCount(value) {
-
     const count =
         Number(value);
 
-
     if (!Number.isFinite(count)) {
-
         return "0";
-
     }
-
 
     return Math.max(
         0,
         Math.trunc(count)
     ).toLocaleString();
-
 }

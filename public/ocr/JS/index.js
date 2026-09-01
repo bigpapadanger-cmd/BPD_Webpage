@@ -7,14 +7,14 @@ const OCR_SCRIPT_PATHS = [
     "/Tabs/RocketLeague/SubmitImage/JS/submit_onpage_items.js"
 ];
 
-function loadScript(
-    src
-) {
+
+/* =========================================================
+   SCRIPT LOADER
+   ========================================================= */
+
+function loadScript(src) {
     return new Promise(
-        (
-            resolve,
-            reject
-        ) => {
+        function(resolve, reject) {
             const existing =
                 document.querySelector(
                     `script[data-ocr-script="${src}"]`
@@ -26,7 +26,6 @@ function loadScript(
                     "true"
                 ) {
                     resolve();
-
                     return;
                 }
 
@@ -34,17 +33,21 @@ function loadScript(
                     "load",
                     resolve,
                     {
-                        once:
-                            true
+                        once: true
                     }
                 );
 
                 existing.addEventListener(
                     "error",
-                    reject,
+                    function() {
+                        reject(
+                            new Error(
+                                `Failed to load OCR script: ${src}`
+                            )
+                        );
+                    },
                     {
-                        once:
-                            true
+                        once: true
                     }
                 );
 
@@ -67,21 +70,20 @@ function loadScript(
 
             script.addEventListener(
                 "load",
-                () => {
+                function() {
                     script.dataset.loaded =
                         "true";
 
                     resolve();
                 },
                 {
-                    once:
-                        true
+                    once: true
                 }
             );
 
             script.addEventListener(
                 "error",
-                () => {
+                function() {
                     reject(
                         new Error(
                             `Failed to load OCR script: ${src}`
@@ -89,8 +91,7 @@ function loadScript(
                     );
                 },
                 {
-                    once:
-                        true
+                    once: true
                 }
             );
 
@@ -100,6 +101,11 @@ function loadScript(
         }
     );
 }
+
+
+/* =========================================================
+   LOAD OCR FILES
+   ========================================================= */
 
 async function loadOcrScripts() {
     for (
@@ -111,6 +117,77 @@ async function loadOcrScripts() {
         );
     }
 }
+
+
+/* =========================================================
+   RUN OCR INITIALIZERS
+   ========================================================= */
+
+function initializeOcrSystems() {
+    const initializers = [
+        {
+            name:
+                "OCR Core",
+
+            fn:
+                window.initializeOcrCore
+        },
+        {
+            name:
+                "OCR Submission",
+
+            fn:
+                window.initializeOcrSubmission
+        },
+        {
+            name:
+                "OCR Testing",
+
+            fn:
+                window.initializeOcrTesting
+        },
+        {
+            name:
+                "OCR On-Page UI",
+
+            fn:
+                window.initializeOcrOnPageItems
+        }
+    ];
+
+
+    for (
+        const initializer
+        of initializers
+    ) {
+        if (
+            typeof initializer.fn !==
+            "function"
+        ) {
+            throw new Error(
+                `${initializer.name} initializer was not found.`
+            );
+        }
+
+        const result =
+            initializer.fn();
+
+        if (
+            result ===
+            false
+        ) {
+            throw new Error(
+                `${initializer.name} initialization failed.`
+            );
+        }
+    }
+}
+
+
+/* =========================================================
+   PAGE INITIALIZATION
+   Called by SPA router.
+   ========================================================= */
 
 export async function initializePage() {
     const page =
@@ -126,6 +203,7 @@ export async function initializePage() {
         return;
     }
 
+
     if (
         page.dataset.initialized ===
         "true"
@@ -133,26 +211,37 @@ export async function initializePage() {
         return;
     }
 
+
     try {
+        /*
+        -----------------------------------------------------
+        Load the legacy OCR files once.
+
+        On later SPA visits these scripts remain loaded,
+        but their explicit initializer functions are called
+        again against the newly injected DOM.
+        -----------------------------------------------------
+        */
+
         await loadOcrScripts();
+
+
+        /*
+        -----------------------------------------------------
+        Initialize in dependency order.
+        -----------------------------------------------------
+        */
+
+        initializeOcrSystems();
+
 
         page.dataset.initialized =
             "true";
 
-    } catch (
-        error
-    ) {
+    } catch (error) {
         console.error(
             "OCR PAGE: Initialization failed.",
-            {
-                name:
-                    error?.name ||
-                    "Error",
-
-                message:
-                    error?.message ||
-                    "Unknown error"
-            }
+            error
         );
     }
 }

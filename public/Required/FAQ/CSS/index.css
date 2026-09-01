@@ -366,6 +366,7 @@ ANSWER
 
 
 /*
+/*
 =========================================================
 SUGGESTION
 =========================================================
@@ -374,24 +375,20 @@ SUGGESTION
 .faq-suggestion {
     width: 100%;
     max-width: 100%;
-
     margin-top: 36px;
 }
 
 .faq-suggestion-content {
     display: flex;
-
     align-items: center;
     justify-content: space-between;
     gap: 24px;
 
     width: 100%;
-    min-width: 0;
     max-width: 100%;
+    min-width: 0;
 
     padding: 24px;
-
-    overflow: hidden;
 
     border:
         1px solid
@@ -402,44 +399,69 @@ SUGGESTION
     background:
         linear-gradient(
             135deg,
-            rgba(
-                139,
-                92,
-                246,
-                0.08
-            ),
+            rgba(139, 92, 246, 0.08),
             var(--faq-surface)
         );
 }
 
 .faq-suggestion-content > div {
-    flex: 1 1 auto;
-    min-width: 0;
+    flex: 1 1 0;
+    width: auto;
+    min-width: 180px;
+    max-width: 100%;
+}
+
+.faq-suggestion-label {
+    display: block;
+
+    width: auto;
+    margin-bottom: 8px;
+
+    color:
+        var(--faq-purple);
+
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    line-height: 1.2;
+
+    text-transform: uppercase;
+    white-space: normal;
 }
 
 .faq-suggestion h2 {
+    width: auto;
     margin: 0;
 
     font-size: 1.1rem;
+    line-height: 1.35;
 
-    overflow-wrap: anywhere;
+    white-space: normal;
+    overflow-wrap: normal;
+    word-break: normal;
 }
 
 .faq-suggestion p {
+    width: auto;
     margin: 6px 0 0;
 
     color:
         var(--faq-muted);
 
     font-size: 0.9rem;
+    line-height: 1.5;
 
-    overflow-wrap: anywhere;
+    white-space: normal;
+    overflow-wrap: normal;
+    word-break: normal;
 }
 
 .faq-suggestion-button {
     flex: 0 0 auto;
 
-    max-width: 100%;
+    width: auto !important;
+    min-width: 150px;
+    max-width: 220px;
 
     padding: 11px 17px;
 
@@ -482,6 +504,33 @@ SUGGESTION
     outline-offset: 2px;
 }
 
+
+/*
+=========================================================
+SUGGESTION - NARROW LAYOUT
+=========================================================
+*/
+
+@media (max-width: 800px) {
+    .faq-suggestion-content {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 18px;
+        padding: 20px;
+    }
+
+    .faq-suggestion-content > div {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .faq-suggestion-button {
+        width: 100% !important;
+        min-width: 0;
+        max-width: none;
+        white-space: normal;
+    }
+}
 
 /*
 =========================================================
