@@ -1,10 +1,10 @@
 "use strict";
 
 const OCR_SCRIPT_PATHS = [
-    "/Tabs/RocketLeague/SubmitImage/JS/submit_core.js",
-    "/Tabs/RocketLeague/SubmitImage/JS/submit_img.js",
-    "/Tabs/RocketLeague/SubmitImage/JS/submit_testing.js",
-    "/Tabs/RocketLeague/SubmitImage/JS/submit_onpage_items.js"
+    "/ocr/JS/submit_core.js",
+    "/ocr/JS/submit_img.js",
+    "/ocr/JS/submit_testing.js",
+    "/ocr/JS/submit_onpage_items.js"
 ];
 
 
