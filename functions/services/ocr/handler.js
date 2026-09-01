@@ -300,9 +300,49 @@ export async function handleOCRRequest(
             await request.formData();
 
 
+        const debugFormEntries =
+            Array.from(
+                formData.entries()
+            ).map(
+                function([key, value]) {
+                    return {
+                        key,
+
+                        constructor:
+                            value?.constructor
+                                ?.name ||
+                            null,
+
+                        name:
+                            value?.name ||
+                            null,
+
+                        mime:
+                            value?.type ||
+                            null,
+
+                        size:
+                            value?.size ??
+                            null,
+
+                        hasArrayBuffer:
+                            typeof value?.arrayBuffer ===
+                            "function"
+                    };
+                }
+            );
+
+        console.error(
+            "[OCR HANDLER] FORM DATA:",
+            JSON.stringify(
+                debugFormEntries
+            )
+        );
+
+
         /* ====================================================
-           VALIDATE IMAGE
-           ==================================================== */
+        VALIDATE IMAGE
+        ==================================================== */
 
         const file =
             formData.get(
@@ -323,7 +363,27 @@ export async function handleOCRRequest(
                         false,
 
                     error:
-                        "Missing file upload."
+                        "Missing file upload.",
+
+                    handlerVersion:
+                        OCR_HANDLER_VERSION,
+
+                    formFields:
+                        Array.from(
+                            formData.keys()
+                        ),
+
+                    fileType:
+                        formData.get("file")
+                            ?.constructor
+                            ?.name ||
+                        null,
+
+                    imageType:
+                        formData.get("image")
+                            ?.constructor
+                            ?.name ||
+                        null
                 },
                 400
             );
@@ -339,7 +399,10 @@ export async function handleOCRRequest(
                         false,
 
                     error:
-                        "Uploaded image is empty."
+                        "Uploaded image is empty.",
+
+                    handlerVersion:
+                        OCR_HANDLER_VERSION
                 },
                 400
             );
