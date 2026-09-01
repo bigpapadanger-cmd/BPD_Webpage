@@ -1129,13 +1129,86 @@ async function submitScoreboard(
         const submittedBy =
             await getAuthenticatedSubmitter();
 
+        if (
+            !(blob instanceof Blob)
+        ) {
+            throw new Error(
+                "Prepared scoreboard image is not a valid Blob."
+            );
+        }
+
+        if (
+            blob.size <= 0
+        ) {
+            throw new Error(
+                "Prepared scoreboard image is empty."
+            );
+        }
+
+        const uploadFile =
+            blob instanceof File
+                ? blob
+                : new File(
+                    [
+                        blob
+                    ],
+                    uploadFileName,
+                    {
+                        type:
+                            blob.type ||
+                            "image/png"
+                    }
+                );
+
         const formData =
             new FormData();
 
-        formData.append(
+        formData.set(
             "image",
-            blob,
-            uploadFileName
+            uploadFile
+        );
+
+        console.error(
+            "[OCR CLIENT] IMAGE BEFORE FETCH:",
+            {
+                originalConstructor:
+                    blob.constructor
+                        ?.name ||
+                    null,
+
+                originalSize:
+                    blob.size,
+
+                originalType:
+                    blob.type,
+
+                uploadConstructor:
+                    uploadFile.constructor
+                        ?.name ||
+                    null,
+
+                uploadName:
+                    uploadFile.name,
+
+                uploadSize:
+                    uploadFile.size,
+
+                uploadType:
+                    uploadFile.type,
+
+                formConstructor:
+                    formData
+                        .get("image")
+                        ?.constructor
+                        ?.name ||
+                    null,
+
+                formSize:
+                    formData
+                        .get("image")
+                        ?.size ??
+                    null
+            }
         );
 
         formData.append(
