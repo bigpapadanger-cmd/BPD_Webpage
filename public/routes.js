@@ -40,7 +40,7 @@ export const ROUTES = {
         header: "/Framework/Shell/HTML/Header/header.html",
         sidebar: "/Framework/Shell/HTML/Sidebar/dashboard.html",
         footer: "/Framework/Shell/HTML/Footer/footer.html",
-        module: "/Global/Index/JS/Index.js",
+        module: "/Global/Index/JS/index.js",
         sitemap: true
     },
 
@@ -142,7 +142,7 @@ export const ROUTES = {
         header: "/Framework/Shell/HTML/Header/header.html",
         sidebar: "/Framework/Shell/HTML/Sidebar/mainmenu.html",
         footer: "/Framework/Shell/HTML/Footer/footer.html",
-        module: "/Global/Index/JS/Index.js",
+        module: "/Required/PrivacyPolicy/JS/loadPage.js",
         sitemap: true
     },
 

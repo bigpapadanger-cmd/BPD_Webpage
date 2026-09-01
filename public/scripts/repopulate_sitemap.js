@@ -6,31 +6,38 @@ SITEMAP GENERATOR
 
 Run from DomainData:
 
-    node scripts/repopulate_sitemap.js
+    node public/scripts/repopulate_sitemap.js
 
 =========================================================
 */
 
 import fs from "node:fs";
 import path from "node:path";
+
 import {
     fileURLToPath
 } from "node:url";
 
 import {
-    ROUTES
-} from "../public/Framework/Shell/JS/routes.js";
+    ROUTES,
+    PRIORITY_MAP
+} from "../routes.js";
+
 
 const DOMAIN =
     "https://bpd-gaming-network.com";
 
 const SCRIPT_FILE =
-    fileURLToPath(import.meta.url);
+    fileURLToPath(
+        import.meta.url
+    );
 
 const SCRIPT_DIRECTORY =
-    path.dirname(SCRIPT_FILE);
+    path.dirname(
+        SCRIPT_FILE
+    );
 
-const PROJECT_DIRECTORY =
+const PUBLIC_DIRECTORY =
     path.resolve(
         SCRIPT_DIRECTORY,
         ".."
@@ -38,10 +45,16 @@ const PROJECT_DIRECTORY =
 
 const OUTPUT_FILE =
     path.join(
-        PROJECT_DIRECTORY,
-        "public",
+        PUBLIC_DIRECTORY,
         "sitemap.xml"
     );
+
+
+/*
+=========================================================
+XML ESCAPING
+=========================================================
+*/
 
 function escapeXml(value) {
     return String(value)
@@ -51,6 +64,13 @@ function escapeXml(value) {
         .replaceAll('"', "&quot;")
         .replaceAll("'", "&apos;");
 }
+
+
+/*
+=========================================================
+ROUTE FILTER
+=========================================================
+*/
 
 function shouldIncludeRoute(
     route,
@@ -64,16 +84,27 @@ function shouldIncludeRoute(
         return false;
     }
 
-    if (routeConfig.sitemap === false) {
+    if (
+        routeConfig.sitemap !== true
+    ) {
         return false;
     }
 
-    if (routeConfig.requiresAuth === true) {
+    if (
+        routeConfig.requiresAuth === true
+    ) {
         return false;
     }
 
     return true;
 }
+
+
+/*
+=========================================================
+CREATE URL ENTRY
+=========================================================
+*/
 
 function createSitemapEntry(route) {
     const url =
@@ -82,24 +113,52 @@ function createSitemapEntry(route) {
             DOMAIN
         ).href;
 
-    return [
+    const priority =
+        PRIORITY_MAP[route];
+
+    const lines = [
         "    <url>",
-        `        <loc>${escapeXml(url)}</loc>`,
+        `        <loc>${escapeXml(url)}</loc>`
+    ];
+
+    if (
+        typeof priority === "number"
+    ) {
+        lines.push(
+            `        <priority>${priority.toFixed(1)}</priority>`
+        );
+    }
+
+    lines.push(
         "    </url>"
-    ].join("\n");
+    );
+
+    return lines.join("\n");
 }
 
+
+/*
+=========================================================
+GENERATE SITEMAP
+=========================================================
+*/
+
 function generateSitemap() {
+    const sitemapRoutes =
+        Object.entries(
+            ROUTES
+        )
+        .filter(function(
+            [route, routeConfig]
+        ) {
+            return shouldIncludeRoute(
+                route,
+                routeConfig
+            );
+        });
+
     const urls =
-        Object.entries(ROUTES)
-            .filter(function(
-                [route, routeConfig]
-            ) {
-                return shouldIncludeRoute(
-                    route,
-                    routeConfig
-                );
-            })
+        sitemapRoutes
             .map(function([route]) {
                 return createSitemapEntry(
                     route
@@ -122,8 +181,9 @@ function generateSitemap() {
     );
 
     console.log(
-        `Sitemap generated at ${OUTPUT_FILE}`
+        `Sitemap generated with ${sitemapRoutes.length} routes at ${OUTPUT_FILE}`
     );
 }
+
 
 generateSitemap();

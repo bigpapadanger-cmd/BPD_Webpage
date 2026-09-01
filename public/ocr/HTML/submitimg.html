@@ -1,509 +1,417 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<main class="page">
 
-    <title>
-        Submit Scoreboard Image
-    </title>
+    <section class="panel">
 
-    <link
-        rel="stylesheet"
-        href="../CSS/submitimg.css">
+        <header class="page-header">
+            <div class="page-header-content">
 
-    <link
-        rel="stylesheet"
-        href="../CSS/submit_testing.css">
-</head>
+                <div class="page-eyebrow">
+                    ROCKET LEAGUE
+                </div>
 
-<body>
+                <h1 class="page-title">
+                    Scoreboard OCR
+                </h1>
 
-    <main class="page">
+                <p class="page-subtitle">
+                    Upload a Rocket League scoreboard screenshot,
+                    choose the match size, and enter the expected
+                    players. The first scan uses the full uploaded
+                    image. If the scoreboard cannot be located
+                    reliably, you will be asked to crop the image
+                    and retry.
+                </p>
 
-        <section class="panel">
+            </div>
+        </header>
 
-            <!-- =================================================
-                 HEADER
-                 ================================================= -->
+        <section
+            class="submission-section"
+            aria-labelledby="submissionTitle">
 
-            <header class="page-header">
+            <div class="section-heading">
+                <div>
 
-                <div class="page-header-content">
-
-                    <div class="page-eyebrow">
-                        ROCKET LEAGUE
+                    <div class="section-label">
+                        MATCH DETAILS
                     </div>
 
-                    <h1 class="page-title">
-                        Scoreboard OCR
-                    </h1>
+                    <h2
+                        class="section-title"
+                        id="submissionTitle">
+                        Prepare Scoreboard
+                    </h2>
 
-                    <p class="page-subtitle">
-                        Upload a Rocket League scoreboard screenshot,
-                        choose the match size, and enter the expected
-                        players. The first scan uses the full uploaded
-                        image. If the scoreboard cannot be located
-                        reliably, you will be asked to crop the image
-                        and retry.
-                    </p>
+                </div>
+            </div>
+
+            <div class="controls">
+
+                <div class="field">
+
+                    <label for="matchSize">
+                        Match Size
+                    </label>
+
+                    <select id="matchSize">
+                        <option value="1">
+                            1v1
+                        </option>
+
+                        <option value="2">
+                            2v2
+                        </option>
+
+                        <option
+                            value="3"
+                            selected>
+                            3v3
+                        </option>
+
+                        <option value="4">
+                            4v4
+                        </option>
+                    </select>
 
                 </div>
 
-            </header>
+                <div class="field player-names-field">
 
+                    <div class="field-heading">
 
-            <!-- =================================================
-                 SUBMISSION FORM
-                 ================================================= -->
-
-            <section
-                class="submission-section"
-                aria-labelledby="submissionTitle">
-
-                <div class="section-heading">
-
-                    <div>
-
-                        <div class="section-label">
-                            MATCH DETAILS
-                        </div>
-
-                        <h2
-                            class="section-title"
-                            id="submissionTitle">
-                            Prepare Scoreboard
-                        </h2>
-
-                    </div>
-
-                </div>
-
-
-                <div class="controls">
-
-                    <!-- MATCH SIZE -->
-
-                    <div class="field">
-
-                        <label for="matchSize">
-                            Match Size
+                        <label>
+                            Expected Player Names
                         </label>
 
-                        <select id="matchSize">
-
-                            <option value="1">
-                                1v1
-                            </option>
-
-                            <option value="2">
-                                2v2
-                            </option>
-
-                            <option
-                                value="3"
-                                selected>
-                                3v3
-                            </option>
-
-                            <option value="4">
-                                4v4
-                            </option>
-
-                        </select>
-
-                    </div>
-
-
-                    <!-- EXPECTED PLAYERS -->
-
-                    <div class="field player-names-field">
-
-                        <div class="field-heading">
-
-                            <label>
-                                Expected Player Names
-                            </label>
-
-                            <div class="player-names-help">
-                                Enter every player expected in the match.
-                                These names are used to associate detected
-                                scoreboard rows with the expected roster.
-                            </div>
-
-                        </div>
-
-                        <div
-                            class="player-names-grid"
-                            id="playerNamesContainer">
+                        <div class="player-names-help">
+                            Enter every player expected in the match.
+                            These names are used to associate detected
+                            scoreboard rows with the expected roster.
                         </div>
 
                     </div>
-
-
-                    <!-- IMAGE UPLOAD -->
-
-                    <div class="field image-upload-field">
-
-                        <label for="imageInput">
-                            Scoreboard Image
-                        </label>
-
-                        <div class="image-upload-control">
-
-                            <input
-                                id="imageInput"
-                                type="file"
-                                accept="image/png,image/jpeg,image/webp">
-
-                            <div class="image-upload-help">
-                                Upload the original screenshot. Cropping
-                                is only required if the first scan cannot
-                                reliably locate the scoreboard.
-                            </div>
-
-                        </div>
-
-                    </div>
-
-                </div>
-
-            </section>
-
-
-            <!-- =================================================
-                 EXAMPLE
-                 ================================================= -->
-
-            <section class="example-section">
-
-                <button
-                    class="example-toggle"
-                    id="exampleToggle"
-                    type="button"
-                    aria-expanded="true"
-                    aria-controls="exampleContent">
-
-                    <span class="example-toggle-label">
-                        Example Scoreboard
-                    </span>
-
-                    <span
-                        class="example-toggle-arrow-box"
-                        id="exampleToggleIcon"
-                        aria-hidden="true">
-                        ▲
-                    </span>
-
-                </button>
-
-                <div
-                    class="example-content"
-                    id="exampleContent">
-
-                    <img
-                        class="example-image"
-                        src="../../Assets/images/submit_img_samples/imgsample1.png"
-                        alt="Example Rocket League scoreboard screenshot">
-
-                    <div class="example-help">
-                        The screenshot should clearly show all player
-                        rows and scoreboard statistics. The surrounding
-                        game screen may remain in the image because the
-                        first OCR attempt uses the full upload.
-                    </div>
-
-                </div>
-
-            </section>
-
-
-            <!-- =================================================
-                 IMAGE PREVIEW / CROP FALLBACK
-                 ================================================= -->
-
-            <section
-                class="scoreboard-preview-section"
-                aria-labelledby="previewTitle">
-
-                <div class="section-heading">
-
-                    <div>
-
-                        <div class="section-label">
-                            IMAGE
-                        </div>
-
-                        <h2
-                            class="section-title"
-                            id="previewTitle">
-                            Scoreboard Preview
-                        </h2>
-
-                    </div>
-
-                </div>
-
-
-                <div
-                    class="canvas-wrap"
-                    id="canvasWrap">
 
                     <div
-                        class="empty-state"
-                        id="emptyState">
-                        Upload a screenshot to begin.
+                        class="player-names-grid"
+                        id="playerNamesContainer">
                     </div>
-
-                    <canvas
-                        id="scoreboardCanvas"
-                        hidden>
-                    </canvas>
 
                 </div>
 
+                <div class="field image-upload-field">
 
-                <!-- Hidden until first full-image attempt fails -->
+                    <label for="imageInput">
+                        Scoreboard Image
+                    </label>
 
-                <div
-                    class="crop-fallback"
-                    id="cropFallback"
-                    hidden>
+                    <div class="image-upload-control">
 
-                    <div class="crop-fallback-header">
+                        <input
+                            id="imageInput"
+                            type="file"
+                            accept="image/png,image/jpeg,image/webp">
 
-                        <div>
-
-                            <div class="crop-fallback-label">
-                                CROP REQUIRED
-                            </div>
-
-                            <div class="crop-help">
-                                The full-image scan could not reliably
-                                locate the scoreboard. Move and resize
-                                the green box around the complete
-                                scoreboard, then retry.
-                            </div>
-
+                        <div class="image-upload-help">
+                            Upload the original screenshot. Cropping
+                            is only required if the first scan cannot
+                            reliably locate the scoreboard.
                         </div>
 
-                        <button
-                            id="resetCropBtn"
-                            type="button"
-                            hidden
-                            disabled>
-                            Reset Crop
-                        </button>
-
                     </div>
 
                 </div>
 
-            </section>
+            </div>
 
+        </section>
 
-            <!-- =================================================
-                 SUBMIT
-                 ================================================= -->
+        <section class="example-section">
 
-            <section class="submission-actions-section">
+            <button
+                class="example-toggle"
+                id="exampleToggle"
+                type="button"
+                aria-expanded="true"
+                aria-controls="exampleContent">
 
-                <div class="actions">
+                <span class="example-toggle-label">
+                    Example Scoreboard
+                </span>
+
+                <span
+                    class="example-toggle-arrow-box"
+                    id="exampleToggleIcon"
+                    aria-hidden="true">
+                    ▲
+                </span>
+
+            </button>
+
+            <div
+                class="example-content"
+                id="exampleContent">
+
+                <img
+                    class="example-image"
+                    src="/ocr/Assets/images/submit_img_samples/imgsample1.png"
+                    alt="Example Rocket League scoreboard screenshot">
+
+                <div class="example-help">
+                    The screenshot should clearly show all player
+                    rows and scoreboard statistics. The surrounding
+                    game screen may remain in the image because the
+                    first OCR attempt uses the full upload.
+                </div>
+
+            </div>
+
+        </section>
+
+        <section
+            class="scoreboard-preview-section"
+            aria-labelledby="previewTitle">
+
+            <div class="section-heading">
+                <div>
+
+                    <div class="section-label">
+                        IMAGE
+                    </div>
+
+                    <h2
+                        class="section-title"
+                        id="previewTitle">
+                        Scoreboard Preview
+                    </h2>
+
+                </div>
+            </div>
+
+            <div
+                class="canvas-wrap"
+                id="canvasWrap">
+
+                <div
+                    class="empty-state"
+                    id="emptyState">
+                    Upload a screenshot to begin.
+                </div>
+
+                <canvas
+                    id="scoreboardCanvas"
+                    hidden>
+                </canvas>
+
+            </div>
+
+            <div
+                class="crop-fallback"
+                id="cropFallback"
+                hidden>
+
+                <div class="crop-fallback-header">
+
+                    <div>
+
+                        <div class="crop-fallback-label">
+                            CROP REQUIRED
+                        </div>
+
+                        <div class="crop-help">
+                            The full-image scan could not reliably
+                            locate the scoreboard. Move and resize
+                            the green box around the complete
+                            scoreboard, then retry.
+                        </div>
+
+                    </div>
 
                     <button
-                        id="submitBtn"
+                        id="resetCropBtn"
                         type="button"
+                        hidden
                         disabled>
-                        Read Scoreboard
+                        Reset Crop
                     </button>
 
                 </div>
 
+            </div>
 
-                <div
-                    class="loading-wrap"
-                    id="loadingWrap"
-                    hidden>
+        </section>
 
-                    <div class="loading-header">
+        <section class="submission-actions-section">
 
-                        <span id="loadingText">
-                            Reading scoreboard...
-                        </span>
+            <div class="actions">
 
-                        <span id="loadingPercent">
-                            0%
-                        </span>
+                <button
+                    id="submitBtn"
+                    type="button"
+                    disabled>
+                    Read Scoreboard
+                </button>
 
+            </div>
+
+            <div
+                class="loading-wrap"
+                id="loadingWrap"
+                hidden>
+
+                <div class="loading-header">
+
+                    <span id="loadingText">
+                        Reading scoreboard...
+                    </span>
+
+                    <span id="loadingPercent">
+                        0%
+                    </span>
+
+                </div>
+
+                <div class="loading-bar">
+                    <div
+                        class="loading-fill"
+                        id="loadingFill">
                     </div>
+                </div>
 
-                    <div class="loading-bar">
+            </div>
 
-                        <div
-                            class="loading-fill"
-                            id="loadingFill">
+            <div
+                class="status"
+                id="status"
+                role="status"
+                aria-live="polite">
+                Waiting for image.
+            </div>
+
+        </section>
+
+        <dialog
+            class="results-modal"
+            id="results"
+            aria-labelledby="resultsTitle">
+
+            <div class="results-modal-card">
+
+                <div class="results-modal-header">
+
+                    <div>
+
+                        <div class="results-modal-label">
+                            OCR REPORT
                         </div>
 
+                        <h2 id="resultsTitle">
+                            Review Scoreboard Results
+                        </h2>
+
+                        <p class="results-modal-description">
+                            Review the returned values before
+                            confirming the match.
+                        </p>
+
                     </div>
 
+                    <button
+                        class="results-modal-close"
+                        id="resultsCloseBtn"
+                        type="button"
+                        aria-label="Close results">
+                        ×
+                    </button>
+
                 </div>
 
+                <section
+                    class="results-review-section"
+                    aria-labelledby="resultsReviewTitle">
 
-                <div
-                    class="status"
-                    id="status"
-                    role="status"
-                    aria-live="polite">
-                    Waiting for image.
-                </div>
-
-            </section>
-
-
-            <!-- =================================================
-                 RESULTS MODAL
-                 ================================================= -->
-
-            <dialog
-                class="results-modal"
-                id="results"
-                aria-labelledby="resultsTitle">
-
-                <div class="results-modal-card">
-
-                    <!-- HEADER -->
-
-                    <div class="results-modal-header">
-
+                    <div class="results-review-heading">
                         <div>
 
-                            <div class="results-modal-label">
-                                OCR REPORT
+                            <div class="results-review-label">
+                                DETECTED VALUES
                             </div>
 
-                            <h2 id="resultsTitle">
-                                Review Scoreboard Results
-                            </h2>
-
-                            <p class="results-modal-description">
-                                Review the returned values before
-                                confirming the match.
-                            </p>
+                            <h3 id="resultsReviewTitle">
+                                Scoreboard Data
+                            </h3>
 
                         </div>
+                    </div>
+
+                    <div
+                        class="results-summary"
+                        id="resultsSummary">
+                    </div>
+
+                </section>
+
+                <section
+                    class="ocr-testing-panel"
+                    id="ocrTestingPanel"
+                    aria-labelledby="ocrTestingTitle"
+                    hidden>
+
+                    <div class="ocr-testing-label">
+                        RESULT REVIEW
+                    </div>
+
+                    <h3 id="ocrTestingTitle">
+                        Review & Confirm Results
+                    </h3>
+
+                    <p>
+                        Gray values are high-confidence OCR results
+                        and normally should not be changed.
+                        Highlighted values need additional review.
+                        Any value you change will be recorded as
+                        disputed while preserving the original OCR,
+                        Template, Tesseract, and Paddle results.
+                    </p>
+
+                    <div
+                        class="ocr-testing-status"
+                        id="ocrTestingStatus"
+                        role="status"
+                        aria-live="polite">
+                    </div>
+
+                    <div class="ocr-testing-actions">
 
                         <button
-                            class="results-modal-close"
-                            id="resultsCloseBtn"
-                            type="button"
-                            aria-label="Close results">
-                            ×
+                            id="ocrTestingAccurateBtn"
+                            type="button">
+                            Confirm Results
+                        </button>
+
+                        <button
+                            id="ocrTestingIncorrectBtn"
+                            type="button">
+                            Reset Changes
                         </button>
 
                     </div>
 
+                </section>
 
-                    <!-- RESULT TABLE INSERTED HERE BY JS -->
+                <details class="results-details">
 
-                    <section
-                        class="results-review-section"
-                        aria-labelledby="resultsReviewTitle">
+                    <summary>
+                        View Full OCR Report
+                    </summary>
 
-                        <div class="results-review-heading">
+                    <pre id="resultsOutput"></pre>
 
-                            <div>
+                </details>
 
-                                <div class="results-review-label">
-                                    DETECTED VALUES
-                                </div>
+            </div>
 
-                                <h3 id="resultsReviewTitle">
-                                    Scoreboard Data
-                                </h3>
+        </dialog>
 
-                            </div>
+    </section>
 
-                        </div>
-
-                        <div
-                            class="results-summary"
-                            id="resultsSummary">
-                        </div>
-
-                    </section>
-
-
-                    <!-- CONFIRMATION / DISPUTES -->
-
-                    <section
-                        class="ocr-testing-panel"
-                        id="ocrTestingPanel"
-                        aria-labelledby="ocrTestingTitle"
-                        hidden>
-
-                        <div class="ocr-testing-label">
-                            RESULT REVIEW
-                        </div>
-
-                        <h3 id="ocrTestingTitle">
-                            Review & Confirm Results
-                        </h3>
-
-                        <p>
-                            Gray values are high-confidence OCR results
-                            and normally should not be changed.
-                            Highlighted values need additional review.
-                            Any value you change will be recorded as
-                            disputed while preserving the original OCR,
-                            Template, Tesseract, and Paddle results.
-                        </p>
-
-                        <div
-                            class="ocr-testing-status"
-                            id="ocrTestingStatus"
-                            role="status"
-                            aria-live="polite">
-                        </div>
-
-                        <div class="ocr-testing-actions">
-
-                            <button
-                                id="ocrTestingAccurateBtn"
-                                type="button">
-                                Confirm Results
-                            </button>
-
-                            <button
-                                id="ocrTestingIncorrectBtn"
-                                type="button">
-                                Reset Changes
-                            </button>
-
-                        </div>
-
-                    </section>
-
-
-                    <!-- FULL TECHNICAL REPORT -->
-
-                    <details class="results-details">
-
-                        <summary>
-                            View Full OCR Report
-                        </summary>
-
-                        <pre id="resultsOutput"></pre>
-
-                    </details>
-
-                </div>
-
-            </dialog>
-
-        </section>
-
-    </main>
-
-
-</body>
-</html>
+</main>

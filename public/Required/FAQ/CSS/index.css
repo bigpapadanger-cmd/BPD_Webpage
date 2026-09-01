@@ -1,6 +1,6 @@
 /* BPD GAMING NETWORK - FAQ */
 
-:root {
+.faq-page {
     --faq-background: #0d0f13;
     --faq-surface: #15181f;
     --faq-surface-hover: #1b1f28;
@@ -9,34 +9,24 @@
     --faq-muted: #9ca5b5;
     --faq-purple: #8b5cf6;
     --faq-purple-hover: #9d74ff;
-}
 
-
-html,
-body {
-    margin: 0;
-    min-height: 100%;
-    background: var(--faq-background);
-    color: var(--faq-text);
-    font-family:
-        Inter,
-        system-ui,
-        -apple-system,
-        BlinkMacSystemFont,
-        "Segoe UI",
-        sans-serif;
-}
-
-button {
-    font: inherit;
-}
-
-.faq-page {
     width: min(100%, 1100px);
+    max-width: 100%;
     margin: 0 auto;
     padding:
         clamp(40px, 6vw, 80px)
         clamp(18px, 4vw, 40px);
+
+    color: var(--faq-text);
+}
+
+.faq-page,
+.faq-page * {
+    box-sizing: border-box;
+}
+
+.faq-page button {
+    font: inherit;
 }
 
 
@@ -55,29 +45,37 @@ HEADER
 }
 
 .faq-eyebrow,
-.faq-login-eyebrow {
+.faq-login-eyebrow,
+.faq-suggestion-label {
     display: inline-block;
     margin-bottom: 10px;
+
     color: var(--faq-purple);
+
     font-size: 0.75rem;
     font-weight: 700;
     letter-spacing: 0.12em;
+    text-transform: uppercase;
 }
 
 .faq-header h1 {
     margin: 0;
+
     font-size:
         clamp(
             2rem,
             5vw,
             3.4rem
         );
+
     line-height: 1.05;
 }
 
 .faq-header p {
     margin: 14px 0 0;
+
     color: var(--faq-muted);
+
     font-size: 1rem;
     line-height: 1.6;
 }
@@ -89,20 +87,36 @@ FAQ LIST
 =========================================================
 */
 
+.faq-content {
+    width: 100%;
+    min-width: 0;
+}
+
 .faq-list {
     display: flex;
     flex-direction: column;
     gap: 12px;
+
+    width: 100%;
+    min-width: 0;
     min-height: 0;
 }
 
 .faq-item {
+    width: 100%;
+    min-width: 0;
+
     overflow: hidden;
+
     border:
         1px solid
         var(--faq-border);
+
     border-radius: 14px;
-    background: var(--faq-surface);
+
+    background:
+        var(--faq-surface);
+
     transition:
         border-color 0.2s ease,
         background 0.2s ease;
@@ -110,12 +124,16 @@ FAQ LIST
 
 .faq-item:hover {
     border-color: #3a4050;
-    background: var(--faq-surface-hover);
+    background:
+        var(--faq-surface-hover);
 }
 
 .faq-item-main {
     display: flex;
     align-items: stretch;
+
+    width: 100%;
+    min-width: 0;
 }
 
 
@@ -129,10 +147,13 @@ UPVOTE
     display: flex;
     flex: 0 0 72px;
     flex-direction: column;
+
     align-items: center;
     justify-content: center;
     gap: 4px;
+
     padding: 16px 10px;
+
     border-right:
         1px solid
         var(--faq-border);
@@ -142,17 +163,26 @@ UPVOTE
     display: flex;
     align-items: center;
     justify-content: center;
+
     width: 34px;
     height: 30px;
     padding: 0;
+
     cursor: pointer;
+
     border:
         1px solid
         transparent;
+
     border-radius: 8px;
+
     background: transparent;
-    color: var(--faq-muted);
+
+    color:
+        var(--faq-muted);
+
     font-size: 18px;
+
     transition:
         color 0.2s ease,
         background 0.2s ease,
@@ -160,9 +190,13 @@ UPVOTE
         transform 0.15s ease;
 }
 
-.faq-upvote-button:hover {
+.faq-upvote-button:hover,
+.faq-upvote-button:focus-visible {
     color: #ffffff;
-    border-color: var(--faq-purple);
+
+    border-color:
+        var(--faq-purple);
+
     background:
         rgba(
             139,
@@ -170,11 +204,23 @@ UPVOTE
             246,
             0.12
         );
-    transform: translateY(-1px);
+
+    transform:
+        translateY(-1px);
+}
+
+.faq-upvote-button:focus-visible {
+    outline:
+        2px solid
+        var(--faq-purple);
+
+    outline-offset: 2px;
 }
 
 .faq-upvote-button.voted {
-    color: var(--faq-purple);
+    color:
+        var(--faq-purple);
+
     border-color:
         rgba(
             139,
@@ -182,6 +228,7 @@ UPVOTE
             246,
             0.5
         );
+
     background:
         rgba(
             139,
@@ -192,7 +239,9 @@ UPVOTE
 }
 
 .faq-upvote-count {
-    color: var(--faq-muted);
+    color:
+        var(--faq-muted);
+
     font-size: 0.78rem;
     font-weight: 700;
 }
@@ -206,41 +255,69 @@ QUESTION
 
 .faq-question-button {
     display: flex;
-    flex: 1;
+    flex: 1 1 auto;
+
     align-items: center;
     justify-content: space-between;
     gap: 20px;
+
     min-width: 0;
     padding: 20px 22px;
+
     cursor: pointer;
+
     border: 0;
     background: transparent;
+
     color: inherit;
+
     text-align: left;
 }
 
+.faq-question-button:focus-visible {
+    outline:
+        2px solid
+        var(--faq-purple);
+
+    outline-offset: -2px;
+}
+
 .faq-question-content {
+    flex: 1 1 auto;
     min-width: 0;
 }
 
 .faq-question {
     margin: 0 0 6px;
+
     color: #ffffff;
+
     font-size: 1rem;
     font-weight: 700;
+
+    overflow-wrap: anywhere;
 }
 
 .faq-summary {
     margin: 0;
-    color: var(--faq-muted);
+
+    color:
+        var(--faq-muted);
+
     font-size: 0.9rem;
     line-height: 1.5;
+
+    overflow-wrap: anywhere;
 }
 
 .faq-chevron {
     flex: 0 0 auto;
-    color: var(--faq-muted);
+
+    color:
+        var(--faq-muted);
+
     font-size: 18px;
+
     transition:
         transform 0.2s ease,
         color 0.2s ease;
@@ -248,8 +325,11 @@ QUESTION
 
 .faq-item.expanded
 .faq-chevron {
-    transform: rotate(180deg);
-    color: var(--faq-purple);
+    transform:
+        rotate(180deg);
+
+    color:
+        var(--faq-purple);
 }
 
 
@@ -261,13 +341,18 @@ ANSWER
 
 .faq-answer {
     display: none;
+
     padding:
         0
         22px
         22px
         94px;
+
     color: #c7ced9;
+
     line-height: 1.65;
+
+    overflow-wrap: anywhere;
 }
 
 .faq-item.expanded
@@ -280,41 +365,51 @@ ANSWER
 }
 
 
-/* =========================================================
-   SUGGESTION
-   ========================================================= */
+/*
+=========================================================
+SUGGESTION
+=========================================================
+*/
 
 .faq-suggestion {
     width: 100%;
     max-width: 100%;
+
     margin-top: 36px;
-    box-sizing: border-box;
 }
 
 .faq-suggestion-content {
     display: flex;
+
     align-items: center;
     justify-content: space-between;
     gap: 24px;
 
     width: 100%;
-    max-width: 100%;
     min-width: 0;
+    max-width: 100%;
 
     padding: 24px;
-    box-sizing: border-box;
 
-    border: 1px solid var(--faq-border);
+    overflow: hidden;
+
+    border:
+        1px solid
+        var(--faq-border);
+
     border-radius: 16px;
 
     background:
         linear-gradient(
             135deg,
-            rgba(139, 92, 246, 0.08),
+            rgba(
+                139,
+                92,
+                246,
+                0.08
+            ),
             var(--faq-surface)
         );
-
-    overflow: hidden;
 }
 
 .faq-suggestion-content > div {
@@ -324,30 +419,41 @@ ANSWER
 
 .faq-suggestion h2 {
     margin: 0;
+
     font-size: 1.1rem;
+
     overflow-wrap: anywhere;
 }
 
 .faq-suggestion p {
     margin: 6px 0 0;
-    color: var(--faq-muted);
+
+    color:
+        var(--faq-muted);
+
     font-size: 0.9rem;
+
     overflow-wrap: anywhere;
 }
 
 .faq-suggestion-button {
     flex: 0 0 auto;
+
     max-width: 100%;
 
     padding: 11px 17px;
-    box-sizing: border-box;
 
     cursor: pointer;
 
-    border: 1px solid var(--faq-purple);
+    border:
+        1px solid
+        var(--faq-purple);
+
     border-radius: 9px;
 
-    background: var(--faq-purple);
+    background:
+        var(--faq-purple);
+
     color: #ffffff;
 
     font-weight: 700;
@@ -355,12 +461,25 @@ ANSWER
 
     transition:
         background 0.2s ease,
-        transform 0.15s ease;
+        transform 0.15s ease,
+        box-shadow 0.2s ease;
 }
 
-.faq-suggestion-button:hover {
-    background: var(--faq-purple-hover);
-    transform: translateY(-1px);
+.faq-suggestion-button:hover,
+.faq-suggestion-button:focus-visible {
+    background:
+        var(--faq-purple-hover);
+
+    transform:
+        translateY(-1px);
+}
+
+.faq-suggestion-button:focus-visible {
+    outline:
+        2px solid
+        #ffffff;
+
+    outline-offset: 2px;
 }
 
 
@@ -378,15 +497,19 @@ LOGIN MODAL
     position: fixed;
     inset: 0;
     z-index: 500;
+
     display: flex;
+
     align-items: center;
     justify-content: center;
+
     padding: 20px;
 }
 
 .faq-login-backdrop {
     position: absolute;
     inset: 0;
+
     background:
         rgba(
             0,
@@ -394,23 +517,37 @@ LOGIN MODAL
             0,
             0.72
         );
-    backdrop-filter: blur(5px);
+
+    backdrop-filter:
+        blur(5px);
 }
 
 .faq-login-dialog {
     position: relative;
     z-index: 1;
+
     width:
         min(
             100%,
             430px
         );
+
+    max-height:
+        calc(100dvh - 40px);
+
     padding: 28px;
+
+    overflow-y: auto;
+
     border:
         1px solid
         var(--faq-border);
+
     border-radius: 16px;
-    background: #15181f;
+
+    background:
+        var(--faq-surface);
+
     box-shadow:
         0 24px 70px
         rgba(
@@ -427,25 +564,42 @@ LOGIN MODAL
 
 .faq-login-dialog p {
     margin: 10px 0 0;
-    color: var(--faq-muted);
+
+    color:
+        var(--faq-muted);
+
     line-height: 1.5;
 }
 
 .faq-login-close {
     position: absolute;
+
     top: 12px;
     right: 12px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
     width: 34px;
     height: 34px;
+    padding: 0;
+
     cursor: pointer;
+
     border: 0;
     border-radius: 8px;
+
     background: transparent;
-    color: var(--faq-muted);
+
+    color:
+        var(--faq-muted);
+
     font-size: 24px;
 }
 
-.faq-login-close:hover {
+.faq-login-close:hover,
+.faq-login-close:focus-visible {
     background: #222630;
     color: #ffffff;
 }
@@ -453,15 +607,22 @@ LOGIN MODAL
 .faq-login-actions {
     display: flex;
     gap: 10px;
+
     margin-top: 24px;
 }
 
 .faq-login-primary,
 .faq-login-secondary {
-    flex: 1;
+    flex: 1 1 0;
+
+    min-width: 0;
+
     padding: 11px 14px;
+
     cursor: pointer;
+
     border-radius: 8px;
+
     font-weight: 700;
 }
 
@@ -469,16 +630,32 @@ LOGIN MODAL
     border:
         1px solid
         var(--faq-purple);
-    background: var(--faq-purple);
+
+    background:
+        var(--faq-purple);
+
     color: #ffffff;
+}
+
+.faq-login-primary:hover,
+.faq-login-primary:focus-visible {
+    background:
+        var(--faq-purple-hover);
 }
 
 .faq-login-secondary {
     border:
         1px solid
         var(--faq-border);
+
     background: #1b1f27;
+
     color: #ffffff;
+}
+
+.faq-login-secondary:hover,
+.faq-login-secondary:focus-visible {
+    background: #242a35;
 }
 
 
@@ -489,17 +666,30 @@ MOBILE
 */
 
 @media (max-width: 650px) {
+    .faq-page {
+        padding:
+            36px
+            14px
+            56px;
+    }
 
-    .faq-item-main {
-        align-items: stretch;
+    .faq-header {
+        margin-bottom: 28px;
     }
 
     .faq-vote {
         flex-basis: 58px;
+        padding:
+            14px
+            8px;
     }
 
     .faq-question-button {
-        padding: 17px 15px;
+        gap: 12px;
+
+        padding:
+            17px
+            15px;
     }
 
     .faq-answer {
@@ -510,20 +700,44 @@ MOBILE
             73px;
     }
 
-    .faq-suggestion-content > div {
-        flex: 1 1 auto;
-        min-width: 0;
-    }
-
-     .faq-suggestion-content {
+    .faq-suggestion-content {
         flex-direction: column;
+
         align-items: stretch;
         gap: 18px;
+
         padding: 20px;
     }
 
     .faq-suggestion-button {
         width: 100%;
         white-space: normal;
+    }
+
+    .faq-login-dialog {
+        padding:
+            24px
+            20px;
+    }
+
+    .faq-login-actions {
+        flex-direction: column;
+    }
+}
+
+
+/*
+=========================================================
+REDUCED MOTION
+=========================================================
+*/
+
+@media (prefers-reduced-motion: reduce) {
+    .faq-page *,
+    .faq-page *::before,
+    .faq-page *::after {
+        scroll-behavior: auto !important;
+        transition: none !important;
+        animation: none !important;
     }
 }
