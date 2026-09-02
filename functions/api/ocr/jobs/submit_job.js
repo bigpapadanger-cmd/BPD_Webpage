@@ -3,60 +3,166 @@
 // OCR JOB SUBMISSION
 // ============================================================
 
-const SUBMIT_JOB_VERSION = "ocr-submit-job-1.0";
+import {
+    getStoredSession
+} from "../../../services/common_helpers/reload_sessions.js";
 
-export async function onRequestPost(context) {
+const SUBMIT_JOB_VERSION =
+    "ocr-submit-job-1.1";
+
+// ============================================================
+// MAIN
+// ============================================================
+
+export async function onRequestPost(
+    context
+) {
     const {
         request,
         env
     } = context;
 
     try {
-        if (!env.OCR_STORAGE) {
+        if (
+            !env.OCR_STORAGE
+        ) {
             return jsonResponse(
                 {
                     success: false,
-                    message: "OCR storage is not configured.",
-                    version: SUBMIT_JOB_VERSION
+                    message:
+                        "OCR storage is not configured.",
+                    version:
+                        SUBMIT_JOB_VERSION
                 },
                 500
             );
         }
 
-        const contentType =
-            request.headers.get("content-type") || "";
-
         if (
-            !contentType.includes(
-                "multipart/form-data"
-            )
+            !env.OCR_OWNER_SECRET
         ) {
             return jsonResponse(
                 {
                     success: false,
-                    message: "Expected multipart/form-data.",
-                    version: SUBMIT_JOB_VERSION
+                    message:
+                        "OCR owner hashing is not configured.",
+                    version:
+                        SUBMIT_JOB_VERSION
+                },
+                503
+            );
+        }
+
+        const contentType =
+            String(
+                request.headers.get(
+                    "Content-Type"
+                )
+                || ""
+            );
+
+        if (
+            !contentType
+                .toLowerCase()
+                .includes(
+                    "multipart/form-data"
+                )
+        ) {
+            return jsonResponse(
+                {
+                    success: false,
+                    message:
+                        "Expected multipart/form-data.",
+                    version:
+                        SUBMIT_JOB_VERSION
                 },
                 400
             );
         }
 
-        const formData =
-            await request.formData();
+        // ====================================================
+        // AUTHENTICATED USER
+        // ====================================================
 
-        const image =
-            formData.get("image");
+        const session =
+            await getStoredSession(
+                request,
+                env
+            );
 
         if (
-            !image
-            ||
-            typeof image.arrayBuffer !== "function"
+            !session
+            || !session.sessionData
         ) {
             return jsonResponse(
                 {
                     success: false,
-                    message: "Missing OCR image.",
-                    version: SUBMIT_JOB_VERSION
+                    message:
+                        "Authentication required.",
+                    version:
+                        SUBMIT_JOB_VERSION
+                },
+                401
+            );
+        }
+
+        const epicUniqueId =
+            String(
+                session
+                    .sessionData
+                    .EpicUniqueId
+                || ""
+            )
+            .trim();
+
+        if (
+            !epicUniqueId
+        ) {
+            return jsonResponse(
+                {
+                    success: false,
+                    message:
+                        "Authenticated account is missing an EpicUniqueId.",
+                    version:
+                        SUBMIT_JOB_VERSION
+                },
+                401
+            );
+        }
+
+        const submittedBy =
+            await createOwnerHash(
+                epicUniqueId,
+                env.OCR_OWNER_SECRET
+            );
+
+        // ====================================================
+        // FORM DATA
+        // ====================================================
+
+        const formData =
+            await request.formData();
+
+        const image =
+            formData.get(
+                "file"
+            )
+            || formData.get(
+                "image"
+            );
+
+        if (
+            !image
+            || typeof image.arrayBuffer
+                !== "function"
+        ) {
+            return jsonResponse(
+                {
+                    success: false,
+                    message:
+                        "Missing OCR image.",
+                    version:
+                        SUBMIT_JOB_VERSION
                 },
                 400
             );
@@ -67,24 +173,30 @@ export async function onRequestPost(context) {
 
         if (
             !imageBytes
-            ||
-            imageBytes.byteLength === 0
+            || imageBytes.byteLength === 0
         ) {
             return jsonResponse(
                 {
                     success: false,
-                    message: "OCR image is empty.",
-                    version: SUBMIT_JOB_VERSION
+                    message:
+                        "OCR image is empty.",
+                    version:
+                        SUBMIT_JOB_VERSION
                 },
                 400
             );
         }
 
+        // ====================================================
+        // JOB
+        // ====================================================
+
         const jobId =
             createJobId();
 
         const now =
-            new Date().toISOString();
+            new Date()
+                .toISOString();
 
         const baseKey =
             `ocr-jobs/${jobId}`;
@@ -98,12 +210,26 @@ export async function onRequestPost(context) {
         const statusKey =
             `${baseKey}/status.json`;
 
-        const requestData =
-            buildRequestData(
-                formData,
-                jobId,
-                now
+        const fields =
+            buildRequestFields(
+                formData
             );
+
+        // Browser is never allowed to provide ownership.
+        fields.submittedBy =
+            submittedBy;
+
+        const requestData = {
+            version:
+                "ocr-job-request-1.1",
+
+            jobId,
+
+            createdAt:
+                now,
+
+            fields
+        };
 
         const statusData = {
             version:
@@ -168,6 +294,7 @@ export async function onRequestPost(context) {
                             image.type
                             || "image/png"
                     },
+
                     customMetadata: {
                         jobId,
                         uploadedAt:
@@ -210,28 +337,24 @@ export async function onRequestPost(context) {
         return jsonResponse(
             {
                 success: true,
-
                 version:
                     SUBMIT_JOB_VERSION,
-
                 jobId,
-
                 status:
                     "queued",
-
                 stage:
                     "queued",
-
                 progress:
                     0,
-
                 uploadStatus:
                     "completed"
             },
             202
         );
     }
-    catch (error) {
+    catch (
+        error
+    ) {
         console.error(
             "OCR submit job failed:",
             error
@@ -240,16 +363,13 @@ export async function onRequestPost(context) {
         return jsonResponse(
             {
                 success: false,
-
                 message:
                     "Unable to create OCR job.",
-
                 error:
                     String(
                         error?.message
                         || error
                     ),
-
                 version:
                     SUBMIT_JOB_VERSION
             },
@@ -259,13 +379,11 @@ export async function onRequestPost(context) {
 }
 
 // ============================================================
-// REQUEST DATA
+// REQUEST FIELDS
 // ============================================================
 
-function buildRequestData(
-    formData,
-    jobId,
-    createdAt
+function buildRequestFields(
+    formData
 ) {
     const fields = {};
 
@@ -278,50 +396,114 @@ function buildRequestData(
     ) {
         if (
             key === "image"
+            || key === "file"
+            || key === "submittedBy"
         ) {
             continue;
         }
 
         if (
-            typeof value === "string"
+            typeof value
+            !== "string"
         ) {
-            if (
-                Object.prototype.hasOwnProperty.call(
+            continue;
+        }
+
+        if (
+            Object.prototype
+                .hasOwnProperty
+                .call(
                     fields,
                     key
                 )
+        ) {
+            if (
+                !Array.isArray(
+                    fields[key]
+                )
             ) {
-                if (
-                    !Array.isArray(
-                        fields[key]
-                    )
-                ) {
-                    fields[key] = [
-                        fields[key]
-                    ];
-                }
+                fields[key] = [
+                    fields[key]
+                ];
+            }
 
-                fields[key].push(
-                    value
-                );
-            }
-            else {
-                fields[key] =
-                    value;
-            }
+            fields[key].push(
+                value
+            );
+        }
+        else {
+            fields[key] =
+                value;
         }
     }
 
-    return {
-        version:
-            "ocr-job-request-1.0",
+    return fields;
+}
 
-        jobId,
+// ============================================================
+// OWNER HASH
+// ============================================================
 
-        createdAt,
+async function createOwnerHash(
+    epicUniqueId,
+    secret
+) {
+    const encoder =
+        new TextEncoder();
 
-        fields
-    };
+    const key =
+        await crypto.subtle.importKey(
+            "raw",
+            encoder.encode(
+                String(
+                    secret
+                )
+            ),
+            {
+                name:
+                    "HMAC",
+                hash:
+                    "SHA-256"
+            },
+            false,
+            [
+                "sign"
+            ]
+        );
+
+    const signature =
+        await crypto.subtle.sign(
+            "HMAC",
+            key,
+            encoder.encode(
+                String(
+                    epicUniqueId
+                )
+            )
+        );
+
+    return Array.from(
+        new Uint8Array(
+            signature
+        )
+    )
+        .map(
+            function(
+                byte
+            ) {
+                return byte
+                    .toString(
+                        16
+                    )
+                    .padStart(
+                        2,
+                        "0"
+                    );
+            }
+        )
+        .join(
+            ""
+        );
 }
 
 // ============================================================
@@ -343,7 +525,7 @@ function createJobId() {
 }
 
 // ============================================================
-// JSON RESPONSE
+// RESPONSE
 // ============================================================
 
 function jsonResponse(
@@ -358,10 +540,10 @@ function jsonResponse(
             status,
 
             headers: {
-                "content-type":
+                "Content-Type":
                     "application/json; charset=utf-8",
 
-                "cache-control":
+                "Cache-Control":
                     "no-store"
             }
         }
