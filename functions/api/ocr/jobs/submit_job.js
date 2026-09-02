@@ -8,7 +8,7 @@ import {
 } from "../../../services/common_helpers/reload_sessions.js";
 
 const SUBMIT_JOB_VERSION =
-    "ocr-submit-job-1.1";
+    "ocr-submit-job-1.2";
 
 // ============================================================
 // MAIN
@@ -23,6 +23,10 @@ export async function onRequestPost(
     } = context;
 
     try {
+        // ====================================================
+        // CONFIGURATION
+        // ====================================================
+
         if (
             !env.OCR_STORAGE
         ) {
@@ -52,6 +56,25 @@ export async function onRequestPost(
                 503
             );
         }
+
+        if (
+            !env.OCR_JOB_QUEUE
+        ) {
+            return jsonResponse(
+                {
+                    success: false,
+                    message:
+                        "OCR job queue is not configured.",
+                    version:
+                        SUBMIT_JOB_VERSION
+                },
+                503
+            );
+        }
+
+        // ====================================================
+        // CONTENT TYPE
+        // ====================================================
 
         const contentType =
             String(
@@ -143,6 +166,113 @@ export async function onRequestPost(
         const formData =
             await request.formData();
 
+        // ====================================================
+        // PLAYERS PER TEAM
+        // ====================================================
+
+        const playersPerTeam =
+            Number(
+                formData.get(
+                    "playersPerTeam"
+                )
+            );
+
+        if (
+            ![1, 2, 3, 4]
+                .includes(
+                    playersPerTeam
+                )
+        ) {
+            return jsonResponse(
+                {
+                    success: false,
+                    message:
+                        "playersPerTeam must be 1, 2, 3, or 4.",
+                    version:
+                        SUBMIT_JOB_VERSION
+                },
+                400
+            );
+        }
+
+        // ====================================================
+        // EXPECTED PLAYER NAMES
+        // ====================================================
+
+        let expectedPlayerNames;
+
+        try {
+            expectedPlayerNames =
+                JSON.parse(
+                    String(
+                        formData.get(
+                            "expectedPlayerNames"
+                        )
+                        || "[]"
+                    )
+                );
+        }
+        catch {
+            expectedPlayerNames =
+                [];
+        }
+
+        if (
+            Array.isArray(
+                expectedPlayerNames
+            )
+        ) {
+            expectedPlayerNames =
+                expectedPlayerNames.map(
+                    function(
+                        value
+                    ) {
+                        return String(
+                            value
+                            || ""
+                        )
+                            .trim()
+                            .toUpperCase();
+                    }
+                );
+        }
+
+        const expectedCount =
+            playersPerTeam * 2;
+
+        if (
+            !Array.isArray(
+                expectedPlayerNames
+            )
+            || expectedPlayerNames.length
+                !== expectedCount
+            || expectedPlayerNames.some(
+                function(
+                    name
+                ) {
+                    return !name;
+                }
+            )
+            || new Set(
+                expectedPlayerNames
+            ).size !== expectedCount
+        ) {
+            return jsonResponse(
+                {
+                    success: false,
+                    message:
+                        `Player Names Must Contain Exactly ${expectedCount} Unique Names.`,
+                    version:
+                        SUBMIT_JOB_VERSION
+                },
+                400
+            );
+        }
+
+        // ====================================================
+        // IMAGE
+        // ====================================================
+
         const image =
             formData.get(
                 "file"
@@ -160,7 +290,23 @@ export async function onRequestPost(
                 {
                     success: false,
                     message:
-                        "Missing OCR image.",
+                        "Missing image.",
+                    version:
+                        SUBMIT_JOB_VERSION
+                },
+                400
+            );
+        }
+
+        if (
+            image.size !== undefined
+            && image.size <= 0
+        ) {
+            return jsonResponse(
+                {
+                    success: false,
+                    message:
+                        "Uploaded image is empty.",
                     version:
                         SUBMIT_JOB_VERSION
                 },
@@ -179,13 +325,31 @@ export async function onRequestPost(
                 {
                     success: false,
                     message:
-                        "OCR image is empty.",
+                        "Image is empty or did not transfer correctly.",
                     version:
                         SUBMIT_JOB_VERSION
                 },
                 400
             );
         }
+
+        // ====================================================
+        // NORMALIZE REQUEST FIELDS
+        // ====================================================
+
+        formData.set(
+            "playersPerTeam",
+            String(
+                playersPerTeam
+            )
+        );
+
+        formData.set(
+            "expectedPlayerNames",
+            JSON.stringify(
+                expectedPlayerNames
+            )
+        );
 
         // ====================================================
         // JOB
@@ -215,13 +379,20 @@ export async function onRequestPost(
                 formData
             );
 
-        // Browser is never allowed to provide ownership.
+        // ====================================================
+        // TRUSTED SERVER-DERIVED OWNERSHIP
+        // ====================================================
+
         fields.submittedBy =
             submittedBy;
 
+        // ====================================================
+        // REQUEST DATA
+        // ====================================================
+
         const requestData = {
             version:
-                "ocr-job-request-1.1",
+                "ocr-job-request-1.2",
 
             jobId,
 
@@ -231,9 +402,13 @@ export async function onRequestPost(
             fields
         };
 
+        // ====================================================
+        // STATUS DATA
+        // ====================================================
+
         const statusData = {
             version:
-                "ocr-job-state-1.0",
+                "ocr-job-state-1.1",
 
             jobId,
 
@@ -267,6 +442,9 @@ export async function onRequestPost(
             attempt:
                 0,
 
+            providerJobId:
+                null,
+
             matchId:
                 null,
 
@@ -283,6 +461,10 @@ export async function onRequestPost(
             error:
                 null
         };
+
+        // ====================================================
+        // STORE JOB FILES
+        // ====================================================
 
         await Promise.all([
             env.OCR_STORAGE.put(
@@ -334,18 +516,92 @@ export async function onRequestPost(
             )
         ]);
 
+        // ====================================================
+        // QUEUE JOB
+        // ====================================================
+
+        try {
+            await env.OCR_JOB_QUEUE.send(
+                {
+                    jobId
+                }
+            );
+        }
+        catch (
+            queueError
+        ) {
+            const failedAt =
+                new Date()
+                    .toISOString();
+
+            await env.OCR_STORAGE.put(
+                statusKey,
+                JSON.stringify(
+                    {
+                        ...statusData,
+
+                        status:
+                            "failed",
+
+                        stage:
+                            "queue_failed",
+
+                        progress:
+                            100,
+
+                        updatedAt:
+                            failedAt,
+
+                        completedAt:
+                            failedAt,
+
+                        error: {
+                            code:
+                                "QUEUE_SEND_FAILED",
+
+                            message:
+                                String(
+                                    queueError?.message
+                                    || queueError
+                                )
+                        }
+                    },
+                    null,
+                    2
+                ),
+                {
+                    httpMetadata: {
+                        contentType:
+                            "application/json"
+                    }
+                }
+            );
+
+            throw queueError;
+        }
+
+        // ====================================================
+        // RESPONSE
+        // ====================================================
+
         return jsonResponse(
             {
                 success: true,
+
                 version:
                     SUBMIT_JOB_VERSION,
+
                 jobId,
+
                 status:
                     "queued",
+
                 stage:
                     "queued",
+
                 progress:
                     0,
+
                 uploadStatus:
                     "completed"
             },
@@ -356,20 +612,23 @@ export async function onRequestPost(
         error
     ) {
         console.error(
-            "OCR submit job failed:",
+            "OCR job submission failed:",
             error
         );
 
         return jsonResponse(
             {
                 success: false,
+
                 message:
                     "Unable to create OCR job.",
+
                 error:
                     String(
                         error?.message
                         || error
                     ),
+
                 version:
                     SUBMIT_JOB_VERSION
             },
@@ -462,6 +721,7 @@ async function createOwnerHash(
             {
                 name:
                     "HMAC",
+
                 hash:
                     "SHA-256"
             },

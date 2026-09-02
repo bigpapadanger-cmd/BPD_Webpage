@@ -2,11 +2,14 @@
 // BPD GAMING NETWORK
 // OCR JOB PROCESSOR
 // ============================================================
+
 const PROCESS_JOB_VERSION =
-    "ocr-process-job-1.0";
+    "ocr-process-job-1.1";
+
 // ============================================================
 // MAIN
 // ============================================================
+
 export async function onRequestPost(
     context
 ) {
@@ -14,9 +17,15 @@ export async function onRequestPost(
         request,
         env
     } = context;
+
     let jobId =
         null;
+
     try {
+        // ====================================================
+        // CONFIGURATION
+        // ====================================================
+
         if (
             !env.OCR_STORAGE
         ) {
@@ -31,6 +40,7 @@ export async function onRequestPost(
                 500
             );
         }
+
         if (
             !env.OCR_API_URL
         ) {
@@ -45,6 +55,7 @@ export async function onRequestPost(
                 503
             );
         }
+
         if (
             !env.OCR_API_KEY
         ) {
@@ -59,12 +70,79 @@ export async function onRequestPost(
                 503
             );
         }
-        const body =
-            await request.json();
+        const processToken =
+            String(
+                request.headers.get(
+                    "X-OCR-Job-Token"
+                )
+                || ""
+            )
+            .trim();
+
+        const expectedToken =
+            String(
+                env.OCR_JOB_PROCESS_SECURE_TOKEN
+                || ""
+            )
+            .trim();
+
+        if (
+            !expectedToken
+        ) {
+            return jsonResponse(
+                {
+                    success: false,
+                    message:
+                        "OCR job processor authentication is not configured.",
+                    version:
+                        PROCESS_JOB_VERSION
+                },
+                503
+            );
+        }
+
+        if (
+            processToken !== expectedToken
+        ) {
+            return jsonResponse(
+                {
+                    success: false,
+                    message:
+                        "Unauthorized.",
+                    version:
+                        PROCESS_JOB_VERSION
+                },
+                401
+            );
+        }
+        // ====================================================
+        // REQUEST
+        // ====================================================
+
+        let body;
+
+        try {
+            body =
+                await request.json();
+        }
+        catch {
+            return jsonResponse(
+                {
+                    success: false,
+                    message:
+                        "Request body must be valid JSON.",
+                    version:
+                        PROCESS_JOB_VERSION
+                },
+                400
+            );
+        }
+
         jobId =
             sanitizeJobId(
                 body?.jobId
             );
+
         if (
             !jobId
         ) {
@@ -79,17 +157,23 @@ export async function onRequestPost(
                 400
             );
         }
+
         const baseKey =
             `ocr-jobs/${jobId}`;
+
         const inputKey =
             `${baseKey}/input.png`;
+
         const requestKey =
             `${baseKey}/request.json`;
+
         const statusKey =
             `${baseKey}/status.json`;
+
         // ====================================================
         // LOAD STORED JOB
         // ====================================================
+
         const [
             inputObject,
             requestObject,
@@ -105,6 +189,7 @@ export async function onRequestPost(
                 statusKey
             )
         ]);
+
         if (
             !inputObject
             || !requestObject
@@ -122,17 +207,39 @@ export async function onRequestPost(
                 404
             );
         }
-        const requestData =
-            JSON.parse(
-                await requestObject.text()
+
+        let requestData;
+        let statusData;
+
+        try {
+            requestData =
+                JSON.parse(
+                    await requestObject.text()
+                );
+
+            statusData =
+                JSON.parse(
+                    await statusObject.text()
+                );
+        }
+        catch {
+            return jsonResponse(
+                {
+                    success: false,
+                    message:
+                        "OCR job metadata is invalid.",
+                    jobId,
+                    version:
+                        PROCESS_JOB_VERSION
+                },
+                500
             );
-        const statusData =
-            JSON.parse(
-                await statusObject.text()
-            );
+        }
+
         // ====================================================
         // JOB STATE CHECK
         // ====================================================
+
         if (
             statusData.status
             === "completed"
@@ -140,25 +247,48 @@ export async function onRequestPost(
             return jsonResponse(
                 {
                     success: true,
-                    message:
-                        "OCR job is already completed.",
                     jobId,
+                    providerJobId:
+                        statusData.providerJobId
+                        || null,
                     status:
                         "completed",
+                    matchId:
+                        statusData.matchId
+                        || null,
+                    resultKey:
+                        statusData.resultKey
+                        || null,
+                    benchmarkKey:
+                        statusData.benchmarkKey
+                        || null,
+                    message:
+                        "OCR job is already completed.",
                     version:
                         PROCESS_JOB_VERSION
                 },
                 200
             );
         }
+
+        const now =
+            new Date()
+                .toISOString();
+
         const startedAt =
             statusData.startedAt
-            || new Date().toISOString();
+            || now;
+
         const attempt =
             Number(
                 statusData.attempt
                 || 0
             ) + 1;
+
+        // ====================================================
+        // MARK PROCESSING
+        // ====================================================
+
         await updateStatus(
             env,
             statusKey,
@@ -172,25 +302,27 @@ export async function onRequestPost(
                     5,
                 startedAt,
                 updatedAt:
-                    new Date().toISOString(),
+                    now,
                 heartbeatAt:
-                    new Date().toISOString(),
+                    now,
                 attempt,
                 error:
                     null
             }
         );
+
         // ====================================================
         // BUILD CLOUD RUN FORM
         // ====================================================
+
         const imageBytes =
             await inputObject.arrayBuffer();
-        const formData =
-            new FormData();
+
         const contentType =
             inputObject.httpMetadata
                 ?.contentType
             || "image/png";
+
         const imageBlob =
             new Blob(
                 [
@@ -201,11 +333,16 @@ export async function onRequestPost(
                         contentType
                 }
             );
+
+        const formData =
+            new FormData();
+
         formData.set(
             "file",
             imageBlob,
             "input.png"
         );
+
         const fields =
             (
                 requestData
@@ -215,6 +352,7 @@ export async function onRequestPost(
             )
                 ? requestData.fields
                 : {};
+
         for (
             const [
                 key,
@@ -230,6 +368,7 @@ export async function onRequestPost(
             ) {
                 continue;
             }
+
             if (
                 Array.isArray(
                     value
@@ -256,9 +395,15 @@ export async function onRequestPost(
                 );
             }
         }
+
         // ====================================================
-        // UPDATE STATE BEFORE OCR
+        // UPDATE STATE BEFORE CLOUD RUN
         // ====================================================
+
+        const ocrStartedAt =
+            new Date()
+                .toISOString();
+
         await updateStatus(
             env,
             statusKey,
@@ -272,31 +417,37 @@ export async function onRequestPost(
                     10,
                 startedAt,
                 updatedAt:
-                    new Date().toISOString(),
+                    ocrStartedAt,
                 heartbeatAt:
-                    new Date().toISOString(),
+                    ocrStartedAt,
                 attempt,
                 error:
                     null
             }
         );
+
         // ====================================================
         // CALL CLOUD RUN
         // ====================================================
+
         const upstreamHeaders =
             new Headers();
+
         upstreamHeaders.set(
             "X-API-Key",
             env.OCR_API_KEY
         );
+
         upstreamHeaders.set(
             "X-BPD-OCR-Handler-Version",
             PROCESS_JOB_VERSION
         );
+
         upstreamHeaders.set(
             "X-BPD-OCR-Job-ID",
             jobId
         );
+
         const ocrResponse =
             await fetch(
                 env.OCR_API_URL,
@@ -309,16 +460,60 @@ export async function onRequestPost(
                         formData
                 }
             );
+
         const result =
             await readUpstreamResponse(
                 ocrResponse
             );
+
+        // ====================================================
+        // ISOLATE PROVIDER DATA
+        // ====================================================
+
+        const providerJobId =
+            result?.jobId
+            || result?.benchmark?.jobId
+            || null;
+
+        const matchId =
+            result?.matchId
+            || null;
+
+        const resultKey =
+            result?.storage?.reportKey
+            || (
+                matchId
+                    ? `match-reports/${matchId}.json`
+                    : null
+            );
+
+        const benchmarkKey =
+            result?.storage?.benchmarkKey
+            || result?.benchmark
+                ?.storage
+                ?.benchmarkKey
+            || (
+                providerJobId
+                    ? `ocr-benchmarks/${providerJobId}.json`
+                    : null
+            );
+
+        const providerMessage =
+            result?.message
+            || result?.error
+            || null;
+
         // ====================================================
         // FAILED OCR
         // ====================================================
+
         if (
             !ocrResponse.ok
         ) {
+            const failedAt =
+                new Date()
+                    .toISOString();
+
             const failedStatus = {
                 ...statusData,
                 status:
@@ -329,53 +524,55 @@ export async function onRequestPost(
                     100,
                 startedAt,
                 updatedAt:
-                    new Date().toISOString(),
+                    failedAt,
                 completedAt:
-                    new Date().toISOString(),
+                    failedAt,
                 heartbeatAt:
-                    new Date().toISOString(),
+                    failedAt,
                 attempt,
+                providerJobId,
                 error: {
                     code:
                         `HTTP_${ocrResponse.status}`,
                     message:
-                        result?.message
-                        || result?.error
+                        providerMessage
                         || "OCR processing failed."
                 }
             };
+
             await updateStatus(
                 env,
                 statusKey,
                 failedStatus
             );
+
             return jsonResponse(
                 {
                     success: false,
                     jobId,
+                    providerJobId,
                     status:
                         "failed",
                     providerStatus:
                         ocrResponse.status,
-                    result,
+                    message:
+                        providerMessage
+                        || "OCR processing failed.",
                     version:
                         PROCESS_JOB_VERSION
                 },
                 ocrResponse.status
             );
         }
+
         // ====================================================
         // COMPLETED OCR
         // ====================================================
-        const matchId =
-            result?.matchId
-            || null;
-        const resultKey =
-            matchId
-                ? `match-reports/${matchId}.json`
-                : null;
-        const benchmarkKey =
-            `ocr-benchmarks/${jobId}.json`;
+
+        const completedAt =
+            new Date()
+                .toISOString();
+
         const completedStatus = {
             ...statusData,
             status:
@@ -386,33 +583,35 @@ export async function onRequestPost(
                 100,
             startedAt,
             updatedAt:
-                new Date().toISOString(),
-            completedAt:
-                new Date().toISOString(),
+                completedAt,
+            completedAt,
             heartbeatAt:
-                new Date().toISOString(),
+                completedAt,
             attempt,
+            providerJobId,
             matchId,
             resultKey,
             benchmarkKey,
             error:
                 null
         };
+
         await updateStatus(
             env,
             statusKey,
             completedStatus
         );
+
         return jsonResponse(
             {
                 success: true,
                 jobId,
+                providerJobId,
                 status:
                     "completed",
                 matchId,
                 resultKey,
                 benchmarkKey,
-                result,
                 version:
                     PROCESS_JOB_VERSION
             },
@@ -426,6 +625,7 @@ export async function onRequestPost(
             "OCR process job failed:",
             error
         );
+
         if (
             jobId
             && env.OCR_STORAGE
@@ -433,21 +633,36 @@ export async function onRequestPost(
             try {
                 const statusKey =
                     `ocr-jobs/${jobId}/status.json`;
+
                 const statusObject =
                     await env.OCR_STORAGE.get(
                         statusKey
                     );
+
                 let statusData = {
                     jobId
                 };
+
                 if (
                     statusObject
                 ) {
-                    statusData =
-                        JSON.parse(
-                            await statusObject.text()
-                        );
+                    try {
+                        statusData =
+                            JSON.parse(
+                                await statusObject.text()
+                            );
+                    }
+                    catch {
+                        statusData = {
+                            jobId
+                        };
+                    }
                 }
+
+                const failedAt =
+                    new Date()
+                        .toISOString();
+
                 await updateStatus(
                     env,
                     statusKey,
@@ -460,11 +675,11 @@ export async function onRequestPost(
                         progress:
                             100,
                         updatedAt:
-                            new Date().toISOString(),
+                            failedAt,
                         completedAt:
-                            new Date().toISOString(),
+                            failedAt,
                         heartbeatAt:
-                            new Date().toISOString(),
+                            failedAt,
                         error: {
                             code:
                                 "PROCESS_EXCEPTION",
@@ -486,10 +701,13 @@ export async function onRequestPost(
                 );
             }
         }
+
         return jsonResponse(
             {
                 success: false,
                 jobId,
+                status:
+                    "failed",
                 message:
                     "Unable to process OCR job.",
                 error:
@@ -504,9 +722,11 @@ export async function onRequestPost(
         );
     }
 }
+
 // ============================================================
 // STATUS UPDATE
 // ============================================================
+
 async function updateStatus(
     env,
     statusKey,
@@ -527,9 +747,11 @@ async function updateStatus(
         }
     );
 }
+
 // ============================================================
 // UPSTREAM RESPONSE
 // ============================================================
+
 async function readUpstreamResponse(
     response
 ) {
@@ -541,6 +763,7 @@ async function readUpstreamResponse(
             || ""
         )
         .toLowerCase();
+
     if (
         contentType.includes(
             "application/json"
@@ -557,8 +780,10 @@ async function readUpstreamResponse(
             };
         }
     }
+
     const text =
         await response.text();
+
     return {
         success:
             response.ok,
@@ -571,9 +796,11 @@ async function readUpstreamResponse(
             )
     };
 }
+
 // ============================================================
 // JOB ID
 // ============================================================
+
 function sanitizeJobId(
     value
 ) {
@@ -584,6 +811,7 @@ function sanitizeJobId(
         )
         .trim()
         .toUpperCase();
+
     if (
         !/^[A-Z0-9]{16}$/.test(
             jobId
@@ -591,11 +819,14 @@ function sanitizeJobId(
     ) {
         return null;
     }
+
     return jobId;
 }
+
 // ============================================================
 // JSON RESPONSE
 // ============================================================
+
 function jsonResponse(
     data,
     status=200

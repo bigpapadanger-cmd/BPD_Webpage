@@ -29,5 +29,14 @@
             "binding": "OCR_STORAGE",
             "bucket_name": "ocr-storage"
         }
-    ]
+    ],
+
+    "queues": {
+        "producers": [
+            {
+                "queue": "bpd-ocr-jobs",
+                "binding": "OCR_JOB_QUEUE"
+            }
+        ]
+    }
 }

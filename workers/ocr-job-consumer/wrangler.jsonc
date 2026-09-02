@@ -1,0 +1,24 @@
+{
+    "name": "bpd-ocr-job-consumer",
+
+    "main": "src/index.js",
+
+    "compatibility_date": "2026-09-01",
+
+    "queues": {
+        "consumers": [
+            {
+                "queue": "bpd-ocr-jobs",
+                "max_batch_size": 1,
+                "max_batch_timeout": 1,
+                "max_retries": 2,
+                "max_concurrency": 1
+            }
+        ]
+    },
+
+    "vars": {
+        "OCR_JOB_PROCESS_URL":
+            "https://bpd-gaming-network.com/api/ocr/jobs/process_job"
+    }
+}
