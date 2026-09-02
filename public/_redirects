@@ -1,16 +1,13 @@
 /RocketLeague                       /RocketLeague 200
-/RocketLeague/*                     /RocketLeague 200
-
 /Ark                                /Ark 200
-/Ark/*                              /Ark 200
-
 /Minecraft                          /Minecraft 200
-/Minecraft/*                        /Minecraft 200
-
-
 /FAQ                                /FAQ 200
 /Settings                           /index.html 200
 /About                              /About 200
 /Privacy                            /Privacy 200
 /TOS                                /TOS 200
 /Error                              /index.html 200
+
+/RocketLeague/*                     /RocketLeague 200
+/Minecraft/*                        /Minecraft 200
+/Ark/*                              /Ark 200

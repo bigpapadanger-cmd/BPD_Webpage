@@ -4,47 +4,70 @@
 // ============================================================
 
 const TRAINING_STORAGE_VERSION =
-    "ocr-training-storage-1.0";
-
+    "ocr-training-storage-2.0";
 
 // ============================================================
 // SETTINGS
 // ============================================================
 
-const TRAINING_TARGET_PER_CLASS = 200;
+const TRAINING_TARGET_PER_CLASS =
+    200;
 
-const TRAINING_ID_LENGTH = 8;
+const TRAINING_HIGH_CONFIDENCE_THRESHOLD =
+    0.95;
+
+const TRAINING_ID_LENGTH =
+    8;
 
 const TRAINING_ID_ALPHABET =
     "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
 
-const TRAINING_CATEGORIES = new Set([
-    "0",
-    "1",
-    "2",
-    "3",
-    "4",
-    "5",
-    "6",
-    "7",
-    "8",
-    "9",
-    "bar",
-    "undetermined"
-]);
+const TRAINING_CATEGORIES =
+    new Set([
+        "0",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "bar",
+        "undetermined"
+    ]);
 
-const CAPPED_TRAINING_CATEGORIES = new Set([
-    "0",
-    "1",
-    "2",
-    "3",
-    "4",
-    "5",
-    "6",
-    "7",
-    "8",
-    "9"
-]);
+const CAPPED_TRAINING_CATEGORIES =
+    new Set([
+        "0",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9"
+    ]);
+
+const NUMERIC_TRAINING_CATEGORIES =
+    new Set([
+        "0",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9"
+    ]);
+
+const FINGERPRINT_PREFIX =
+    "_fingerprints";
 
 // ============================================================
 // CATEGORY HELPERS
@@ -84,6 +107,198 @@ export function isCappedTrainingCategory(
 
 
 // ============================================================
+// CONFIDENCE
+// ============================================================
+
+function normalizeConfidence(
+    value
+) {
+    if (
+        value === null
+        || value === undefined
+        || value === ""
+    ) {
+        return null;
+    }
+
+    const numeric =
+        Number(
+            value
+        );
+
+    if (
+        !Number.isFinite(
+            numeric
+        )
+    ) {
+        return null;
+    }
+
+    return Math.max(
+        0,
+        Math.min(
+            1,
+            numeric
+        )
+    );
+}
+
+
+// ============================================================
+// FINAL CATEGORY ROUTING
+//
+// Numeric classes are trusted only when:
+// - OCR supplied a specific digit class
+// - confidence meets threshold
+//
+// Anything weaker goes to undetermined.
+//
+// Bar remains its own explicit category.
+// ============================================================
+
+export function resolveTrainingCategory(
+    requestedCategory,
+    confidence
+) {
+    const normalizedCategory =
+        normalizeTrainingCategory(
+            requestedCategory
+        );
+
+    if (
+        normalizedCategory === "bar"
+    ) {
+        return {
+            requestedCategory:
+                normalizedCategory,
+
+            category:
+                "bar",
+
+            highConfidence:
+                true,
+
+            confidence:
+                normalizeConfidence(
+                    confidence
+                ),
+
+            threshold:
+                TRAINING_HIGH_CONFIDENCE_THRESHOLD,
+
+            reason:
+                "bar_training_sample"
+        };
+    }
+
+    const normalizedConfidence =
+        normalizeConfidence(
+            confidence
+        );
+
+    if (
+        NUMERIC_TRAINING_CATEGORIES.has(
+            normalizedCategory
+        )
+        && normalizedConfidence !== null
+        && normalizedConfidence
+            >= TRAINING_HIGH_CONFIDENCE_THRESHOLD
+    ) {
+        return {
+            requestedCategory:
+                normalizedCategory,
+
+            category:
+                normalizedCategory,
+
+            highConfidence:
+                true,
+
+            confidence:
+                normalizedConfidence,
+
+            threshold:
+                TRAINING_HIGH_CONFIDENCE_THRESHOLD,
+
+            reason:
+                "high_confidence_numeric_sample"
+        };
+    }
+
+    return {
+        requestedCategory:
+            normalizedCategory,
+
+        category:
+            "undetermined",
+
+        highConfidence:
+            false,
+
+        confidence:
+            normalizedConfidence,
+
+        threshold:
+            TRAINING_HIGH_CONFIDENCE_THRESHOLD,
+
+        reason:
+            "requires_training_review"
+    };
+}
+
+
+// ============================================================
+// FINGERPRINT
+// ============================================================
+
+export function normalizeTrainingFingerprint(
+    fingerprint
+) {
+    return String(
+        fingerprint ?? ""
+    )
+        .trim()
+        .toLowerCase();
+}
+
+
+export function validTrainingFingerprint(
+    fingerprint
+) {
+    return /^[a-f0-9]{64}$/.test(
+        normalizeTrainingFingerprint(
+            fingerprint
+        )
+    );
+}
+
+
+function buildFingerprintKey(
+    fingerprint
+) {
+    const normalized =
+        normalizeTrainingFingerprint(
+            fingerprint
+        );
+
+    if (
+        !validTrainingFingerprint(
+            normalized
+        )
+    ) {
+        throw new Error(
+            "Training fingerprint must be a valid SHA-256 value."
+        );
+    }
+
+    return (
+        `${FINGERPRINT_PREFIX}/`
+        + `${normalized}.json`
+    );
+}
+
+
+// ============================================================
 // ID HELPERS
 // ============================================================
 
@@ -108,9 +323,11 @@ function randomAlphabetCharacter() {
 
 
 export function generateTrainingId(
-    length = TRAINING_ID_LENGTH
+    length =
+        TRAINING_ID_LENGTH
 ) {
-    let value = "";
+    let value =
+        "";
 
     for (
         let index = 0;
@@ -223,14 +440,19 @@ export async function getTrainingCategoryCount(
     const prefix =
         `${normalizedCategory}/`;
 
-    let cursor = undefined;
-    let count = 0;
+    let cursor =
+        undefined;
+
+    let count =
+        0;
 
     do {
         const result =
             await bucket.list({
                 prefix,
+
                 cursor,
+
                 limit:
                     TRAINING_TARGET_PER_CLASS
             });
@@ -250,7 +472,9 @@ export async function getTrainingCategoryCount(
                 ? result.cursor
                 : undefined;
 
-    } while (cursor);
+    } while (
+        cursor
+    );
 
     return count;
 }
@@ -326,7 +550,8 @@ async function createUniqueTrainingObjectKey(
     matchId,
     category
 ) {
-    const maximumAttempts = 10;
+    const maximumAttempts =
+        10;
 
     for (
         let attempt = 0;
@@ -348,7 +573,9 @@ async function createUniqueTrainingObjectKey(
                 objectKey
             );
 
-        if (!existing) {
+        if (
+            !existing
+        ) {
             return {
                 trainingId,
                 objectKey
@@ -393,14 +620,22 @@ function normalizeMetadataValue(
 function buildTrainingMetadata({
     matchId,
     trainingId,
+    fingerprint,
     category,
+    requestedCategory,
+    highConfidence,
+    confidenceThreshold,
+
     field = null,
     team = null,
     playerIndex = null,
+
     confidence = null,
     engine = null,
+
     approval = null,
     ocrVersion = null,
+
     additionalMetadata = null
 }) {
     const metadata = {
@@ -414,9 +649,29 @@ function buildTrainingMetadata({
                 trainingId
             ),
 
+        fingerprint:
+            normalizeMetadataValue(
+                fingerprint
+            ),
+
         category:
             normalizeMetadataValue(
                 category
+            ),
+
+        requestedCategory:
+            normalizeMetadataValue(
+                requestedCategory
+            ),
+
+        highConfidence:
+            normalizeMetadataValue(
+                highConfidence
+            ),
+
+        confidenceThreshold:
+            normalizeMetadataValue(
+                confidenceThreshold
             ),
 
         field:
@@ -460,7 +715,8 @@ function buildTrainingMetadata({
 
     if (
         additionalMetadata
-        && typeof additionalMetadata === "object"
+        && typeof additionalMetadata
+            === "object"
     ) {
         for (
             const [
@@ -487,6 +743,170 @@ function buildTrainingMetadata({
 
 
 // ============================================================
+// FINGERPRINT RESERVATION
+//
+// Uses an R2 conditional write.
+//
+// If two requests attempt to store the same fingerprint at the
+// same time, only the first reservation is accepted.
+//
+// Cloudflare R2 returns null when the condition fails.
+// ============================================================
+
+async function reserveTrainingFingerprint(
+    bucket,
+    {
+        fingerprint,
+        matchId,
+        category
+    }
+) {
+    const fingerprintKey =
+        buildFingerprintKey(
+            fingerprint
+        );
+
+    const headers =
+        new Headers();
+
+    headers.set(
+        "If-None-Match",
+        "*"
+    );
+
+    const reservation =
+        await bucket.put(
+            fingerprintKey,
+            JSON.stringify({
+                fingerprint:
+                    normalizeTrainingFingerprint(
+                        fingerprint
+                    ),
+
+                state:
+                    "reserved",
+
+                matchId:
+                    normalizeMatchId(
+                        matchId
+                    ),
+
+                category,
+
+                objectKey:
+                    null,
+
+                createdAt:
+                    new Date()
+                        .toISOString()
+            }),
+            {
+                onlyIf:
+                    headers,
+
+                httpMetadata: {
+                    contentType:
+                        "application/json"
+                },
+
+                customMetadata: {
+                    fingerprint:
+                        normalizeTrainingFingerprint(
+                            fingerprint
+                        ),
+
+                    state:
+                        "reserved",
+
+                    category:
+                        String(
+                            category
+                        )
+                }
+            }
+        );
+
+    return {
+        reserved:
+            reservation !== null,
+
+        fingerprintKey
+    };
+}
+
+
+// ============================================================
+// FINALIZE FINGERPRINT
+// ============================================================
+
+async function finalizeTrainingFingerprint(
+    bucket,
+    {
+        fingerprint,
+        fingerprintKey,
+        matchId,
+        category,
+        objectKey,
+        trainingId
+    }
+) {
+    await bucket.put(
+        fingerprintKey,
+        JSON.stringify({
+            fingerprint:
+                normalizeTrainingFingerprint(
+                    fingerprint
+                ),
+
+            state:
+                "stored",
+
+            matchId:
+                normalizeMatchId(
+                    matchId
+                ),
+
+            category,
+
+            objectKey,
+
+            trainingId,
+
+            updatedAt:
+                new Date()
+                    .toISOString()
+        }),
+        {
+            httpMetadata: {
+                contentType:
+                    "application/json"
+            },
+
+            customMetadata: {
+                fingerprint:
+                    normalizeTrainingFingerprint(
+                        fingerprint
+                    ),
+
+                state:
+                    "stored",
+
+                category:
+                    String(
+                        category
+                    ),
+
+                objectKey:
+                    String(
+                        objectKey
+                    )
+            }
+        }
+    );
+}
+
+
+// ============================================================
 // STORE TRAINING IMAGE
 // ============================================================
 
@@ -495,50 +915,105 @@ export async function putTrainingImage(
     {
         image,
         matchId,
-        category = "undetermined",
 
-        field = null,
-        team = null,
-        playerIndex = null,
+        fingerprint,
 
-        confidence = null,
-        engine = null,
+        category =
+            "undetermined",
 
-        approval = null,
-        ocrVersion = null,
+        field =
+            null,
 
-        additionalMetadata = null
+        team =
+            null,
+
+        playerIndex =
+            null,
+
+        confidence =
+            null,
+
+        engine =
+            null,
+
+        approval =
+            null,
+
+        ocrVersion =
+            null,
+
+        additionalMetadata =
+            null
     }
 ) {
-    if (!bucket) {
+    if (
+        !bucket
+    ) {
         throw new Error(
             "OCR training R2 bucket is unavailable."
         );
     }
 
-    if (!image) {
+    if (
+        !image
+    ) {
         throw new Error(
             "Training image is required."
         );
     }
 
-    const normalizedCategory =
-        normalizeTrainingCategory(
-            category
-        );
-
-    // --------------------------------------------------------
-    // CHECK CATEGORY CAP
-    // --------------------------------------------------------
-
-    const categoryStatus =
-        await getTrainingCategoryStatus(
-            bucket,
-            normalizedCategory
+    const normalizedFingerprint =
+        normalizeTrainingFingerprint(
+            fingerprint
         );
 
     if (
-        !categoryStatus.accepting
+        !validTrainingFingerprint(
+            normalizedFingerprint
+        )
+    ) {
+        throw new Error(
+            "A valid SHA-256 training fingerprint is required."
+        );
+    }
+
+    // ========================================================
+    // DETERMINE TRUSTED DESTINATION
+    // ========================================================
+
+    const routing =
+        resolveTrainingCategory(
+            category,
+            confidence
+        );
+
+    const normalizedCategory =
+        routing.category;
+
+    // ========================================================
+    // RESERVE UNIQUE FINGERPRINT
+    //
+    // This happens before category counting and image writing.
+    //
+    // Duplicate images never consume training capacity.
+    // ========================================================
+
+    const fingerprintReservation =
+        await reserveTrainingFingerprint(
+            bucket,
+            {
+                fingerprint:
+                    normalizedFingerprint,
+
+                matchId,
+
+                category:
+                    normalizedCategory
+            }
+        );
+
+    if (
+        !fingerprintReservation.reserved
     ) {
         return {
             success:
@@ -547,121 +1022,296 @@ export async function putTrainingImage(
             stored:
                 false,
 
+            duplicate:
+                true,
+
+            fingerprint:
+                normalizedFingerprint,
+
             category:
                 normalizedCategory,
 
+            requestedCategory:
+                routing.requestedCategory,
+
             reason:
-                "training_category_complete",
-
-            currentCount:
-                categoryStatus.currentCount,
-
-            targetCount:
-                categoryStatus.targetCount
+                "duplicate_training_image"
         };
     }
 
-    // --------------------------------------------------------
-    // CREATE UNIQUE KEY
-    // --------------------------------------------------------
+    let trainingImageStored =
+        false;
 
-    const {
-        trainingId,
-        objectKey
-    } =
-        await createUniqueTrainingObjectKey(
-            bucket,
-            matchId,
-            normalizedCategory
+    let objectKey =
+        null;
+
+    try {
+
+        // ====================================================
+        // CHECK CATEGORY CAP
+        // ====================================================
+
+        const categoryStatus =
+            await getTrainingCategoryStatus(
+                bucket,
+                normalizedCategory
+            );
+
+        if (
+            !categoryStatus.accepting
+        ) {
+            await bucket.delete(
+                fingerprintReservation
+                    .fingerprintKey
+            );
+
+            return {
+                success:
+                    true,
+
+                stored:
+                    false,
+
+                duplicate:
+                    false,
+
+                category:
+                    normalizedCategory,
+
+                requestedCategory:
+                    routing.requestedCategory,
+
+                highConfidence:
+                    routing.highConfidence,
+
+                confidence:
+                    routing.confidence,
+
+                reason:
+                    "training_category_complete",
+
+                currentCount:
+                    categoryStatus.currentCount,
+
+                targetCount:
+                    categoryStatus.targetCount
+            };
+        }
+
+        // ====================================================
+        // CREATE UNIQUE IMAGE KEY
+        // ====================================================
+
+        const {
+            trainingId,
+            objectKey:
+                generatedObjectKey
+        } =
+            await createUniqueTrainingObjectKey(
+                bucket,
+                matchId,
+                normalizedCategory
+            );
+
+        objectKey =
+            generatedObjectKey;
+
+        // ====================================================
+        // BUILD METADATA
+        // ====================================================
+
+        const customMetadata =
+            buildTrainingMetadata({
+                matchId,
+
+                trainingId,
+
+                fingerprint:
+                    normalizedFingerprint,
+
+                category:
+                    normalizedCategory,
+
+                requestedCategory:
+                    routing.requestedCategory,
+
+                highConfidence:
+                    routing.highConfidence,
+
+                confidenceThreshold:
+                    routing.threshold,
+
+                field,
+
+                team,
+
+                playerIndex,
+
+                confidence:
+                    routing.confidence,
+
+                engine,
+
+                approval,
+
+                ocrVersion,
+
+                additionalMetadata
+            });
+
+        // ====================================================
+        // WRITE IMAGE
+        // ====================================================
+
+        await bucket.put(
+            objectKey,
+            image,
+            {
+                httpMetadata: {
+                    contentType:
+                        "image/png"
+                },
+
+                customMetadata
+            }
         );
 
-    // --------------------------------------------------------
-    // BUILD METADATA
-    // --------------------------------------------------------
+        trainingImageStored =
+            true;
 
-    const customMetadata =
-        buildTrainingMetadata({
-            matchId,
-            trainingId,
+        // ====================================================
+        // FINALIZE FINGERPRINT INDEX
+        // ====================================================
+
+        await finalizeTrainingFingerprint(
+            bucket,
+            {
+                fingerprint:
+                    normalizedFingerprint,
+
+                fingerprintKey:
+                    fingerprintReservation
+                        .fingerprintKey,
+
+                matchId,
+
+                category:
+                    normalizedCategory,
+
+                objectKey,
+
+                trainingId
+            }
+        );
+
+        return {
+            success:
+                true,
+
+            stored:
+                true,
+
+            duplicate:
+                false,
+
             category:
                 normalizedCategory,
-            field,
-            team,
-            playerIndex,
-            confidence,
-            engine,
-            approval,
-            ocrVersion,
-            additionalMetadata
-        });
 
-    // --------------------------------------------------------
-    // WRITE TO R2
-    // --------------------------------------------------------
+            requestedCategory:
+                routing.requestedCategory,
 
-    await bucket.put(
-        objectKey,
-        image,
-        {
-            httpMetadata: {
-                contentType:
-                    "image/png"
-            },
+            highConfidence:
+                routing.highConfidence,
 
-            customMetadata
+            confidence:
+                routing.confidence,
+
+            confidenceThreshold:
+                routing.threshold,
+
+            routingReason:
+                routing.reason,
+
+            fingerprint:
+                normalizedFingerprint,
+
+            matchId:
+                normalizeMatchId(
+                    matchId
+                ),
+
+            matchPrefix:
+                getMatchPrefix(
+                    matchId
+                ),
+
+            trainingId,
+
+            objectKey,
+
+            currentCount:
+                categoryStatus.currentCount
+                === null
+                    ? null
+                    : categoryStatus.currentCount
+                        + 1,
+
+            targetCount:
+                categoryStatus.targetCount,
+
+            metadata:
+                customMetadata
+        };
+
+    } catch (
+        error
+    ) {
+
+        // ====================================================
+        // ROLLBACK
+        //
+        // If image write succeeded but fingerprint finalization
+        // failed, delete both so a later retry can safely store
+        // the sample.
+        // ====================================================
+
+        if (
+            trainingImageStored
+            && objectKey
+        ) {
+            try {
+                await bucket.delete(
+                    objectKey
+                );
+            } catch {
+                // Ignore rollback cleanup errors.
+            }
         }
-    );
 
-    return {
-        success:
-            true,
+        try {
+            await bucket.delete(
+                fingerprintReservation
+                    .fingerprintKey
+            );
+        } catch {
+            // Ignore rollback cleanup errors.
+        }
 
-        stored:
-            true,
-
-        category:
-            normalizedCategory,
-
-        matchId:
-            normalizeMatchId(
-                matchId
-            ),
-
-        matchPrefix:
-            getMatchPrefix(
-                matchId
-            ),
-
-        trainingId,
-
-        objectKey,
-
-        currentCount:
-            categoryStatus.currentCount === null
-                ? null
-                : categoryStatus.currentCount
-                    + 1,
-
-        targetCount:
-            categoryStatus.targetCount,
-
-        metadata:
-            customMetadata
-    };
+        throw error;
+    }
 }
 
 
 // ============================================================
 // MOVE TRAINING IMAGE
 //
-// Primarily used later for manual review:
+// Used after manual/user review:
 //
 // undetermined/
 //      ↓
 // 7/
 //
-// R2 has no traditional rename operation, so this performs
-// copy + delete.
+// R2 has no rename operation, so this uses copy + delete.
 // ============================================================
 
 export async function moveTrainingImage(
@@ -669,7 +1319,9 @@ export async function moveTrainingImage(
     sourceKey,
     destinationCategory
 ) {
-    if (!bucket) {
+    if (
+        !bucket
+    ) {
         throw new Error(
             "OCR training R2 bucket is unavailable."
         );
@@ -680,7 +1332,9 @@ export async function moveTrainingImage(
             sourceKey
         );
 
-    if (!source) {
+    if (
+        !source
+    ) {
         return {
             success:
                 false,
@@ -698,17 +1352,23 @@ export async function moveTrainingImage(
             destinationCategory
         );
 
-    const filename =
-        String(
-            sourceKey
+    if (
+        !NUMERIC_TRAINING_CATEGORIES.has(
+            normalizedCategory
         )
-        .split("/")
-        .pop();
+        && normalizedCategory
+            !== "bar"
+    ) {
+        return {
+            success:
+                false,
 
-    if (!filename) {
-        throw new Error(
-            "Training object filename could not be resolved."
-        );
+            moved:
+                false,
+
+            reason:
+                "invalid_destination_category"
+        };
     }
 
     const categoryStatus =
@@ -741,6 +1401,21 @@ export async function moveTrainingImage(
         };
     }
 
+    const filename =
+        String(
+            sourceKey
+        )
+        .split("/")
+        .pop();
+
+    if (
+        !filename
+    ) {
+        throw new Error(
+            "Training object filename could not be resolved."
+        );
+    }
+
     const destinationKey =
         `${normalizedCategory}/${filename}`;
 
@@ -749,7 +1424,9 @@ export async function moveTrainingImage(
             destinationKey
         );
 
-    if (existing) {
+    if (
+        existing
+    ) {
         return {
             success:
                 false,
@@ -764,11 +1441,20 @@ export async function moveTrainingImage(
         };
     }
 
-    const customMetadata = {
+    const sourceMetadata = {
         ...(
             source.customMetadata
             || {}
-        ),
+        )
+    };
+
+    const fingerprint =
+        normalizeTrainingFingerprint(
+            sourceMetadata.fingerprint
+        );
+
+    const customMetadata = {
+        ...sourceMetadata,
 
         category:
             normalizedCategory,
@@ -792,6 +1478,69 @@ export async function moveTrainingImage(
         sourceKey
     );
 
+    // ========================================================
+    // UPDATE FINGERPRINT LOCATION
+    // ========================================================
+
+    if (
+        validTrainingFingerprint(
+            fingerprint
+        )
+    ) {
+        const fingerprintKey =
+            buildFingerprintKey(
+                fingerprint
+            );
+
+        await bucket.put(
+            fingerprintKey,
+            JSON.stringify({
+                fingerprint,
+
+                state:
+                    "stored",
+
+                matchId:
+                    normalizeMatchId(
+                        sourceMetadata.matchId
+                    ),
+
+                category:
+                    normalizedCategory,
+
+                objectKey:
+                    destinationKey,
+
+                trainingId:
+                    sourceMetadata.trainingId
+                    || null,
+
+                updatedAt:
+                    new Date()
+                        .toISOString()
+            }),
+            {
+                httpMetadata: {
+                    contentType:
+                        "application/json"
+                },
+
+                customMetadata: {
+                    fingerprint,
+
+                    state:
+                        "stored",
+
+                    category:
+                        normalizedCategory,
+
+                    objectKey:
+                        destinationKey
+                }
+            }
+        );
+    }
+
     return {
         success:
             true,
@@ -804,7 +1553,11 @@ export async function moveTrainingImage(
         destinationKey,
 
         category:
-            normalizedCategory
+            normalizedCategory,
+
+        fingerprint:
+            fingerprint
+            || null
     };
 }
 
@@ -817,15 +1570,41 @@ export async function deleteTrainingImage(
     bucket,
     objectKey
 ) {
-    if (!bucket) {
+    if (
+        !bucket
+    ) {
         throw new Error(
             "OCR training R2 bucket is unavailable."
         );
     }
 
+    const existing =
+        await bucket.head(
+            objectKey
+        );
+
+    const fingerprint =
+        normalizeTrainingFingerprint(
+            existing
+                ?.customMetadata
+                ?.fingerprint
+        );
+
     await bucket.delete(
         objectKey
     );
+
+    if (
+        validTrainingFingerprint(
+            fingerprint
+        )
+    ) {
+        await bucket.delete(
+            buildFingerprintKey(
+                fingerprint
+            )
+        );
+    }
 
     return {
         success:
@@ -834,6 +1613,10 @@ export async function deleteTrainingImage(
         deleted:
             true,
 
-        objectKey
+        objectKey,
+
+        fingerprint:
+            fingerprint
+            || null
     };
 }

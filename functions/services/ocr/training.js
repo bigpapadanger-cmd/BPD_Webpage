@@ -2,6 +2,8 @@
 
 import {
     normalizeTrainingCategory,
+    normalizeTrainingFingerprint,
+    validTrainingFingerprint,
     putTrainingImage
 } from "./trainingStorage.js";
 
@@ -12,7 +14,7 @@ import {
 // ============================================================
 
 const TRAINING_SERVICE_VERSION =
-    "ocr-training-service-1.0";
+    "ocr-training-service-2.1";
 
 
 // ============================================================
@@ -39,6 +41,147 @@ function jsonResponse(
             }
         }
     );
+}
+
+
+// ============================================================
+// AUTHENTICATION
+// ============================================================
+
+function getBearerToken(
+    request
+) {
+    const authorization =
+        String(
+            request.headers.get(
+                "Authorization"
+            )
+            || ""
+        )
+        .trim();
+
+    if (
+        !authorization.startsWith(
+            "Bearer "
+        )
+    ) {
+        return "";
+    }
+
+    return authorization
+        .slice(
+            7
+        )
+        .trim();
+}
+
+
+function constantTimeEqual(
+    first,
+    second
+) {
+    const encoder =
+        new TextEncoder();
+
+    const a =
+        encoder.encode(
+            String(
+                first || ""
+            )
+        );
+
+    const b =
+        encoder.encode(
+            String(
+                second || ""
+            )
+        );
+
+    if (
+        a.length
+        !== b.length
+    ) {
+        return false;
+    }
+
+    let result =
+        0;
+
+    for (
+        let index = 0;
+        index < a.length;
+        index += 1
+    ) {
+        result |=
+            a[
+                index
+            ]
+            ^ b[
+                index
+            ];
+    }
+
+    return result === 0;
+}
+
+
+function validateInternalRequest(
+    request,
+    env
+) {
+    const expectedToken =
+        String(
+            env.OCR_STORAGE_TOKEN
+            || ""
+        )
+        .trim();
+
+    if (
+        !expectedToken
+    ) {
+        return {
+            valid:
+                false,
+
+            status:
+                503,
+
+            reason:
+                (
+                    "OCR training authentication "
+                    + "is not configured."
+                )
+        };
+    }
+
+    const receivedToken =
+        getBearerToken(
+            request
+        );
+
+    if (
+        !receivedToken
+        || !constantTimeEqual(
+            receivedToken,
+            expectedToken
+        )
+    ) {
+        return {
+            valid:
+                false,
+
+            status:
+                401,
+
+            reason:
+                "Unauthorized."
+        };
+    }
+
+    return {
+        valid:
+            true
+    };
 }
 
 
@@ -116,7 +259,8 @@ function isValidUpload(
 ) {
     return (
         value
-        && typeof value.arrayBuffer === "function"
+        && typeof value.arrayBuffer
+            === "function"
     );
 }
 
@@ -144,9 +288,44 @@ export async function handleOCRTrainingUpload(
                         false,
 
                     message:
-                        "Method not allowed."
+                        "Method not allowed.",
+
+                    version:
+                        TRAINING_SERVICE_VERSION
                 },
                 405
+            );
+        }
+
+
+        // ----------------------------------------------------
+        // AUTHENTICATION
+        //
+        // Only the internal OCR service should be able to
+        // create training samples.
+        // ----------------------------------------------------
+
+        const authentication =
+            validateInternalRequest(
+                request,
+                env
+            );
+
+        if (
+            !authentication.valid
+        ) {
+            return jsonResponse(
+                {
+                    success:
+                        false,
+
+                    message:
+                        authentication.reason,
+
+                    version:
+                        TRAINING_SERVICE_VERSION
+                },
+                authentication.status
             );
         }
 
@@ -164,9 +343,15 @@ export async function handleOCRTrainingUpload(
                         false,
 
                     message:
-                        "OCR training bucket is not configured."
+                        (
+                            "OCR training bucket "
+                            + "is not configured."
+                        ),
+
+                    version:
+                        TRAINING_SERVICE_VERSION
                 },
-                500
+                503
             );
         }
 
@@ -176,9 +361,12 @@ export async function handleOCRTrainingUpload(
         // ----------------------------------------------------
 
         const contentType =
-            request.headers.get(
-                "content-type"
-            ) || "";
+            String(
+                request.headers.get(
+                    "content-type"
+                )
+                || ""
+            );
 
         if (
             !contentType
@@ -193,7 +381,10 @@ export async function handleOCRTrainingUpload(
                         false,
 
                     message:
-                        "Expected multipart/form-data."
+                        "Expected multipart/form-data.",
+
+                    version:
+                        TRAINING_SERVICE_VERSION
                 },
                 400
             );
@@ -231,7 +422,34 @@ export async function handleOCRTrainingUpload(
                         false,
 
                     message:
-                        "Training image is required."
+                        "Training image is required.",
+
+                    version:
+                        TRAINING_SERVICE_VERSION
+                },
+                400
+            );
+        }
+
+
+        // ----------------------------------------------------
+        // IMAGE SIZE
+        // ----------------------------------------------------
+
+        if (
+            imageFile.size !== undefined
+            && imageFile.size <= 0
+        ) {
+            return jsonResponse(
+                {
+                    success:
+                        false,
+
+                    message:
+                        "Training image is empty.",
+
+                    version:
+                        TRAINING_SERVICE_VERSION
                 },
                 400
             );
@@ -247,10 +465,13 @@ export async function handleOCRTrainingUpload(
                 formData.get(
                     "matchId"
                 )
-            );
+            )
+            .toUpperCase();
 
         if (
-            matchId.length < 8
+            !/^[A-Z0-9]{16}$/.test(
+                matchId
+            )
         ) {
             return jsonResponse(
                 {
@@ -258,7 +479,13 @@ export async function handleOCRTrainingUpload(
                         false,
 
                     message:
-                        "A valid matchId is required."
+                        (
+                            "matchId must be a "
+                            + "16-character alphanumeric ID."
+                        ),
+
+                    version:
+                        TRAINING_SERVICE_VERSION
                 },
                 400
             );
@@ -266,7 +493,51 @@ export async function handleOCRTrainingUpload(
 
 
         // ----------------------------------------------------
-        // CATEGORY
+        // FINGERPRINT
+        // ----------------------------------------------------
+
+        const fingerprint =
+            normalizeTrainingFingerprint(
+                formData.get(
+                    "fingerprint"
+                )
+            );
+
+        if (
+            !validTrainingFingerprint(
+                fingerprint
+            )
+        ) {
+            return jsonResponse(
+                {
+                    success:
+                        false,
+
+                    message:
+                        (
+                            "A valid SHA-256 training "
+                            + "fingerprint is required."
+                        ),
+
+                    version:
+                        TRAINING_SERVICE_VERSION
+                },
+                400
+            );
+        }
+
+
+        // ----------------------------------------------------
+        // REQUESTED CATEGORY
+        //
+        // This is only the OCR-proposed category.
+        //
+        // trainingStorage.js remains authoritative for:
+        //
+        // - confidence threshold
+        // - undetermined routing
+        // - duplicate rejection
+        // - category caps
         // ----------------------------------------------------
 
         const category =
@@ -286,7 +557,8 @@ export async function handleOCRTrainingUpload(
                 formData.get(
                     "field"
                 )
-            ) || null;
+            )
+            || null;
 
         const team =
             normalizeInteger(
@@ -314,21 +586,24 @@ export async function handleOCRTrainingUpload(
                 formData.get(
                     "engine"
                 )
-            ) || null;
+            )
+            || null;
 
         const approval =
             normalizeText(
                 formData.get(
                     "approval"
                 )
-            ) || null;
+            )
+            || null;
 
         const ocrVersion =
             normalizeText(
                 formData.get(
                     "ocrVersion"
                 )
-            ) || null;
+            )
+            || null;
 
 
         // ----------------------------------------------------
@@ -356,7 +631,8 @@ export async function handleOCRTrainingUpload(
 
                 if (
                     parsed
-                    && typeof parsed === "object"
+                    && typeof parsed
+                        === "object"
                     && !Array.isArray(
                         parsed
                     )
@@ -379,16 +655,38 @@ export async function handleOCRTrainingUpload(
         const image =
             await imageFile.arrayBuffer();
 
+        if (
+            !image
+            || image.byteLength === 0
+        ) {
+            return jsonResponse(
+                {
+                    success:
+                        false,
+
+                    message:
+                        "Training image is empty.",
+
+                    version:
+                        TRAINING_SERVICE_VERSION
+                },
+                400
+            );
+        }
+
 
         // ----------------------------------------------------
         // STORE
         //
         // trainingStorage.js handles:
         //
-        // - category normalization
+        // - fingerprint reservation
+        // - durable duplicate rejection
+        // - confidence-based category routing
+        // - undetermined fallback
         // - category count
-        // - 200-target cap
-        // - unique ID
+        // - 200-target digit cap
+        // - unique training ID
         // - R2 object key
         // - metadata
         // - R2 write
@@ -401,6 +699,8 @@ export async function handleOCRTrainingUpload(
                     image,
 
                     matchId,
+
+                    fingerprint,
 
                     category,
 
@@ -432,11 +732,14 @@ export async function handleOCRTrainingUpload(
 
 
         // ----------------------------------------------------
-        // CATEGORY ALREADY COMPLETE
+        // NOT STORED
         //
-        // This is not an error.
-        // The training system successfully determined that
-        // this category no longer needs additional examples.
+        // Examples:
+        //
+        // duplicate_training_image
+        // training_category_complete
+        //
+        // These are valid training decisions, not API errors.
         // ----------------------------------------------------
 
         if (
@@ -450,11 +753,37 @@ export async function handleOCRTrainingUpload(
                     stored:
                         false,
 
+                    duplicate:
+                        result.duplicate
+                        === true,
+
+                    fingerprint:
+                        result.fingerprint
+                        ?? fingerprint,
+
                     category:
-                        result.category,
+                        result.category
+                        ?? null,
+
+                    requestedCategory:
+                        result.requestedCategory
+                        ?? category,
+
+                    highConfidence:
+                        result.highConfidence
+                        ?? false,
+
+                    confidence:
+                        result.confidence
+                        ?? confidence,
+
+                    confidenceThreshold:
+                        result.confidenceThreshold
+                        ?? null,
 
                     reason:
-                        result.reason,
+                        result.reason
+                        ?? null,
 
                     currentCount:
                         result.currentCount
@@ -462,8 +791,12 @@ export async function handleOCRTrainingUpload(
 
                     targetCount:
                         result.targetCount
-                        ?? null
-                }
+                        ?? null,
+
+                    version:
+                        TRAINING_SERVICE_VERSION
+                },
+                200
             );
         }
 
@@ -480,8 +813,35 @@ export async function handleOCRTrainingUpload(
                 stored:
                     true,
 
+                duplicate:
+                    false,
+
+                fingerprint:
+                    result.fingerprint
+                    ?? fingerprint,
+
                 category:
                     result.category,
+
+                requestedCategory:
+                    result.requestedCategory
+                    ?? category,
+
+                highConfidence:
+                    result.highConfidence
+                    ?? false,
+
+                confidence:
+                    result.confidence
+                    ?? confidence,
+
+                confidenceThreshold:
+                    result.confidenceThreshold
+                    ?? null,
+
+                routingReason:
+                    result.routingReason
+                    ?? null,
 
                 matchId:
                     result.matchId,
@@ -498,8 +858,12 @@ export async function handleOCRTrainingUpload(
 
                 targetCount:
                     result.targetCount
-                    ?? null
-            }
+                    ?? null,
+
+                version:
+                    TRAINING_SERVICE_VERSION
+            },
+            200
         );
 
     } catch (
@@ -519,7 +883,10 @@ export async function handleOCRTrainingUpload(
                     (
                         error?.message
                         || "OCR training upload failed."
-                    )
+                    ),
+
+                version:
+                    TRAINING_SERVICE_VERSION
             },
             500
         );
