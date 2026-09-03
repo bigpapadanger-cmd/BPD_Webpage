@@ -881,52 +881,7 @@ async function readJsonRequest(
     }
 }
 
-// ============================================================
-// CLOUD RUN FORM
-// ============================================================
 
-function buildCloudRunHeaders(
-    env,
-    jobId
-) {
-    const headers =
-        new Headers();
-
-    headers.set(
-        "X-API-Key",
-        String(
-            env.OCR_API_KEY
-        )
-    );
-
-    headers.set(
-        "X-BPD-OCR-Handler-Version",
-        PROCESS_JOB_VERSION
-    );
-
-    headers.set(
-        "X-BPD-OCR-Job-ID",
-        jobId
-    );
-
-    const callbackUrl =
-        String(
-            env.OCR_JOB_PROGRESS_URL
-            || ""
-        )
-            .trim();
-
-    if (
-        callbackUrl
-    ) {
-        headers.set(
-            "X-BPD-OCR-Progress-URL",
-            callbackUrl
-        );
-    }
-
-    return headers;
-}
 // ============================================================
 // CLOUD RUN HEADERS
 // ============================================================
