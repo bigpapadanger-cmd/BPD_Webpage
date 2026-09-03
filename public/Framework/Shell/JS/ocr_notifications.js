@@ -33,12 +33,12 @@ const OCR_NOTIFICATION_CONTAINER_ID =
     "ocrNotificationContainer";
 
 const OCR_NOTIFICATION_CHECK_SCHEDULE_MS = [
-    1500,
-    3000,
-    5000,
-    7500,
+    2000,
+    4000,
+    7000,
     10000,
-    15000,
+    13000,
+    16000,
     20000
 ];
 
