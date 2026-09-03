@@ -14,7 +14,7 @@ import {
 // ============================================================
 
 const CONSUMER_VERSION =
-    "ocr-job-consumer-1.3";
+    "ocr-job-consumer-1.3-AUTODEPLOY-ENABLED";
 
 const OCR_JOB_STATUS_PREFIX =
     "ocr-jobs";
