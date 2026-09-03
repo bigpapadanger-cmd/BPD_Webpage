@@ -75,11 +75,11 @@ export async function onRequestPost(
         // ====================================================
 
         if (
-            !isAuthorizedProcessorRequest(
+            !await isAuthorizedProcessorRequest(
                 request,
                 env
             )
-        ) {
+        ){
             return jsonResponse(
                 {
                     success: false,
@@ -716,7 +716,79 @@ function validateConfiguration(
 // INTERNAL AUTHENTICATION
 // ============================================================
 
-function isAuthorizedProcessorRequest(
+async function getTokenFingerprint(
+    value
+) {
+    const token =
+        String(
+            value
+            || ""
+        )
+            .trim();
+
+    if (
+        !token
+    ) {
+        return {
+            present:
+                false,
+            length:
+                0,
+            fingerprint:
+                null
+        };
+    }
+
+    const bytes =
+        new TextEncoder()
+            .encode(
+                token
+            );
+
+    const digest =
+        await crypto.subtle.digest(
+            "SHA-256",
+            bytes
+        );
+
+    const fingerprint =
+        Array.from(
+            new Uint8Array(
+                digest
+            )
+        )
+            .slice(
+                0,
+                6
+            )
+            .map(
+                function(
+                    byte
+                ) {
+                    return byte
+                        .toString(
+                            16
+                        )
+                        .padStart(
+                            2,
+                            "0"
+                        );
+                }
+            )
+            .join(
+                ""
+            );
+
+    return {
+        present:
+            true,
+        length:
+            token.length,
+        fingerprint
+    };
+}
+
+async function isAuthorizedProcessorRequest(
     request,
     env
 ) {
@@ -736,17 +808,37 @@ function isAuthorizedProcessorRequest(
         )
             .trim();
 
-    return (
-        Boolean(
-            suppliedToken
-        )
-        && Boolean(
-            expectedToken
-        )
+    if (
+        suppliedToken
+        && expectedToken
         && suppliedToken === expectedToken
-    );
-}
+    ) {
+        return true;
+    }
 
+    const [
+        supplied,
+        expected
+    ] =
+        await Promise.all([
+            getTokenFingerprint(
+                suppliedToken
+            ),
+            getTokenFingerprint(
+                expectedToken
+            )
+        ]);
+
+    console.error(
+        "[OCR PROCESS] Processor authentication failed.",
+        {
+            supplied,
+            expected
+        }
+    );
+
+    return false;
+}
 // ============================================================
 // REQUEST JSON
 // ============================================================
