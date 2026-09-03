@@ -38,8 +38,10 @@ const OCR_NOTIFICATION_CHECK_SCHEDULE_MS = [
     30000
 ];
 
-const OCR_NOTIFICATION_MAX_QUEUED_CHECKS =
-    3;
+const OCR_NOTIFICATION_QUEUE_STALE_MS =
+    2
+    * 60
+    * 1000;
 
 const OCR_NOTIFICATION_MAX_STALE_CHECKS =
     3;
@@ -218,7 +220,8 @@ function clearStoredActiveJob() {
 
 function handleVisibilityChange() {
     if (
-        document.visibilityState === "visible"
+        document.visibilityState ===
+        "visible"
     ) {
         checkActiveOcrSubmission();
     }
@@ -678,8 +681,8 @@ function createNotification(
             );
 
             if (
-                typeof onClick
-                === "function"
+                typeof onClick ===
+                "function"
             ) {
                 await onClick();
             }
@@ -713,8 +716,8 @@ function createNotification(
                 );
 
                 if (
-                    typeof onTimeout
-                    === "function"
+                    typeof onTimeout ===
+                    "function"
                 ) {
                     await onTimeout();
                 }
@@ -729,6 +732,7 @@ function createNotification(
         timer
     );
 }
+
 /* =========================================================
    JSON
    ========================================================= */
@@ -776,10 +780,13 @@ async function getOcrJob(
             {
                 method:
                     "GET",
+
                 credentials:
                     "same-origin",
+
                 cache:
                     "no-store",
+
                 headers: {
                     "Accept":
                         "application/json"
@@ -863,14 +870,14 @@ async function getOcrResult(
     const result =
         (
             data?.result
-            && typeof data.result
-                === "object"
+            && typeof data.result ===
+                "object"
         )
             ? data.result
             : (
                 data?.matchReport
-                && typeof data.matchReport
-                    === "object"
+                && typeof data.matchReport ===
+                    "object"
                     ? data.matchReport
                     : null
             );
@@ -912,6 +919,7 @@ function getResultTeams(
         teams.push({
             team:
                 1,
+
             players:
                 result.team1
         });
@@ -925,6 +933,7 @@ function getResultTeams(
         teams.push({
             team:
                 2,
+
             players:
                 result.team2
         });
@@ -997,8 +1006,8 @@ function buildConfirmationFields(
 
                                     if (
                                         value === null
-                                        || typeof value
-                                            === "undefined"
+                                        || typeof value ===
+                                            "undefined"
                                     ) {
                                         return;
                                     }
@@ -1053,7 +1062,8 @@ async function autoAcceptOcrResult(
 
     if (
         !currentPending
-        || currentPending.clicked === true
+        || currentPending.clicked ===
+            true
     ) {
         return;
     }
@@ -1173,8 +1183,8 @@ async function navigateToOcrRoute(
 
     if (
         destination === current
-        || destination
-            === window.location.pathname
+        || destination ===
+            window.location.pathname
     ) {
         return true;
     }
@@ -1187,8 +1197,8 @@ async function navigateToOcrRoute(
 
     if (
         router
-        && typeof router.navigate
-            === "function"
+        && typeof router.navigate ===
+            "function"
     ) {
         try {
             await router.navigate(
@@ -1338,7 +1348,8 @@ function showSuccessNotification(
 
                 if (
                     !current
-                    || current.clicked === true
+                    || current.clicked ===
+                        true
                 ) {
                     return;
                 }
@@ -1396,6 +1407,7 @@ function showFailureNotification(
             }
     });
 }
+
 /* =========================================================
    POLLING
    ========================================================= */
@@ -1495,8 +1507,8 @@ function hasOcrJobProgressed(
     }
 
     if (
-        signature
-        !== OCR_NOTIFICATION_LAST_PROGRESS_SIGNATURE
+        signature !==
+        OCR_NOTIFICATION_LAST_PROGRESS_SIGNATURE
     ) {
         OCR_NOTIFICATION_LAST_PROGRESS_SIGNATURE =
             signature;
@@ -1547,37 +1559,7 @@ function getOcrJobActivityTimestamp(
     return null;
 }
 
-function isOcrProcessingStale(
-    job
-) {
-    if (
-        OCR_NOTIFICATION_STALE_CHECKS
-        < OCR_NOTIFICATION_MAX_STALE_CHECKS
-    ) {
-        return false;
-    }
-
-    const activityAt =
-        getOcrJobActivityTimestamp(
-            job
-        );
-
-    if (
-        !Number.isFinite(
-            activityAt
-        )
-    ) {
-        return false;
-    }
-
-    return (
-        Date.now()
-        - activityAt
-        >= OCR_NOTIFICATION_PROCESSING_STALE_MS
-    );
-}
-
-function isOcrJobPastClientLifetime(
+function getOcrJobCreatedTimestamp(
     job
 ) {
     const createdAt =
@@ -1586,6 +1568,67 @@ function isOcrJobPastClientLifetime(
                 job?.createdAt
                 || ""
             )
+        );
+
+    return Number.isFinite(
+        createdAt
+    )
+        ? createdAt
+        : null;
+}
+
+function isOcrQueueStale(
+    job
+) {
+    const createdAt =
+        getOcrJobCreatedTimestamp(
+            job
+        );
+
+    if (
+        !Number.isFinite(
+            createdAt
+        )
+    ) {
+        return false;
+    }
+
+    return (
+        Date.now()
+        - createdAt
+        >= OCR_NOTIFICATION_QUEUE_STALE_MS
+    );
+}
+
+function isOcrProcessingStale(job) {
+    if (
+        OCR_NOTIFICATION_STALE_CHECKS <
+        OCR_NOTIFICATION_MAX_STALE_CHECKS
+    ) {
+        return false;
+    }
+
+    const activityAt =
+        getOcrJobActivityTimestamp(job);
+
+    if (
+        !Number.isFinite(activityAt)
+    ) {
+        return false;
+    }
+
+    return (
+        Date.now() - activityAt >=
+        OCR_NOTIFICATION_PROCESSING_STALE_MS
+    );
+}
+
+function isOcrJobPastClientLifetime(
+    job
+) {
+    const createdAt =
+        getOcrJobCreatedTimestamp(
+            job
         );
 
     if (
@@ -1720,12 +1763,17 @@ function abandonActiveOcrJob(
     );
 }
 
+/* =========================================================
+   POLL SCHEDULING
+   ========================================================= */
+
 function scheduleActiveOcrCheck(
     jobId
 ) {
     if (
         !OCR_NOTIFICATION_POLLING
-        || OCR_NOTIFICATION_ACTIVE_JOB_ID !== jobId
+        || OCR_NOTIFICATION_ACTIVE_JOB_ID !==
+            jobId
     ) {
         return;
     }
@@ -1795,7 +1843,8 @@ function startOcrNotificationCheckBurst() {
 
     if (
         OCR_NOTIFICATION_POLLING
-        && OCR_NOTIFICATION_ACTIVE_JOB_ID === jobId
+        && OCR_NOTIFICATION_ACTIVE_JOB_ID ===
+            jobId
     ) {
         return;
     }
@@ -1954,6 +2003,7 @@ function handleFailedJob(
         )
     );
 }
+
 /* =========================================================
    ACTIVE JOB CHECK
    ========================================================= */
@@ -1970,7 +2020,8 @@ async function runActiveOcrCheck() {
 
     if (
         !jobId
-        || OCR_NOTIFICATION_ACTIVE_JOB_ID !== jobId
+        || OCR_NOTIFICATION_ACTIVE_JOB_ID !==
+            jobId
     ) {
         stopOcrNotificationPolling();
 
@@ -2025,6 +2076,7 @@ async function runActiveOcrCheck() {
                 {
                     detail: {
                         jobId,
+
                         job
                     }
                 }
@@ -2060,8 +2112,9 @@ async function runActiveOcrCheck() {
                 1;
 
             if (
-                OCR_NOTIFICATION_QUEUED_CHECKS
-                >= OCR_NOTIFICATION_MAX_QUEUED_CHECKS
+                isOcrQueueStale(
+                    job
+                )
             ) {
                 abandonActiveOcrJob(
                     jobId,
@@ -2074,7 +2127,7 @@ async function runActiveOcrCheck() {
                             "QUEUE_STALLED",
 
                         message:
-                            "The scoreboard job did not start processing. Please try the upload again."
+                            "The scoreboard job remained queued for more than two minutes. Please try the upload again."
                     }
                 );
 
@@ -2212,7 +2265,8 @@ export function restorePendingNotifications() {
                 pending
             ) {
                 if (
-                    pending?.clicked === true
+                    pending?.clicked ===
+                    true
                 ) {
                     const currentRoute =
                         String(
@@ -2233,7 +2287,8 @@ export function restorePendingNotifications() {
 
                     if (
                         reviewRoute
-                        && currentRoute === reviewRoute
+                        && currentRoute ===
+                            reviewRoute
                     ) {
                         document.dispatchEvent(
                             new CustomEvent(
@@ -2252,9 +2307,10 @@ export function restorePendingNotifications() {
                 if (
                     Number(
                         pending?.autoConfirmAt
-                    ) <= Date.now()
+                    )
+                    <= Date.now()
                 ) {
-                    autoAcceptOcrResult(
+                    void autoAcceptOcrResult(
                         pending
                     );
 
@@ -2305,7 +2361,8 @@ function handleStorageChange(
     event
 ) {
     if (
-        event.key === OCR_ACTIVE_JOB_KEY
+        event.key ===
+        OCR_ACTIVE_JOB_KEY
     ) {
         checkActiveOcrSubmission();
 
@@ -2313,7 +2370,8 @@ function handleStorageChange(
     }
 
     if (
-        event.key === OCR_PENDING_REVIEW_KEY
+        event.key ===
+        OCR_PENDING_REVIEW_KEY
     ) {
         restorePendingNotifications();
     }
