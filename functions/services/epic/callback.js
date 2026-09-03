@@ -378,6 +378,36 @@ export async function handleEpicCallback(
             );
         }
 
+        const existingSessionId =
+            getCookie(
+                request,
+                AUTH_SESSION_COOKIE
+            );
+
+        if (
+            existingSessionId
+            && env.AUTH_SESSIONS
+        ) {
+            try {
+                await env.AUTH_SESSIONS.delete(
+                    `session:${existingSessionId}`
+                );
+            }
+            catch (
+                error
+            ) {
+                console.warn(
+                    "EPIC CALLBACK: Existing session cleanup failed.",
+                    {
+                        debugId,
+                        message:
+                            error?.message
+                            || "Unknown error"
+                    }
+                );
+            }
+        }
+
         const sessionId =
             crypto.randomUUID();
 

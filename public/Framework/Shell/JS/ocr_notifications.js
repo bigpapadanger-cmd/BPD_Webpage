@@ -30,8 +30,10 @@ const OCR_CONFIRM_URL =
 const OCR_NOTIFICATION_CONTAINER_ID =
     "ocrNotificationContainer";
 
+const OCR_NOTIFICATION_MAX_CHECKS_PER_BURST =
+    3;
 const OCR_NOTIFICATION_POLL_INTERVAL_MS =
-    1500;
+    3000;
 
 const OCR_NOTIFICATION_DISPLAY_MS =
     12500;
@@ -64,6 +66,9 @@ let OCR_NOTIFICATION_CHECK_RUNNING =
 
 const OCR_NOTIFICATION_TIMERS =
     new Map();
+
+let OCR_NOTIFICATION_CHECKS_REMAINING =
+    0;
 
 
 /* =========================================================
@@ -181,6 +186,17 @@ function clearStoredActiveJob() {
 /* =========================================================
    PENDING REVIEW STORAGE
    ========================================================= */
+function handleVisibilityChange() {
+    if (
+        document.visibilityState === "visible"
+    ) {
+        checkActiveOcrSubmission();
+    }
+}
+
+function handleWindowFocus() {
+    checkActiveOcrSubmission();
+}
 
 export function readPendingReviews() {
     try {
@@ -1339,12 +1355,19 @@ function showFailureNotification(
    POLLING
    ========================================================= */
 
+/* =========================================================
+   POLLING
+   ========================================================= */
+
 function stopOcrNotificationPolling() {
     OCR_NOTIFICATION_POLLING =
         false;
 
     OCR_NOTIFICATION_ACTIVE_JOB_ID =
         "";
+
+    OCR_NOTIFICATION_CHECKS_REMAINING =
+        0;
 
     if (
         OCR_NOTIFICATION_POLL_TIMER
@@ -1356,6 +1379,81 @@ function stopOcrNotificationPolling() {
         OCR_NOTIFICATION_POLL_TIMER =
             null;
     }
+}
+
+
+function scheduleActiveOcrCheck(
+    jobId
+) {
+    if (
+        !OCR_NOTIFICATION_POLLING
+        || OCR_NOTIFICATION_ACTIVE_JOB_ID
+            !== jobId
+        || OCR_NOTIFICATION_CHECKS_REMAINING <= 0
+    ) {
+        return;
+    }
+
+    if (
+        OCR_NOTIFICATION_POLL_TIMER
+    ) {
+        clearTimeout(
+            OCR_NOTIFICATION_POLL_TIMER
+        );
+    }
+
+    OCR_NOTIFICATION_POLL_TIMER =
+        setTimeout(
+            function() {
+                OCR_NOTIFICATION_POLL_TIMER =
+                    null;
+
+                runActiveOcrCheck();
+            },
+            OCR_NOTIFICATION_POLL_INTERVAL_MS
+        );
+}
+
+
+function startOcrNotificationCheckBurst() {
+    const jobId =
+        getStoredActiveJobId();
+
+    if (
+        !jobId
+    ) {
+        stopOcrNotificationPolling();
+
+        return;
+    }
+
+    if (
+        OCR_NOTIFICATION_CHECK_RUNNING
+    ) {
+        return;
+    }
+
+    if (
+        OCR_NOTIFICATION_POLL_TIMER
+    ) {
+        clearTimeout(
+            OCR_NOTIFICATION_POLL_TIMER
+        );
+
+        OCR_NOTIFICATION_POLL_TIMER =
+            null;
+    }
+
+    OCR_NOTIFICATION_ACTIVE_JOB_ID =
+        jobId;
+
+    OCR_NOTIFICATION_POLLING =
+        true;
+
+    OCR_NOTIFICATION_CHECKS_REMAINING =
+        OCR_NOTIFICATION_MAX_CHECKS_PER_BURST;
+
+    runActiveOcrCheck();
 }
 
 
@@ -1499,7 +1597,7 @@ function handleFailedJob(
    ACTIVE JOB CHECK
    ========================================================= */
 
-export async function checkActiveOcrSubmission() {
+async function runActiveOcrCheck() {
     if (
         OCR_NOTIFICATION_CHECK_RUNNING
     ) {
@@ -1511,6 +1609,7 @@ export async function checkActiveOcrSubmission() {
 
     if (
         !jobId
+        || OCR_NOTIFICATION_ACTIVE_JOB_ID !== jobId
     ) {
         stopOcrNotificationPolling();
 
@@ -1518,22 +1617,18 @@ export async function checkActiveOcrSubmission() {
     }
 
     if (
-        OCR_NOTIFICATION_POLLING
-        && OCR_NOTIFICATION_ACTIVE_JOB_ID
-            === jobId
-        && OCR_NOTIFICATION_POLL_TIMER
+        OCR_NOTIFICATION_CHECKS_REMAINING <= 0
     ) {
+        stopOcrNotificationPolling();
+
         return;
     }
 
     OCR_NOTIFICATION_CHECK_RUNNING =
         true;
 
-    OCR_NOTIFICATION_POLLING =
-        true;
-
-    OCR_NOTIFICATION_ACTIVE_JOB_ID =
-        jobId;
+    OCR_NOTIFICATION_CHECKS_REMAINING -=
+        1;
 
     try {
         const job =
@@ -1555,7 +1650,6 @@ export async function checkActiveOcrSubmission() {
                 {
                     detail: {
                         jobId,
-
                         job
                     }
                 }
@@ -1584,9 +1678,17 @@ export async function checkActiveOcrSubmission() {
             return;
         }
 
-        scheduleActiveOcrCheck(
-            jobId
-        );
+        if (
+            OCR_NOTIFICATION_CHECKS_REMAINING > 0
+        ) {
+            scheduleActiveOcrCheck(
+                jobId
+            );
+
+            return;
+        }
+
+        stopOcrNotificationPolling();
     }
     catch (
         error
@@ -1598,14 +1700,16 @@ export async function checkActiveOcrSubmission() {
 
         if (
             navigator.onLine
+            && OCR_NOTIFICATION_CHECKS_REMAINING > 0
         ) {
             scheduleActiveOcrCheck(
                 jobId
             );
+
+            return;
         }
-        else {
-            stopOcrNotificationPolling();
-        }
+
+        stopOcrNotificationPolling();
     }
     finally {
         OCR_NOTIFICATION_CHECK_RUNNING =
@@ -1613,6 +1717,10 @@ export async function checkActiveOcrSubmission() {
     }
 }
 
+
+export function checkActiveOcrSubmission() {
+    startOcrNotificationCheckBurst();
+}
 
 /* =========================================================
    RESTORE PENDING
@@ -1752,7 +1860,15 @@ export function initializeOcrNotifications() {
 
         return true;
     }
+    document.addEventListener(
+        "visibilitychange",
+        handleVisibilityChange
+    );
 
+    window.addEventListener(
+        "focus",
+        handleWindowFocus
+    );
     window.addEventListener(
         "online",
         handleOnline

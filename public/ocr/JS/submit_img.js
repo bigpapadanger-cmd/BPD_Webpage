@@ -10,12 +10,16 @@ const OCR_JOB_SUBMIT_URL =
 
 const OCR_JOB_RESULT_URL =
     "/api/ocr/jobs/get_result";
+
 const OCR_REVIEW_OPEN_REQUEST_KEY =
     "rocketLeagueOcrReviewOpenRequestV1";
+
 const OCR_ACTIVE_JOB_KEY =
     "rocketLeagueOcrActiveJobV1";
+
 const OCR_ACTIVE_JOB_ROUTE_KEY =
     "rocketLeagueOcrActiveJobRouteV1";
+
 const OCR_RESULT_FIELD_ORDER = [
     "score",
     "goals",
@@ -33,15 +37,103 @@ let OCR_ACTIVE_JOB_ID =
 let OCR_LOADING_PROGRESS =
     0;
 
+let OCR_LOADING_CONFIRMED_PROGRESS =
+    0;
+
+let OCR_LOADING_NEXT_GATE =
+    0;
+
+let OCR_LOADING_VELOCITY =
+    0;
+
+let OCR_LOADING_ANIMATION_TIMER =
+    null;
+
+let OCR_LOADING_FINISH_TIMER =
+    null;
+
+let OCR_LOADING_LAST_MESSAGE =
+    "";
+
 let OCR_SUBMISSION_EVENTS_BOUND =
     false;
 
+const OCR_PROGRESS_CHECKPOINTS = [
+    0,
+    2,
+    4,
+    6,
+    8,
+    10,
+    12,
+    18,
+    25,
+    34,
+    45,
+    56,
+    68,
+    76,
+    82,
+    89,
+    94,
+    96,
+    100
+];
+
+const OCR_PROGRESS_FAST_RATIO =
+    0.70;
+
+const OCR_PROGRESS_TICK_MS =
+    60;
+
+const OCR_PROGRESS_INITIAL_VELOCITY =
+    0.025;
+
+const OCR_PROGRESS_ACCELERATION =
+    0.014;
+
+const OCR_PROGRESS_MAX_FAST_VELOCITY =
+    0.18;
+
+const OCR_PROGRESS_MIN_CREEP_VELOCITY =
+    0.006;
+
+const OCR_PROGRESS_DECELERATION =
+    0.90;
+
+const OCR_PROGRESS_GATE_PADDING =
+    0.08;
 
 /* =========================================================
    LOADING UI
    ========================================================= */
 
-function updateOcrLoading(
+function normalizeOcrProgress(
+    progress
+) {
+    const numeric =
+        Number(
+            progress
+        );
+
+    if (
+        !Number.isFinite(
+            numeric
+        )
+    ) {
+        return 0;
+    }
+
+    return Math.min(
+        100,
+        Math.max(
+            0,
+            numeric
+        )
+    );
+}
+
+function renderOcrLoading(
     progress,
     text = null
 ) {
@@ -75,14 +167,8 @@ function updateOcrLoading(
     }
 
     const normalizedProgress =
-        Math.min(
-            100,
-            Math.max(
-                0,
-                Number(
-                    progress
-                ) || 0
-            )
+        normalizeOcrProgress(
+            progress
         );
 
     OCR_LOADING_PROGRESS =
@@ -102,25 +188,288 @@ function updateOcrLoading(
     if (
         text
     ) {
+        OCR_LOADING_LAST_MESSAGE =
+            String(
+                text
+            );
+
         loadingText.textContent =
-            text;
+            OCR_LOADING_LAST_MESSAGE;
     }
 }
 
+function getNextOcrProgressGate(
+    confirmedProgress
+) {
+    const confirmed =
+        normalizeOcrProgress(
+            confirmedProgress
+        );
+
+    for (
+        const checkpoint
+        of OCR_PROGRESS_CHECKPOINTS
+    ) {
+        if (
+            checkpoint > confirmed
+        ) {
+            return checkpoint;
+        }
+    }
+
+    return 100;
+}
+
+function stopOcrLoadingAnimation() {
+    if (
+        OCR_LOADING_ANIMATION_TIMER
+    ) {
+        clearInterval(
+            OCR_LOADING_ANIMATION_TIMER
+        );
+
+        OCR_LOADING_ANIMATION_TIMER =
+            null;
+    }
+}
+
+function clearOcrLoadingFinishTimer() {
+    if (
+        OCR_LOADING_FINISH_TIMER
+    ) {
+        clearTimeout(
+            OCR_LOADING_FINISH_TIMER
+        );
+
+        OCR_LOADING_FINISH_TIMER =
+            null;
+    }
+}
+
+function calculateOcrProgressStep() {
+    if (
+        OCR_LOADING_PROGRESS >= 100
+    ) {
+        return 0;
+    }
+
+    const confirmed =
+        OCR_LOADING_CONFIRMED_PROGRESS;
+
+    const nextGate =
+        OCR_LOADING_NEXT_GATE;
+
+    if (
+        nextGate <= 0
+        || nextGate <= confirmed
+    ) {
+        return 0;
+    }
+
+    const checkpointDistance =
+        nextGate
+        - confirmed;
+
+    const fastEnd =
+        confirmed
+        + (
+            checkpointDistance
+            * OCR_PROGRESS_FAST_RATIO
+        );
+
+    const visualCeiling =
+        nextGate >= 100
+            ? 99.92
+            : nextGate
+                - OCR_PROGRESS_GATE_PADDING;
+
+    if (
+        OCR_LOADING_PROGRESS >=
+        visualCeiling
+    ) {
+        return 0;
+    }
+
+    if (
+        OCR_LOADING_PROGRESS <
+        confirmed
+    ) {
+        OCR_LOADING_VELOCITY =
+            Math.min(
+                OCR_PROGRESS_MAX_FAST_VELOCITY,
+                Math.max(
+                    OCR_LOADING_VELOCITY,
+                    OCR_PROGRESS_INITIAL_VELOCITY
+                )
+                + OCR_PROGRESS_ACCELERATION
+            );
+
+        return Math.min(
+            OCR_LOADING_VELOCITY,
+            confirmed
+            - OCR_LOADING_PROGRESS
+        );
+    }
+
+    if (
+        OCR_LOADING_PROGRESS <
+        fastEnd
+    ) {
+        OCR_LOADING_VELOCITY =
+            Math.min(
+                OCR_PROGRESS_MAX_FAST_VELOCITY,
+                Math.max(
+                    OCR_LOADING_VELOCITY,
+                    OCR_PROGRESS_INITIAL_VELOCITY
+                )
+                + OCR_PROGRESS_ACCELERATION
+            );
+
+        return Math.min(
+            OCR_LOADING_VELOCITY,
+            visualCeiling
+            - OCR_LOADING_PROGRESS
+        );
+    }
+
+    const remaining =
+        visualCeiling
+        - OCR_LOADING_PROGRESS;
+
+    if (
+        remaining <= 0
+    ) {
+        return 0;
+    }
+
+    OCR_LOADING_VELOCITY =
+        Math.max(
+            OCR_PROGRESS_MIN_CREEP_VELOCITY,
+            OCR_LOADING_VELOCITY
+            * OCR_PROGRESS_DECELERATION
+        );
+
+    const distanceLimitedStep =
+        remaining
+        * 0.075;
+
+    return Math.min(
+        remaining,
+        OCR_LOADING_VELOCITY,
+        Math.max(
+            OCR_PROGRESS_MIN_CREEP_VELOCITY,
+            distanceLimitedStep
+        )
+    );
+}
+
+function animateOcrLoadingStep() {
+    const step =
+        calculateOcrProgressStep();
+
+    if (
+        step <= 0
+    ) {
+        return;
+    }
+
+    renderOcrLoading(
+        OCR_LOADING_PROGRESS
+        + step
+    );
+}
+
+function ensureOcrLoadingAnimation() {
+    if (
+        OCR_LOADING_ANIMATION_TIMER
+    ) {
+        return;
+    }
+
+    OCR_LOADING_ANIMATION_TIMER =
+        setInterval(
+            animateOcrLoadingStep,
+            OCR_PROGRESS_TICK_MS
+        );
+}
+
+function updateOcrLoading(
+    progress,
+    text = null
+) {
+    const normalizedProgress =
+        normalizeOcrProgress(
+            progress
+        );
+
+    if (
+        normalizedProgress >
+        OCR_LOADING_CONFIRMED_PROGRESS
+    ) {
+        OCR_LOADING_CONFIRMED_PROGRESS =
+            normalizedProgress;
+
+        OCR_LOADING_NEXT_GATE =
+            getNextOcrProgressGate(
+                OCR_LOADING_CONFIRMED_PROGRESS
+            );
+
+        OCR_LOADING_VELOCITY =
+            Math.max(
+                OCR_LOADING_VELOCITY,
+                OCR_PROGRESS_INITIAL_VELOCITY
+            );
+    }
+
+    if (
+        text
+    ) {
+        renderOcrLoading(
+            OCR_LOADING_PROGRESS,
+            text
+        );
+    }
+
+    if (
+        normalizedProgress >= 100
+    ) {
+        return;
+    }
+
+    ensureOcrLoadingAnimation();
+}
 
 function showOcrLoading(
     text =
         "Submitting scoreboard..."
 ) {
+    stopOcrLoadingAnimation();
+    clearOcrLoadingFinishTimer();
+
     OCR_LOADING_PROGRESS =
         0;
 
-    updateOcrLoading(
+    OCR_LOADING_CONFIRMED_PROGRESS =
+        0;
+
+    OCR_LOADING_NEXT_GATE =
+        getNextOcrProgressGate(
+            0
+        );
+
+    OCR_LOADING_VELOCITY =
+        OCR_PROGRESS_INITIAL_VELOCITY;
+
+    OCR_LOADING_LAST_MESSAGE =
+        "";
+
+    renderOcrLoading(
         0,
         text
     );
-}
 
+    ensureOcrLoadingAnimation();
+}
 
 function finishOcrLoading(
     success,
@@ -131,17 +480,32 @@ function finishOcrLoading(
             "loadingWrap"
         );
 
+    clearOcrLoadingFinishTimer();
+
     if (
         success
     ) {
-        updateOcrLoading(
+        stopOcrLoadingAnimation();
+
+        OCR_LOADING_CONFIRMED_PROGRESS =
+            100;
+
+        OCR_LOADING_NEXT_GATE =
+            100;
+
+        OCR_LOADING_VELOCITY =
+            0;
+
+        renderOcrLoading(
             100,
             text
             || "Scoreboard scan completed."
         );
     }
     else {
-        updateOcrLoading(
+        stopOcrLoadingAnimation();
+
+        renderOcrLoading(
             OCR_LOADING_PROGRESS,
             text
             || "OCR processing stopped."
@@ -151,61 +515,24 @@ function finishOcrLoading(
     if (
         loadingWrap
     ) {
-        setTimeout(
-            function() {
-                if (
-                    loadingWrap.isConnected
-                ) {
-                    loadingWrap.hidden =
-                        true;
-                }
-            },
-            900
-        );
-    }
-}
+        OCR_LOADING_FINISH_TIMER =
+            setTimeout(
+                function() {
+                    if (
+                        loadingWrap.isConnected
+                    ) {
+                        loadingWrap.hidden =
+                            true;
+                    }
 
-function restoreRequestedOcrReview() {
-    let pending =
-        null;
-
-    try {
-        pending =
-            JSON.parse(
-                sessionStorage.getItem(
-                    OCR_REVIEW_OPEN_REQUEST_KEY
-                )
-                || "null"
+                    OCR_LOADING_FINISH_TIMER =
+                        null;
+                },
+                900
             );
-
-        sessionStorage.removeItem(
-            OCR_REVIEW_OPEN_REQUEST_KEY
-        );
     }
-    catch (
-        error
-    ) {
-        console.error(
-            "[OCR] Could not restore requested OCR review.",
-            error
-        );
-
-        return;
-    }
-
-    if (
-        !pending
-        || typeof pending
-            !== "object"
-    ) {
-        return;
-    }
-
-    handlePendingReviewOpen({
-        detail:
-            pending
-    });
 }
+
 /* =========================================================
    JOB STAGE DISPLAY
    ========================================================= */
@@ -229,56 +556,23 @@ function getJobStageMessage(
             .trim()
             .toLowerCase();
 
-    const totalImages =
-        Number(
-            job?.totalImages
-        );
-
-    const completedImages =
-        Number(
-            job?.completedImages
-        );
-
-    let suffix =
-        "";
+    const providerMessage =
+        String(
+            job?.message
+            || ""
+        )
+            .trim();
 
     if (
-        Number.isFinite(
-            totalImages
-        )
-        && totalImages > 1
-        && Number.isFinite(
-            completedImages
-        )
+        providerMessage
     ) {
-        const remaining =
-            Math.max(
-                0,
-                totalImages
-                - completedImages
-            );
-
-        suffix =
-            (
-                " • "
-                + remaining
-                + " image"
-                + (
-                    remaining === 1
-                        ? ""
-                        : "s"
-                )
-                + " remaining"
-            );
+        return providerMessage;
     }
 
     if (
         status === "queued"
     ) {
-        return (
-            "Scoreboard queued for processing..."
-            + suffix
-        );
+        return "Scoreboard queued for processing...";
     }
 
     if (
@@ -293,82 +587,85 @@ function getJobStageMessage(
         return "Scoreboard processing failed.";
     }
 
-    let message;
-
     switch (
         stage
     ) {
+        case "starting":
+            return "Starting scoreboard reader...";
+
+        case "loading_job":
+            return "Loading your scoreboard...";
+
         case "preparing_image":
-            message =
-                "Preparing scoreboard image...";
-            break;
+            return "Getting the pixels lined up...";
+
+        case "building_request":
+            return "Building the OCR request...";
+
+        case "contacting_ocr":
+            return "Waking up the scoreboard reader...";
 
         case "ocr":
-            message =
-                "Reading scoreboard...";
-            break;
+            return "Crunching scoreboard pixels...";
+
+        case "preflight":
+            return "Checking for a Rocket League scoreboard...";
+
+        case "normalization":
+        case "normalized":
+            return "Getting the scoreboard into formation...";
 
         case "headers":
-            message =
-                "Reading scoreboard headers...";
-            break;
+            return "Reading scoreboard headers...";
 
         case "anchors":
-            message =
-                "Locating scoreboard anchors...";
-            break;
+            return "Finding the important bits...";
 
         case "rows":
-            message =
-                "Locating player rows...";
-            break;
+            return "Lining up the players...";
 
+        case "cells":
+            return "Mapping the scoreboard values...";
+
+        case "names":
+            return "Reading who's on the pitch...";
+
+        case "stats":
         case "numeric_matcher":
-            message =
-                "Reading scoreboard statistics...";
-            break;
+            return "Counting up the scoreboard...";
 
         case "numeric_tesseract":
-            message =
-                "Verifying scoreboard statistics...";
-            break;
+            return "Double-checking scoreboard numbers...";
 
         case "numeric_paddle":
-            message =
-                "Resolving uncertain values...";
-            break;
+            return "Resolving the tricky values...";
 
         case "validation":
-            message =
-                "Validating scoreboard results...";
-            break;
+            return "Double-checking the numbers...";
+
+        case "training_capture":
+            return "Preparing the match for saving...";
+
+        case "reconciliation":
+            return "Sorting out the tricky bits...";
 
         case "saving":
-            message =
-                "Saving scoreboard results...";
-            break;
+            return "Saving the match...";
+
+        case "finalizing":
+            return "Putting the finishing touches on your scoreboard...";
 
         case "retry_pending":
-            message =
-                "OCR processing will retry...";
-            break;
+            return "OCR processing will retry...";
 
         default:
-            message =
-                (
-                    status === "processing"
-                        ? "Reading scoreboard..."
-                        : "Preparing OCR job..."
-                );
-            break;
+            return (
+                status === "processing"
+                    ? "Reading scoreboard..."
+                    : "Preparing OCR job..."
+            );
     }
-
-    return (
-        message
-        + suffix
-    );
 }
-
 
 /* =========================================================
    JOB PROGRESS
@@ -471,6 +768,55 @@ function getJobProgress(
     return OCR_LOADING_PROGRESS;
 }
 
+/* =========================================================
+   GLOBAL JOB PROGRESS EVENT
+   ========================================================= */
+
+function handleGlobalOcrJobProgress(
+    event
+) {
+    const jobId =
+        String(
+            event?.detail?.jobId
+            || ""
+        )
+            .trim()
+            .toUpperCase();
+
+    const job =
+        event?.detail?.job
+        || {};
+
+    if (
+        !/^[A-Z0-9]{16}$/.test(
+            jobId
+        )
+    ) {
+        return;
+    }
+
+    if (
+        OCR_ACTIVE_JOB_ID
+        && OCR_ACTIVE_JOB_ID !== jobId
+    ) {
+        return;
+    }
+
+    const progress =
+        getJobProgress(
+            job
+        );
+
+    const message =
+        getJobStageMessage(
+            job
+        );
+
+    updateOcrLoading(
+        progress,
+        message
+    );
+}
 
 /* =========================================================
    ACTIVE JOB STORAGE
@@ -487,14 +833,10 @@ function notifyGlobalJobWatcher(
                 {
                     key:
                         OCR_ACTIVE_JOB_KEY,
-
                     oldValue,
-
                     newValue,
-
                     storageArea:
                         localStorage,
-
                     url:
                         window.location.href
                 }
@@ -511,10 +853,9 @@ function notifyGlobalJobWatcher(
     }
 }
 
-
 function saveActiveOcrJob(
     jobId
-    ) {
+) {
     OCR_ACTIVE_JOB_ID =
         String(
             jobId
@@ -597,7 +938,6 @@ function getSavedActiveOcrJob() {
     }
 }
 
-
 /* =========================================================
    JSON RESPONSE
    ========================================================= */
@@ -626,7 +966,6 @@ async function readJsonResponse(
     }
 }
 
-
 /* =========================================================
    GET COMPLETED RESULT
    ========================================================= */
@@ -646,13 +985,10 @@ async function getOcrJobResult(
             {
                 method:
                     "GET",
-
                 credentials:
                     "same-origin",
-
                 cache:
                     "no-store",
-
                 headers: {
                     "Accept":
                         "application/json"
@@ -707,7 +1043,6 @@ async function getOcrJobResult(
     };
 }
 
-
 /* =========================================================
    SCOREBOARD HELPERS
    ========================================================= */
@@ -734,7 +1069,6 @@ function getOcrTeams(
         teams.push({
             team:
                 1,
-
             players:
                 result.team1
         });
@@ -748,7 +1082,6 @@ function getOcrTeams(
         teams.push({
             team:
                 2,
-
             players:
                 result.team2
         });
@@ -756,7 +1089,6 @@ function getOcrTeams(
 
     return teams;
 }
-
 
 function getOcrPlayerName(
     player
@@ -769,7 +1101,6 @@ function getOcrPlayerName(
         || "Unknown Player"
     );
 }
-
 
 function getVisibleScoreboardFields(
     teams
@@ -828,7 +1159,6 @@ function getVisibleScoreboardFields(
         );
 }
 
-
 function getOcrEditLockState() {
     const policy =
         Reflect.get(
@@ -849,7 +1179,6 @@ function getOcrEditLockState() {
         === true
     );
 }
-
 
 /* =========================================================
    SCOREBOARD RESULT TABLE
@@ -1168,7 +1497,6 @@ function renderOcrResultTable(
     );
 }
 
-
 /* =========================================================
    RESULT MODAL
    ========================================================= */
@@ -1193,10 +1521,6 @@ function renderOcrResult(
         result
     );
 
-    /*
-     * Do not expose the raw OCR/debug response to the user.
-     */
-
     if (
         resultsOutput
     ) {
@@ -1219,7 +1543,6 @@ function renderOcrResult(
                         )
                             .trim()
                             .toUpperCase(),
-
                     matchId:
                         String(
                             matchId
@@ -1228,7 +1551,6 @@ function renderOcrResult(
                         )
                             .trim()
                             .toUpperCase(),
-
                     result
                 }
             }
@@ -1253,7 +1575,6 @@ function renderOcrResult(
         ""
     );
 }
-
 
 /* =========================================================
    CROP RETRY
@@ -1321,79 +1642,11 @@ function shouldOfferCropRetry(
     );
 }
 
-
-/* =========================================================
-   GLOBAL JOB PROGRESS EVENT
-   ========================================================= */
-
-function handleGlobalOcrJobCompleted(
-    event
-    ) {
-    const jobId =
-        String(
-            event?.detail?.jobId
-            || ""
-        )
-            .trim()
-            .toUpperCase();
-
-    if (
-        !/^[A-Z0-9]{16}$/.test(
-            jobId
-        )
-    ) {
-        return;
-    }
-
-    OCR_ACTIVE_JOB_ID =
-        "";
-
-    finishOcrLoading(
-        true,
-        "Scoreboard scan completed."
-    );
-
-    setStatus(
-        "Image upload complete. You have 10 seconds to review the result before it is automatically accepted."
-    );
-
-    setOcrControlsLocked(
-        false
-    );
-
-    savePageState();
-
-    document.dispatchEvent(
-        new CustomEvent(
-            "ocr:successful-result",
-            {
-                detail: {
-                    jobId,
-
-                    matchId:
-                        String(
-                            event?.detail?.matchId
-                            || ""
-                        )
-                            .trim()
-                            .toUpperCase(),
-
-                    usedCrop:
-                        Boolean(
-                            cropFallbackVisible
-                        )
-                }
-            }
-        )
-    );
-}
-
-
 /* =========================================================
    GLOBAL COMPLETED EVENT
    ========================================================= */
 
-async function handleGlobalOcrJobCompleted(
+function handleGlobalOcrJobCompleted(
     event
 ) {
     const jobId =
@@ -1416,97 +1669,56 @@ async function handleGlobalOcrJobCompleted(
         return;
     }
 
+    if (
+        OCR_ACTIVE_JOB_ID
+        && OCR_ACTIVE_JOB_ID !== jobId
+    ) {
+        return;
+    }
+
     OCR_ACTIVE_JOB_ID =
         "";
 
-    try {
-        updateOcrLoading(
-            99,
-            "Loading completed scoreboard..."
-        );
+    finishOcrLoading(
+        true,
+        "Scoreboard scan completed."
+    );
 
-        const completed =
-            await getOcrJobResult(
-                jobId
-            );
+    setStatus(
+        "Image upload complete. Click the completion notification to review the scoreboard."
+    );
 
-        const result =
-            completed.result;
+    setOcrControlsLocked(
+        false
+    );
 
-        const matchId =
-            String(
-                result?.matchId
-                || event?.detail?.matchId
-                || job?.matchId
-                || ""
-            )
-                .trim()
-                .toUpperCase();
+    savePageState();
 
-        finishOcrLoading(
-            true,
-            "Scoreboard scan completed."
-        );
+    const matchId =
+        String(
+            event?.detail?.matchId
+            || job?.matchId
+            || ""
+        )
+            .trim()
+            .toUpperCase();
 
-        setStatus(
-            "SUCCESS: Scoreboard read successfully. Review the values against your image."
-        );
-
-        renderOcrResult(
-            result,
-            jobId,
-            matchId
-        );
-
-        document.dispatchEvent(
-            new CustomEvent(
-                "ocr:successful-result",
-                {
-                    detail: {
-                        jobId,
-
-                        matchId,
-
-                        result,
-
-                        usedCrop:
-                            Boolean(
-                                cropFallbackVisible
-                            )
-                    }
+    document.dispatchEvent(
+        new CustomEvent(
+            "ocr:successful-result",
+            {
+                detail: {
+                    jobId,
+                    matchId,
+                    usedCrop:
+                        Boolean(
+                            cropFallbackVisible
+                        )
                 }
-            )
-        );
-
-        setOcrControlsLocked(
-            false
-        );
-
-        savePageState();
-    }
-    catch (
-        error
-    ) {
-        console.error(
-            "[OCR] Completed result could not be loaded.",
-            error
-        );
-
-        finishOcrLoading(
-            false,
-            "Scoreboard completed, but the result could not be loaded."
-        );
-
-        setStatus(
-            "The scoreboard finished processing, but the result could not be loaded. Use the completion notification to try again."
-        );
-
-        setOcrControlsLocked(
-            false
-        );
-    }
+            }
+        )
+    );
 }
-
 
 /* =========================================================
    GLOBAL FAILED EVENT
@@ -1560,7 +1772,6 @@ function handleGlobalOcrJobFailed(
     );
 }
 
-
 /* =========================================================
    OPEN PENDING REVIEW
    ========================================================= */
@@ -1590,12 +1801,22 @@ async function handlePendingReviewOpen(
                 jobId
             );
 
+        const result =
+            completed.result;
+
+        const matchId =
+            String(
+                event?.detail?.matchId
+                || result?.matchId
+                || ""
+            )
+                .trim()
+                .toUpperCase();
+
         renderOcrResult(
-            completed.result,
+            result,
             jobId,
-            event?.detail?.matchId
-            || completed.result?.matchId
-            || ""
+            matchId
         );
     }
     catch (
@@ -1611,7 +1832,6 @@ async function handlePendingReviewOpen(
         );
     }
 }
-
 
 /* =========================================================
    SUBMIT
@@ -1781,13 +2001,10 @@ async function submitScoreboard(
                 {
                     method:
                         "POST",
-
                     body:
                         formData,
-
                     credentials:
                         "same-origin",
-
                     cache:
                         "no-store"
                 }
@@ -1851,13 +2068,6 @@ async function submitScoreboard(
         );
 
         savePageState();
-
-        /*
-         * No polling starts here.
-         *
-         * The global ocr_notifications.js watcher receives the
-         * active-job storage notification and owns polling.
-         */
     }
     catch (
         error
@@ -1887,7 +2097,6 @@ async function submitScoreboard(
         );
     }
 }
-
 
 /* =========================================================
    RESTORE ACTIVE JOB UI
@@ -1926,16 +2135,11 @@ function restoreActiveOcrJob() {
         "Restoring active scoreboard scan..."
     );
 
-    /*
-     * Wake the global watcher in this tab if necessary.
-     */
-
     notifyGlobalJobWatcher(
         jobId,
         jobId
     );
 }
-
 
 /* =========================================================
    EVENTS
@@ -1972,7 +2176,6 @@ function bindOcrSubmissionEvents() {
         true;
 }
 
-
 /* =========================================================
    INITIALIZATION
    ========================================================= */
@@ -1998,8 +2201,23 @@ function initializeOcrSubmission() {
         return false;
     }
 
+    stopOcrLoadingAnimation();
+    clearOcrLoadingFinishTimer();
+
     OCR_LOADING_PROGRESS =
         0;
+
+    OCR_LOADING_CONFIRMED_PROGRESS =
+        0;
+
+    OCR_LOADING_NEXT_GATE =
+        0;
+
+    OCR_LOADING_VELOCITY =
+        0;
+
+    OCR_LOADING_LAST_MESSAGE =
+        "";
 
     OCR_ACTIVE_JOB_ID =
         "";
@@ -2023,9 +2241,9 @@ function initializeOcrSubmission() {
 
     restoreActiveOcrJob();
     restoreRequestedOcrReview();
+
     return true;
 }
-
 
 window.initializeOcrSubmission =
     initializeOcrSubmission;

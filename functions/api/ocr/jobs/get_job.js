@@ -1,3 +1,6 @@
+
+"use strict";
+
 // ============================================================
 // BPD GAMING NETWORK
 // OCR JOB STATUS READER
@@ -8,7 +11,23 @@ import {
 } from "../../../services/common_helpers/reload_sessions.js";
 
 const GET_JOB_VERSION =
-    "ocr-get-job-1.1";
+    "ocr-get-job-1.3";
+
+const ALLOWED_STATUSES =
+    new Set([
+        "created",
+        "uploading",
+        "queued",
+        "processing",
+        "completed",
+        "failed"
+    ]);
+
+const MAX_MESSAGE_LENGTH =
+    160;
+
+const MAX_STAGE_LENGTH =
+    64;
 
 // ============================================================
 // MAIN
@@ -38,7 +57,7 @@ export async function onRequestGet(
                     version:
                         GET_JOB_VERSION
                 },
-                500
+                503
             );
         }
 
@@ -49,7 +68,7 @@ export async function onRequestGet(
                 {
                     success: false,
                     message:
-                        "OCR owner hashing is not configured.",
+                        "OCR owner verification is not configured.",
                     version:
                         GET_JOB_VERSION
                 },
@@ -58,7 +77,7 @@ export async function onRequestGet(
         }
 
         // ====================================================
-        // AUTHENTICATED USER
+        // AUTHENTICATION
         // ====================================================
 
         const session =
@@ -68,8 +87,7 @@ export async function onRequestGet(
             );
 
         if (
-            !session
-            || !session.sessionData
+            !session?.sessionData
         ) {
             return jsonResponse(
                 {
@@ -90,7 +108,7 @@ export async function onRequestGet(
                     .EpicUniqueId
                 || ""
             )
-            .trim();
+                .trim();
 
         if (
             !epicUniqueId
@@ -99,7 +117,7 @@ export async function onRequestGet(
                 {
                     success: false,
                     message:
-                        "Authenticated account is missing an EpicUniqueId.",
+                        "Authenticated account is incomplete.",
                     version:
                         GET_JOB_VERSION
                 },
@@ -143,7 +161,6 @@ export async function onRequestGet(
                 400
             );
         }
-
         const baseKey =
             `ocr-jobs/${jobId}`;
 
@@ -154,32 +171,22 @@ export async function onRequestGet(
             `${baseKey}/request.json`;
 
         // ====================================================
-        // LOAD JOB DATA
+        // LOAD STATUS
         // ====================================================
 
-        const [
-            statusObject,
-            requestObject
-        ] = await Promise.all([
-            env.OCR_STORAGE.get(
+        const statusObject =
+            await env.OCR_STORAGE.get(
                 statusKey
-            ),
-
-            env.OCR_STORAGE.get(
-                requestKey
-            )
-        ]);
+            );
 
         if (
             !statusObject
-            || !requestObject
         ) {
             return jsonResponse(
                 {
                     success: false,
                     message:
                         "OCR job was not found.",
-                    jobId,
                     version:
                         GET_JOB_VERSION
                 },
@@ -187,26 +194,16 @@ export async function onRequestGet(
             );
         }
 
-        let statusData;
-        let requestData;
+        const statusData =
+            await readStoredJson(
+                statusObject
+            );
 
-        try {
-            statusData =
-                JSON.parse(
-                    await statusObject.text()
-                );
-
-            requestData =
-                JSON.parse(
-                    await requestObject.text()
-                );
-        }
-        catch (
-            error
+        if (
+            !statusData
         ) {
             console.error(
-                "OCR job metadata JSON parse failed:",
-                error
+                `[OCR GET JOB] Invalid status metadata for ${jobId}.`
             );
 
             return jsonResponse(
@@ -214,7 +211,6 @@ export async function onRequestGet(
                     success: false,
                     message:
                         "OCR job metadata is invalid.",
-                    jobId,
                     version:
                         GET_JOB_VERSION
                 },
@@ -223,7 +219,7 @@ export async function onRequestGet(
         }
 
         // ====================================================
-        // VERIFY STORED JOB ID
+        // VERIFY JOB IDENTIFIER
         // ====================================================
 
         const storedJobId =
@@ -231,21 +227,18 @@ export async function onRequestGet(
                 statusData?.jobId
             );
 
-        const requestJobId =
-            sanitizeJobId(
-                requestData?.jobId
-            );
-
         if (
             storedJobId !== jobId
-            || requestJobId !== jobId
         ) {
+            console.error(
+                `[OCR GET JOB] Job metadata mismatch for ${jobId}.`
+            );
+
             return jsonResponse(
                 {
                     success: false,
                     message:
-                        "Stored OCR job metadata does not match the requested job.",
-                    jobId,
+                        "OCR job metadata is inconsistent.",
                     version:
                         GET_JOB_VERSION
                 },
@@ -254,27 +247,116 @@ export async function onRequestGet(
         }
 
         // ====================================================
-        // VERIFY JOB OWNERSHIP
+        // VERIFY OWNERSHIP
         // ====================================================
 
-        const submittedBy =
+        let submittedBy =
             String(
-                requestData
-                    ?.fields
-                    ?.submittedBy
+                statusData?.ownerId
                 || ""
             )
-            .trim();
+                .trim();
+
+        // ====================================================
+        // LEGACY JOB FALLBACK
+        // ====================================================
 
         if (
             !submittedBy
         ) {
+            const requestObject =
+                await env.OCR_STORAGE.get(
+                    requestKey
+                );
+
+            if (
+                !requestObject
+            ) {
+                console.error(
+                    `[OCR GET JOB] Legacy request metadata missing for ${jobId}.`
+                );
+
+                return jsonResponse(
+                    {
+                        success: false,
+                        message:
+                            "OCR job ownership is invalid.",
+                        version:
+                            GET_JOB_VERSION
+                    },
+                    409
+                );
+            }
+
+            const requestData =
+                await readStoredJson(
+                    requestObject
+                );
+
+            if (
+                !requestData
+            ) {
+                console.error(
+                    `[OCR GET JOB] Legacy request metadata invalid for ${jobId}.`
+                );
+
+                return jsonResponse(
+                    {
+                        success: false,
+                        message:
+                            "OCR job ownership is invalid.",
+                        version:
+                            GET_JOB_VERSION
+                    },
+                    409
+                );
+            }
+
+            const requestJobId =
+                sanitizeJobId(
+                    requestData?.jobId
+                );
+
+            if (
+                requestJobId !== jobId
+            ) {
+                console.error(
+                    `[OCR GET JOB] Legacy request job mismatch for ${jobId}.`
+                );
+
+                return jsonResponse(
+                    {
+                        success: false,
+                        message:
+                            "OCR job metadata is inconsistent.",
+                        version:
+                            GET_JOB_VERSION
+                    },
+                    409
+                );
+            }
+
+            submittedBy =
+                String(
+                    requestData
+                        ?.fields
+                        ?.submittedBy
+                    || ""
+                )
+                    .trim();
+        }
+        if (
+            !submittedBy
+        ) {
+            console.error(
+                `[OCR GET JOB] Missing owner for ${jobId}.`
+            );
+
             return jsonResponse(
                 {
                     success: false,
                     message:
-                        "Stored OCR job has no owner.",
-                    jobId,
+                        "OCR job ownership is invalid.",
                     version:
                         GET_JOB_VERSION
                 },
@@ -330,11 +412,6 @@ export async function onRequestGet(
                 success: false,
                 message:
                     "Unable to read OCR job.",
-                error:
-                    String(
-                        error?.message
-                        || error
-                    ),
                 version:
                     GET_JOB_VERSION
             },
@@ -344,92 +421,111 @@ export async function onRequestGet(
 }
 
 // ============================================================
-// JOB RESPONSE
+// STORED JSON
+// ============================================================
+
+async function readStoredJson(
+    object
+) {
+    try {
+        const data =
+            JSON.parse(
+                await object.text()
+            );
+
+        if (
+            !data
+            || typeof data !== "object"
+            || Array.isArray(
+                data
+            )
+        ) {
+            return null;
+        }
+
+        return data;
+    }
+    catch {
+        return null;
+    }
+}
+
+// ============================================================
+// SAFE JOB RESPONSE
 // ============================================================
 
 function sanitizeJobResponse(
     statusData
 ) {
+    const status =
+        normalizeStatus(
+            statusData?.status
+        );
+
+    const progress =
+        status === "completed"
+            ? 100
+            : normalizeProgress(
+                statusData?.progress
+            );
+
     return {
         jobId:
             sanitizeJobId(
                 statusData?.jobId
             ),
 
-        providerJobId:
-            sanitizeJobId(
-                statusData?.providerJobId
-            ),
-
-        status:
-            normalizeStatus(
-                statusData?.status
-            ),
+        status,
 
         stage:
             normalizeStage(
                 statusData?.stage
             ),
 
-        progress:
-            normalizeProgress(
-                statusData?.progress
+        progress,
+
+        message:
+            normalizeMessage(
+                statusData?.message,
+                status
             ),
 
         uploadStatus:
-            normalizeOptionalString(
+            normalizeUploadStatus(
                 statusData?.uploadStatus
             ),
 
         createdAt:
-            normalizeOptionalString(
+            normalizeTimestamp(
                 statusData?.createdAt
             ),
 
         startedAt:
-            normalizeOptionalString(
+            normalizeTimestamp(
                 statusData?.startedAt
             ),
 
         updatedAt:
-            normalizeOptionalString(
+            normalizeTimestamp(
                 statusData?.updatedAt
             ),
 
         completedAt:
-            normalizeOptionalString(
+            normalizeTimestamp(
                 statusData?.completedAt
             ),
 
         heartbeatAt:
-            normalizeOptionalString(
+            normalizeTimestamp(
                 statusData?.heartbeatAt
             ),
 
-        attempt:
-            normalizeAttempt(
-                statusData?.attempt
-            ),
-
         matchId:
-            sanitizeMatchId(
-                statusData?.matchId
-            ),
-
-        resultKey:
-            normalizeStorageKey(
-                statusData?.resultKey
-            ),
-
-        benchmarkKey:
-            normalizeStorageKey(
-                statusData?.benchmarkKey
-            ),
-
-        error:
-            sanitizeError(
-                statusData?.error
-            )
+            status === "completed"
+                ? sanitizeMatchId(
+                    statusData?.matchId
+                )
+                : null
     };
 }
 
@@ -455,7 +551,6 @@ async function createOwnerHash(
             {
                 name:
                     "HMAC",
-
                 hash:
                     "SHA-256"
             },
@@ -527,71 +622,33 @@ function constantTimeEqual(
             )
         );
 
-    if (
-        firstBytes.length
-        !== secondBytes.length
-    ) {
-        return false;
-    }
+    const maxLength =
+        Math.max(
+            firstBytes.length,
+            secondBytes.length
+        );
 
     let difference =
-        0;
+        firstBytes.length
+        ^ secondBytes.length;
 
     for (
         let index = 0;
-        index < firstBytes.length;
+        index < maxLength;
         index += 1
     ) {
         difference |=
-            firstBytes[
-                index
-            ]
-            ^ secondBytes[
-                index
-            ];
+            (
+                firstBytes[index]
+                || 0
+            )
+            ^ (
+                secondBytes[index]
+                || 0
+            );
     }
 
     return difference === 0;
-}
-
-// ============================================================
-// ERROR RESPONSE
-// ============================================================
-
-function sanitizeError(
-    error
-) {
-    if (
-        !error
-    ) {
-        return null;
-    }
-
-    if (
-        typeof error
-        === "string"
-    ) {
-        return {
-            code:
-                null,
-
-            message:
-                error
-        };
-    }
-
-    return {
-        code:
-            normalizeOptionalString(
-                error.code
-            ),
-
-        message:
-            normalizeOptionalString(
-                error.message
-            )
-            || "OCR processing failed."
-    };
 }
 
 // ============================================================
@@ -606,25 +663,14 @@ function normalizeStatus(
             value
             || ""
         )
-        .trim()
-        .toLowerCase();
+            .trim()
+            .toLowerCase();
 
-    if (
-        [
-            "created",
-            "uploading",
-            "queued",
-            "processing",
-            "completed",
-            "failed"
-        ].includes(
-            status
-        )
-    ) {
-        return status;
-    }
-
-    return "unknown";
+    return ALLOWED_STATUSES.has(
+        status
+    )
+        ? status
+        : "unknown";
 }
 
 // ============================================================
@@ -639,13 +685,69 @@ function normalizeStage(
             value
             || ""
         )
-        .trim()
-        .toLowerCase();
+            .trim()
+            .toLowerCase()
+            .slice(
+                0,
+                MAX_STAGE_LENGTH
+            );
 
-    return (
+    if (
+        !stage
+    ) {
+        return "unknown";
+    }
+
+    return /^[a-z0-9_-]+$/.test(
         stage
-        || "unknown"
-    );
+    )
+        ? stage
+        : "unknown";
+}
+
+// ============================================================
+// MESSAGE
+// ============================================================
+
+function normalizeMessage(
+    value,
+    status
+) {
+    const message =
+        String(
+            value
+            || ""
+        )
+            .trim()
+            .slice(
+                0,
+                MAX_MESSAGE_LENGTH
+            );
+
+    if (
+        message
+    ) {
+        return message;
+    }
+
+    switch (
+        status
+    ) {
+        case "queued":
+            return "Waiting for the scoreboard reader.";
+
+        case "processing":
+            return "Reading your scoreboard.";
+
+        case "completed":
+            return "Scoreboard ready. Nice shot!";
+
+        case "failed":
+            return "The scoreboard reader hit a bump.";
+
+        default:
+            return "Preparing your scoreboard.";
+    }
 }
 
 // ============================================================
@@ -672,85 +774,81 @@ function normalizeProgress(
         0,
         Math.min(
             100,
-            progress
+            Math.round(
+                progress
+            )
         )
     );
 }
 
 // ============================================================
-// ATTEMPT
+// UPLOAD STATUS
 // ============================================================
 
-function normalizeAttempt(
+function normalizeUploadStatus(
     value
 ) {
-    const attempt =
-        Number(
-            value
-        );
-
-    if (
-        !Number.isInteger(
-            attempt
-        )
-        || attempt < 0
-    ) {
-        return 0;
-    }
-
-    return attempt;
-}
-
-// ============================================================
-// OPTIONAL STRING
-// ============================================================
-
-function normalizeOptionalString(
-    value
-) {
-    const normalized =
+    const status =
         String(
             value
             || ""
         )
-        .trim();
+            .trim()
+            .toLowerCase();
 
-    return (
-        normalized
-        || null
-    );
+    if (
+        [
+            "pending",
+            "uploading",
+            "completed",
+            "failed"
+        ].includes(
+            status
+        )
+    ) {
+        return status;
+    }
+
+    return null;
 }
 
 // ============================================================
-// STORAGE KEY
+// TIMESTAMP
 // ============================================================
 
-function normalizeStorageKey(
+function normalizeTimestamp(
     value
 ) {
-    const key =
-        normalizeOptionalString(
+    const timestamp =
+        String(
             value
+            || ""
+        )
+            .trim();
+
+    if (
+        !timestamp
+    ) {
+        return null;
+    }
+
+    const parsed =
+        Date.parse(
+            timestamp
         );
 
     if (
-        !key
-    ) {
-        return null;
-    }
-
-    if (
-        key.includes(
-            ".."
-        )
-        || key.startsWith(
-            "/"
+        !Number.isFinite(
+            parsed
         )
     ) {
         return null;
     }
 
-    return key;
+    return new Date(
+        parsed
+    )
+        .toISOString();
 }
 
 // ============================================================
@@ -765,18 +863,14 @@ function sanitizeJobId(
             value
             || ""
         )
-        .trim()
-        .toUpperCase();
+            .trim()
+            .toUpperCase();
 
-    if (
-        !/^[A-Z0-9]{16}$/.test(
-            jobId
-        )
-    ) {
-        return null;
-    }
-
-    return jobId;
+    return /^[A-Z0-9]{16}$/.test(
+        jobId
+    )
+        ? jobId
+        : null;
 }
 
 // ============================================================
@@ -791,27 +885,23 @@ function sanitizeMatchId(
             value
             || ""
         )
-        .trim()
-        .toUpperCase();
+            .trim()
+            .toUpperCase();
 
-    if (
-        !/^[A-Z0-9]{16}$/.test(
-            matchId
-        )
-    ) {
-        return null;
-    }
-
-    return matchId;
+    return /^[A-Z0-9]{16}$/.test(
+        matchId
+    )
+        ? matchId
+        : null;
 }
 
 // ============================================================
-// JSON RESPONSE
+// RESPONSE
 // ============================================================
 
 function jsonResponse(
     data,
-    status=200
+    status = 200
 ) {
     return new Response(
         JSON.stringify(
@@ -819,14 +909,13 @@ function jsonResponse(
         ),
         {
             status,
-
             headers: {
                 "Content-Type":
                     "application/json; charset=utf-8",
-
                 "Cache-Control":
                     "no-store"
             }
         }
     );
 }
+

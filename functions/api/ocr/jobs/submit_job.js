@@ -408,14 +408,14 @@ export async function onRequestPost(
 
         const statusData = {
             version:
-                "ocr-job-state-1.1",
+                "ocr-job-state-1.2",
 
             jobId,
 
-            status:
-                "queued",
+            ownerId:
+                submittedBy,
 
-            stage:
+            status:
                 "queued",
 
             progress:

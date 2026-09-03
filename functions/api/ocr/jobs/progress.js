@@ -1,3 +1,6 @@
+
+"use strict";
+
 // ============================================================
 // BPD GAMING NETWORK
 // OCR JOB PROCESSOR
@@ -6,26 +9,25 @@
 const PROCESS_JOB_VERSION =
     "ocr-process-job-1.3";
 
-const JOB_PROGRESS = Object.freeze({
-    STARTING:
-        2,
-    LOADING_JOB:
-        4,
-    PREPARING_IMAGE:
-        6,
-    BUILDING_REQUEST:
-        8,
-    CONTACTING_OCR:
-        10,
-    OCR_STARTED:
-        12,
-    FINALIZING:
-        96,
-    COMPLETED:
-        100,
-    FAILED:
-        100
-});
+const JOB_PROGRESS =
+    Object.freeze({
+        LOADING_JOB:
+            4,
+        PREPARING_IMAGE:
+            6,
+        BUILDING_REQUEST:
+            8,
+        CONTACTING_OCR:
+            10,
+        OCR_STARTED:
+            12,
+        FINALIZING:
+            96,
+        COMPLETED:
+            100,
+        FAILED:
+            100
+    });
 
 // ============================================================
 // MAIN
@@ -71,7 +73,7 @@ export async function onRequestPost(
         }
 
         // ====================================================
-        // INTERNAL AUTHENTICATION
+        // AUTHENTICATION
         // ====================================================
 
         if (
@@ -149,7 +151,7 @@ export async function onRequestPost(
             `${baseKey}/status.json`;
 
         // ====================================================
-        // LOAD CURRENT STATUS
+        // CURRENT STATUS
         // ====================================================
 
         let currentStatus =
@@ -201,7 +203,7 @@ export async function onRequestPost(
         }
 
         // ====================================================
-        // PROCESSING START
+        // LOAD JOB
         // ====================================================
 
         currentStatus =
@@ -226,10 +228,6 @@ export async function onRequestPost(
                         null
                 }
             );
-
-        // ====================================================
-        // LOAD STORED JOB DATA
-        // ====================================================
 
         const [
             inputObject,
@@ -269,6 +267,10 @@ export async function onRequestPost(
             );
         }
 
+        // ====================================================
+        // PREPARE IMAGE
+        // ====================================================
+
         currentStatus =
             await transitionStatus(
                 env,
@@ -285,10 +287,6 @@ export async function onRequestPost(
                         true
                 }
             );
-
-        // ====================================================
-        // IMAGE
-        // ====================================================
 
         const imageBytes =
             await inputObject.arrayBuffer();
@@ -321,7 +319,7 @@ export async function onRequestPost(
             );
 
         // ====================================================
-        // CLOUD RUN REQUEST
+        // BUILD CLOUD RUN REQUEST
         // ====================================================
 
         currentStatus =
@@ -353,6 +351,10 @@ export async function onRequestPost(
                 jobId
             );
 
+        // ====================================================
+        // CONTACT CLOUD RUN
+        // ====================================================
+
         currentStatus =
             await transitionStatus(
                 env,
@@ -370,10 +372,6 @@ export async function onRequestPost(
                 }
             );
 
-        // ====================================================
-        // CALL CLOUD RUN
-        // ====================================================
-
         currentStatus =
             await transitionStatus(
                 env,
@@ -390,6 +388,10 @@ export async function onRequestPost(
                         true
                 }
             );
+
+        // ====================================================
+        // CLOUD RUN
+        // ====================================================
 
         const ocrResponse =
             await fetch(
@@ -448,12 +450,11 @@ export async function onRequestPost(
             );
 
         // ====================================================
-        // UPSTREAM FAILURE
+        // CLOUD RUN FAILURE
         // ====================================================
 
         if (
             !ocrResponse.ok
-            || result?.success !== true
         ) {
             const providerMessage =
                 getSafeProviderMessage(
@@ -496,7 +497,7 @@ export async function onRequestPost(
         }
 
         // ====================================================
-        // VALIDATE SUCCESS RESULT
+        // VALIDATE RESULT
         // ====================================================
 
         if (
@@ -509,9 +510,14 @@ export async function onRequestPost(
         }
 
         // ====================================================
-        // FINALIZING
+        // FINALIZE
         // ====================================================
 
+        /*
+         * Re-read status because Cloud Run may have updated
+         * progress through the callback endpoint while this
+         * request was waiting for OCR to complete.
+         */
         currentStatus =
             await readStatus(
                 env,
@@ -535,23 +541,36 @@ export async function onRequestPost(
                         "Putting the finishing touches on your scoreboard.",
                     heartbeat:
                         true,
-                    providerJobId,
+                    providerJobId:
+                        providerJobId
+                        || currentStatus.providerJobId
+                        || null,
                     matchId,
-                    resultKey,
-                    benchmarkKey,
+                    resultKey:
+                        resultKey
+                        || currentStatus.resultKey
+                        || null,
+                    benchmarkKey:
+                        benchmarkKey
+                        || currentStatus.benchmarkKey
+                        || null,
                     error:
                         null
                 }
             );
 
         // ====================================================
-        // COMPLETED
+        // COMPLETE
         // ====================================================
 
         const completedAt =
             new Date()
                 .toISOString();
 
+        /*
+         * Re-read one final time so a late provider callback
+         * cannot cause us to overwrite newer state blindly.
+         */
         currentStatus =
             await readStatus(
                 env,
@@ -706,14 +725,20 @@ function validateConfiguration(
     if (
         !env.OCR_JOB_PROGRESS_URL
     ) {
-        return "OCR progress callback URL is not configured.";
+        return "OCR progress URL is not configured.";
+    }
+
+    if (
+        !env.OCR_JOB_PROGRESS_SECURE_TOKEN
+    ) {
+        return "OCR progress authentication is not configured.";
     }
 
     return "";
 }
 
 // ============================================================
-// INTERNAL AUTHENTICATION
+// AUTHENTICATION
 // ============================================================
 
 function isAuthorizedProcessorRequest(
@@ -748,7 +773,7 @@ function isAuthorizedProcessorRequest(
 }
 
 // ============================================================
-// REQUEST JSON
+// JSON REQUEST
 // ============================================================
 
 async function readJsonRequest(
@@ -885,21 +910,21 @@ function buildCloudRunHeaders(
         jobId
     );
 
-    const callbackUrl =
+    headers.set(
+        "X-BPD-OCR-Progress-URL",
         String(
             env.OCR_JOB_PROGRESS_URL
-            || ""
         )
-            .trim();
+            .trim()
+    );
 
-    if (
-        callbackUrl
-    ) {
-        headers.set(
-            "X-BPD-OCR-Progress-URL",
-            callbackUrl
-        );
-    }
+    headers.set(
+        "X-BPD-OCR-Progress-Token",
+        String(
+            env.OCR_JOB_PROGRESS_SECURE_TOKEN
+        )
+            .trim()
+    );
 
     return headers;
 }
@@ -1013,15 +1038,15 @@ async function transitionStatus(
             now
     };
 
-    delete nextStatus.ensureStartedAt;
-    delete nextStatus.heartbeat;
-
     if (
         changes?.heartbeat === true
     ) {
         nextStatus.heartbeatAt =
             now;
     }
+
+    delete nextStatus.ensureStartedAt;
+    delete nextStatus.heartbeat;
 
     return updateStatus(
         env,
@@ -1050,6 +1075,10 @@ async function markJobFailed(
         )
         || {};
 
+    /*
+     * Never let a late error overwrite a job that has
+     * already reached a successful terminal state.
+     */
     if (
         currentStatus.status
         === "completed"
@@ -1061,44 +1090,46 @@ async function markJobFailed(
         new Date()
             .toISOString();
 
-    const failedStatus = {
-        ...currentStatus,
-        status:
-            "failed",
-        stage:
-            "failed",
-        progress:
-            JOB_PROGRESS.FAILED,
-        message:
-            "The scoreboard reader hit a bump.",
-        updatedAt:
-            failedAt,
-        completedAt:
-            failedAt,
-        heartbeatAt:
-            failedAt,
-        providerJobId:
-            providerJobId
-            || currentStatus.providerJobId
-            || null,
-        error: {
-            code:
-                String(
-                    code
-                    || "OCR_PROCESSING_FAILED"
-                ),
-            message:
-                String(
-                    internalMessage
-                    || "OCR processing failed."
-                )
-        }
-    };
-
     return updateStatus(
         env,
         statusKey,
-        failedStatus
+        {
+            ...currentStatus,
+            status:
+                "failed",
+            stage:
+                "failed",
+            progress:
+                JOB_PROGRESS.FAILED,
+            message:
+                "The scoreboard reader hit a bump.",
+            updatedAt:
+                failedAt,
+            completedAt:
+                failedAt,
+            heartbeatAt:
+                failedAt,
+            providerJobId:
+                providerJobId
+                || currentStatus.providerJobId
+                || null,
+            error: {
+                code:
+                    String(
+                        code
+                        || "OCR_PROCESSING_FAILED"
+                    ),
+                message:
+                    String(
+                        internalMessage
+                        || "OCR processing failed."
+                    )
+                    .slice(
+                        0,
+                        1000
+                    )
+            }
+        }
     );
 }
 
@@ -1172,16 +1203,17 @@ function getSafeProviderMessage(
         || "";
 
     if (
-        typeof value === "string"
+        typeof value !== "string"
     ) {
-        return value
-            .slice(
-                0,
-                1000
-            );
+        return "";
     }
 
-    return "";
+    return value
+        .trim()
+        .slice(
+            0,
+            1000
+        );
 }
 
 // ============================================================
@@ -1336,7 +1368,7 @@ function sanitizeStorageKey(
 }
 
 // ============================================================
-// JSON RESPONSE
+// RESPONSE
 // ============================================================
 
 function jsonResponse(
@@ -1358,3 +1390,4 @@ function jsonResponse(
         }
     );
 }
+
