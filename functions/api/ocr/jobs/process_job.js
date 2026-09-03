@@ -408,7 +408,17 @@ export async function onRequestPost(
             await readUpstreamResponse(
                 ocrResponse
             );
+        const cloudRuntimeSeconds =
+            Number(
+                result?.runtimeSeconds
+            );
 
+        const validCloudRuntimeSeconds =
+            Number.isFinite(
+                cloudRuntimeSeconds
+            )
+                ? cloudRuntimeSeconds
+                : null;
         // ====================================================
         // PROVIDER RESULT
         // ====================================================
@@ -568,6 +578,8 @@ export async function onRequestPost(
                     "completed",
                 stage:
                     "completed",
+                cloudRuntimeSeconds:
+                    validCloudRuntimeSeconds,
                 progress:
                     JOB_PROGRESS.COMPLETED,
                 message:
