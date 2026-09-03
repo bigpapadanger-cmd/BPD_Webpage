@@ -14,7 +14,7 @@ import {
 // ============================================================
 
 const TRAINING_SERVICE_VERSION =
-    "ocr-training-service-3.0";
+    "ocr-training-service-3.1";
 
 const TRAINING_BATCH_MAX_SIZE =
     32;
@@ -22,9 +22,8 @@ const TRAINING_BATCH_MAX_SIZE =
 const TRAINING_STORAGE_CONCURRENCY =
     4;
 
-
 // ============================================================
-// RESPONSE HELPER
+// RESPONSE
 // ============================================================
 
 function jsonResponse(
@@ -37,18 +36,15 @@ function jsonResponse(
         ),
         {
             status,
-
             headers: {
                 "Content-Type":
-                    "application/json",
-
+                    "application/json; charset=utf-8",
                 "Cache-Control":
                     "no-store"
             }
         }
     );
 }
-
 
 // ============================================================
 // AUTHENTICATION
@@ -64,7 +60,7 @@ function getBearerToken(
             )
             || ""
         )
-        .trim();
+            .trim();
 
     if (
         !authorization.startsWith(
@@ -81,7 +77,6 @@ function getBearerToken(
         .trim();
 }
 
-
 function constantTimeEqual(
     first,
     second
@@ -89,47 +84,50 @@ function constantTimeEqual(
     const encoder =
         new TextEncoder();
 
-    const a =
+    const firstBytes =
         encoder.encode(
             String(
-                first || ""
+                first
+                || ""
             )
         );
 
-    const b =
+    const secondBytes =
         encoder.encode(
             String(
-                second || ""
+                second
+                || ""
             )
         );
 
-    if (
-        a.length
-        !== b.length
-    ) {
-        return false;
-    }
+    const maxLength =
+        Math.max(
+            firstBytes.length,
+            secondBytes.length
+        );
 
-    let result =
-        0;
+    let difference =
+        firstBytes.length
+        ^ secondBytes.length;
 
     for (
         let index = 0;
-        index < a.length;
+        index < maxLength;
         index += 1
     ) {
-        result |=
-            a[
-                index
-            ]
-            ^ b[
-                index
-            ];
+        difference |=
+            (
+                firstBytes[index]
+                || 0
+            )
+            ^ (
+                secondBytes[index]
+                || 0
+            );
     }
 
-    return result === 0;
+    return difference === 0;
 }
-
 
 function validateInternalRequest(
     request,
@@ -140,7 +138,7 @@ function validateInternalRequest(
             env.OCR_STORAGE_TOKEN
             || ""
         )
-        .trim();
+            .trim();
 
     if (
         !expectedToken
@@ -148,15 +146,10 @@ function validateInternalRequest(
         return {
             valid:
                 false,
-
             status:
                 503,
-
             reason:
-                (
-                    "OCR training authentication "
-                    + "is not configured."
-                )
+                "OCR training authentication is not configured."
         };
     }
 
@@ -175,10 +168,8 @@ function validateInternalRequest(
         return {
             valid:
                 false,
-
             status:
                 401,
-
             reason:
                 "Unauthorized."
         };
@@ -190,20 +181,19 @@ function validateInternalRequest(
     };
 }
 
-
 // ============================================================
-// NORMALIZATION HELPERS
+// NORMALIZATION
 // ============================================================
 
 function normalizeText(
     value
 ) {
     return String(
-        value ?? ""
+        value
+        ?? ""
     )
         .trim();
 }
-
 
 function normalizeInteger(
     value
@@ -231,7 +221,6 @@ function normalizeInteger(
         : null;
 }
 
-
 function normalizeNumber(
     value
 ) {
@@ -255,38 +244,59 @@ function normalizeNumber(
         : null;
 }
 
-
 function normalizeBoolean(
     value
 ) {
     return (
         String(
-            value ?? ""
+            value
+            ?? ""
         )
-        .trim()
-        .toLowerCase()
+            .trim()
+            .toLowerCase()
         === "true"
     );
 }
 
+function normalizeNullableText(
+    value
+) {
+    const normalized =
+        normalizeText(
+            value
+        );
+
+    return normalized
+        || null;
+}
 
 // ============================================================
-// IMAGE VALIDATION
+// IMAGE
 // ============================================================
 
 function isValidUpload(
     value
 ) {
-    return (
-        value
-        && typeof value.arrayBuffer
-            === "function"
-    );
+    if (
+        !value
+        || typeof value.arrayBuffer
+            !== "function"
+    ) {
+        return false;
+    }
+
+    if (
+        typeof value.size === "number"
+        && value.size <= 0
+    ) {
+        return false;
+    }
+
+    return true;
 }
 
-
 // ============================================================
-// MATCH ID VALIDATION
+// MATCH ID
 // ============================================================
 
 function normalizeAndValidateMatchId(
@@ -296,18 +306,16 @@ function normalizeAndValidateMatchId(
         normalizeText(
             value
         )
-        .toUpperCase();
+            .toUpperCase();
 
     return {
         matchId,
-
         valid:
             /^[A-Z0-9]{16}$/.test(
                 matchId
             )
     };
 }
-
 
 // ============================================================
 // ADDITIONAL METADATA
@@ -349,14 +357,13 @@ function normalizeAdditionalMetadata(
         ) {
             return parsed;
         }
-
-    } catch {
+    }
+    catch {
         return null;
     }
 
     return null;
 }
-
 
 // ============================================================
 // STORAGE RESULT
@@ -375,51 +382,38 @@ function normalizeStorageResult(
     ) {
         return {
             success:
-                true,
-
+                result?.success !== false,
             stored:
                 false,
-
             duplicate:
-                result.duplicate
-                === true,
-
+                result?.duplicate === true,
             fingerprint:
-                result.fingerprint
+                result?.fingerprint
                 ?? fingerprint,
-
             category:
-                result.category
+                result?.category
                 ?? null,
-
             requestedCategory:
-                result.requestedCategory
+                result?.requestedCategory
                 ?? category,
-
             highConfidence:
-                result.highConfidence
+                result?.highConfidence
                 ?? false,
-
             confidence:
-                result.confidence
+                result?.confidence
                 ?? confidence,
-
             confidenceThreshold:
-                result.confidenceThreshold
+                result?.confidenceThreshold
                 ?? null,
-
             reason:
-                result.reason
+                result?.reason
                 ?? null,
-
             currentCount:
-                result.currentCount
+                result?.currentCount
                 ?? null,
-
             targetCount:
-                result.targetCount
+                result?.targetCount
                 ?? null,
-
             version:
                 TRAINING_SERVICE_VERSION
         };
@@ -427,114 +421,317 @@ function normalizeStorageResult(
 
     return {
         success:
-            true,
-
+            result?.success !== false,
         stored:
-            true,
-
+            result?.stored === true,
         duplicate:
-            false,
-
+            result?.duplicate === true,
         fingerprint:
             result?.fingerprint
             ?? fingerprint,
-
         category:
             result?.category
             ?? null,
-
         requestedCategory:
             result?.requestedCategory
             ?? category,
-
         highConfidence:
             result?.highConfidence
             ?? false,
-
         confidence:
             result?.confidence
             ?? confidence,
-
         confidenceThreshold:
             result?.confidenceThreshold
             ?? null,
-
         routingReason:
             result?.routingReason
             ?? null,
-
         matchId:
             result?.matchId
             ?? null,
-
         trainingId:
             result?.trainingId
             ?? null,
-
         objectKey:
             result?.objectKey
             ?? null,
-
         currentCount:
             result?.currentCount
             ?? null,
-
         targetCount:
             result?.targetCount
             ?? null,
-
         version:
             TRAINING_SERVICE_VERSION
     };
 }
 
+function buildSampleFailure(
+    reason,
+    {
+        fingerprint =
+            null,
+        category =
+            null,
+        confidence =
+            null
+    } = {}
+) {
+    return {
+        success:
+            false,
+        stored:
+            false,
+        duplicate:
+            false,
+        fingerprint,
+        category:
+            null,
+        requestedCategory:
+            category,
+        highConfidence:
+            false,
+        confidence,
+        confidenceThreshold:
+            null,
+        reason,
+        currentCount:
+            null,
+        targetCount:
+            null,
+        version:
+            TRAINING_SERVICE_VERSION
+    };
+}
 
 // ============================================================
 // PROCESS ONE TRAINING SAMPLE
-//
-// This is the common path used by BOTH:
-//
-// - legacy single uploads
-// - new batch uploads
-//
-// trainingStorage.js remains authoritative for:
-//
-// - fingerprint reservation
-// - durable duplicate rejection
-// - confidence-based category routing
-// - undetermined fallback
-// - category count
-// - 500-target digit cap (Determined by TRAINING_TARGET_PER_CLASS)
-// - unique training ID
-// - R2 object key
-// - metadata
-// - R2 write
 // ============================================================
+
+async function processTrainingSample(
+    bucket,
+    sample
+) {
+    const requestedCategory =
+        normalizeTrainingCategory(
+            sample?.category
+        );
+
+    const confidence =
+        normalizeNumber(
+            sample?.confidence
+        );
+
+    const fingerprint =
+        normalizeTrainingFingerprint(
+            sample?.fingerprint
+        );
+
+    const matchValidation =
+        normalizeAndValidateMatchId(
+            sample?.matchId
+        );
+
+    if (
+        !matchValidation.valid
+    ) {
+        return buildSampleFailure(
+            "invalid_match_id",
+            {
+                fingerprint:
+                    fingerprint || null,
+                category:
+                    requestedCategory,
+                confidence
+            }
+        );
+    }
+
+    if (
+        !isValidUpload(
+            sample?.imageFile
+        )
+    ) {
+        return buildSampleFailure(
+            "training_image_required",
+            {
+                fingerprint:
+                    fingerprint || null,
+                category:
+                    requestedCategory,
+                confidence
+            }
+        );
+    }
+
+    if (
+        !validTrainingFingerprint(
+            fingerprint
+        )
+    ) {
+        return buildSampleFailure(
+            "invalid_training_fingerprint",
+            {
+                fingerprint:
+                    fingerprint || null,
+                category:
+                    requestedCategory,
+                confidence
+            }
+        );
+    }
+
+    let image;
+
+    try {
+        image =
+            await sample
+                .imageFile
+                .arrayBuffer();
+    }
+    catch (
+        error
+    ) {
+        console.error(
+            "OCR TRAINING: Failed to read training image.",
+            {
+                name:
+                    error?.name
+                    || "Error",
+                message:
+                    error?.message
+                    || "Unknown error"
+            }
+        );
+
+        return buildSampleFailure(
+            "training_image_read_failed",
+            {
+                fingerprint,
+                category:
+                    requestedCategory,
+                confidence
+            }
+        );
+    }
+
+    if (
+        !image
+        || image.byteLength <= 0
+    ) {
+        return buildSampleFailure(
+            "training_image_empty",
+            {
+                fingerprint,
+                category:
+                    requestedCategory,
+                confidence
+            }
+        );
+    }
+
+    const field =
+        normalizeNullableText(
+            sample?.field
+        );
+
+    const team =
+        normalizeInteger(
+            sample?.team
+        );
+
+    const playerIndex =
+        normalizeInteger(
+            sample?.playerIndex
+        );
+
+    const engine =
+        normalizeNullableText(
+            sample?.engine
+        );
+
+    const approval =
+        normalizeNullableText(
+            sample?.approval
+        );
+
+    const ocrVersion =
+        normalizeNullableText(
+            sample?.ocrVersion
+        );
+
+    const additionalMetadata =
+        normalizeAdditionalMetadata(
+            sample?.additionalMetadata
+        );
+
+    try {
+        const result =
+            await putTrainingImage(
+                bucket,
+                {
+                    image,
+                    matchId:
+                        matchValidation.matchId,
+                    fingerprint,
+                    category:
+                        requestedCategory,
+                    field,
+                    team,
+                    playerIndex,
+                    confidence,
+                    engine,
+                    approval,
+                    ocrVersion,
+                    additionalMetadata
+                }
+            );
+
+        return normalizeStorageResult(
+            result,
+            {
+                fingerprint,
+                category:
+                    requestedCategory,
+                confidence
+            }
+        );
+    }
+    catch (
+        error
+    ) {
+        console.error(
+            "OCR TRAINING: Sample storage failed.",
+            {
+                matchId:
+                    matchValidation.matchId,
+                fingerprint,
+                category:
+                    requestedCategory,
+                name:
+                    error?.name
+                    || "Error",
+                message:
+                    error?.message
+                    || "Unknown error"
+            }
+        );
+
+        return buildSampleFailure(
+            "training_storage_failed",
+            {
+                fingerprint,
+                category:
+                    requestedCategory,
+                confidence
+            }
+        );
+    }
+}
 
 // ============================================================
 // STORAGE LANE
-//
-// Numeric categories 0-9 are capped.
-//
-// Every sample that ultimately routes to the same capped
-// numeric category is assigned to the same sequential lane.
-//
-// Examples:
-//
-// requested 7 @ 0.98
-//      ↓
-// final 7
-//      ↓
-// lane "category:7"
-//
-// requested 7 @ 0.70
-//      ↓
-// final undetermined
-//      ↓
-// uncapped lane
-//
-// Bar and undetermined are not subject to the numeric class
-// cap, so they do not need same-category serialization.
 // ============================================================
 
 function getTrainingStorageLane(
@@ -558,10 +755,8 @@ function getTrainingStorageLane(
         return {
             key:
                 `category:${finalCategory}`,
-
             category:
                 finalCategory,
-
             capped:
                 true
         };
@@ -570,47 +765,24 @@ function getTrainingStorageLane(
     return {
         key:
             `uncapped:${index}`,
-
         category:
             finalCategory,
-
         capped:
             false
     };
 }
 
-
 // ============================================================
-// BOUNDED CATEGORY-AWARE BATCH PROCESSING
+// CATEGORY-AWARE BATCH PROCESSING
 //
-// Rules:
+// Same capped numeric category:
+//     sequential
 //
-// 1. Up to TRAINING_STORAGE_CONCURRENCY lanes may operate at
-//    the same time.
+// Different categories:
+//     concurrent
 //
-// 2. Samples belonging to the same capped numeric category
-//    are always stored sequentially.
-//
-// 3. Different numeric categories may operate concurrently.
-//
-// 4. Bar / undetermined samples are uncapped and therefore
-//    receive independent lanes.
-//
-// Example:
-//
-// 7,7,7,3,3,9,bar,undetermined
-//
-// possible execution:
-//
-// lane 1: 7 -> 7 -> 7
-// lane 2: 3 -> 3
-// lane 3: 9
-// lane 4: bar
-//
-// then the next available worker takes undetermined.
-//
-// This prevents same-batch category-count races without
-// removing useful R2 concurrency.
+// Bar / undetermined:
+//     independent lanes
 // ============================================================
 
 async function processTrainingBatch(
@@ -627,10 +799,6 @@ async function processTrainingBatch(
     ) {
         return results;
     }
-
-    // ========================================================
-    // BUILD STORAGE LANES
-    // ========================================================
 
     const laneMap =
         new Map();
@@ -661,13 +829,10 @@ async function processTrainingBatch(
                 {
                     key:
                         lane.key,
-
                     category:
                         lane.category,
-
                     capped:
                         lane.capped,
-
                     entries:
                         []
                 }
@@ -678,7 +843,6 @@ async function processTrainingBatch(
             lane.key
         ).entries.push({
             index,
-
             sample
         });
     }
@@ -688,29 +852,21 @@ async function processTrainingBatch(
             laneMap.values()
         );
 
-    // ========================================================
-    // SHARED LANE POINTER
-    //
-    // JavaScript execution within this request is cooperative.
-    // Each worker claims one lane before awaiting storage.
-    // ========================================================
-
     let nextLaneIndex =
         0;
 
     async function runLaneWorker() {
-
         while (
             true
         ) {
             const laneIndex =
                 nextLaneIndex;
 
-            nextLaneIndex += 1;
+            nextLaneIndex +=
+                1;
 
             if (
-                laneIndex
-                >= lanes.length
+                laneIndex >= lanes.length
             ) {
                 return;
             }
@@ -719,16 +875,6 @@ async function processTrainingBatch(
                 lanes[
                     laneIndex
                 ];
-
-            // =================================================
-            // PROCESS THIS LANE SEQUENTIALLY
-            //
-            // This is the important category-cap protection.
-            //
-            // If four "7" samples are in this lane, sample two
-            // cannot count the category until sample one has
-            // completed its storage operation.
-            // =================================================
 
             for (
                 const entry
@@ -744,10 +890,6 @@ async function processTrainingBatch(
             }
         }
     }
-
-    // ========================================================
-    // START BOUNDED LANE WORKERS
-    // ========================================================
 
     const workerCount =
         Math.min(
@@ -776,7 +918,7 @@ async function processTrainingBatch(
 }
 
 // ============================================================
-// LEGACY SINGLE UPLOAD
+// SINGLE UPLOAD
 // ============================================================
 
 async function handleSingleTrainingUpload(
@@ -797,13 +939,8 @@ async function handleSingleTrainingUpload(
             {
                 success:
                     false,
-
                 message:
-                    (
-                        "matchId must be a "
-                        + "16-character alphanumeric ID."
-                    ),
-
+                    "matchId must be a 16-character alphanumeric ID.",
                 version:
                     TRAINING_SERVICE_VERSION
             },
@@ -828,10 +965,8 @@ async function handleSingleTrainingUpload(
             {
                 success:
                     false,
-
                 message:
                     "Training image is required.",
-
                 version:
                     TRAINING_SERVICE_VERSION
             },
@@ -855,13 +990,8 @@ async function handleSingleTrainingUpload(
             {
                 success:
                     false,
-
                 message:
-                    (
-                        "A valid SHA-256 training "
-                        + "fingerprint is required."
-                    ),
-
+                    "A valid SHA-256 training fingerprint is required.",
                 version:
                     TRAINING_SERVICE_VERSION
             },
@@ -874,52 +1004,41 @@ async function handleSingleTrainingUpload(
             env.OCR_TRAINING,
             {
                 imageFile,
-
                 matchId:
                     matchValidation.matchId,
-
                 fingerprint,
-
                 category:
                     formData.get(
                         "category"
                     ),
-
                 field:
                     formData.get(
                         "field"
                     ),
-
                 team:
                     formData.get(
                         "team"
                     ),
-
                 playerIndex:
                     formData.get(
                         "playerIndex"
                     ),
-
                 confidence:
                     formData.get(
                         "confidence"
                     ),
-
                 engine:
                     formData.get(
                         "engine"
                     ),
-
                 approval:
                     formData.get(
                         "approval"
                     ),
-
                 ocrVersion:
                     formData.get(
                         "ocrVersion"
                     ),
-
                 additionalMetadata:
                     formData.get(
                         "metadata"
@@ -929,87 +1048,11 @@ async function handleSingleTrainingUpload(
 
     return jsonResponse(
         result,
-        (
-            result.success
+        result.success
             ? 200
             : 400
-        )
     );
 }
-
-
-// ============================================================
-// BOUNDED BATCH PROCESSING
-//
-// A batch may contain up to 32 images.
-//
-// Storage is processed in groups of four.
-//
-// Example:
-//
-// 32 samples
-//
-// 0-3   -> concurrent
-// wait
-// 4-7   -> concurrent
-// wait
-// ...
-//
-// This avoids creating 32 simultaneous R2 storage pipelines.
-// ============================================================
-
-async function processTrainingBatch(
-    bucket,
-    samples
-) {
-    const results =
-        new Array(
-            samples.length
-        );
-
-    for (
-        let start = 0;
-        start < samples.length;
-        start += TRAINING_STORAGE_CONCURRENCY
-    ) {
-        const group =
-            samples.slice(
-                start,
-                start
-                + TRAINING_STORAGE_CONCURRENCY
-            );
-
-        const groupResults =
-            await Promise.all(
-                group.map(
-                    (
-                        sample
-                    ) =>
-                        processTrainingSample(
-                            bucket,
-                            sample
-                        )
-                )
-            );
-
-        for (
-            let offset = 0;
-            offset < groupResults.length;
-            offset += 1
-        ) {
-            results[
-                start
-                + offset
-            ] =
-                groupResults[
-                    offset
-                ];
-        }
-    }
-
-    return results;
-}
-
 
 // ============================================================
 // BATCH UPLOAD
@@ -1033,16 +1076,10 @@ async function handleBatchTrainingUpload(
             {
                 success:
                     false,
-
                 message:
-                    (
-                        "matchId must be a "
-                        + "16-character alphanumeric ID."
-                    ),
-
+                    "matchId must be a 16-character alphanumeric ID.",
                 results:
                     [],
-
                 version:
                     TRAINING_SERVICE_VERSION
             },
@@ -1051,12 +1088,11 @@ async function handleBatchTrainingUpload(
     }
 
     const ocrVersion =
-        normalizeText(
+        normalizeNullableText(
             formData.get(
                 "ocrVersion"
             )
-        )
-        || null;
+        );
 
     const rawBatchMetadata =
         formData.get(
@@ -1070,13 +1106,10 @@ async function handleBatchTrainingUpload(
             {
                 success:
                     false,
-
                 message:
                     "batchMetadata is required.",
-
                 results:
                     [],
-
                 version:
                     TRAINING_SERVICE_VERSION
             },
@@ -1093,19 +1126,16 @@ async function handleBatchTrainingUpload(
                     rawBatchMetadata
                 )
             );
-
-    } catch {
+    }
+    catch {
         return jsonResponse(
             {
                 success:
                     false,
-
                 message:
                     "batchMetadata must contain valid JSON.",
-
                 results:
                     [],
-
                 version:
                     TRAINING_SERVICE_VERSION
             },
@@ -1122,13 +1152,10 @@ async function handleBatchTrainingUpload(
             {
                 success:
                     false,
-
                 message:
                     "batchMetadata must be an array.",
-
                 results:
                     [],
-
                 version:
                     TRAINING_SERVICE_VERSION
             },
@@ -1143,13 +1170,10 @@ async function handleBatchTrainingUpload(
             {
                 success:
                     false,
-
                 message:
                     "Training batch is empty.",
-
                 results:
                     [],
-
                 version:
                     TRAINING_SERVICE_VERSION
             },
@@ -1165,16 +1189,13 @@ async function handleBatchTrainingUpload(
             {
                 success:
                     false,
-
                 message:
                     (
                         "Training batch exceeds "
                         + `${TRAINING_BATCH_MAX_SIZE} samples.`
                     ),
-
                 results:
                     [],
-
                 version:
                     TRAINING_SERVICE_VERSION
             },
@@ -1182,7 +1203,8 @@ async function handleBatchTrainingUpload(
         );
     }
 
-    const samples = [];
+    const samples =
+        [];
 
     for (
         let index = 0;
@@ -1196,8 +1218,7 @@ async function handleBatchTrainingUpload(
 
         if (
             !metadata
-            || typeof metadata
-                !== "object"
+            || typeof metadata !== "object"
             || Array.isArray(
                 metadata
             )
@@ -1205,16 +1226,12 @@ async function handleBatchTrainingUpload(
             samples.push({
                 imageFile:
                     null,
-
                 matchId:
                     matchValidation.matchId,
-
                 fingerprint:
                     "",
-
                 category:
                     "undetermined",
-
                 ocrVersion
             });
 
@@ -1226,52 +1243,34 @@ async function handleBatchTrainingUpload(
                 metadata.imageField
             );
 
-        const expectedImageField =
-            `image_${index}`;
-
         const resolvedImageField =
-            (
-                imageField
-                || expectedImageField
-            );
-
-        const imageFile =
-            formData.get(
-                resolvedImageField
-            );
+            imageField
+            || `image_${index}`;
 
         samples.push({
-            imageFile,
-
+            imageFile:
+                formData.get(
+                    resolvedImageField
+                ),
             matchId:
                 matchValidation.matchId,
-
             fingerprint:
                 metadata.fingerprint,
-
             category:
                 metadata.category,
-
             field:
                 metadata.field,
-
             team:
                 metadata.team,
-
             playerIndex:
                 metadata.playerIndex,
-
             confidence:
                 metadata.confidence,
-
             engine:
                 metadata.engine,
-
             approval:
                 metadata.approval,
-
             ocrVersion,
-
             additionalMetadata:
                 metadata.metadata
         });
@@ -1295,42 +1294,56 @@ async function handleBatchTrainingUpload(
     let undeterminedCount =
         0;
 
+    let categoryCompleteCount =
+        0;
+
     for (
         const result
         of results
     ) {
         if (
-            result?.stored
-            === true
+            result?.stored === true
         ) {
-            storedCount += 1;
+            storedCount +=
+                1;
 
             if (
                 result.category
                 === "undetermined"
             ) {
-                undeterminedCount += 1;
+                undeterminedCount +=
+                    1;
             }
 
             continue;
         }
 
         if (
-            result?.duplicate
-            === true
+            result?.duplicate === true
             || result?.reason
                 === "duplicate_training_image"
         ) {
-            duplicateCount += 1;
+            duplicateCount +=
+                1;
 
             continue;
         }
 
         if (
-            result?.success
-            !== true
+            result?.reason
+            === "training_category_complete"
         ) {
-            failedCount += 1;
+            categoryCompleteCount +=
+                1;
+
+            continue;
+        }
+
+        if (
+            result?.success !== true
+        ) {
+            failedCount +=
+                1;
         }
     }
 
@@ -1338,30 +1351,22 @@ async function handleBatchTrainingUpload(
         {
             success:
                 failedCount === 0,
-
             batch:
                 true,
-
             attemptedCount:
                 samples.length,
-
             storedCount,
-
             duplicateCount,
-
             undeterminedCount,
-
+            categoryCompleteCount,
             failedCount,
-
             results,
-
             version:
                 TRAINING_SERVICE_VERSION
         },
         200
     );
 }
-
 
 // ============================================================
 // MAIN HANDLER
@@ -1372,11 +1377,6 @@ export async function handleOCRTrainingUpload(
     env
 ) {
     try {
-
-        // ----------------------------------------------------
-        // METHOD
-        // ----------------------------------------------------
-
         if (
             request.method !== "POST"
         ) {
@@ -1384,21 +1384,14 @@ export async function handleOCRTrainingUpload(
                 {
                     success:
                         false,
-
                     message:
                         "Method not allowed.",
-
                     version:
                         TRAINING_SERVICE_VERSION
                 },
                 405
             );
         }
-
-
-        // ----------------------------------------------------
-        // AUTHENTICATION
-        // ----------------------------------------------------
 
         const authentication =
             validateInternalRequest(
@@ -1413,21 +1406,14 @@ export async function handleOCRTrainingUpload(
                 {
                     success:
                         false,
-
                     message:
                         authentication.reason,
-
                     version:
                         TRAINING_SERVICE_VERSION
                 },
                 authentication.status
             );
         }
-
-
-        // ----------------------------------------------------
-        // BUCKET
-        // ----------------------------------------------------
 
         if (
             !env.OCR_TRAINING
@@ -1436,24 +1422,14 @@ export async function handleOCRTrainingUpload(
                 {
                     success:
                         false,
-
                     message:
-                        (
-                            "OCR training bucket "
-                            + "is not configured."
-                        ),
-
+                        "OCR training bucket is not configured.",
                     version:
                         TRAINING_SERVICE_VERSION
                 },
                 503
             );
         }
-
-
-        // ----------------------------------------------------
-        // CONTENT TYPE
-        // ----------------------------------------------------
 
         const contentType =
             String(
@@ -1474,10 +1450,8 @@ export async function handleOCRTrainingUpload(
                 {
                     success:
                         false,
-
                     message:
                         "Expected multipart/form-data.",
-
                     version:
                         TRAINING_SERVICE_VERSION
                 },
@@ -1485,21 +1459,8 @@ export async function handleOCRTrainingUpload(
             );
         }
 
-
-        // ----------------------------------------------------
-        // FORM DATA
-        //
-        // Multipart parsing occurs once regardless of whether
-        // this is a single sample or a batch.
-        // ----------------------------------------------------
-
         const formData =
             await request.formData();
-
-
-        // ----------------------------------------------------
-        // BATCH OR SINGLE
-        // ----------------------------------------------------
 
         const batchRequest =
             normalizeBoolean(
@@ -1521,8 +1482,8 @@ export async function handleOCRTrainingUpload(
             formData,
             env
         );
-
-    } catch (
+    }
+    catch (
         error
     ) {
         console.error(
@@ -1534,13 +1495,8 @@ export async function handleOCRTrainingUpload(
             {
                 success:
                     false,
-
                 message:
-                    (
-                        error?.message
-                        || "OCR training upload failed."
-                    ),
-
+                    "OCR training upload failed.",
                 version:
                     TRAINING_SERVICE_VERSION
             },
