@@ -32,12 +32,15 @@ const OCR_NOTIFICATION_CONTAINER_ID =
 
 const OCR_NOTIFICATION_CHECK_SCHEDULE_MS = [
     1000,
-    5000,
-    9000,
-    14000,
-    21000,
+    4000,
+    8000,
+    15000,
+    20000,
     30000
 ];
+
+const OCR_NOTIFICATION_MAX_QUEUED_CHECKS =
+    3;
 
 const OCR_NOTIFICATION_MAX_STALE_CHECKS =
     3;
@@ -85,7 +88,8 @@ let OCR_NOTIFICATION_STALE_CHECKS =
 
 let OCR_NOTIFICATION_LAST_PROGRESS_SIGNATURE =
     "";
-
+let OCR_NOTIFICATION_QUEUED_CHECKS =
+    0;
 
 /* =========================================================
    NORMALIZATION
@@ -1384,6 +1388,9 @@ function stopOcrNotificationPolling() {
     OCR_NOTIFICATION_BURST_STARTED_AT =
         0;
 
+    OCR_NOTIFICATION_QUEUED_CHECKS =
+        0;
+
     OCR_NOTIFICATION_STALE_CHECKS =
         0;
 
@@ -1401,7 +1408,6 @@ function stopOcrNotificationPolling() {
             null;
     }
 }
-
 
 function getOcrProgressSignature(
     job
@@ -1443,7 +1449,6 @@ function getOcrProgressSignature(
         );
 }
 
-
 function hasOcrJobProgressed(
     job
 ) {
@@ -1483,6 +1488,144 @@ function hasOcrJobProgressed(
     return false;
 }
 
+/* =========================================================
+   ABANDON STALLED JOB
+   ========================================================= */
+
+function abandonActiveOcrJob(
+    jobId,
+    job,
+    {
+        stage,
+        message,
+        reason
+    }
+) {
+    const reviewRoute =
+        getStoredActiveJobRoute();
+
+    const abandonedJob = {
+        ...(
+            job
+            && typeof job === "object"
+                ? job
+                : {}
+        ),
+
+        jobId,
+
+        status:
+            "failed",
+
+        stage:
+            String(
+                stage
+                || "client_polling_stopped"
+            ),
+
+        message:
+            String(
+                message
+                || "OCR processing stopped responding."
+            ),
+
+        error: {
+            code:
+                String(
+                    reason
+                    || "CLIENT_POLLING_STOPPED"
+                ),
+
+            message:
+                String(
+                    message
+                    || "OCR processing stopped responding."
+                )
+        }
+    };
+
+    console.warn(
+        "[OCR NOTIFICATIONS] Releasing stalled OCR job.",
+        {
+            jobId,
+
+            reason:
+                abandonedJob.error.code,
+
+            status:
+                job?.status
+                || null,
+
+            stage:
+                job?.stage
+                || null,
+
+            progress:
+                job?.progress
+                ?? null,
+
+            queuedChecks:
+                OCR_NOTIFICATION_QUEUED_CHECKS,
+
+            staleChecks:
+                OCR_NOTIFICATION_STALE_CHECKS
+        }
+    );
+
+    stopOcrNotificationPolling();
+
+    /*
+     * This is intentional.
+     *
+     * A stalled job must no longer keep the upload page locked.
+     *
+     * The backend R2 job is not deleted. Only the browser-side
+     * ownership of the active submission is released.
+     */
+
+    clearStoredActiveJob();
+
+    const detail = {
+        jobId,
+
+        reviewRoute,
+
+        job:
+            abandonedJob,
+
+        abandoned:
+            true,
+
+        reason:
+            abandonedJob.error.code
+    };
+
+    showFailureNotification(
+        detail
+    );
+
+    /*
+     * submit_img.js already listens for ocr:job-failed.
+     *
+     * That handler:
+     *
+     * - clears OCR_ACTIVE_JOB_ID
+     * - stops the loading UI
+     * - updates status
+     * - calls setOcrControlsLocked(false)
+     *
+     * Therefore the user can immediately submit another image.
+     */
+
+    document.dispatchEvent(
+        new CustomEvent(
+            "ocr:job-failed",
+            {
+                detail
+            }
+        )
+    );
+}
 
 function scheduleActiveOcrCheck(
     jobId
@@ -1549,7 +1692,6 @@ function scheduleActiveOcrCheck(
         );
 }
 
-
 function startOcrNotificationCheckBurst() {
     const jobId =
         getStoredActiveJobId();
@@ -1599,6 +1741,9 @@ function startOcrNotificationCheckBurst() {
     OCR_NOTIFICATION_BURST_STARTED_AT =
         Date.now();
 
+    OCR_NOTIFICATION_QUEUED_CHECKS =
+        0;
+
     OCR_NOTIFICATION_STALE_CHECKS =
         0;
 
@@ -1610,6 +1755,350 @@ function startOcrNotificationCheckBurst() {
     );
 }
 
+
+/* =========================================================
+   COMPLETED
+   ========================================================= */
+
+function handleCompletedJob(
+    jobId,
+    job
+) {
+    const matchId =
+        normalizeId(
+            job?.matchId
+        );
+
+    if (
+        !matchId
+    ) {
+        console.error(
+            "[OCR NOTIFICATIONS] Completed job is missing matchId."
+        );
+
+        abandonActiveOcrJob(
+            jobId,
+            job,
+            {
+                stage:
+                    "completed_without_match",
+
+                reason:
+                    "MATCH_ID_MISSING",
+
+                message:
+                    "OCR completed without returning a match ID."
+            }
+        );
+
+        return;
+    }
+
+    const pending =
+        addPendingReview({
+            jobId,
+
+            matchId,
+
+            matchSize:
+                job?.matchSize
+                || job?.matchType
+                || "",
+
+            reviewRoute:
+                getStoredActiveJobRoute()
+        });
+
+    stopOcrNotificationPolling();
+
+    clearStoredActiveJob();
+
+    if (
+        pending
+    ) {
+        showSuccessNotification(
+            pending
+        );
+    }
+
+    document.dispatchEvent(
+        new CustomEvent(
+            "ocr:job-completed",
+            {
+                detail: {
+                    jobId,
+
+                    matchId,
+
+                    job
+                }
+            }
+        )
+    );
+}
+
+
+/* =========================================================
+   FAILED
+   ========================================================= */
+
+function handleFailedJob(
+    jobId,
+    job
+) {
+    const reviewRoute =
+        getStoredActiveJobRoute();
+
+    stopOcrNotificationPolling();
+
+    clearStoredActiveJob();
+
+    const detail = {
+        jobId,
+
+        reviewRoute,
+
+        job
+    };
+
+    showFailureNotification(
+        detail
+    );
+
+    document.dispatchEvent(
+        new CustomEvent(
+            "ocr:job-failed",
+            {
+                detail
+            }
+        )
+    );
+}
+
+
+/* =========================================================
+   ACTIVE JOB CHECK
+   ========================================================= */
+
+async function runActiveOcrCheck() {
+    if (
+        OCR_NOTIFICATION_CHECK_RUNNING
+    ) {
+        return;
+    }
+
+    const jobId =
+        getStoredActiveJobId();
+
+    if (
+        !jobId
+        || OCR_NOTIFICATION_ACTIVE_JOB_ID
+            !== jobId
+    ) {
+        stopOcrNotificationPolling();
+
+        return;
+    }
+
+    OCR_NOTIFICATION_CHECK_RUNNING =
+        true;
+
+    try {
+        const job =
+            await getOcrJob(
+                jobId
+            );
+
+        const status =
+            String(
+                job?.status
+                || ""
+            )
+                .trim()
+                .toLowerCase();
+
+        document.dispatchEvent(
+            new CustomEvent(
+                "ocr:job-progress",
+                {
+                    detail: {
+                        jobId,
+
+                        job
+                    }
+                }
+            )
+        );
+
+        if (
+            status === "completed"
+        ) {
+            handleCompletedJob(
+                jobId,
+                job
+            );
+
+            return;
+        }
+
+        if (
+            status === "failed"
+        ) {
+            handleFailedJob(
+                jobId,
+                job
+            );
+
+            return;
+        }
+
+        /*
+         * QUEUE PROTECTION
+         *
+         * A healthy queue should take ownership quickly.
+         *
+         * Three consecutive queued responses:
+         *
+         * 1 second
+         * 4 seconds
+         * 8 seconds
+         *
+         * means the browser stops treating the job as active.
+         */
+
+        if (
+            status === "queued"
+        ) {
+            OCR_NOTIFICATION_QUEUED_CHECKS +=
+                1;
+
+            if (
+                OCR_NOTIFICATION_QUEUED_CHECKS
+                >= OCR_NOTIFICATION_MAX_QUEUED_CHECKS
+            ) {
+                abandonActiveOcrJob(
+                    jobId,
+                    job,
+                    {
+                        stage:
+                            "queue_stalled",
+
+                        reason:
+                            "QUEUE_STALLED",
+
+                        message:
+                            "The scoreboard job did not start processing. Please try the upload again."
+                    }
+                );
+
+                return;
+            }
+        }
+        else {
+            OCR_NOTIFICATION_QUEUED_CHECKS =
+                0;
+        }
+
+        /*
+         * STALE BACKEND PROTECTION
+         *
+         * Once processing has started, status/stage/progress/
+         * updatedAt/heartbeatAt must continue changing.
+         */
+
+        hasOcrJobProgressed(
+            job
+        );
+
+        if (
+            status !== "queued"
+            && OCR_NOTIFICATION_STALE_CHECKS
+                >= OCR_NOTIFICATION_MAX_STALE_CHECKS
+        ) {
+            abandonActiveOcrJob(
+                jobId,
+                job,
+                {
+                    stage:
+                        "processing_stalled",
+
+                    reason:
+                        "PROCESSING_STALLED",
+
+                    message:
+                        "The scoreboard reader stopped reporting progress. You can try the upload again."
+                }
+            );
+
+            return;
+        }
+
+        /*
+         * END OF THIS POLLING BURST
+         *
+         * Do not clear a healthy active job simply because the
+         * six-call window ended.
+         *
+         * The next page focus / visibility / load event can
+         * start another bounded burst.
+         */
+
+        if (
+            OCR_NOTIFICATION_CHECK_INDEX
+            >= OCR_NOTIFICATION_CHECK_SCHEDULE_MS.length
+        ) {
+            stopOcrNotificationPolling();
+
+            return;
+        }
+
+        scheduleActiveOcrCheck(
+            jobId
+        );
+    }
+    catch (
+        error
+    ) {
+        console.warn(
+            "[OCR NOTIFICATIONS] OCR status check failed.",
+            error
+        );
+
+        if (
+            !navigator.onLine
+        ) {
+            /*
+             * Being offline is not evidence that the OCR job
+             * failed, so preserve the stored active job.
+             */
+
+            stopOcrNotificationPolling();
+
+            return;
+        }
+
+        if (
+            OCR_NOTIFICATION_CHECK_INDEX
+            >= OCR_NOTIFICATION_CHECK_SCHEDULE_MS.length
+        ) {
+            stopOcrNotificationPolling();
+
+            return;
+        }
+
+        scheduleActiveOcrCheck(
+            jobId
+        );
+    }
+    finally {
+        OCR_NOTIFICATION_CHECK_RUNNING =
+            false;
+    }
+}
+
+export function checkActiveOcrSubmission() {
+    startOcrNotificationCheckBurst();
+}
 
 /* =========================================================
    COMPLETED
