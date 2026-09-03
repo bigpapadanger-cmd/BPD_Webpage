@@ -1,3 +1,5 @@
+"use strict";
+
 // ============================================================
 // BPD GAMING NETWORK
 // OCR JOB RESULT
@@ -7,8 +9,18 @@ import {
     getStoredSession
 } from "../../../services/common_helpers/reload_sessions.js";
 
-const GET_RESULT_VERSION =
-    "ocr-get-result-1.0";
+const ALLOWED_SCOREBOARD_FIELDS =
+    new Set([
+        "score",
+        "goals",
+        "assists",
+        "demos",
+        "saves",
+        "shots",
+        "damage",
+        "ping"
+    ]);
+
 
 // ============================================================
 // MAIN
@@ -23,6 +35,7 @@ export async function onRequestGet(
     } = context;
 
     try {
+
         // ====================================================
         // CONFIGURATION
         // ====================================================
@@ -32,11 +45,11 @@ export async function onRequestGet(
         ) {
             return jsonResponse(
                 {
-                    success: false,
+                    success:
+                        false,
+
                     message:
-                        "OCR storage is not configured.",
-                    version:
-                        GET_RESULT_VERSION
+                        "OCR storage is not configured."
                 },
                 500
             );
@@ -47,15 +60,16 @@ export async function onRequestGet(
         ) {
             return jsonResponse(
                 {
-                    success: false,
+                    success:
+                        false,
+
                     message:
-                        "OCR owner hashing is not configured.",
-                    version:
-                        GET_RESULT_VERSION
+                        "OCR owner hashing is not configured."
                 },
                 503
             );
         }
+
 
         // ====================================================
         // AUTHENTICATION
@@ -73,11 +87,11 @@ export async function onRequestGet(
         ) {
             return jsonResponse(
                 {
-                    success: false,
+                    success:
+                        false,
+
                     message:
-                        "Authentication required.",
-                    version:
-                        GET_RESULT_VERSION
+                        "Authentication required."
                 },
                 401
             );
@@ -90,18 +104,18 @@ export async function onRequestGet(
                     .EpicUniqueId
                 || ""
             )
-            .trim();
+                .trim();
 
         if (
             !epicUniqueId
         ) {
             return jsonResponse(
                 {
-                    success: false,
+                    success:
+                        false,
+
                     message:
-                        "Authenticated account is missing an EpicUniqueId.",
-                    version:
-                        GET_RESULT_VERSION
+                        "Authenticated account is missing an EpicUniqueId."
                 },
                 401
             );
@@ -112,6 +126,7 @@ export async function onRequestGet(
                 epicUniqueId,
                 env.OCR_OWNER_SECRET
             );
+
 
         // ====================================================
         // JOB ID
@@ -134,26 +149,24 @@ export async function onRequestGet(
         ) {
             return jsonResponse(
                 {
-                    success: false,
+                    success:
+                        false,
+
                     message:
-                        "Missing or invalid jobId.",
-                    version:
-                        GET_RESULT_VERSION
+                        "Missing or invalid jobId."
                 },
                 400
             );
         }
 
+
         // ====================================================
         // LOAD JOB STATUS
         // ====================================================
 
-        const statusKey =
-            `ocr-jobs/${jobId}/status.json`;
-
         const statusObject =
             await env.OCR_STORAGE.get(
-                statusKey
+                `ocr-jobs/${jobId}/status.json`
             );
 
         if (
@@ -161,12 +174,11 @@ export async function onRequestGet(
         ) {
             return jsonResponse(
                 {
-                    success: false,
+                    success:
+                        false,
+
                     message:
-                        "OCR job was not found.",
-                    jobId,
-                    version:
-                        GET_RESULT_VERSION
+                        "OCR job was not found."
                 },
                 404
             );
@@ -183,16 +195,16 @@ export async function onRequestGet(
         catch {
             return jsonResponse(
                 {
-                    success: false,
+                    success:
+                        false,
+
                     message:
-                        "Stored OCR job status is invalid.",
-                    jobId,
-                    version:
-                        GET_RESULT_VERSION
+                        "Stored OCR job status is invalid."
                 },
                 500
             );
         }
+
 
         // ====================================================
         // JOB STATE
@@ -203,24 +215,21 @@ export async function onRequestGet(
                 statusData?.status
                 || ""
             )
-            .trim()
-            .toLowerCase();
+                .trim()
+                .toLowerCase();
 
         if (
             status === "failed"
         ) {
             return jsonResponse(
                 {
-                    success: false,
-                    jobId,
-                    status:
-                        "failed",
+                    success:
+                        false,
+
                     message:
                         statusData?.error
                             ?.message
-                        || "OCR job failed.",
-                    version:
-                        GET_RESULT_VERSION
+                        || "OCR job failed."
                 },
                 409
             );
@@ -231,27 +240,16 @@ export async function onRequestGet(
         ) {
             return jsonResponse(
                 {
-                    success: false,
-                    jobId,
-                    status:
-                        status
-                        || "unknown",
-                    stage:
-                        statusData?.stage
-                        || null,
-                    progress:
-                        Number(
-                            statusData?.progress
-                            || 0
-                        ),
+                    success:
+                        false,
+
                     message:
-                        "OCR job is not completed yet.",
-                    version:
-                        GET_RESULT_VERSION
+                        "OCR job is not completed yet."
                 },
                 409
             );
         }
+
 
         // ====================================================
         // MATCH ID
@@ -267,27 +265,24 @@ export async function onRequestGet(
         ) {
             return jsonResponse(
                 {
-                    success: false,
-                    jobId,
+                    success:
+                        false,
+
                     message:
-                        "Completed OCR job does not contain a valid matchId.",
-                    version:
-                        GET_RESULT_VERSION
+                        "Completed OCR job does not contain a valid matchId."
                 },
                 409
             );
         }
 
+
         // ====================================================
         // LOAD MATCH REPORT
         // ====================================================
 
-        const reportKey =
-            `match-reports/${matchId}.json`;
-
         const reportObject =
             await env.OCR_STORAGE.get(
-                reportKey
+                `match-reports/${matchId}.json`
             );
 
         if (
@@ -295,13 +290,11 @@ export async function onRequestGet(
         ) {
             return jsonResponse(
                 {
-                    success: false,
-                    jobId,
-                    matchId,
+                    success:
+                        false,
+
                     message:
-                        "Completed match report was not found.",
-                    version:
-                        GET_RESULT_VERSION
+                        "Completed match report was not found."
                 },
                 404
             );
@@ -318,17 +311,16 @@ export async function onRequestGet(
         catch {
             return jsonResponse(
                 {
-                    success: false,
-                    jobId,
-                    matchId,
+                    success:
+                        false,
+
                     message:
-                        "Stored match report is invalid.",
-                    version:
-                        GET_RESULT_VERSION
+                        "Stored match report is invalid."
                 },
                 500
             );
         }
+
 
         // ====================================================
         // MATCH ID VERIFICATION
@@ -345,17 +337,16 @@ export async function onRequestGet(
         ) {
             return jsonResponse(
                 {
-                    success: false,
-                    jobId,
-                    matchId,
+                    success:
+                        false,
+
                     message:
-                        "Stored match report does not match this OCR job.",
-                    version:
-                        GET_RESULT_VERSION
+                        "Stored match report does not match this OCR job."
                 },
                 409
             );
         }
+
 
         // ====================================================
         // OWNERSHIP VERIFICATION
@@ -366,20 +357,18 @@ export async function onRequestGet(
                 matchReport?.submittedBy
                 || ""
             )
-            .trim();
+                .trim();
 
         if (
             !submittedBy
         ) {
             return jsonResponse(
                 {
-                    success: false,
-                    jobId,
-                    matchId,
+                    success:
+                        false,
+
                     message:
-                        "Stored match report has no owner.",
-                    version:
-                        GET_RESULT_VERSION
+                        "Stored match report has no owner."
                 },
                 409
             );
@@ -393,15 +382,41 @@ export async function onRequestGet(
         ) {
             return jsonResponse(
                 {
-                    success: false,
+                    success:
+                        false,
+
                     message:
-                        "You are not authorized to access this OCR result.",
-                    version:
-                        GET_RESULT_VERSION
+                        "You are not authorized to access this OCR result."
                 },
                 403
             );
         }
+
+
+        // ====================================================
+        // SANITIZE SCOREBOARD
+        // ====================================================
+
+        const result =
+            sanitizePublicScoreboard(
+                matchReport
+            );
+
+        if (
+            result.teams.length === 0
+        ) {
+            return jsonResponse(
+                {
+                    success:
+                        false,
+
+                    message:
+                        "Stored match report contains no scoreboard values."
+                },
+                409
+            );
+        }
+
 
         // ====================================================
         // RESPONSE
@@ -409,37 +424,12 @@ export async function onRequestGet(
 
         return jsonResponse(
             {
-                success: true,
-
-                version:
-                    GET_RESULT_VERSION,
-
-                jobId,
-
-                providerJobId:
-                    statusData?.providerJobId
-                    || null,
-
-                status:
-                    "completed",
-
-                stage:
-                    "completed",
-
-                progress:
-                    100,
+                success:
+                    true,
 
                 matchId,
 
-                resultKey:
-                    statusData?.resultKey
-                    || reportKey,
-
-                benchmarkKey:
-                    statusData?.benchmarkKey
-                    || null,
-
-                matchReport
+                result
             },
             200
         );
@@ -454,21 +444,179 @@ export async function onRequestGet(
 
         return jsonResponse(
             {
-                success: false,
+                success:
+                    false,
+
                 message:
-                    "Unable to load OCR result.",
-                error:
-                    String(
-                        error?.message
-                        || error
-                    ),
-                version:
-                    GET_RESULT_VERSION
+                    "Unable to load OCR result."
             },
             500
         );
     }
 }
+
+
+// ============================================================
+// PUBLIC SCOREBOARD
+// ============================================================
+
+function sanitizePublicScoreboard(
+    matchReport
+) {
+    const teams =
+        Array.isArray(
+            matchReport?.teams
+        )
+            ? matchReport.teams
+            : [];
+
+    const publicTeams =
+        [];
+
+    for (
+        let teamArrayIndex = 0;
+        teamArrayIndex < teams.length;
+        teamArrayIndex += 1
+    ) {
+        const team =
+            teams[
+                teamArrayIndex
+            ];
+
+        const teamIndex =
+            Number(
+                team?.team
+                ?? team?.teamIndex
+                ?? (
+                    teamArrayIndex
+                    + 1
+                )
+            );
+
+        if (
+            teamIndex !== 1
+            && teamIndex !== 2
+        ) {
+            continue;
+        }
+
+        const players =
+            Array.isArray(
+                team?.players
+            )
+                ? team.players
+                : [];
+
+        const publicPlayers =
+            [];
+
+        for (
+            const player
+            of players
+        ) {
+            const playerName =
+                String(
+                    player?.player
+                    || player?.matchedName
+                    || player?.username
+                    || player?.name
+                    || ""
+                )
+                    .trim();
+
+            if (
+                !playerName
+            ) {
+                continue;
+            }
+
+            const publicPlayer = {
+                player:
+                    playerName
+            };
+
+            for (
+                const field
+                of ALLOWED_SCOREBOARD_FIELDS
+            ) {
+                let value =
+                    player?.[
+                        field
+                    ];
+
+                if (
+                    (
+                        value === null
+                        || typeof value
+                            === "undefined"
+                    )
+                    && player?.reviewFields?.[
+                        field
+                    ]
+                ) {
+                    value =
+                        player
+                            .reviewFields[
+                                field
+                            ]
+                            ?.value;
+                }
+
+                if (
+                    value === null
+                    || typeof value
+                        === "undefined"
+                    || String(
+                        value
+                    ).trim() === ""
+                ) {
+                    continue;
+                }
+
+                const numeric =
+                    Number(
+                        value
+                    );
+
+                if (
+                    !Number.isInteger(
+                        numeric
+                    )
+                    || numeric < 0
+                ) {
+                    continue;
+                }
+
+                publicPlayer[
+                    field
+                ] =
+                    numeric;
+            }
+
+            publicPlayers.push(
+                publicPlayer
+            );
+        }
+
+        if (
+            publicPlayers.length > 0
+        ) {
+            publicTeams.push({
+                team:
+                    teamIndex,
+
+                players:
+                    publicPlayers
+            });
+        }
+    }
+
+    return {
+        teams:
+            publicTeams
+    };
+}
+
 
 // ============================================================
 // OWNER HASH
@@ -537,6 +685,7 @@ async function createOwnerHash(
         );
 }
 
+
 // ============================================================
 // CONSTANT-TIME STRING COMPARE
 // ============================================================
@@ -591,6 +740,7 @@ function constantTimeEqual(
     return difference === 0;
 }
 
+
 // ============================================================
 // JOB ID
 // ============================================================
@@ -603,8 +753,8 @@ function sanitizeJobId(
             value
             || ""
         )
-        .trim()
-        .toUpperCase();
+            .trim()
+            .toUpperCase();
 
     if (
         !/^[A-Z0-9]{16}$/.test(
@@ -616,6 +766,7 @@ function sanitizeJobId(
 
     return jobId;
 }
+
 
 // ============================================================
 // MATCH ID
@@ -629,8 +780,8 @@ function sanitizeMatchId(
             value
             || ""
         )
-        .trim()
-        .toUpperCase();
+            .trim()
+            .toUpperCase();
 
     if (
         !/^[A-Z0-9]{16}$/.test(
@@ -643,13 +794,14 @@ function sanitizeMatchId(
     return matchId;
 }
 
+
 // ============================================================
 // RESPONSE
 // ============================================================
 
 function jsonResponse(
     data,
-    status=200
+    status = 200
 ) {
     return new Response(
         JSON.stringify(

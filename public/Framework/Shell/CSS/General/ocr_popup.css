@@ -1,0 +1,78 @@
+.ocr-notification-container {
+    position: fixed;
+    top: 18px;
+    right: 18px;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: min(340px, calc(100vw - 36px));
+    pointer-events: none;
+}
+
+.ocr-notification {
+    display: grid;
+    grid-template-columns: 12px 1fr;
+    column-gap: 11px;
+    align-items: start;
+    width: 100%;
+    padding: 13px 15px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    background: rgba(18, 18, 22, 0.97);
+    color: #fff;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+    cursor: pointer;
+    text-align: left;
+    font: inherit;
+    pointer-events: auto;
+    animation: ocr-notification-in 250ms ease-out;
+}
+
+.ocr-notification-dot {
+    width: 10px;
+    height: 10px;
+    margin-top: 4px;
+    border-radius: 50%;
+}
+
+.ocr-notification-success .ocr-notification-dot {
+    background: #32d26f;
+    box-shadow: 0 0 8px rgba(50, 210, 111, 0.5);
+}
+
+.ocr-notification-failure .ocr-notification-dot {
+    background: #ef4b4b;
+    box-shadow: 0 0 8px rgba(239, 75, 75, 0.5);
+}
+
+.ocr-notification-title {
+    margin-bottom: 4px;
+    font-weight: 700;
+}
+
+.ocr-notification-description {
+    font-size: 0.88rem;
+    opacity: 0.72;
+}
+.ocr-notification-content {
+    min-width: 0;
+}
+@keyframes ocr-notification-in {
+    from {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+@media (max-width: 480px) {
+    .ocr-notification-container {
+        top: 12px;
+        right: 12px;
+        width: calc(100vw - 24px);
+    }
+}

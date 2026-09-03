@@ -11,7 +11,7 @@ const TRAINING_STORAGE_VERSION =
 // ============================================================
 
 const TRAINING_TARGET_PER_CLASS =
-    200;
+    500;
 
 const TRAINING_HIGH_CONFIDENCE_THRESHOLD =
     0.95;

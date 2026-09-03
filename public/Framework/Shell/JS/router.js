@@ -4,6 +4,11 @@ import {
 } from "/routes.js";
 
 import {
+    initializeOcrNotifications,
+    checkActiveOcrSubmission
+} from "./ocr_notifications.js";
+
+import {
     loadSidebarHover,
     initializeSidebar
 } from "./sidebar.js";
@@ -21,6 +26,41 @@ const ERROR_ROUTE = "/Error";
 const AUTH_FALLBACK_ROUTE = "/RocketLeague";
 
 let navigationId = 0;
+
+
+/* =========================================================
+   OCR GLOBAL NOTIFICATIONS
+   ========================================================= */
+
+function initializeGlobalOcrNotifications() {
+    try {
+        initializeOcrNotifications();
+    }
+    catch (
+        error
+    ) {
+        console.error(
+            "ROUTER: OCR notification initialization failed.",
+            error
+        );
+    }
+}
+
+
+async function checkGlobalOcrSubmission() {
+    try {
+        await checkActiveOcrSubmission();
+    }
+    catch (
+        error
+    ) {
+        console.error(
+            "ROUTER: OCR active submission check failed.",
+            error
+        );
+    }
+}
+
 
 function normalizePath(path) {
     let pathname;
@@ -59,6 +99,7 @@ function normalizePath(path) {
     return pathname;
 }
 
+
 function normalizeDestination(destination) {
     const url =
         new URL(
@@ -76,6 +117,7 @@ function normalizeDestination(destination) {
     );
 }
 
+
 function resolveRoute(path) {
     const normalizedPath =
         normalizePath(path);
@@ -89,10 +131,15 @@ function resolveRoute(path) {
         return {
             requestedPath:
                 normalizedPath,
+
             routePath:
                 normalizedPath,
+
             config:
-                ROUTES[normalizedPath],
+                ROUTES[
+                    normalizedPath
+                ],
+
             found:
                 true
         };
@@ -107,10 +154,15 @@ function resolveRoute(path) {
         return {
             requestedPath:
                 normalizedPath,
+
             routePath:
                 ERROR_ROUTE,
+
             config:
-                ROUTES[ERROR_ROUTE],
+                ROUTES[
+                    ERROR_ROUTE
+                ],
+
             found:
                 false
         };
@@ -119,14 +171,20 @@ function resolveRoute(path) {
     return {
         requestedPath:
             normalizedPath,
+
         routePath:
             DEFAULT_ROUTE,
+
         config:
-            ROUTES[DEFAULT_ROUTE],
+            ROUTES[
+                DEFAULT_ROUTE
+            ],
+
         found:
             false
     };
 }
+
 
 function findInheritedMapValue(
     map,
@@ -142,34 +200,52 @@ function findInheritedMapValue(
             normalizedPath
         )
     ) {
-        return map[normalizedPath];
+        return map[
+            normalizedPath
+        ];
     }
 
     const matchingRoutes =
-        Object.keys(map)
-            .filter(function(route) {
-                const normalizedRoute =
-                    normalizePath(route);
+        Object.keys(
+            map
+        )
+            .filter(
+                function(
+                    route
+                ) {
+                    const normalizedRoute =
+                        normalizePath(
+                            route
+                        );
 
-                return (
-                    normalizedRoute !== "/" &&
-                    normalizedPath.startsWith(
-                        `${normalizedRoute}/`
-                    )
-                );
-            })
-            .sort(function(
-                firstRoute,
-                secondRoute
-            ) {
-                return (
-                    secondRoute.length -
-                    firstRoute.length
-                );
-            });
+                    return (
+                        normalizedRoute !== "/" &&
+                        normalizedPath.startsWith(
+                            `${normalizedRoute}/`
+                        )
+                    );
+                }
+            )
+            .sort(
+                function(
+                    firstRoute,
+                    secondRoute
+                ) {
+                    return (
+                        secondRoute.length -
+                        firstRoute.length
+                    );
+                }
+            );
 
-    if (matchingRoutes.length > 0) {
-        return map[matchingRoutes[0]];
+    if (
+        matchingRoutes.length > 0
+    ) {
+        return map[
+            matchingRoutes[
+                0
+            ]
+        ];
     }
 
     if (
@@ -178,14 +254,19 @@ function findInheritedMapValue(
             DEFAULT_ROUTE
         )
     ) {
-        return map[DEFAULT_ROUTE];
+        return map[
+            DEFAULT_ROUTE
+        ];
     }
 
     return fallbackValue;
 }
 
+
 function getRoutingControl(event) {
-    if (!(event.target instanceof Element)) {
+    if (
+        !(event.target instanceof Element)
+    ) {
         return null;
     }
 
@@ -194,6 +275,7 @@ function getRoutingControl(event) {
     );
 }
 
+
 function getRoutingDestination(control) {
     if (!control) {
         return null;
@@ -201,7 +283,9 @@ function getRoutingDestination(control) {
 
     const destination =
         control.dataset.route ||
-        control.getAttribute("href");
+        control.getAttribute(
+            "href"
+        );
 
     if (!destination) {
         return null;
@@ -220,14 +304,19 @@ function getRoutingDestination(control) {
         return null;
     }
 
-    return normalizeDestination(url.href);
+    return normalizeDestination(
+        url.href
+    );
 }
+
 
 async function handleRoutingButtonPressed(
     event
 ) {
     const control =
-        getRoutingControl(event);
+        getRoutingControl(
+            event
+        );
 
     if (!control) {
         return;
@@ -240,16 +329,22 @@ async function handleRoutingButtonPressed(
         event.metaKey ||
         event.shiftKey ||
         event.altKey ||
-        control.hasAttribute("download") ||
+        control.hasAttribute(
+            "download"
+        ) ||
         control.target === "_blank" ||
         control.disabled ||
-        control.classList.contains("disabled")
+        control.classList.contains(
+            "disabled"
+        )
     ) {
         return;
     }
 
     const destination =
-        getRoutingDestination(control);
+        getRoutingDestination(
+            control
+        );
 
     if (!destination) {
         return;
@@ -258,7 +353,9 @@ async function handleRoutingButtonPressed(
     event.preventDefault();
 
     const routeTest =
-        testRoute(destination);
+        testRoute(
+            destination
+        );
 
     console.info(
         "ROUTER: Navigation button pressed.",
@@ -271,7 +368,9 @@ async function handleRoutingButtonPressed(
             {
                 detail: {
                     control,
+
                     destination,
+
                     route:
                         routeTest
                 }
@@ -279,55 +378,86 @@ async function handleRoutingButtonPressed(
         )
     );
 
-    await navigate(destination);
+    await navigate(
+        destination
+    );
 }
 
-export function testRoute(path = "/") {
+
+export function testRoute(
+    path = "/"
+) {
     const route =
-        resolveRoute(path);
+        resolveRoute(
+            path
+        );
 
     const result = {
         requestedPath:
             route.requestedPath,
+
         resolvedPath:
             route.routePath,
+
         found:
             route.found,
+
         requiresAuth:
             route.config
                 ?.requiresAuth === true,
+
         sitemap:
             route.config
                 ?.sitemap !== false,
+
         title:
-            route.config?.title || null,
+            route.config
+                ?.title || null,
+
         body:
-            route.config?.body || null,
+            route.config
+                ?.body || null,
+
         header:
-            route.config?.header || null,
+            route.config
+                ?.header || null,
+
         sidebar:
-            route.config?.sidebar || null,
+            route.config
+                ?.sidebar || null,
+
         footer:
-            route.config?.footer || null,
+            route.config
+                ?.footer || null,
+
         module:
-            route.config?.module || null
+            route.config
+                ?.module || null
     };
 
-    console.table(result);
+    console.table(
+        result
+    );
 
     return result;
 }
+
 
 export async function testRouteNavigation(
     path = "/"
 ) {
     const result =
-        testRoute(path);
+        testRoute(
+            path
+        );
 
-    await navigate(path);
+    await navigate(
+        path
+    );
 
     return result;
 }
+
 
 async function fetchHTML(
     file,
@@ -341,23 +471,33 @@ async function fetchHTML(
         await fetch(
             file,
             {
-                method: "GET",
-                cache: "no-store",
+                method:
+                    "GET",
+
+                cache:
+                    "no-store",
+
                 headers: {
-                    "accept": "text/html"
+                    "accept":
+                        "text/html"
                 }
             }
         );
 
-    if (!response.ok) {
+    if (
+        !response.ok
+    ) {
         throw new Error(
-            `${label} failed to load: ` +
-            `${response.status} (${file})`
+            (
+                `${label} failed to load: `
+                + `${response.status} (${file})`
+            )
         );
     }
 
     return response.text();
 }
+
 
 async function loadRouterAuthSession() {
     let result;
@@ -369,14 +509,21 @@ async function loadRouterAuthSession() {
     ) {
         result =
             await window.BPDAuth.getSession();
-    } else {
+    }
+    else {
         const response =
             await fetch(
                 BPD_AUTH_SESSION_URL,
                 {
-                    method: "GET",
-                    credentials: "same-origin",
-                    cache: "no-store",
+                    method:
+                        "GET",
+
+                    credentials:
+                        "same-origin",
+
+                    cache:
+                        "no-store",
+
                     headers: {
                         "accept":
                             "application/json"
@@ -384,26 +531,33 @@ async function loadRouterAuthSession() {
                 }
             );
 
-        if (!response.ok) {
+        if (
+            !response.ok
+        ) {
             return {
-                authenticated: false,
-                user: null
+                authenticated:
+                    false,
+
+                user:
+                    null
             };
         }
 
         result =
-            await response.json().catch(
-                function() {
-                    return {};
-                }
-            );
+            await response.json()
+                .catch(
+                    function() {
+                        return {};
+                    }
+                );
     }
 
     return {
         ...result,
 
         authenticated:
-            result?.authenticated === true,
+            result?.authenticated
+            === true,
 
         user:
             result?.user ||
@@ -412,16 +566,22 @@ async function loadRouterAuthSession() {
     };
 }
 
+
 async function enforceRouteAuthentication(
     route
 ) {
     if (
-        route.config?.requiresAuth !== true
+        route.config
+            ?.requiresAuth !== true
     ) {
         return {
             route,
-            authSession: null,
-            redirected: false
+
+            authSession:
+                null,
+
+            redirected:
+                false
         };
     }
 
@@ -430,25 +590,35 @@ async function enforceRouteAuthentication(
     try {
         authSession =
             await loadRouterAuthSession();
-    } catch (error) {
+    }
+    catch (
+        error
+    ) {
         console.warn(
             "ROUTER: Unable to verify authentication.",
             error
         );
 
         authSession = {
-            authenticated: false,
-            user: null
+            authenticated:
+                false,
+
+            user:
+                null
         };
     }
 
     if (
-        authSession?.authenticated === true
+        authSession
+            ?.authenticated === true
     ) {
         return {
             route,
+
             authSession,
-            redirected: false
+
+            redirected:
+                false
         };
     }
 
@@ -456,10 +626,12 @@ async function enforceRouteAuthentication(
         route.requestedPath;
 
     const fallbackUrl =
-        `${AUTH_FALLBACK_ROUTE}` +
-        `?returnTo=${encodeURIComponent(
-            requestedPath
-        )}`;
+        (
+            `${AUTH_FALLBACK_ROUTE}`
+            + `?returnTo=${encodeURIComponent(
+                requestedPath
+            )}`
+        );
 
     window.history.replaceState(
         {},
@@ -473,6 +645,7 @@ async function enforceRouteAuthentication(
             {
                 detail: {
                     requestedPath,
+
                     fallbackPath:
                         AUTH_FALLBACK_ROUTE
                 }
@@ -485,12 +658,18 @@ async function enforceRouteAuthentication(
             resolveRoute(
                 AUTH_FALLBACK_ROUTE
             ),
+
         authSession,
-        redirected: true
+
+        redirected:
+            true
     };
 }
 
-function dispatchAuthState(authSession) {
+
+function dispatchAuthState(
+    authSession
+) {
     if (!authSession) {
         return;
     }
@@ -502,20 +681,25 @@ function dispatchAuthState(authSession) {
                 detail: {
                     authenticated:
                         authSession
-                            ?.authenticated ===
-                        true,
+                            ?.authenticated === true,
+
                     user:
-                        authSession?.user ||
-                        null
+                        authSession
+                            ?.user || null
                 }
             }
         )
     );
 }
 
-function setHeaderVisibility(showHeader) {
+
+function setHeaderVisibility(
+    showHeader
+) {
     const headerElement =
-        document.getElementById("header");
+        document.getElementById(
+            "header"
+        );
 
     document.body.dataset.header =
         showHeader
@@ -534,20 +718,29 @@ function setHeaderVisibility(showHeader) {
     headerElement.hidden =
         !showHeader;
 
-    if (!showHeader) {
-        headerElement.innerHTML = "";
+    if (
+        !showHeader
+    ) {
+        headerElement.innerHTML =
+            "";
     }
 }
 
-function setPageLoading(loading) {
+
+function setPageLoading(
+    loading
+) {
     document.body.dataset.pageLoading =
-        String(loading);
+        String(
+            loading
+        );
 
     document.body.classList.toggle(
         "page-loading",
         loading
     );
 }
+
 
 async function initializeLoadedSidebar(
     authSession
@@ -560,13 +753,17 @@ async function initializeLoadedSidebar(
         dispatchAuthState(
             authSession
         );
-    } catch (error) {
+    }
+    catch (
+        error
+    ) {
         console.error(
             "ROUTER: Sidebar initialization failed.",
             error
         );
     }
 }
+
 
 async function initializeLoadedRouteModule(
     moduleFile
@@ -592,7 +789,10 @@ async function initializeLoadedRouteModule(
         await initializeRouteModule(
             moduleUrl.href
         );
-    } catch (error) {
+    }
+    catch (
+        error
+    ) {
         console.error(
             "ROUTER: Route module initialization failed.",
             error
@@ -605,6 +805,7 @@ async function initializeLoadedRouteModule(
                     detail: {
                         module:
                             moduleFile,
+
                         error
                     }
                 }
@@ -613,11 +814,14 @@ async function initializeLoadedRouteModule(
     }
 }
 
+
 async function loadShell() {
     const currentNavigationId =
         ++navigationId;
 
-    setPageLoading(true);
+    setPageLoading(
+        true
+    );
 
     let route =
         resolveRoute(
@@ -630,7 +834,8 @@ async function loadShell() {
         );
 
     if (
-        currentNavigationId !== navigationId
+        currentNavigationId !==
+        navigationId
     ) {
         return;
     }
@@ -641,12 +846,16 @@ async function loadShell() {
     const routeConfig =
         route.config;
 
-    if (!routeConfig) {
+    if (
+        !routeConfig
+    ) {
         console.error(
             "ROUTER: Route configuration was not found."
         );
 
-        setPageLoading(false);
+        setPageLoading(
+            false
+        );
 
         return;
     }
@@ -686,7 +895,9 @@ async function loadShell() {
             "ROUTER: Required shell elements were not found."
         );
 
-        setPageLoading(false);
+        setPageLoading(
+            false
+        );
 
         return;
     }
@@ -705,29 +916,32 @@ async function loadShell() {
             sidebarHTML,
             pageHTML,
             footerHTML
-        ] = await Promise.all([
-            showHeader
-                ? fetchHTML(
-                    routeConfig.header,
-                    "Header"
+        ] =
+            await Promise.all([
+                showHeader
+                    ? fetchHTML(
+                        routeConfig.header,
+                        "Header"
+                    )
+                    : Promise.resolve(
+                        ""
+                    ),
+
+                fetchHTML(
+                    routeConfig.sidebar,
+                    "Sidebar"
+                ),
+
+                fetchHTML(
+                    routeConfig.body,
+                    "Page"
+                ),
+
+                fetchHTML(
+                    routeConfig.footer,
+                    "Footer"
                 )
-                : Promise.resolve(""),
-
-            fetchHTML(
-                routeConfig.sidebar,
-                "Sidebar"
-            ),
-
-            fetchHTML(
-                routeConfig.body,
-                "Page"
-            ),
-
-            fetchHTML(
-                routeConfig.footer,
-                "Footer"
-            )
-        ]);
+            ]);
 
         if (
             currentNavigationId !==
@@ -750,7 +964,9 @@ async function loadShell() {
         contentElement.innerHTML =
             pageHTML;
 
-        if (footerElement) {
+        if (
+            footerElement
+        ) {
             footerElement.innerHTML =
                 footerHTML;
         }
@@ -759,7 +975,9 @@ async function loadShell() {
             route.routePath;
 
         document.body.dataset.routeFound =
-            String(route.found);
+            String(
+                route.found
+            );
 
         await initializeLoadedSidebar(
             authCheck.authSession
@@ -770,13 +988,19 @@ async function loadShell() {
         );
 
         contentElement.focus({
-            preventScroll: true
+            preventScroll:
+                true
         });
 
         window.scrollTo({
-            top: 0,
-            left: 0,
-            behavior: "auto"
+            top:
+                0,
+
+            left:
+                0,
+
+            behavior:
+                "auto"
         });
 
         document.dispatchEvent(
@@ -786,17 +1010,38 @@ async function loadShell() {
                     detail: {
                         requestedPath:
                             route.requestedPath,
+
                         routePath:
                             route.routePath,
+
                         found:
                             route.found,
+
                         redirected:
                             authCheck.redirected
                     }
                 }
             )
         );
-    } catch (error) {
+
+        /* =================================================
+           OCR ACTIVE SUBMISSION CHECK
+
+           This does not start permanent polling for users
+           without an OCR job.
+
+           If an active OCR job exists in localStorage,
+           ocr_notifications.js resumes/checks that job.
+
+           If no active job exists, this is effectively a
+           no-op.
+           ================================================= */
+
+        await checkGlobalOcrSubmission();
+    }
+    catch (
+        error
+    ) {
         console.error(
             "ROUTER: Shell loading failed.",
             error
@@ -814,15 +1059,19 @@ async function loadShell() {
                 </a>
             </section>
         `;
-    } finally {
+    }
+    finally {
         if (
             currentNavigationId ===
             navigationId
         ) {
-            setPageLoading(false);
+            setPageLoading(
+                false
+            );
         }
     }
 }
+
 
 async function navigate(
     destination,
@@ -840,21 +1089,26 @@ async function navigate(
         );
 
     const currentUrl =
-        window.location.pathname +
-        window.location.search +
-        window.location.hash;
+        (
+            window.location.pathname +
+            window.location.search +
+            window.location.hash
+        );
 
     if (
         normalizedDestination !==
         currentUrl
     ) {
-        if (options.replace === true) {
+        if (
+            options.replace === true
+        ) {
             window.history.replaceState(
                 {},
                 "",
                 destinationUrl.href
             );
-        } else {
+        }
+        else {
             window.history.pushState(
                 {},
                 "",
@@ -866,10 +1120,16 @@ async function navigate(
     await loadShell();
 }
 
+
+/* =========================================================
+   ROUTER EVENTS
+   ========================================================= */
+
 document.addEventListener(
     "click",
     handleRoutingButtonPressed
 );
+
 
 window.addEventListener(
     "popstate",
@@ -878,13 +1138,38 @@ window.addEventListener(
     }
 );
 
+
+/* =========================================================
+   PUBLIC ROUTER
+   ========================================================= */
+
 window.BPDRouter = {
     testRoute,
+
     testRouteNavigation,
+
     navigate,
+
     reload:
         loadShell
 };
+
+
+/* =========================================================
+   GLOBAL OCR NOTIFICATION INITIALIZATION
+
+   Runs once when the router module itself loads.
+
+   ocr_notifications.js owns its own timer and should only
+   poll while an active OCR job exists.
+   ========================================================= */
+
+initializeGlobalOcrNotifications();
+
+
+/* =========================================================
+   INITIAL PAGE LOAD
+   ========================================================= */
 
 if (
     !window.location.pathname.startsWith(

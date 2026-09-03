@@ -1244,69 +1244,57 @@ export async function handleOcrConfirmation(
         };
 
 
-        /* =================================================
-           STORE UPDATED REPORT
-           ================================================= */
+    /* =================================================
+    STORE UPDATED REPORT
+    ================================================= */
 
-        const storageResult =
-            await putMatchReport(
-                env.OCR_STORAGE,
-                {
-                    matchId:
-                        matchId,
+    await putMatchReport(
+        env.OCR_STORAGE,
+        {
+            matchId:
+                matchId,
 
-                    report:
-                        existingReport
-                }
-            );
+            report:
+                existingReport
+        }
+    );
 
 
-        /* =================================================
-           RESPONSE
-           ================================================= */
+    /* =================================================
+    RESPONSE
 
-        return jsonResponse(
-            {
-                success:
-                    true,
+    Successful confirmation intentionally returns
+    no OCR or storage metadata to the browser.
+    ================================================= */
 
-                matchId:
-                    matchId,
+    return new Response(
+        null,
+        {
+            status:
+                204,
 
-                confirmationStatus:
-                    confirmationStatus,
-
-                confirmedAt:
-                    confirmedAt,
-
-                hasDisputes:
-                    disputes.length > 0,
-
-                disputeCount:
-                    disputes.length,
-
-                reportKey:
-                    storageResult.objectKey
-            },
-            200
-        );
+            headers: {
+                "Cache-Control":
+                    "no-store"
+            }
+        }
+    );
 
     } catch (
         error
     ) {
+        console.error(
+            "OCR result confirmation failed:",
+            error
+        );
+
         return jsonResponse(
             {
                 success:
                     false,
 
                 message:
-                    "OCR result confirmation failed.",
-
-                error:
-                    String(
-                        error?.message
-                        || error
-                    )
+                    "OCR result confirmation failed."
             },
             500
         );
