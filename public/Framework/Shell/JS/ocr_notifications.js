@@ -1,4 +1,3 @@
-
 "use strict";
 
 /* =========================================================
@@ -83,13 +82,14 @@ let OCR_NOTIFICATION_CHECK_INDEX =
 let OCR_NOTIFICATION_BURST_STARTED_AT =
     0;
 
+let OCR_NOTIFICATION_QUEUED_CHECKS =
+    0;
+
 let OCR_NOTIFICATION_STALE_CHECKS =
     0;
 
 let OCR_NOTIFICATION_LAST_PROGRESS_SIGNATURE =
     "";
-let OCR_NOTIFICATION_QUEUED_CHECKS =
-    0;
 
 /* =========================================================
    NORMALIZATION
@@ -99,12 +99,12 @@ function normalizeId(
     value
 ) {
     return String(
-        value || ""
+        value
+        || ""
     )
         .trim()
         .toUpperCase();
 }
-
 
 function validJobId(
     value
@@ -115,7 +115,6 @@ function validJobId(
         )
     );
 }
-
 
 /* =========================================================
    ACTIVE JOB STORAGE
@@ -148,7 +147,6 @@ function getStoredActiveJobId() {
     }
 }
 
-
 function getStoredActiveJobRoute() {
     try {
         const route =
@@ -178,7 +176,6 @@ function getStoredActiveJobRoute() {
     }
 }
 
-
 function clearStoredActiveJob() {
     OCR_NOTIFICATION_ACTIVE_JOB_ID =
         "";
@@ -202,10 +199,10 @@ function clearStoredActiveJob() {
     }
 }
 
-
 /* =========================================================
-   PENDING REVIEW STORAGE
+   VISIBILITY / FOCUS
    ========================================================= */
+
 function handleVisibilityChange() {
     if (
         document.visibilityState === "visible"
@@ -217,6 +214,10 @@ function handleVisibilityChange() {
 function handleWindowFocus() {
     checkActiveOcrSubmission();
 }
+
+/* =========================================================
+   PENDING REVIEW STORAGE
+   ========================================================= */
 
 export function readPendingReviews() {
     try {
@@ -246,7 +247,6 @@ export function readPendingReviews() {
     }
 }
 
-
 function writePendingReviews(
     reviews
 ) {
@@ -272,7 +272,6 @@ function writePendingReviews(
     }
 }
 
-
 function getPendingReview(
     matchId
 ) {
@@ -296,7 +295,6 @@ function getPendingReview(
         )
         || null;
 }
-
 
 function addPendingReview(
     detail
@@ -385,7 +383,6 @@ function addPendingReview(
             ...reviews[
                 existingIndex
             ],
-
             ...pending
         };
     }
@@ -401,7 +398,6 @@ function addPendingReview(
 
     return pending;
 }
-
 
 function markPendingReviewClicked(
     matchId
@@ -444,7 +440,6 @@ function markPendingReviewClicked(
     return pending;
 }
 
-
 export function removePendingReview(
     matchId
 ) {
@@ -481,7 +476,6 @@ export function removePendingReview(
     );
 }
 
-
 /* =========================================================
    NOTIFICATION CONTAINER
    ========================================================= */
@@ -516,7 +510,6 @@ function ensureNotificationContainer() {
     return container;
 }
 
-
 /* =========================================================
    NOTIFICATION UI
    ========================================================= */
@@ -532,7 +525,6 @@ function getNotificationId(
     );
 }
 
-
 function removeNotificationElement(
     id
 ) {
@@ -542,7 +534,6 @@ function removeNotificationElement(
         )
     )?.remove();
 }
-
 
 function clearNotificationTimer(
     id
@@ -569,7 +560,6 @@ function clearNotificationTimer(
         );
     }
 }
-
 
 function createNotification(
     {
@@ -727,7 +717,6 @@ function createNotification(
     );
 }
 
-
 /* =========================================================
    JSON
    ========================================================= */
@@ -755,7 +744,6 @@ async function readJsonResponse(
         );
     }
 }
-
 
 /* =========================================================
    GET JOB
@@ -809,7 +797,6 @@ async function getOcrJob(
     return data.job;
 }
 
-
 /* =========================================================
    GET RESULT
    ========================================================= */
@@ -861,14 +848,12 @@ async function getOcrResult(
     const result =
         (
             data?.result
-            && typeof data.result
-                === "object"
+            && typeof data.result === "object"
         )
             ? data.result
             : (
                 data?.matchReport
-                && typeof data.matchReport
-                    === "object"
+                && typeof data.matchReport === "object"
                     ? data.matchReport
                     : null
             );
@@ -883,7 +868,6 @@ async function getOcrResult(
 
     return result;
 }
-
 
 /* =========================================================
    SCOREBOARD VALUES
@@ -911,7 +895,6 @@ function getResultTeams(
         teams.push({
             team:
                 1,
-
             players:
                 result.team1
         });
@@ -925,7 +908,6 @@ function getResultTeams(
         teams.push({
             team:
                 2,
-
             players:
                 result.team2
         });
@@ -933,7 +915,6 @@ function getResultTeams(
 
     return teams;
 }
-
 
 function getPlayerName(
     player
@@ -946,7 +927,6 @@ function getPlayerName(
         || ""
     );
 }
-
 
 function buildConfirmationFields(
     result
@@ -1000,8 +980,7 @@ function buildConfirmationFields(
 
                                     if (
                                         value === null
-                                        || typeof value
-                                            === "undefined"
+                                        || typeof value === "undefined"
                                     ) {
                                         return;
                                     }
@@ -1041,7 +1020,6 @@ function buildConfirmationFields(
 
     return fields;
 }
-
 
 /* =========================================================
    AUTO ACCEPT
@@ -1146,7 +1124,6 @@ async function autoAcceptOcrResult(
     }
 }
 
-
 /* =========================================================
    OPEN REVIEW
    ========================================================= */
@@ -1202,8 +1179,7 @@ async function openPendingReview(
 
     if (
         router
-        && typeof router.navigate
-            === "function"
+        && typeof router.navigate === "function"
     ) {
         try {
             await router.navigate(
@@ -1258,7 +1234,6 @@ async function openPendingReview(
     }
 }
 
-
 /* =========================================================
    SUCCESS NOTIFICATION
    ========================================================= */
@@ -1312,7 +1287,6 @@ function showSuccessNotification(
     });
 }
 
-
 /* =========================================================
    FAILURE NOTIFICATION
    ========================================================= */
@@ -1350,8 +1324,7 @@ function showFailureNotification(
                 if (
                     reviewRoute
                     && router
-                    && typeof router.navigate
-                        === "function"
+                    && typeof router.navigate === "function"
                 ) {
                     await router.navigate(
                         reviewRoute
@@ -1369,7 +1342,6 @@ function showFailureNotification(
             }
     });
 }
-
 
 /* =========================================================
    POLLING
@@ -1574,15 +1546,6 @@ function abandonActiveOcrJob(
 
     stopOcrNotificationPolling();
 
-    /*
-     * This is intentional.
-     *
-     * A stalled job must no longer keep the upload page locked.
-     *
-     * The backend R2 job is not deleted. Only the browser-side
-     * ownership of the active submission is released.
-     */
-
     clearStoredActiveJob();
 
     const detail = {
@@ -1604,19 +1567,6 @@ function abandonActiveOcrJob(
         detail
     );
 
-    /*
-     * submit_img.js already listens for ocr:job-failed.
-     *
-     * That handler:
-     *
-     * - clears OCR_ACTIVE_JOB_ID
-     * - stops the loading UI
-     * - updates status
-     * - calls setOcrControlsLocked(false)
-     *
-     * Therefore the user can immediately submit another image.
-     */
-
     document.dispatchEvent(
         new CustomEvent(
             "ocr:job-failed",
@@ -1632,8 +1582,7 @@ function scheduleActiveOcrCheck(
 ) {
     if (
         !OCR_NOTIFICATION_POLLING
-        || OCR_NOTIFICATION_ACTIVE_JOB_ID
-            !== jobId
+        || OCR_NOTIFICATION_ACTIVE_JOB_ID !== jobId
     ) {
         return;
     }
@@ -1712,8 +1661,7 @@ function startOcrNotificationCheckBurst() {
 
     if (
         OCR_NOTIFICATION_POLLING
-        && OCR_NOTIFICATION_ACTIVE_JOB_ID
-            === jobId
+        && OCR_NOTIFICATION_ACTIVE_JOB_ID === jobId
     ) {
         return;
     }
@@ -1754,7 +1702,6 @@ function startOcrNotificationCheckBurst() {
         jobId
     );
 }
-
 
 /* =========================================================
    COMPLETED
@@ -1837,7 +1784,6 @@ function handleCompletedJob(
     );
 }
 
-
 /* =========================================================
    FAILED
    ========================================================= */
@@ -1875,7 +1821,6 @@ function handleFailedJob(
     );
 }
 
-
 /* =========================================================
    ACTIVE JOB CHECK
    ========================================================= */
@@ -1892,8 +1837,7 @@ async function runActiveOcrCheck() {
 
     if (
         !jobId
-        || OCR_NOTIFICATION_ACTIVE_JOB_ID
-            !== jobId
+        || OCR_NOTIFICATION_ACTIVE_JOB_ID !== jobId
     ) {
         stopOcrNotificationPolling();
 
@@ -1951,20 +1895,6 @@ async function runActiveOcrCheck() {
 
             return;
         }
-
-        /*
-         * QUEUE PROTECTION
-         *
-         * A healthy queue should take ownership quickly.
-         *
-         * Three consecutive queued responses:
-         *
-         * 1 second
-         * 4 seconds
-         * 8 seconds
-         *
-         * means the browser stops treating the job as active.
-         */
 
         if (
             status === "queued"
@@ -1999,13 +1929,6 @@ async function runActiveOcrCheck() {
                 0;
         }
 
-        /*
-         * STALE BACKEND PROTECTION
-         *
-         * Once processing has started, status/stage/progress/
-         * updatedAt/heartbeatAt must continue changing.
-         */
-
         hasOcrJobProgressed(
             job
         );
@@ -2033,282 +1956,6 @@ async function runActiveOcrCheck() {
             return;
         }
 
-        /*
-         * END OF THIS POLLING BURST
-         *
-         * Do not clear a healthy active job simply because the
-         * six-call window ended.
-         *
-         * The next page focus / visibility / load event can
-         * start another bounded burst.
-         */
-
-        if (
-            OCR_NOTIFICATION_CHECK_INDEX
-            >= OCR_NOTIFICATION_CHECK_SCHEDULE_MS.length
-        ) {
-            stopOcrNotificationPolling();
-
-            return;
-        }
-
-        scheduleActiveOcrCheck(
-            jobId
-        );
-    }
-    catch (
-        error
-    ) {
-        console.warn(
-            "[OCR NOTIFICATIONS] OCR status check failed.",
-            error
-        );
-
-        if (
-            !navigator.onLine
-        ) {
-            /*
-             * Being offline is not evidence that the OCR job
-             * failed, so preserve the stored active job.
-             */
-
-            stopOcrNotificationPolling();
-
-            return;
-        }
-
-        if (
-            OCR_NOTIFICATION_CHECK_INDEX
-            >= OCR_NOTIFICATION_CHECK_SCHEDULE_MS.length
-        ) {
-            stopOcrNotificationPolling();
-
-            return;
-        }
-
-        scheduleActiveOcrCheck(
-            jobId
-        );
-    }
-    finally {
-        OCR_NOTIFICATION_CHECK_RUNNING =
-            false;
-    }
-}
-
-export function checkActiveOcrSubmission() {
-    startOcrNotificationCheckBurst();
-}
-
-/* =========================================================
-   COMPLETED
-   ========================================================= */
-
-function handleCompletedJob(
-    jobId,
-    job
-) {
-    const matchId =
-        normalizeId(
-            job?.matchId
-        );
-
-    if (
-        !matchId
-    ) {
-        console.error(
-            "[OCR NOTIFICATIONS] Completed job is missing matchId."
-        );
-
-        stopOcrNotificationPolling();
-
-        return;
-    }
-
-    const pending =
-        addPendingReview({
-            jobId,
-
-            matchId,
-
-            matchSize:
-                job?.matchSize
-                || job?.matchType
-                || "",
-
-            reviewRoute:
-                getStoredActiveJobRoute()
-        });
-
-    stopOcrNotificationPolling();
-
-    clearStoredActiveJob();
-
-    if (
-        pending
-    ) {
-        showSuccessNotification(
-            pending
-        );
-    }
-
-    document.dispatchEvent(
-        new CustomEvent(
-            "ocr:job-completed",
-            {
-                detail: {
-                    jobId,
-
-                    matchId,
-
-                    job
-                }
-            }
-        )
-    );
-}
-
-
-/* =========================================================
-   FAILED
-   ========================================================= */
-
-function handleFailedJob(
-    jobId,
-    job
-) {
-    const reviewRoute =
-        getStoredActiveJobRoute();
-
-    stopOcrNotificationPolling();
-
-    clearStoredActiveJob();
-
-    const detail = {
-        jobId,
-
-        reviewRoute,
-
-        job
-    };
-
-    showFailureNotification(
-        detail
-    );
-
-    document.dispatchEvent(
-        new CustomEvent(
-            "ocr:job-failed",
-            {
-                detail
-            }
-        )
-    );
-}
-
-
-/* =========================================================
-   ACTIVE JOB CHECK
-   ========================================================= */
-
-async function runActiveOcrCheck() {
-    if (
-        OCR_NOTIFICATION_CHECK_RUNNING
-    ) {
-        return;
-    }
-
-    const jobId =
-        getStoredActiveJobId();
-
-    if (
-        !jobId
-        || OCR_NOTIFICATION_ACTIVE_JOB_ID
-            !== jobId
-    ) {
-        stopOcrNotificationPolling();
-
-        return;
-    }
-
-    OCR_NOTIFICATION_CHECK_RUNNING =
-        true;
-
-    try {
-        const job =
-            await getOcrJob(
-                jobId
-            );
-
-        const status =
-            String(
-                job?.status
-                || ""
-            )
-                .trim()
-                .toLowerCase();
-
-        document.dispatchEvent(
-            new CustomEvent(
-                "ocr:job-progress",
-                {
-                    detail: {
-                        jobId,
-                        job
-                    }
-                }
-            )
-        );
-
-        if (
-            status === "completed"
-        ) {
-            handleCompletedJob(
-                jobId,
-                job
-            );
-
-            return;
-        }
-
-        if (
-            status === "failed"
-        ) {
-            handleFailedJob(
-                jobId,
-                job
-            );
-
-            return;
-        }
-
-        hasOcrJobProgressed(
-            job
-        );
-
-        if (
-            OCR_NOTIFICATION_STALE_CHECKS
-            >= OCR_NOTIFICATION_MAX_STALE_CHECKS
-        ) {
-            console.info(
-                "[OCR NOTIFICATIONS] Status polling stopped because no backend progress was detected.",
-                {
-                    jobId,
-                    status,
-                    stage:
-                        job?.stage
-                        || null,
-                    progress:
-                        job?.progress
-                        ?? null
-                }
-            );
-
-            stopOcrNotificationPolling();
-
-            return;
-        }
-
         if (
             OCR_NOTIFICATION_CHECK_INDEX
             >= OCR_NOTIFICATION_CHECK_SCHEDULE_MS.length
@@ -2357,10 +2004,10 @@ async function runActiveOcrCheck() {
     }
 }
 
-
 export function checkActiveOcrSubmission() {
     startOcrNotificationCheckBurst();
 }
+
 /* =========================================================
    RESTORE PENDING
    ========================================================= */
@@ -2428,7 +2075,6 @@ export function restorePendingNotifications() {
         );
 }
 
-
 /* =========================================================
    CONFIRMATION EVENT
    ========================================================= */
@@ -2448,7 +2094,6 @@ function handleResultsConfirmed(
     }
 }
 
-
 /* =========================================================
    ONLINE
    ========================================================= */
@@ -2459,7 +2104,6 @@ function handleOnline() {
     restorePendingNotifications();
 }
 
-
 /* =========================================================
    STORAGE
    ========================================================= */
@@ -2468,8 +2112,7 @@ function handleStorageChange(
     event
 ) {
     if (
-        event.key ===
-        OCR_ACTIVE_JOB_KEY
+        event.key === OCR_ACTIVE_JOB_KEY
     ) {
         checkActiveOcrSubmission();
 
@@ -2477,13 +2120,11 @@ function handleStorageChange(
     }
 
     if (
-        event.key ===
-        OCR_PENDING_REVIEW_KEY
+        event.key === OCR_PENDING_REVIEW_KEY
     ) {
         restorePendingNotifications();
     }
 }
-
 
 /* =========================================================
    INITIALIZE
@@ -2499,6 +2140,7 @@ export function initializeOcrNotifications() {
 
         return true;
     }
+
     document.addEventListener(
         "visibilitychange",
         handleVisibilityChange
@@ -2508,6 +2150,7 @@ export function initializeOcrNotifications() {
         "focus",
         handleWindowFocus
     );
+
     window.addEventListener(
         "online",
         handleOnline
@@ -2532,4 +2175,3 @@ export function initializeOcrNotifications() {
 
     return true;
 }
-
