@@ -34,12 +34,17 @@ const OCR_NOTIFICATION_CONTAINER_ID =
 
 const OCR_NOTIFICATION_CHECK_SCHEDULE_MS = [
     2000,
+    3000,
     4000,
+    5000,
+    6000,
     7000,
+    8000,
     10000,
-    13000,
-    16000,
-    20000
+    12000,
+    15000,
+    20000,
+    25000
 ];
 
 const OCR_NOTIFICATION_QUEUE_STALE_MS =
