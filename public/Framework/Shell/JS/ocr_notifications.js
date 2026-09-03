@@ -44,6 +44,19 @@ const OCR_NOTIFICATION_MAX_QUEUED_CHECKS =
 const OCR_NOTIFICATION_MAX_STALE_CHECKS =
     3;
 
+const OCR_NOTIFICATION_PROCESSING_STALE_MS =
+    90
+    * 1000;
+
+const OCR_NOTIFICATION_TAIL_POLL_MS =
+    20
+    * 1000;
+
+const OCR_NOTIFICATION_MAX_ACTIVE_JOB_MS =
+    6
+    * 60
+    * 1000;
+
 const OCR_NOTIFICATION_DISPLAY_MS =
     12500;
 
@@ -716,7 +729,6 @@ function createNotification(
         timer
     );
 }
-
 /* =========================================================
    JSON
    ========================================================= */
@@ -851,12 +863,14 @@ async function getOcrResult(
     const result =
         (
             data?.result
-            && typeof data.result === "object"
+            && typeof data.result
+                === "object"
         )
             ? data.result
             : (
                 data?.matchReport
-                && typeof data.matchReport === "object"
+                && typeof data.matchReport
+                    === "object"
                     ? data.matchReport
                     : null
             );
@@ -983,7 +997,8 @@ function buildConfirmationFields(
 
                                     if (
                                         value === null
-                                        || typeof value === "undefined"
+                                        || typeof value
+                                            === "undefined"
                                     ) {
                                         return;
                                     }
@@ -1128,6 +1143,78 @@ async function autoAcceptOcrResult(
 }
 
 /* =========================================================
+   ROUTE NAVIGATION
+   ========================================================= */
+
+async function navigateToOcrRoute(
+    route
+) {
+    const destination =
+        String(
+            route
+            || ""
+        )
+            .trim();
+
+    if (
+        !destination.startsWith(
+            "/"
+        )
+    ) {
+        return false;
+    }
+
+    const current =
+        (
+            window.location.pathname
+            + window.location.search
+            + window.location.hash
+        );
+
+    if (
+        destination === current
+        || destination
+            === window.location.pathname
+    ) {
+        return true;
+    }
+
+    const router =
+        Reflect.get(
+            window,
+            "BPDRouter"
+        );
+
+    if (
+        router
+        && typeof router.navigate
+            === "function"
+    ) {
+        try {
+            await router.navigate(
+                destination
+            );
+
+            return true;
+        }
+        catch (
+            error
+        ) {
+            console.error(
+                "[OCR NOTIFICATIONS] Router navigation failed. Falling back to a full navigation.",
+                error
+            );
+        }
+    }
+
+    window.location.assign(
+        destination
+    );
+
+    return true;
+}
+
+/* =========================================================
    OPEN REVIEW
    ========================================================= */
 
@@ -1174,43 +1261,6 @@ async function openPendingReview(
         return;
     }
 
-    const router =
-        Reflect.get(
-            window,
-            "BPDRouter"
-        );
-
-    if (
-        router
-        && typeof router.navigate === "function"
-    ) {
-        try {
-            await router.navigate(
-                reviewRoute
-            );
-
-            document.dispatchEvent(
-                new CustomEvent(
-                    "ocr:pending-review-open",
-                    {
-                        detail:
-                            updatedPending
-                    }
-                )
-            );
-
-            return;
-        }
-        catch (
-            error
-        ) {
-            console.error(
-                "[OCR NOTIFICATIONS] OCR route navigation failed.",
-                error
-            );
-        }
-    }
-
     try {
         sessionStorage.setItem(
             OCR_REVIEW_OPEN_REQUEST_KEY,
@@ -1229,12 +1279,22 @@ async function openPendingReview(
     }
 
     if (
-        reviewRoute
-    ) {
-        window.location.assign(
+        await navigateToOcrRoute(
             reviewRoute
-        );
+        )
+    ) {
+        return;
     }
+
+    document.dispatchEvent(
+        new CustomEvent(
+            "ocr:pending-review-open",
+            {
+                detail:
+                    updatedPending
+            }
+        )
+    );
 }
 
 /* =========================================================
@@ -1316,36 +1376,26 @@ function showFailureNotification(
                     String(
                         detail?.reviewRoute
                         || ""
-                    );
-
-                const router =
-                    Reflect.get(
-                        window,
-                        "BPDRouter"
-                    );
+                    )
+                        .trim();
 
                 if (
                     reviewRoute
-                    && router
-                    && typeof router.navigate === "function"
                 ) {
-                    await router.navigate(
+                    await navigateToOcrRoute(
                         reviewRoute
                     );
+
+                    return;
                 }
 
-                document.dispatchEvent(
-                    new CustomEvent(
-                        "ocr:job-failed",
-                        {
-                            detail
-                        }
-                    )
+                console.warn(
+                    "[OCR NOTIFICATIONS] Failure notification has no saved OCR route.",
+                    detail
                 );
             }
     });
 }
-
 /* =========================================================
    POLLING
    ========================================================= */
@@ -1461,6 +1511,96 @@ function hasOcrJobProgressed(
         1;
 
     return false;
+}
+
+function getOcrJobActivityTimestamp(
+    job
+) {
+    const candidates = [
+        job?.heartbeatAt,
+        job?.updatedAt,
+        job?.startedAt,
+        job?.createdAt
+    ];
+
+    for (
+        const candidate
+        of candidates
+    ) {
+        const parsed =
+            Date.parse(
+                String(
+                    candidate
+                    || ""
+                )
+            );
+
+        if (
+            Number.isFinite(
+                parsed
+            )
+        ) {
+            return parsed;
+        }
+    }
+
+    return null;
+}
+
+function isOcrProcessingStale(
+    job
+) {
+    if (
+        OCR_NOTIFICATION_STALE_CHECKS
+        < OCR_NOTIFICATION_MAX_STALE_CHECKS
+    ) {
+        return false;
+    }
+
+    const activityAt =
+        getOcrJobActivityTimestamp(
+            job
+        );
+
+    if (
+        !Number.isFinite(
+            activityAt
+        )
+    ) {
+        return false;
+    }
+
+    return (
+        Date.now()
+        - activityAt
+        >= OCR_NOTIFICATION_PROCESSING_STALE_MS
+    );
+}
+
+function isOcrJobPastClientLifetime(
+    job
+) {
+    const createdAt =
+        Date.parse(
+            String(
+                job?.createdAt
+                || ""
+            )
+        );
+
+    if (
+        !Number.isFinite(
+            createdAt
+        )
+    ) {
+        return false;
+    }
+
+    return (
+        Date.now()
+        - createdAt
+        >= OCR_NOTIFICATION_MAX_ACTIVE_JOB_MS
+    );
 }
 
 /* =========================================================
@@ -1591,15 +1731,6 @@ function scheduleActiveOcrCheck(
     }
 
     if (
-        OCR_NOTIFICATION_CHECK_INDEX
-        >= OCR_NOTIFICATION_CHECK_SCHEDULE_MS.length
-    ) {
-        stopOcrNotificationPolling();
-
-        return;
-    }
-
-    if (
         OCR_NOTIFICATION_POLL_TIMER
     ) {
         clearTimeout(
@@ -1610,24 +1741,24 @@ function scheduleActiveOcrCheck(
             null;
     }
 
-    const targetOffset =
-        OCR_NOTIFICATION_CHECK_SCHEDULE_MS[
-            OCR_NOTIFICATION_CHECK_INDEX
-        ];
-
-    const elapsed =
-        Math.max(
-            0,
-            Date.now()
-            - OCR_NOTIFICATION_BURST_STARTED_AT
-        );
+    const usingInitialSchedule =
+        OCR_NOTIFICATION_CHECK_INDEX
+        < OCR_NOTIFICATION_CHECK_SCHEDULE_MS.length;
 
     const delay =
-        Math.max(
-            0,
-            targetOffset
-            - elapsed
-        );
+        usingInitialSchedule
+            ? Math.max(
+                0,
+                OCR_NOTIFICATION_CHECK_SCHEDULE_MS[
+                    OCR_NOTIFICATION_CHECK_INDEX
+                ]
+                - Math.max(
+                    0,
+                    Date.now()
+                    - OCR_NOTIFICATION_BURST_STARTED_AT
+                )
+            )
+            : OCR_NOTIFICATION_TAIL_POLL_MS;
 
     OCR_NOTIFICATION_POLL_TIMER =
         setTimeout(
@@ -1823,7 +1954,6 @@ function handleFailedJob(
         )
     );
 }
-
 /* =========================================================
    ACTIVE JOB CHECK
    ========================================================= */
@@ -1864,13 +1994,37 @@ async function runActiveOcrCheck() {
                 .trim()
                 .toLowerCase();
 
+        if (
+            status !== "completed"
+            && status !== "failed"
+            && isOcrJobPastClientLifetime(
+                job
+            )
+        ) {
+            abandonActiveOcrJob(
+                jobId,
+                job,
+                {
+                    stage:
+                        "client_job_timeout",
+
+                    reason:
+                        "CLIENT_JOB_TIMEOUT",
+
+                    message:
+                        "The scoreboard job exceeded the allowed processing window. You can submit another image."
+                }
+            );
+
+            return;
+        }
+
         document.dispatchEvent(
             new CustomEvent(
                 "ocr:job-progress",
                 {
                     detail: {
                         jobId,
-
                         job
                     }
                 }
@@ -1938,8 +2092,9 @@ async function runActiveOcrCheck() {
 
         if (
             status !== "queued"
-            && OCR_NOTIFICATION_STALE_CHECKS
-                >= OCR_NOTIFICATION_MAX_STALE_CHECKS
+            && isOcrProcessingStale(
+                job
+            )
         ) {
             abandonActiveOcrJob(
                 jobId,
@@ -1955,15 +2110,6 @@ async function runActiveOcrCheck() {
                         "The scoreboard reader stopped reporting progress. You can try the upload again."
                 }
             );
-
-            return;
-        }
-
-        if (
-            OCR_NOTIFICATION_CHECK_INDEX
-            >= OCR_NOTIFICATION_CHECK_SCHEDULE_MS.length
-        ) {
-            stopOcrNotificationPolling();
 
             return;
         }
@@ -1995,10 +2141,12 @@ async function runActiveOcrCheck() {
                 {
                     stage:
                         "job_unavailable",
+
                     reason:
                         status === 404
                             ? "JOB_NOT_FOUND"
                             : "JOB_INVALID",
+
                     message:
                         "The previous scoreboard job is no longer available. You can submit another image."
                 }
@@ -2017,10 +2165,12 @@ async function runActiveOcrCheck() {
                 {
                     stage:
                         "job_access_lost",
+
                     reason:
                         status === 401
                             ? "AUTHENTICATION_REQUIRED"
                             : "JOB_ACCESS_DENIED",
+
                     message:
                         "The previous scoreboard job can no longer be accessed. You can submit another image."
                 }
@@ -2031,15 +2181,6 @@ async function runActiveOcrCheck() {
 
         if (
             !navigator.onLine
-        ) {
-            stopOcrNotificationPolling();
-
-            return;
-        }
-
-        if (
-            OCR_NOTIFICATION_CHECK_INDEX
-            >= OCR_NOTIFICATION_CHECK_SCHEDULE_MS.length
         ) {
             stopOcrNotificationPolling();
 

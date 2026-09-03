@@ -2,78 +2,129 @@
 
 const OCR_SCRIPT_PATHS = [
     "/ocr/JS/submit_core.js",
+    "/ocr/JS/ocr_review_policy.js",
     "/ocr/JS/submit_img.js",
     "/ocr/JS/submit_testing.js",
     "/ocr/JS/submit_onpage_items.js"
 ];
 
-function createOcrScript(src) {
-    return new Promise(function(resolve, reject) {
-        const script = document.createElement("script");
-
-        script.src = src;
-        script.async = false;
-        script.dataset.ocrScript = src;
-
-        script.addEventListener(
-            "load",
-            function() {
-                script.dataset.loaded = "true";
-                resolve();
-            },
-            { once: true }
-        );
-
-        script.addEventListener(
-            "error",
-            function() {
-                script.dataset.failed = "true";
-
-                reject(
-                    new Error(
-                        `Failed to load OCR script: ${src}`
-                    )
+function createOcrScript(
+    src
+) {
+    return new Promise(
+        function(
+            resolve,
+            reject
+        ) {
+            const script =
+                document.createElement(
+                    "script"
                 );
-            },
-            { once: true }
-        );
 
-        document.head.appendChild(script);
-    });
+            script.src =
+                src;
+
+            script.async =
+                false;
+
+            script.dataset.ocrScript =
+                src;
+
+            script.addEventListener(
+                "load",
+                function() {
+                    script.dataset.loaded =
+                        "true";
+
+                    resolve();
+                },
+                {
+                    once:
+                        true
+                }
+            );
+
+            script.addEventListener(
+                "error",
+                function() {
+                    script.dataset.failed =
+                        "true";
+
+                    reject(
+                        new Error(
+                            `Failed to load OCR script: ${src}`
+                        )
+                    );
+                },
+                {
+                    once:
+                        true
+                }
+            );
+
+            document.head.appendChild(
+                script
+            );
+        }
+    );
 }
 
-function loadScript(src) {
-    const existing = document.querySelector(
-        `script[data-ocr-script="${src}"]`
-    );
+function loadScript(
+    src
+) {
+    const existing =
+        document.querySelector(
+            `script[data-ocr-script="${src}"]`
+        );
 
-    if (existing?.dataset.loaded === "true") {
+    if (
+        existing?.dataset.loaded
+        === "true"
+    ) {
         return Promise.resolve();
     }
 
-    if (existing) {
+    if (
+        existing
+    ) {
         existing.remove();
     }
 
-    return createOcrScript(src);
+    return createOcrScript(
+        src
+    );
 }
 
 async function loadOcrScripts() {
-    for (const src of OCR_SCRIPT_PATHS) {
-        await loadScript(src);
+    for (
+        const src
+        of OCR_SCRIPT_PATHS
+    ) {
+        await loadScript(
+            src
+        );
     }
 }
 
-function runInitializer(name, initializer) {
-    if (typeof initializer !== "function") {
+function runInitializer(
+    name,
+    initializer
+) {
+    if (
+        typeof initializer
+        !== "function"
+    ) {
         throw new Error(
             `${name} initializer was not found.`
         );
     }
 
-    const result = initializer();
+    const result =
+        initializer();
 
-    if (result === false) {
+    if (
+        result === false
+    ) {
         throw new Error(
             `${name} initialization failed.`
         );
@@ -84,6 +135,11 @@ function initializeOcrSystems() {
     runInitializer(
         "OCR Core",
         window.initializeOcrCore
+    );
+
+    runInitializer(
+        "OCR Review Policy",
+        window.initializeOcrReviewPolicy
     );
 
     runInitializer(
@@ -103,11 +159,14 @@ function initializeOcrSystems() {
 }
 
 export async function initializePage() {
-    const page = document.querySelector(
-        ".page"
-    );
+    const page =
+        document.querySelector(
+            ".page"
+        );
 
-    if (!page) {
+    if (
+        !page
+    ) {
         console.error(
             "OCR PAGE: Page root was not found."
         );
@@ -116,8 +175,8 @@ export async function initializePage() {
     }
 
     if (
-        page.dataset.initialized ===
-        "true"
+        page.dataset.initialized
+        === "true"
     ) {
         return;
     }
@@ -129,7 +188,10 @@ export async function initializePage() {
 
         page.dataset.initialized =
             "true";
-    } catch (error) {
+    }
+    catch (
+        error
+    ) {
         page.dataset.initialized =
             "false";
 

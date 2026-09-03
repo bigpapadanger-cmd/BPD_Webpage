@@ -8,6 +8,21 @@
 const OCR_STATE_KEY =
     "rocketLeagueOcrStateV2";
 
+const OCR_FORM_STATE_KEY =
+    "rocketLeagueOcrFormStateV1";
+
+const OCR_IMAGE_DB_NAME =
+    "bpdOcrClientState";
+
+const OCR_IMAGE_DB_VERSION =
+    1;
+
+const OCR_IMAGE_STORE_NAME =
+    "ocrImages";
+
+const OCR_LAST_IMAGE_KEY =
+    "lastUploadedImage";
+
 const OCR_HANDLE_SIZE =
     10;
 
@@ -22,7 +37,6 @@ const OCR_MIN_SOURCE_CROP_WIDTH =
 
 const OCR_MIN_SOURCE_CROP_HEIGHT =
     120;
-
 
 /* =========================================================
    CURRENT PAGE ELEMENTS
@@ -42,7 +56,6 @@ let resultsCloseBtn = null;
 let canvasWrap = null;
 let playerNamesContainer = null;
 let ctx = null;
-
 
 /* =========================================================
    STATE
@@ -68,7 +81,6 @@ let crop = {
 
 let OCR_CORE_READY = false;
 let ocrCoreWindowEventsBound = false;
-
 
 /* =========================================================
    DOM
@@ -146,7 +158,6 @@ function resolveOcrCoreElements() {
             : null;
 }
 
-
 /* =========================================================
    STATUS
    ========================================================= */
@@ -159,7 +170,6 @@ function setStatus(message) {
     statusBox.textContent =
         String(message || "");
 }
-
 
 /* =========================================================
    PLAYER NAMES
@@ -304,7 +314,8 @@ function buildPlayerNameInputs(
                     "input"
                 );
 
-            input.type = "text";
+            input.type =
+                "text";
 
             input.className =
                 "player-name-input";
@@ -447,11 +458,357 @@ function validateExpectedPlayerNames() {
     };
 }
 
-
 /* =========================================================
-   PAGE STATE
+   DURABLE FORM STATE
    ========================================================= */
 
+function saveOcrFormState() {
+    const state = {
+        matchSize:
+            matchSize?.value
+            || "3",
+
+        playerNames:
+            getPlayerNameState()
+    };
+
+    try {
+        localStorage.setItem(
+            OCR_FORM_STATE_KEY,
+            JSON.stringify(
+                state
+            )
+        );
+    }
+    catch (
+        error
+    ) {
+        console.warn(
+            "[OCR] Could not save OCR form state.",
+            error
+        );
+    }
+}
+
+function readOcrFormState() {
+    try {
+        const state =
+            JSON.parse(
+                localStorage.getItem(
+                    OCR_FORM_STATE_KEY
+                )
+                || "null"
+            );
+
+        if (
+            !state
+            || typeof state !== "object"
+            || Array.isArray(
+                state
+            )
+        ) {
+            return null;
+        }
+
+        return state;
+    }
+    catch (
+        error
+    ) {
+        console.warn(
+            "[OCR] Could not restore OCR form state.",
+            error
+        );
+
+        return null;
+    }
+}
+
+/* =========================================================
+   DURABLE IMAGE STATE
+   ========================================================= */
+
+function openOcrImageDatabase() {
+    return new Promise(
+        function(
+            resolve,
+            reject
+        ) {
+            if (
+                !("indexedDB" in window)
+            ) {
+                reject(
+                    new Error(
+                        "IndexedDB is unavailable."
+                    )
+                );
+
+                return;
+            }
+
+            const request =
+                window.indexedDB.open(
+                    OCR_IMAGE_DB_NAME,
+                    OCR_IMAGE_DB_VERSION
+                );
+
+            request.onupgradeneeded =
+                function() {
+                    const database =
+                        request.result;
+
+                    if (
+                        !database.objectStoreNames.contains(
+                            OCR_IMAGE_STORE_NAME
+                        )
+                    ) {
+                        database.createObjectStore(
+                            OCR_IMAGE_STORE_NAME
+                        );
+                    }
+                };
+
+            request.onsuccess =
+                function() {
+                    resolve(
+                        request.result
+                    );
+                };
+
+            request.onerror =
+                function() {
+                    reject(
+                        request.error
+                        || new Error(
+                            "Could not open OCR image storage."
+                        )
+                    );
+                };
+        }
+    );
+}
+
+async function saveLastUploadedImage(
+    file
+) {
+    if (
+        !(file instanceof Blob)
+    ) {
+        return false;
+    }
+
+    let database =
+        null;
+
+    try {
+        database =
+            await openOcrImageDatabase();
+
+        await new Promise(
+            function(
+                resolve,
+                reject
+            ) {
+                const transaction =
+                    database.transaction(
+                        OCR_IMAGE_STORE_NAME,
+                        "readwrite"
+                    );
+
+                const store =
+                    transaction.objectStore(
+                        OCR_IMAGE_STORE_NAME
+                    );
+
+                store.put(
+                    {
+                        blob:
+                            file,
+
+                        name:
+                            String(
+                                file?.name
+                                || sourceFileName
+                                || "scoreboard.png"
+                            ),
+
+                        type:
+                            String(
+                                file?.type
+                                || "image/png"
+                            ),
+
+                        updatedAt:
+                            new Date()
+                                .toISOString()
+                    },
+                    OCR_LAST_IMAGE_KEY
+                );
+
+                transaction.oncomplete =
+                    function() {
+                        resolve();
+                    };
+
+                transaction.onerror =
+                    function() {
+                        reject(
+                            transaction.error
+                            || new Error(
+                                "Could not save the last OCR image."
+                            )
+                        );
+                    };
+
+                transaction.onabort =
+                    function() {
+                        reject(
+                            transaction.error
+                            || new Error(
+                                "Saving the last OCR image was aborted."
+                            )
+                        );
+                    };
+            }
+        );
+
+        return true;
+    }
+    catch (
+        error
+    ) {
+        console.warn(
+            "[OCR] Could not persist the last uploaded image.",
+            error
+        );
+
+        return false;
+    }
+    finally {
+        database?.close();
+    }
+}
+
+async function readLastUploadedImage() {
+    let database =
+        null;
+
+    try {
+        database =
+            await openOcrImageDatabase();
+
+        const record =
+            await new Promise(
+                function(
+                    resolve,
+                    reject
+                ) {
+                    const transaction =
+                        database.transaction(
+                            OCR_IMAGE_STORE_NAME,
+                            "readonly"
+                        );
+
+                    const store =
+                        transaction.objectStore(
+                            OCR_IMAGE_STORE_NAME
+                        );
+
+                    const request =
+                        store.get(
+                            OCR_LAST_IMAGE_KEY
+                        );
+
+                    request.onsuccess =
+                        function() {
+                            resolve(
+                                request.result
+                                || null
+                            );
+                        };
+
+                    request.onerror =
+                        function() {
+                            reject(
+                                request.error
+                                || new Error(
+                                    "Could not restore the last OCR image."
+                                )
+                            );
+                        };
+                }
+            );
+
+        if (
+            !record
+            || !(record.blob instanceof Blob)
+        ) {
+            return null;
+        }
+
+        return new File(
+            [
+                record.blob
+            ],
+            String(
+                record.name
+                || "scoreboard.png"
+            ),
+            {
+                type:
+                    String(
+                        record.type
+                        || record.blob.type
+                        || "image/png"
+                    )
+            }
+        );
+    }
+    catch (
+        error
+    ) {
+        console.warn(
+            "[OCR] Could not restore the last uploaded image.",
+            error
+        );
+
+        return null;
+    }
+    finally {
+        database?.close();
+    }
+}
+
+async function restoreLastUploadedImage() {
+    if (
+        sourceImage
+        || ocrControlsLocked
+    ) {
+        return false;
+    }
+
+    const file =
+        await readLastUploadedImage();
+
+    if (
+        !file
+    ) {
+        return false;
+    }
+
+    loadImageFile(
+        file,
+        {
+            persist:
+                false,
+
+            restored:
+                true
+        }
+    );
+
+    return true;
+}
 function getNormalizedCrop() {
     if (
         !canvas ||
@@ -481,7 +838,11 @@ function getNormalizedCrop() {
 }
 
 function savePageState() {
-    if (!sourceImage) {
+    saveOcrFormState();
+
+    if (
+        !sourceImage
+    ) {
         return;
     }
 
@@ -492,8 +853,8 @@ function savePageState() {
         sourceFileName,
 
         matchSize:
-            matchSize?.value ||
-            "3",
+            matchSize?.value
+            || "3",
 
         playerNames:
             getPlayerNameState(),
@@ -504,16 +865,21 @@ function savePageState() {
             getNormalizedCrop(),
 
         status:
-            statusBox?.textContent ||
-            ""
+            statusBox?.textContent
+            || ""
     };
 
     try {
         sessionStorage.setItem(
             OCR_STATE_KEY,
-            JSON.stringify(state)
+            JSON.stringify(
+                state
+            )
         );
-    } catch (error) {
+    }
+    catch (
+        error
+    ) {
         console.error(
             "[OCR] Could not save page state.",
             error
@@ -526,7 +892,10 @@ function clearPageState() {
         sessionStorage.removeItem(
             OCR_STATE_KEY
         );
-    } catch (error) {
+    }
+    catch (
+        error
+    ) {
         console.error(
             "[OCR] Could not clear page state.",
             error
@@ -550,11 +919,15 @@ function restoreNormalizedCrop(
         normalizedCrop.y,
         normalizedCrop.width,
         normalizedCrop.height
-    ].map(Number);
+    ].map(
+        Number
+    );
 
     if (
         values.some(
-            function(value) {
+            function(
+                value
+            ) {
                 return !Number.isFinite(
                     value
                 );
@@ -586,21 +959,27 @@ function restoreNormalizedCrop(
 }
 
 function restorePageState() {
-    let state = null;
+    let state =
+        null;
 
     try {
         state =
             JSON.parse(
                 sessionStorage.getItem(
                     OCR_STATE_KEY
-                ) || "null"
+                )
+                || "null"
             );
-    } catch {
+    }
+    catch {
         clearPageState();
+
         return false;
     }
 
-    if (!state?.imageData) {
+    if (
+        !state?.imageData
+    ) {
         return false;
     }
 
@@ -615,30 +994,37 @@ function restorePageState() {
     }
 
     buildPlayerNameInputs(
-        state.playerNames ||
-        null
+        state.playerNames
+        || null
     );
 
     sourceFileName =
-        state.sourceFileName ||
-        "scoreboard.png";
+        state.sourceFileName
+        || "scoreboard.png";
 
     const image =
         new Image();
 
     image.onload =
         function() {
-            sourceImage = image;
-            sourceFile = null;
+            sourceImage =
+                image;
+
+            sourceFile =
+                null;
 
             fitCanvasToImage();
 
-            if (emptyState) {
+            if (
+                emptyState
+            ) {
                 emptyState.hidden =
                     true;
             }
 
-            if (canvas) {
+            if (
+                canvas
+            ) {
                 canvas.hidden =
                     false;
             }
@@ -648,7 +1034,9 @@ function restorePageState() {
                     state.cropFallbackVisible
                 );
 
-            if (cropFallbackVisible) {
+            if (
+                cropFallbackVisible
+            ) {
                 if (
                     !restoreNormalizedCrop(
                         state.normalizedCrop
@@ -656,7 +1044,8 @@ function restorePageState() {
                 ) {
                     resetCrop();
                 }
-            } else {
+            }
+            else {
                 crop = {
                     x: 0,
                     y: 0,
@@ -668,8 +1057,8 @@ function restorePageState() {
             draw();
 
             setStatus(
-                state.status ||
-                (
+                state.status
+                || (
                     cropFallbackVisible
                         ? "Adjust the crop and retry."
                         : "Image restored. Ready to read scoreboard."
@@ -685,12 +1074,17 @@ function restorePageState() {
         function() {
             clearPageState();
 
-            sourceImage = null;
-            sourceFile = null;
+            sourceImage =
+                null;
+
+            sourceFile =
+                null;
 
             buildPlayerNameInputs(
-                state.playerNames ||
-                null
+                state.playerNames
+                || readOcrFormState()
+                    ?.playerNames
+                || null
             );
 
             setOcrControlsLocked(
@@ -698,8 +1092,23 @@ function restorePageState() {
             );
 
             setStatus(
-                "FAIL: Saved image could not be restored."
+                "Saved page image could not be restored. Checking the last uploaded image..."
             );
+
+            void restoreLastUploadedImage()
+                .then(
+                    function(
+                        restored
+                    ) {
+                        if (
+                            !restored
+                        ) {
+                            setStatus(
+                                "FAIL: Saved image could not be restored."
+                            );
+                        }
+                    }
+                );
         };
 
     image.src =
@@ -707,7 +1116,6 @@ function restorePageState() {
 
     return true;
 }
-
 
 /* =========================================================
    CANVAS
@@ -725,8 +1133,8 @@ function fitCanvasToImage() {
     const maximumCssWidth =
         Math.min(
             1100,
-            canvasWrap.clientWidth ||
-            1100
+            canvasWrap.clientWidth
+            || 1100
         );
 
     const maximumCssHeight =
@@ -746,8 +1154,8 @@ function fitCanvasToImage() {
             3,
             Math.max(
                 1,
-                window.devicePixelRatio ||
-                1
+                window.devicePixelRatio
+                || 1
             )
         );
 
@@ -784,7 +1192,9 @@ function fitCanvasToImage() {
 }
 
 function clampCrop() {
-    if (!canvas) {
+    if (
+        !canvas
+    ) {
         return;
     }
 
@@ -836,10 +1246,12 @@ function resetCrop() {
     }
 
     crop.width =
-        canvas.width * 0.96;
+        canvas.width *
+        0.96;
 
     crop.height =
-        canvas.height * 0.72;
+        canvas.height *
+        0.72;
 
     crop.x =
         (
@@ -854,14 +1266,18 @@ function resetCrop() {
         ) / 2;
 
     clampCrop();
+
     draw();
+
     savePageState();
 }
 
 function showCropFallback(
     message = null
 ) {
-    if (!sourceImage) {
+    if (
+        !sourceImage
+    ) {
         return;
     }
 
@@ -870,12 +1286,16 @@ function showCropFallback(
 
     resetCrop();
 
-    if (resetCropBtn) {
+    if (
+        resetCropBtn
+    ) {
         resetCropBtn.disabled =
             ocrControlsLocked;
     }
 
-    if (canvas) {
+    if (
+        canvas
+    ) {
         canvas.style.cursor =
             ocrControlsLocked
                 ? "not-allowed"
@@ -883,11 +1303,12 @@ function showCropFallback(
     }
 
     setStatus(
-        message ||
-        "The full-image scan could not reliably locate the scoreboard. Adjust the crop box and retry."
+        message
+        || "The full-image scan could not reliably locate the scoreboard. Adjust the crop box and retry."
     );
 
     draw();
+
     savePageState();
 
     document.dispatchEvent(
@@ -908,17 +1329,22 @@ function hideCropFallback() {
         height: 0
     };
 
-    if (resetCropBtn) {
+    if (
+        resetCropBtn
+    ) {
         resetCropBtn.disabled =
             true;
     }
 
-    if (canvas) {
+    if (
+        canvas
+    ) {
         canvas.style.cursor =
             "default";
     }
 
     draw();
+
     savePageState();
 }
 
@@ -950,30 +1376,37 @@ function getHandlePoints() {
             x: left,
             y: top
         },
+
         n: {
             x: centerX,
             y: top
         },
+
         ne: {
             x: right,
             y: top
         },
+
         e: {
             x: right,
             y: centerY
         },
+
         se: {
             x: right,
             y: bottom
         },
+
         s: {
             x: centerX,
             y: bottom
         },
+
         sw: {
             x: left,
             y: bottom
         },
+
         w: {
             x: left,
             y: centerY
@@ -995,14 +1428,21 @@ function drawHandles() {
     ctx.fillStyle =
         "#00ff66";
 
-    Object.values(points).forEach(
-        function(point) {
+    Object.values(
+        points
+    ).forEach(
+        function(
+            point
+        ) {
             ctx.fillRect(
                 point.x -
                     OCR_HANDLE_SIZE / 2,
+
                 point.y -
                     OCR_HANDLE_SIZE / 2,
+
                 OCR_HANDLE_SIZE,
+
                 OCR_HANDLE_SIZE
             );
         }
@@ -1039,7 +1479,9 @@ function draw() {
         canvas.height
     );
 
-    if (!cropFallbackVisible) {
+    if (
+        !cropFallbackVisible
+    ) {
         return;
     }
 
@@ -1064,17 +1506,25 @@ function draw() {
 
     ctx.drawImage(
         sourceImage,
+
         crop.x /
             displayScale,
+
         crop.y /
             displayScale,
+
         crop.width /
             displayScale,
+
         crop.height /
             displayScale,
+
         crop.x,
+
         crop.y,
+
         crop.width,
+
         crop.height
     );
 
@@ -1096,13 +1546,16 @@ function draw() {
     ctx.restore();
 }
 
-
 /* =========================================================
    POINTERS
    ========================================================= */
 
-function getPointerPosition(event) {
-    if (!canvas) {
+function getPointerPosition(
+    event
+) {
+    if (
+        !canvas
+    ) {
         return {
             x: 0,
             y: 0
@@ -1145,23 +1598,34 @@ function getPointerPosition(event) {
     };
 }
 
-function hitTestHandle(x, y) {
+function hitTestHandle(
+    x,
+    y
+) {
     const points =
         getHandlePoints();
 
     for (
-        const [name, point]
-        of Object.entries(points)
+        const [
+            name,
+            point
+        ]
+        of Object.entries(
+            points
+        )
     ) {
         if (
             Math.abs(
-                x - point.x
-            ) <=
-                OCR_HANDLE_SIZE &&
+                x -
+                point.x
+            )
+            <= OCR_HANDLE_SIZE
+            &&
             Math.abs(
-                y - point.y
-            ) <=
-                OCR_HANDLE_SIZE
+                y -
+                point.y
+            )
+            <= OCR_HANDLE_SIZE
         ) {
             return name;
         }
@@ -1170,13 +1634,19 @@ function hitTestHandle(x, y) {
     return null;
 }
 
-function pointInsideCrop(x, y) {
+function pointInsideCrop(
+    x,
+    y
+) {
     return (
-        x >= crop.x &&
+        x >= crop.x
+        &&
         x <=
             crop.x +
-            crop.width &&
-        y >= crop.y &&
+            crop.width
+        &&
+        y >= crop.y
+        &&
         y <=
             crop.y +
             crop.height
@@ -1196,7 +1666,9 @@ function handleCanvasPointerDown(
     }
 
     const point =
-        getPointerPosition(event);
+        getPointerPosition(
+            event
+        );
 
     const handle =
         hitTestHandle(
@@ -1204,10 +1676,15 @@ function handleCanvasPointerDown(
             point.y
         );
 
-    if (handle) {
-        dragMode = handle;
-    } else {
-        dragMode = "move";
+    if (
+        handle
+    ) {
+        dragMode =
+            handle;
+    }
+    else {
+        dragMode =
+            "move";
 
         if (
             !pointInsideCrop(
@@ -1228,8 +1705,12 @@ function handleCanvasPointerDown(
     }
 
     dragStart = {
-        x: point.x,
-        y: point.y,
+        x:
+            point.x,
+
+        y:
+            point.y,
+
         crop: {
             ...crop
         }
@@ -1241,7 +1722,6 @@ function handleCanvasPointerDown(
 
     draw();
 }
-
 function handleCanvasPointerMove(
     event
 ) {
@@ -1255,7 +1735,9 @@ function handleCanvasPointerMove(
     }
 
     const point =
-        getPointerPosition(event);
+        getPointerPosition(
+            event
+        );
 
     const dx =
         point.x -
@@ -1268,45 +1750,66 @@ function handleCanvasPointerMove(
     const start =
         dragStart.crop;
 
-    if (dragMode === "move") {
+    if (
+        dragMode === "move"
+    ) {
         crop.x =
-            start.x + dx;
+            start.x +
+            dx;
 
         crop.y =
-            start.y + dy;
-    } else {
-        let left = start.x;
+            start.y +
+            dy;
+    }
+    else {
+        let left =
+            start.x;
+
         let right =
             start.x +
             start.width;
 
-        let top = start.y;
+        let top =
+            start.y;
+
         let bottom =
             start.y +
             start.height;
 
         if (
-            dragMode.includes("w")
+            dragMode.includes(
+                "w"
+            )
         ) {
-            left += dx;
+            left +=
+                dx;
         }
 
         if (
-            dragMode.includes("e")
+            dragMode.includes(
+                "e"
+            )
         ) {
-            right += dx;
+            right +=
+                dx;
         }
 
         if (
-            dragMode.includes("n")
+            dragMode.includes(
+                "n"
+            )
         ) {
-            top += dy;
+            top +=
+                dy;
         }
 
         if (
-            dragMode.includes("s")
+            dragMode.includes(
+                "s"
+            )
         ) {
-            bottom += dy;
+            bottom +=
+                dy;
         }
 
         if (
@@ -1315,12 +1818,15 @@ function handleCanvasPointerMove(
             OCR_MIN_CROP_WIDTH
         ) {
             if (
-                dragMode.includes("w")
+                dragMode.includes(
+                    "w"
+                )
             ) {
                 left =
                     right -
                     OCR_MIN_CROP_WIDTH;
-            } else {
+            }
+            else {
                 right =
                     left +
                     OCR_MIN_CROP_WIDTH;
@@ -1333,37 +1839,49 @@ function handleCanvasPointerMove(
             OCR_MIN_CROP_HEIGHT
         ) {
             if (
-                dragMode.includes("n")
+                dragMode.includes(
+                    "n"
+                )
             ) {
                 top =
                     bottom -
                     OCR_MIN_CROP_HEIGHT;
-            } else {
+            }
+            else {
                 bottom =
                     top +
                     OCR_MIN_CROP_HEIGHT;
             }
         }
 
-        crop.x = left;
-        crop.y = top;
+        crop.x =
+            left;
+
+        crop.y =
+            top;
 
         crop.width =
-            right - left;
+            right -
+            left;
 
         crop.height =
-            bottom - top;
+            bottom -
+            top;
     }
 
     clampCrop();
+
     draw();
 }
 
 function handleCanvasPointerUp(
     event
 ) {
-    dragMode = null;
-    dragStart = null;
+    dragMode =
+        null;
+
+    dragStart =
+        null;
 
     if (
         canvas &&
@@ -1382,8 +1900,11 @@ function handleCanvasPointerUp(
 function handleCanvasPointerCancel(
     event
 ) {
-    dragMode = null;
-    dragStart = null;
+    dragMode =
+        null;
+
+    dragStart =
+        null;
 
     if (
         canvas &&
@@ -1397,21 +1918,27 @@ function handleCanvasPointerCancel(
     }
 }
 
-
 /* =========================================================
    IMAGE OUTPUT
    ========================================================= */
 
 function getOriginalImageBlob() {
-    if (sourceFile) {
+    if (
+        sourceFile
+    ) {
         return Promise.resolve(
             sourceFile
         );
     }
 
     return new Promise(
-        function(resolve, reject) {
-            if (!sourceImage) {
+        function(
+            resolve,
+            reject
+        ) {
+            if (
+                !sourceImage
+            ) {
                 reject(
                     new Error(
                         "No image loaded."
@@ -1436,11 +1963,14 @@ function getOriginalImageBlob() {
                 outputCanvas.getContext(
                     "2d",
                     {
-                        alpha: false
+                        alpha:
+                            false
                     }
                 );
 
-            if (!outputContext) {
+            if (
+                !outputContext
+            ) {
                 reject(
                     new Error(
                         "Could not prepare uploaded image."
@@ -1457,8 +1987,12 @@ function getOriginalImageBlob() {
             );
 
             outputCanvas.toBlob(
-                function(blob) {
-                    if (!blob) {
+                function(
+                    blob
+                ) {
+                    if (
+                        !blob
+                    ) {
                         reject(
                             new Error(
                                 "Could not prepare uploaded image."
@@ -1468,7 +2002,9 @@ function getOriginalImageBlob() {
                         return;
                     }
 
-                    resolve(blob);
+                    resolve(
+                        blob
+                    );
                 },
                 "image/png"
             );
@@ -1478,8 +2014,13 @@ function getOriginalImageBlob() {
 
 function createScoreboardCropBlob() {
     return new Promise(
-        function(resolve, reject) {
-            if (!sourceImage) {
+        function(
+            resolve,
+            reject
+        ) {
+            if (
+                !sourceImage
+            ) {
                 reject(
                     new Error(
                         "No image loaded."
@@ -1489,7 +2030,9 @@ function createScoreboardCropBlob() {
                 return;
             }
 
-            if (!cropFallbackVisible) {
+            if (
+                !cropFallbackVisible
+            ) {
                 reject(
                     new Error(
                         "Crop fallback is not active."
@@ -1502,7 +2045,9 @@ function createScoreboardCropBlob() {
             const normalized =
                 getNormalizedCrop();
 
-            if (!normalized) {
+            if (
+                !normalized
+            ) {
                 reject(
                     new Error(
                         "Scoreboard crop is invalid."
@@ -1598,11 +2143,14 @@ function createScoreboardCropBlob() {
                 outputCanvas.getContext(
                     "2d",
                     {
-                        alpha: false
+                        alpha:
+                            false
                     }
                 );
 
-            if (!outputContext) {
+            if (
+                !outputContext
+            ) {
                 reject(
                     new Error(
                         "Could not prepare scoreboard crop."
@@ -1625,8 +2173,12 @@ function createScoreboardCropBlob() {
             );
 
             outputCanvas.toBlob(
-                function(blob) {
-                    if (!blob) {
+                function(
+                    blob
+                ) {
+                    if (
+                        !blob
+                    ) {
                         reject(
                             new Error(
                                 "Could not create scoreboard crop."
@@ -1636,7 +2188,9 @@ function createScoreboardCropBlob() {
                         return;
                     }
 
-                    resolve(blob);
+                    resolve(
+                        blob
+                    );
                 },
                 "image/png"
             );
@@ -1644,12 +2198,14 @@ function createScoreboardCropBlob() {
     );
 }
 
-
 /* =========================================================
    IMAGE LOADING
    ========================================================= */
 
-function loadImageFile(file) {
+function loadImageFile(
+    file,
+    options = {}
+) {
     if (
         !file ||
         ocrControlsLocked
@@ -1657,32 +2213,48 @@ function loadImageFile(file) {
         return;
     }
 
-    sourceFile = file;
+    const shouldPersist =
+        options?.persist
+        !== false;
+
+    const restored =
+        options?.restored
+        === true;
+
+    sourceFile =
+        file;
 
     sourceFileName =
-        file.name ||
-        "scoreboard.png";
+        file.name
+        || "scoreboard.png";
 
     const reader =
         new FileReader();
 
     reader.onload =
-        function(event) {
+        function(
+            event
+        ) {
             const image =
                 new Image();
 
             image.onload =
                 function() {
-                    sourceImage = image;
+                    sourceImage =
+                        image;
 
                     fitCanvasToImage();
 
-                    if (emptyState) {
+                    if (
+                        emptyState
+                    ) {
                         emptyState.hidden =
                             true;
                     }
 
-                    if (canvas) {
+                    if (
+                        canvas
+                    ) {
                         canvas.hidden =
                             false;
                     }
@@ -1704,10 +2276,20 @@ function loadImageFile(file) {
                     );
 
                     setStatus(
-                        "Image loaded. The first attempt will use the full uploaded image."
+                        restored
+                            ? "Last uploaded image restored. Ready to read scoreboard."
+                            : "Image loaded. The first attempt will use the full uploaded image."
                     );
 
                     savePageState();
+
+                    if (
+                        shouldPersist
+                    ) {
+                        void saveLastUploadedImage(
+                            file
+                        );
+                    }
                 };
 
             image.onerror =
@@ -1718,8 +2300,8 @@ function loadImageFile(file) {
                 };
 
             image.src =
-                event.target?.result ||
-                "";
+                event.target?.result
+                || "";
         };
 
     reader.onerror =
@@ -1729,9 +2311,10 @@ function loadImageFile(file) {
             );
         };
 
-    reader.readAsDataURL(file);
+    reader.readAsDataURL(
+        file
+    );
 }
-
 
 /* =========================================================
    EVENTS
@@ -1751,19 +2334,25 @@ function handleImageInputChange() {
 }
 
 function handleMatchSizeChange() {
-    if (ocrControlsLocked) {
+    if (
+        ocrControlsLocked
+    ) {
         return;
     }
 
     const names =
         getPlayerNameState();
 
-    buildPlayerNameInputs(names);
+    buildPlayerNameInputs(
+        names
+    );
 
     savePageState();
 }
 
-function handleResetCropClick(event) {
+function handleResetCropClick(
+    event
+) {
     event.preventDefault();
 
     if (
@@ -1807,6 +2396,7 @@ function handleWindowResize() {
     }
 
     draw();
+
     savePageState();
 }
 
@@ -1816,7 +2406,9 @@ function bindElementEventOnce(
     handler,
     marker
 ) {
-    if (!element) {
+    if (
+        !element
+    ) {
         return;
     }
 
@@ -1838,7 +2430,8 @@ function bindElementEventOnce(
 
     element.dataset[
         datasetKey
-    ] = "true";
+    ] =
+        "true";
 }
 
 function bindCoreEvents() {
@@ -1903,12 +2496,6 @@ function bindCoreEvents() {
             true;
     }
 }
-
-
-/* =========================================================
-   INITIALIZE
-   ========================================================= */
-
 function initializeOcrCore() {
     resolveOcrCoreElements();
 
@@ -1936,13 +2523,18 @@ function initializeOcrCore() {
             }
         )
         .map(
-            function([name]) {
+            function(
+                [name]
+            ) {
                 return name;
             }
         );
 
-    if (missing.length > 0) {
-        OCR_CORE_READY = false;
+    if (
+        missing.length > 0
+    ) {
+        OCR_CORE_READY =
+            false;
 
         console.error(
             "[OCR] Missing required HTML elements:",
@@ -1954,17 +2546,32 @@ function initializeOcrCore() {
 
     bindCoreEvents();
 
-    if (!restorePageState()) {
-        sourceImage = null;
-        sourceFile = null;
+    if (
+        !restorePageState()
+    ) {
+        sourceImage =
+            null;
+
+        sourceFile =
+            null;
+
         sourceFileName =
             "scoreboard.png";
 
-        displayScale = 1;
-        ocrControlsLocked = false;
-        cropFallbackVisible = false;
-        dragMode = null;
-        dragStart = null;
+        displayScale =
+            1;
+
+        ocrControlsLocked =
+            false;
+
+        cropFallbackVisible =
+            false;
+
+        dragMode =
+            null;
+
+        dragStart =
+            null;
 
         crop = {
             x: 0,
@@ -1973,24 +2580,47 @@ function initializeOcrCore() {
             height: 0
         };
 
-        buildPlayerNameInputs();
+        const savedFormState =
+            readOcrFormState();
+
+        if (
+            savedFormState?.matchSize
+            && matchSize
+        ) {
+            matchSize.value =
+                String(
+                    savedFormState.matchSize
+                );
+        }
+
+        buildPlayerNameInputs(
+            savedFormState?.playerNames
+            || null
+        );
 
         setOcrControlsLocked(
             false
         );
 
-        if (emptyState) {
+        if (
+            emptyState
+        ) {
             emptyState.hidden =
                 false;
         }
 
-        if (canvas) {
+        if (
+            canvas
+        ) {
             canvas.hidden =
                 true;
         }
+
+        void restoreLastUploadedImage();
     }
 
-    OCR_CORE_READY = true;
+    OCR_CORE_READY =
+        true;
 
     return true;
 }

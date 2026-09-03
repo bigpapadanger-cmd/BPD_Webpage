@@ -534,6 +534,76 @@ function finishOcrLoading(
 }
 
 /* =========================================================
+   RESTORE REQUESTED REVIEW
+   ========================================================= */
+
+function restoreRequestedOcrReview() {
+    let pending =
+        null;
+
+    try {
+        pending =
+            JSON.parse(
+                sessionStorage.getItem(
+                    OCR_REVIEW_OPEN_REQUEST_KEY
+                )
+                || "null"
+            );
+
+        sessionStorage.removeItem(
+            OCR_REVIEW_OPEN_REQUEST_KEY
+        );
+    }
+    catch (
+        error
+    ) {
+        console.error(
+            "[OCR] Could not restore requested OCR review.",
+            error
+        );
+
+        return;
+    }
+
+    if (
+        !pending
+        || typeof pending !== "object"
+        || Array.isArray(
+            pending
+        )
+    ) {
+        return;
+    }
+
+    const jobId =
+        String(
+            pending?.jobId
+            || ""
+        )
+            .trim()
+            .toUpperCase();
+
+    if (
+        !/^[A-Z0-9]{16}$/.test(
+            jobId
+        )
+    ) {
+        console.warn(
+            "[OCR] Ignoring invalid restored OCR review request."
+        );
+
+        return;
+    }
+
+    handlePendingReviewOpen({
+        detail: {
+            ...pending,
+            jobId
+        }
+    });
+}
+
+/* =========================================================
    JOB STAGE DISPLAY
    ========================================================= */
 
@@ -666,7 +736,6 @@ function getJobStageMessage(
             );
     }
 }
-
 /* =========================================================
    JOB PROGRESS
    ========================================================= */
@@ -1496,7 +1565,6 @@ function renderOcrResultTable(
         )
     );
 }
-
 /* =========================================================
    RESULT MODAL
    ========================================================= */
@@ -1543,6 +1611,7 @@ function renderOcrResult(
                         )
                             .trim()
                             .toUpperCase(),
+
                     matchId:
                         String(
                             matchId
@@ -1551,6 +1620,7 @@ function renderOcrResult(
                         )
                             .trim()
                             .toUpperCase(),
+
                     result
                 }
             }
@@ -1710,6 +1780,7 @@ function handleGlobalOcrJobCompleted(
                 detail: {
                     jobId,
                     matchId,
+
                     usedCrop:
                         Boolean(
                             cropFallbackVisible
@@ -2001,10 +2072,13 @@ async function submitScoreboard(
                 {
                     method:
                         "POST",
+
                     body:
                         formData,
+
                     credentials:
                         "same-origin",
+
                     cache:
                         "no-store"
                 }
@@ -2058,7 +2132,8 @@ async function submitScoreboard(
                 5,
                 Number(
                     data?.progress
-                ) || 0
+                )
+                || 0
             ),
             "Scoreboard queued for processing..."
         );
@@ -2140,7 +2215,6 @@ function restoreActiveOcrJob() {
         jobId
     );
 }
-
 /* =========================================================
    EVENTS
    ========================================================= */
@@ -2202,6 +2276,7 @@ function initializeOcrSubmission() {
     }
 
     stopOcrLoadingAnimation();
+
     clearOcrLoadingFinishTimer();
 
     OCR_LOADING_PROGRESS =
@@ -2240,6 +2315,7 @@ function initializeOcrSubmission() {
     }
 
     restoreActiveOcrJob();
+
     restoreRequestedOcrReview();
 
     return true;
