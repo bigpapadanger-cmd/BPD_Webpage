@@ -764,13 +764,10 @@ async function getOcrJob(
             {
                 method:
                     "GET",
-
                 credentials:
                     "same-origin",
-
                 cache:
                     "no-store",
-
                 headers: {
                     "Accept":
                         "application/json"
@@ -788,10 +785,16 @@ async function getOcrJob(
         || data?.success !== true
         || !data?.job
     ) {
-        throw new Error(
-            data?.message
-            || "Unable to read OCR job."
-        );
+        const error =
+            new Error(
+                data?.message
+                || "Unable to read OCR job."
+            );
+
+        error.status =
+            response.status;
+
+        throw error;
     }
 
     return data.job;
@@ -1976,6 +1979,55 @@ async function runActiveOcrCheck() {
             "[OCR NOTIFICATIONS] OCR status check failed.",
             error
         );
+
+        const status =
+            Number(
+                error?.status
+            );
+
+        if (
+            status === 404
+            || status === 409
+        ) {
+            abandonActiveOcrJob(
+                jobId,
+                null,
+                {
+                    stage:
+                        "job_unavailable",
+                    reason:
+                        status === 404
+                            ? "JOB_NOT_FOUND"
+                            : "JOB_INVALID",
+                    message:
+                        "The previous scoreboard job is no longer available. You can submit another image."
+                }
+            );
+
+            return;
+        }
+
+        if (
+            status === 401
+            || status === 403
+        ) {
+            abandonActiveOcrJob(
+                jobId,
+                null,
+                {
+                    stage:
+                        "job_access_lost",
+                    reason:
+                        status === 401
+                            ? "AUTHENTICATION_REQUIRED"
+                            : "JOB_ACCESS_DENIED",
+                    message:
+                        "The previous scoreboard job can no longer be accessed. You can submit another image."
+                }
+            );
+
+            return;
+        }
 
         if (
             !navigator.onLine
