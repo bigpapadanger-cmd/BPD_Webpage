@@ -17,8 +17,9 @@
     ],
 
     "vars": {
-        "OCR_API_URL":"https://bpd-ocr-y5wgeempka-uc.a.run.app/api/ocr",
-        "OCR_JOB_PROCESS_URL":"https://bpd-gaming-network.com/api/ocr/jobs/process_job"
+        "OCR_API_URL": "https://bpd-ocr-y5wgeempka-uc.a.run.app/api/ocr",
+        "OCR_JOB_PROCESS_URL": "https://bpd-gaming-network.com/api/ocr/jobs/process_job",
+        "OCR_JOB_PROGRESS_URL": "https://bpd-gaming-network.com/api/ocr/jobs/progress"
     },
 
     "r2_buckets": [
