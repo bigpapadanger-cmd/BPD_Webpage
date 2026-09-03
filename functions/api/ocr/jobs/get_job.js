@@ -11,7 +11,7 @@ import {
 } from "../../../services/common_helpers/reload_sessions.js";
 
 const GET_JOB_VERSION =
-    "ocr-get-job-1.3";
+    "ocr-get-job-1.4";
 
 const ALLOWED_STATUSES =
     new Set([
@@ -453,6 +453,28 @@ async function readStoredJson(
 // ============================================================
 // SAFE JOB RESPONSE
 // ============================================================
+function normalizeRuntimeSeconds(
+    value
+) {
+    const seconds =
+        Number(
+            value
+        );
+
+    if (
+        !Number.isFinite(
+            seconds
+        )
+        || seconds < 0
+    ) {
+        return null;
+    }
+
+    return Math.round(
+        seconds
+        * 10000
+    ) / 10000;
+}
 
 function sanitizeJobResponse(
     statusData
@@ -524,6 +546,13 @@ function sanitizeJobResponse(
             status === "completed"
                 ? sanitizeMatchId(
                     statusData?.matchId
+                )
+                : null,
+
+        cloudRuntimeSeconds:
+            status === "completed"
+                ? normalizeRuntimeSeconds(
+                    statusData?.cloudRuntimeSeconds
                 )
                 : null
     };

@@ -8,7 +8,14 @@ import {
 } from "../../../services/common_helpers/reload_sessions.js";
 
 const SUBMIT_JOB_VERSION =
-    "ocr-submit-job-1.2";
+    "ocr-submit-job-1.3";
+
+const JOB_PROGRESS = Object.freeze({
+    QUEUED:
+        2,
+    FAILED:
+        100
+});
 
 // ============================================================
 // MAIN
@@ -27,44 +34,19 @@ export async function onRequestPost(
         // CONFIGURATION
         // ====================================================
 
-        if (
-            !env.OCR_STORAGE
-        ) {
-            return jsonResponse(
-                {
-                    success: false,
-                    message:
-                        "OCR storage is not configured.",
-                    version:
-                        SUBMIT_JOB_VERSION
-                },
-                500
+        const configurationError =
+            validateConfiguration(
+                env
             );
-        }
 
         if (
-            !env.OCR_OWNER_SECRET
+            configurationError
         ) {
             return jsonResponse(
                 {
                     success: false,
                     message:
-                        "OCR owner hashing is not configured.",
-                    version:
-                        SUBMIT_JOB_VERSION
-                },
-                503
-            );
-        }
-
-        if (
-            !env.OCR_JOB_QUEUE
-        ) {
-            return jsonResponse(
-                {
-                    success: false,
-                    message:
-                        "OCR job queue is not configured.",
+                        configurationError,
                     version:
                         SUBMIT_JOB_VERSION
                 },
@@ -82,14 +64,14 @@ export async function onRequestPost(
                     "Content-Type"
                 )
                 || ""
-            );
+            )
+                .trim()
+                .toLowerCase();
 
         if (
-            !contentType
-                .toLowerCase()
-                .includes(
-                    "multipart/form-data"
-                )
+            !contentType.includes(
+                "multipart/form-data"
+            )
         ) {
             return jsonResponse(
                 {
@@ -114,8 +96,7 @@ export async function onRequestPost(
             );
 
         if (
-            !session
-            || !session.sessionData
+            !session?.sessionData
         ) {
             return jsonResponse(
                 {
@@ -136,7 +117,7 @@ export async function onRequestPost(
                     .EpicUniqueId
                 || ""
             )
-            .trim();
+                .trim();
 
         if (
             !epicUniqueId
@@ -163,8 +144,24 @@ export async function onRequestPost(
         // FORM DATA
         // ====================================================
 
-        const formData =
-            await request.formData();
+        let formData;
+
+        try {
+            formData =
+                await request.formData();
+        }
+        catch {
+            return jsonResponse(
+                {
+                    success: false,
+                    message:
+                        "Unable to read submitted form data.",
+                    version:
+                        SUBMIT_JOB_VERSION
+                },
+                400
+            );
+        }
 
         // ====================================================
         // PLAYERS PER TEAM
@@ -178,10 +175,14 @@ export async function onRequestPost(
             );
 
         if (
-            ![1, 2, 3, 4]
-                .includes(
-                    playersPerTeam
-                )
+            ![
+                1,
+                2,
+                3,
+                4
+            ].includes(
+                playersPerTeam
+            )
         ) {
             return jsonResponse(
                 {
@@ -238,14 +239,15 @@ export async function onRequestPost(
         }
 
         const expectedCount =
-            playersPerTeam * 2;
+            playersPerTeam
+            * 2;
 
         if (
             !Array.isArray(
                 expectedPlayerNames
             )
-            || expectedPlayerNames.length
-                !== expectedCount
+            || expectedPlayerNames.length !==
+                expectedCount
             || expectedPlayerNames.some(
                 function(
                     name
@@ -283,8 +285,8 @@ export async function onRequestPost(
 
         if (
             !image
-            || typeof image.arrayBuffer
-                !== "function"
+            || typeof image.arrayBuffer !==
+                "function"
         ) {
             return jsonResponse(
                 {
@@ -299,8 +301,14 @@ export async function onRequestPost(
         }
 
         if (
-            image.size !== undefined
-            && image.size <= 0
+            Number.isFinite(
+                Number(
+                    image.size
+                )
+            )
+            && Number(
+                image.size
+            ) <= 0
         ) {
             return jsonResponse(
                 {
@@ -319,7 +327,7 @@ export async function onRequestPost(
 
         if (
             !imageBytes
-            || imageBytes.byteLength === 0
+            || imageBytes.byteLength <= 0
         ) {
             return jsonResponse(
                 {
@@ -392,7 +400,7 @@ export async function onRequestPost(
 
         const requestData = {
             version:
-                "ocr-job-request-1.2",
+                "ocr-job-request-1.3",
 
             jobId,
 
@@ -408,7 +416,7 @@ export async function onRequestPost(
 
         const statusData = {
             version:
-                "ocr-job-state-1.2",
+                "ocr-job-state-1.3",
 
             jobId,
 
@@ -418,8 +426,14 @@ export async function onRequestPost(
             status:
                 "queued",
 
+            stage:
+                "queued",
+
             progress:
-                0,
+                JOB_PROGRESS.QUEUED,
+
+            message:
+                "Scoreboard queued for processing.",
 
             uploadStatus:
                 "completed",
@@ -437,7 +451,7 @@ export async function onRequestPost(
                 null,
 
             heartbeatAt:
-                null,
+                now,
 
             attempt:
                 0,
@@ -458,6 +472,9 @@ export async function onRequestPost(
             benchmarkKey:
                 null,
 
+            cloudRuntimeSeconds:
+                null,
+
             error:
                 null
         };
@@ -473,12 +490,15 @@ export async function onRequestPost(
                 {
                     httpMetadata: {
                         contentType:
-                            image.type
-                            || "image/png"
+                            String(
+                                image.type
+                                || "image/png"
+                            )
                     },
 
                     customMetadata: {
                         jobId,
+
                         uploadedAt:
                             now
                     }
@@ -547,12 +567,18 @@ export async function onRequestPost(
                             "queue_failed",
 
                         progress:
-                            100,
+                            JOB_PROGRESS.FAILED,
+
+                        message:
+                            "The scoreboard could not be queued for processing.",
 
                         updatedAt:
                             failedAt,
 
                         completedAt:
+                            failedAt,
+
+                        heartbeatAt:
                             failedAt,
 
                         error: {
@@ -594,16 +620,19 @@ export async function onRequestPost(
                 jobId,
 
                 status:
-                    "queued",
+                    statusData.status,
 
                 stage:
-                    "queued",
+                    statusData.stage,
 
                 progress:
-                    0,
+                    statusData.progress,
+
+                message:
+                    statusData.message,
 
                 uploadStatus:
-                    "completed"
+                    statusData.uploadStatus
             },
             202
         );
@@ -623,18 +652,40 @@ export async function onRequestPost(
                 message:
                     "Unable to create OCR job.",
 
-                error:
-                    String(
-                        error?.message
-                        || error
-                    ),
-
                 version:
                     SUBMIT_JOB_VERSION
             },
             500
         );
     }
+}
+
+// ============================================================
+// CONFIGURATION
+// ============================================================
+
+function validateConfiguration(
+    env
+) {
+    if (
+        !env.OCR_STORAGE
+    ) {
+        return "OCR storage is not configured.";
+    }
+
+    if (
+        !env.OCR_OWNER_SECRET
+    ) {
+        return "OCR owner hashing is not configured.";
+    }
+
+    if (
+        !env.OCR_JOB_QUEUE
+    ) {
+        return "OCR job queue is not configured.";
+    }
+
+    return "";
 }
 
 // ============================================================
@@ -662,8 +713,8 @@ function buildRequestFields(
         }
 
         if (
-            typeof value
-            !== "string"
+            typeof value !==
+                "string"
         ) {
             continue;
         }
@@ -678,20 +729,30 @@ function buildRequestFields(
         ) {
             if (
                 !Array.isArray(
-                    fields[key]
+                    fields[
+                        key
+                    ]
                 )
             ) {
-                fields[key] = [
-                    fields[key]
+                fields[
+                    key
+                ] = [
+                    fields[
+                        key
+                    ]
                 ];
             }
 
-            fields[key].push(
+            fields[
+                key
+            ].push(
                 value
             );
         }
         else {
-            fields[key] =
+            fields[
+                key
+            ] =
                 value;
         }
     }
@@ -790,7 +851,7 @@ function createJobId() {
 
 function jsonResponse(
     data,
-    status=200
+    status = 200
 ) {
     return new Response(
         JSON.stringify(

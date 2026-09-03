@@ -14,7 +14,7 @@ import {
 // ============================================================
 
 const CONSUMER_VERSION =
-    "ocr-job-consumer-1.3-AUTODEPLOY-ENABLED";
+    "ocr-job-consumer-1.4-AUTODEPLOY-ENABLED";
 
 const OCR_JOB_STATUS_PREFIX =
     "ocr-jobs";
@@ -201,11 +201,18 @@ async function markJobStarting(
         progress:
             Math.max(
                 2,
-                Number(status?.progress) || 0
+                Number(
+                    status?.progress
+                )
+                || 0
             ),
 
+        message:
+            "Starting scoreboard reader.",
+
         startedAt:
-            status?.startedAt || now,
+            status?.startedAt
+            || now,
 
         updatedAt:
             now,

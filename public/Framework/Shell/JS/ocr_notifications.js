@@ -5,6 +5,9 @@
    GLOBAL OCR NOTIFICATIONS
    ========================================================= */
 
+const OCR_NOTIFICATION_VERSION =
+    "ocr-notifications-1.1";
+
 const OCR_ACTIVE_JOB_KEY =
     "rocketLeagueOcrActiveJobV1";
 
@@ -30,10 +33,11 @@ const OCR_NOTIFICATION_CONTAINER_ID =
     "ocrNotificationContainer";
 
 const OCR_NOTIFICATION_CHECK_SCHEDULE_MS = [
-    2500,
+    1500,
+    3000,
     5000,
-    8000,
-    12000,
+    7500,
+    10000,
     15000,
     20000
 ];
@@ -47,15 +51,15 @@ const OCR_NOTIFICATION_MAX_STALE_CHECKS =
     3;
 
 const OCR_NOTIFICATION_PROCESSING_STALE_MS =
-    90
+    120
     * 1000;
 
 const OCR_NOTIFICATION_TAIL_POLL_MS =
-    20
+    10
     * 1000;
 
 const OCR_NOTIFICATION_MAX_ACTIVE_JOB_MS =
-    6
+    10
     * 60
     * 1000;
 
@@ -127,6 +131,33 @@ function validJobId(
     return /^[A-Z0-9]{16}$/.test(
         normalizeId(
             value
+        )
+    );
+}
+
+function normalizeClientProgress(
+    value
+) {
+    const numeric =
+        Number(
+            value
+        );
+
+    if (
+        !Number.isFinite(
+            numeric
+        )
+    ) {
+        return 0;
+    }
+
+    return Math.max(
+        0,
+        Math.min(
+            100,
+            Math.round(
+                numeric
+            )
         )
     );
 }
@@ -1465,9 +1496,8 @@ function getOcrProgressSignature(
             .toLowerCase(),
 
         String(
-            Number(
+            normalizeClientProgress(
                 job?.progress
-                || 0
             )
         ),
 
@@ -1600,7 +1630,9 @@ function isOcrQueueStale(
     );
 }
 
-function isOcrProcessingStale(job) {
+function isOcrProcessingStale(
+    job
+) {
     if (
         OCR_NOTIFICATION_STALE_CHECKS <
         OCR_NOTIFICATION_MAX_STALE_CHECKS
@@ -1609,17 +1641,22 @@ function isOcrProcessingStale(job) {
     }
 
     const activityAt =
-        getOcrJobActivityTimestamp(job);
+        getOcrJobActivityTimestamp(
+            job
+        );
 
     if (
-        !Number.isFinite(activityAt)
+        !Number.isFinite(
+            activityAt
+        )
     ) {
         return false;
     }
 
     return (
-        Date.now() - activityAt >=
-        OCR_NOTIFICATION_PROCESSING_STALE_MS
+        Date.now()
+        - activityAt
+        >= OCR_NOTIFICATION_PROCESSING_STALE_MS
     );
 }
 
@@ -1665,7 +1702,8 @@ function abandonActiveOcrJob(
     const abandonedJob = {
         ...(
             job
-            && typeof job === "object"
+            && typeof job ===
+                "object"
                 ? job
                 : {}
         ),
@@ -1705,6 +1743,9 @@ function abandonActiveOcrJob(
     console.warn(
         "[OCR NOTIFICATIONS] Releasing stalled OCR job.",
         {
+            version:
+                OCR_NOTIFICATION_VERSION,
+
             jobId,
 
             reason:
@@ -2077,7 +2118,40 @@ async function runActiveOcrCheck() {
                     detail: {
                         jobId,
 
-                        job
+                        job,
+
+                        status,
+
+                        stage:
+                            String(
+                                job?.stage
+                                || ""
+                            )
+                                .trim()
+                                .toLowerCase(),
+
+                        progress:
+                            normalizeClientProgress(
+                                job?.progress
+                            ),
+
+                        message:
+                            String(
+                                job?.message
+                                || ""
+                            )
+                                .trim(),
+
+                        updatedAt:
+                            job?.updatedAt
+                            || null,
+
+                        heartbeatAt:
+                            job?.heartbeatAt
+                            || null,
+
+                        version:
+                            OCR_NOTIFICATION_VERSION
                     }
                 }
             )

@@ -5,6 +5,9 @@
    OCR IMAGE SUBMISSION
    ========================================================= */
 
+const OCR_SUBMISSION_VERSION =
+    "ocr-submission-1.4";
+
 const OCR_JOB_SUBMIT_URL =
     "/api/ocr/jobs/submit_job";
 
@@ -40,9 +43,6 @@ let OCR_LOADING_PROGRESS =
 let OCR_LOADING_CONFIRMED_PROGRESS =
     0;
 
-let OCR_LOADING_NEXT_GATE =
-    0;
-
 let OCR_LOADING_VELOCITY =
     0;
 
@@ -58,51 +58,23 @@ let OCR_LOADING_LAST_MESSAGE =
 let OCR_SUBMISSION_EVENTS_BOUND =
     false;
 
-const OCR_PROGRESS_CHECKPOINTS = [
-    0,
-    2,
-    4,
-    6,
-    8,
-    10,
-    12,
-    18,
-    25,
-    34,
-    45,
-    56,
-    68,
-    76,
-    82,
-    89,
-    94,
-    96,
-    100
-];
-
-const OCR_PROGRESS_FAST_RATIO =
-    0.70;
-
 const OCR_PROGRESS_TICK_MS =
     60;
 
 const OCR_PROGRESS_INITIAL_VELOCITY =
-    0.025;
+    0.05;
 
 const OCR_PROGRESS_ACCELERATION =
-    0.014;
+    0.025;
 
-const OCR_PROGRESS_MAX_FAST_VELOCITY =
-    0.18;
+const OCR_PROGRESS_MAX_VELOCITY =
+    0.55;
 
-const OCR_PROGRESS_MIN_CREEP_VELOCITY =
-    0.006;
+const OCR_PROGRESS_MIN_VELOCITY =
+    0.025;
 
-const OCR_PROGRESS_DECELERATION =
-    0.90;
-
-const OCR_PROGRESS_GATE_PADDING =
-    0.08;
+const OCR_PROGRESS_DISTANCE_RATIO =
+    0.12;
 
 /* =========================================================
    LOADING UI
@@ -186,38 +158,26 @@ function renderOcrLoading(
         )}%`;
 
     if (
-        text
+        text !== null
+        && typeof text !== "undefined"
     ) {
-        OCR_LOADING_LAST_MESSAGE =
+        const normalizedText =
             String(
                 text
-            );
+                || ""
+            )
+                .trim();
 
-        loadingText.textContent =
-            OCR_LOADING_LAST_MESSAGE;
-    }
-}
-
-function getNextOcrProgressGate(
-    confirmedProgress
-) {
-    const confirmed =
-        normalizeOcrProgress(
-            confirmedProgress
-        );
-
-    for (
-        const checkpoint
-        of OCR_PROGRESS_CHECKPOINTS
-    ) {
         if (
-            checkpoint > confirmed
+            normalizedText
         ) {
-            return checkpoint;
+            OCR_LOADING_LAST_MESSAGE =
+                normalizedText;
+
+            loadingText.textContent =
+                OCR_LOADING_LAST_MESSAGE;
         }
     }
-
-    return 100;
 }
 
 function stopOcrLoadingAnimation() {
@@ -248,118 +208,40 @@ function clearOcrLoadingFinishTimer() {
 
 function calculateOcrProgressStep() {
     if (
-        OCR_LOADING_PROGRESS >= 100
-    ) {
-        return 0;
-    }
-
-    const confirmed =
-        OCR_LOADING_CONFIRMED_PROGRESS;
-
-    const nextGate =
-        OCR_LOADING_NEXT_GATE;
-
-    if (
-        nextGate <= 0
-        || nextGate <= confirmed
-    ) {
-        return 0;
-    }
-
-    const checkpointDistance =
-        nextGate
-        - confirmed;
-
-    const fastEnd =
-        confirmed
-        + (
-            checkpointDistance
-            * OCR_PROGRESS_FAST_RATIO
-        );
-
-    const visualCeiling =
-        nextGate >= 100
-            ? 99.92
-            : nextGate
-                - OCR_PROGRESS_GATE_PADDING;
-
-    if (
         OCR_LOADING_PROGRESS >=
-        visualCeiling
+        OCR_LOADING_CONFIRMED_PROGRESS
     ) {
+        OCR_LOADING_VELOCITY =
+            OCR_PROGRESS_INITIAL_VELOCITY;
+
         return 0;
-    }
-
-    if (
-        OCR_LOADING_PROGRESS <
-        confirmed
-    ) {
-        OCR_LOADING_VELOCITY =
-            Math.min(
-                OCR_PROGRESS_MAX_FAST_VELOCITY,
-                Math.max(
-                    OCR_LOADING_VELOCITY,
-                    OCR_PROGRESS_INITIAL_VELOCITY
-                )
-                + OCR_PROGRESS_ACCELERATION
-            );
-
-        return Math.min(
-            OCR_LOADING_VELOCITY,
-            confirmed
-            - OCR_LOADING_PROGRESS
-        );
-    }
-
-    if (
-        OCR_LOADING_PROGRESS <
-        fastEnd
-    ) {
-        OCR_LOADING_VELOCITY =
-            Math.min(
-                OCR_PROGRESS_MAX_FAST_VELOCITY,
-                Math.max(
-                    OCR_LOADING_VELOCITY,
-                    OCR_PROGRESS_INITIAL_VELOCITY
-                )
-                + OCR_PROGRESS_ACCELERATION
-            );
-
-        return Math.min(
-            OCR_LOADING_VELOCITY,
-            visualCeiling
-            - OCR_LOADING_PROGRESS
-        );
     }
 
     const remaining =
-        visualCeiling
+        OCR_LOADING_CONFIRMED_PROGRESS
         - OCR_LOADING_PROGRESS;
 
-    if (
-        remaining <= 0
-    ) {
-        return 0;
-    }
-
     OCR_LOADING_VELOCITY =
-        Math.max(
-            OCR_PROGRESS_MIN_CREEP_VELOCITY,
-            OCR_LOADING_VELOCITY
-            * OCR_PROGRESS_DECELERATION
+        Math.min(
+            OCR_PROGRESS_MAX_VELOCITY,
+            Math.max(
+                OCR_PROGRESS_MIN_VELOCITY,
+                OCR_LOADING_VELOCITY
+                + OCR_PROGRESS_ACCELERATION
+            )
         );
 
-    const distanceLimitedStep =
-        remaining
-        * 0.075;
+    const distanceStep =
+        Math.max(
+            OCR_PROGRESS_MIN_VELOCITY,
+            remaining
+            * OCR_PROGRESS_DISTANCE_RATIO
+        );
 
     return Math.min(
         remaining,
         OCR_LOADING_VELOCITY,
-        Math.max(
-            OCR_PROGRESS_MIN_CREEP_VELOCITY,
-            distanceLimitedStep
-        )
+        distanceStep
     );
 }
 
@@ -374,8 +256,11 @@ function animateOcrLoadingStep() {
     }
 
     renderOcrLoading(
-        OCR_LOADING_PROGRESS
-        + step
+        Math.min(
+            OCR_LOADING_CONFIRMED_PROGRESS,
+            OCR_LOADING_PROGRESS
+            + step
+        )
     );
 }
 
@@ -409,11 +294,6 @@ function updateOcrLoading(
         OCR_LOADING_CONFIRMED_PROGRESS =
             normalizedProgress;
 
-        OCR_LOADING_NEXT_GATE =
-            getNextOcrProgressGate(
-                OCR_LOADING_CONFIRMED_PROGRESS
-            );
-
         OCR_LOADING_VELOCITY =
             Math.max(
                 OCR_LOADING_VELOCITY,
@@ -444,6 +324,7 @@ function showOcrLoading(
         "Submitting scoreboard..."
 ) {
     stopOcrLoadingAnimation();
+
     clearOcrLoadingFinishTimer();
 
     OCR_LOADING_PROGRESS =
@@ -451,11 +332,6 @@ function showOcrLoading(
 
     OCR_LOADING_CONFIRMED_PROGRESS =
         0;
-
-    OCR_LOADING_NEXT_GATE =
-        getNextOcrProgressGate(
-            0
-        );
 
     OCR_LOADING_VELOCITY =
         OCR_PROGRESS_INITIAL_VELOCITY;
@@ -482,15 +358,15 @@ function finishOcrLoading(
 
     clearOcrLoadingFinishTimer();
 
+    stopOcrLoadingAnimation();
+
     if (
         success
     ) {
-        stopOcrLoadingAnimation();
-
         OCR_LOADING_CONFIRMED_PROGRESS =
             100;
 
-        OCR_LOADING_NEXT_GATE =
+        OCR_LOADING_PROGRESS =
             100;
 
         OCR_LOADING_VELOCITY =
@@ -503,7 +379,8 @@ function finishOcrLoading(
         );
     }
     else {
-        stopOcrLoadingAnimation();
+        OCR_LOADING_VELOCITY =
+            0;
 
         renderOcrLoading(
             OCR_LOADING_PROGRESS,
@@ -736,6 +613,7 @@ function getJobStageMessage(
             );
     }
 }
+
 /* =========================================================
    JOB PROGRESS
    ========================================================= */
@@ -770,22 +648,18 @@ function getJobProgress(
             currentImageProgress
         )
     ) {
-        return Math.min(
-            100,
-            Math.max(
-                0,
+        return normalizeOcrProgress(
+            (
                 (
-                    (
-                        completedImages
-                        + (
-                            currentImageProgress
-                            / 100
-                        )
+                    completedImages
+                    + (
+                        currentImageProgress
+                        / 100
                     )
-                    / totalImages
                 )
-                * 100
+                / totalImages
             )
+            * 100
         );
     }
 
@@ -799,12 +673,8 @@ function getJobProgress(
             progress
         )
     ) {
-        return Math.min(
-            100,
-            Math.max(
-                0,
-                progress
-            )
+        return normalizeOcrProgress(
+            progress
         );
     }
 
@@ -834,7 +704,7 @@ function getJobProgress(
         return 100;
     }
 
-    return OCR_LOADING_PROGRESS;
+    return OCR_LOADING_CONFIRMED_PROGRESS;
 }
 
 /* =========================================================
@@ -866,18 +736,38 @@ function handleGlobalOcrJobProgress(
 
     if (
         OCR_ACTIVE_JOB_ID
-        && OCR_ACTIVE_JOB_ID !== jobId
+        && OCR_ACTIVE_JOB_ID !==
+            jobId
     ) {
         return;
     }
 
-    const progress =
-        getJobProgress(
-            job
+    const eventProgress =
+        Number(
+            event?.detail?.progress
         );
 
+    const progress =
+        Number.isFinite(
+            eventProgress
+        )
+            ? normalizeOcrProgress(
+                eventProgress
+            )
+            : getJobProgress(
+                job
+            );
+
+    const eventMessage =
+        String(
+            event?.detail?.message
+            || ""
+        )
+            .trim();
+
     const message =
-        getJobStageMessage(
+        eventMessage
+        || getJobStageMessage(
             job
         );
 
@@ -902,10 +792,14 @@ function notifyGlobalJobWatcher(
                 {
                     key:
                         OCR_ACTIVE_JOB_KEY,
+
                     oldValue,
+
                     newValue,
+
                     storageArea:
                         localStorage,
+
                     url:
                         window.location.href
                 }
@@ -1054,10 +948,13 @@ async function getOcrJobResult(
             {
                 method:
                     "GET",
+
                 credentials:
                     "same-origin",
+
                 cache:
                     "no-store",
+
                 headers: {
                     "Accept":
                         "application/json"
@@ -1086,14 +983,14 @@ async function getOcrJobResult(
     const result =
         (
             data?.matchReport
-            && typeof data.matchReport
-                === "object"
+            && typeof data.matchReport ===
+                "object"
         )
             ? data.matchReport
             : (
                 data?.result
-                && typeof data.result
-                    === "object"
+                && typeof data.result ===
+                    "object"
                     ? data.result
                     : null
             );
@@ -1138,6 +1035,7 @@ function getOcrTeams(
         teams.push({
             team:
                 1,
+
             players:
                 result.team1
         });
@@ -1151,6 +1049,7 @@ function getOcrTeams(
         teams.push({
             team:
                 2,
+
             players:
                 result.team2
         });
@@ -1203,7 +1102,8 @@ function getVisibleScoreboardFields(
                                     ] !== null
                                     && typeof player?.[
                                         fieldName
-                                    ] !== "undefined"
+                                    ] !==
+                                        "undefined"
                                 ) {
                                     visibleFields.add(
                                         fieldName
@@ -1237,8 +1137,8 @@ function getOcrEditLockState() {
 
     if (
         !policy
-        || typeof policy.areEditsLocked
-            !== "function"
+        || typeof policy.areEditsLocked !==
+            "function"
     ) {
         return false;
     }
@@ -1446,8 +1346,8 @@ function renderOcrResultTable(
                                         fieldName
                                     ]
                                     ?? (
-                                        fieldName
-                                        === "ping"
+                                        fieldName ===
+                                            "ping"
                                             ? 0
                                             : ""
                                     )
@@ -1565,6 +1465,7 @@ function renderOcrResultTable(
         )
     );
 }
+
 /* =========================================================
    RESULT MODAL
    ========================================================= */
@@ -1628,8 +1529,8 @@ function renderOcrResult(
     );
 
     if (
-        typeof results.showModal
-            === "function"
+        typeof results.showModal ===
+            "function"
     ) {
         if (
             !results.open
@@ -1741,7 +1642,8 @@ function handleGlobalOcrJobCompleted(
 
     if (
         OCR_ACTIVE_JOB_ID
-        && OCR_ACTIVE_JOB_ID !== jobId
+        && OCR_ACTIVE_JOB_ID !==
+            jobId
     ) {
         return;
     }
@@ -1779,6 +1681,7 @@ function handleGlobalOcrJobCompleted(
             {
                 detail: {
                     jobId,
+
                     matchId,
 
                     usedCrop:
@@ -2127,15 +2030,20 @@ async function submitScoreboard(
             jobId
         );
 
-        updateOcrLoading(
-            Math.max(
-                5,
+        const submittedProgress =
+            normalizeOcrProgress(
                 Number(
                     data?.progress
                 )
                 || 0
-            ),
-            "Scoreboard queued for processing..."
+            );
+
+        updateOcrLoading(
+            submittedProgress,
+            String(
+                data?.message
+                || "Scoreboard queued for processing..."
+            )
         );
 
         setStatus(
@@ -2215,6 +2123,7 @@ function restoreActiveOcrJob() {
         jobId
     );
 }
+
 /* =========================================================
    EVENTS
    ========================================================= */
@@ -2285,9 +2194,6 @@ function initializeOcrSubmission() {
     OCR_LOADING_CONFIRMED_PROGRESS =
         0;
 
-    OCR_LOADING_NEXT_GATE =
-        0;
-
     OCR_LOADING_VELOCITY =
         0;
 
@@ -2317,6 +2223,10 @@ function initializeOcrSubmission() {
     restoreActiveOcrJob();
 
     restoreRequestedOcrReview();
+
+    console.log(
+        `[OCR SUBMISSION] ${OCR_SUBMISSION_VERSION} ready.`
+    );
 
     return true;
 }

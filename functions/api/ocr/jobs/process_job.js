@@ -2,9 +2,8 @@
 // BPD GAMING NETWORK
 // OCR JOB PROCESSOR
 // ============================================================
-
 const PROCESS_JOB_VERSION =
-    "ocr-process-job-1.3";
+    "ocr-process-job-1.4";
 
 const JOB_PROGRESS = Object.freeze({
     STARTING:
@@ -721,9 +720,14 @@ function validateConfiguration(
         return "OCR progress callback URL is not configured.";
     }
 
+    if (
+        !env.OCR_JOB_PROGRESS_SECURE_TOKEN
+    ) {
+        return "OCR progress authentication is not configured.";
+    }
+
     return "";
 }
-
 // ============================================================
 // INTERNAL AUTHENTICATION
 // ============================================================
@@ -881,86 +885,48 @@ async function readJsonRequest(
 // CLOUD RUN FORM
 // ============================================================
 
-function buildCloudRunForm(
-    imageBlob,
-    requestData
+function buildCloudRunHeaders(
+    env,
+    jobId
 ) {
-    const formData =
-        new FormData();
+    const headers =
+        new Headers();
 
-    formData.set(
-        "file",
-        imageBlob,
-        "input.png"
+    headers.set(
+        "X-API-Key",
+        String(
+            env.OCR_API_KEY
+        )
     );
 
-    const fields =
-        (
-            requestData
-            && typeof requestData.fields
-                === "object"
-            && requestData.fields !== null
-            && !Array.isArray(
-                requestData.fields
-            )
-        )
-            ? requestData.fields
-            : {};
+    headers.set(
+        "X-BPD-OCR-Handler-Version",
+        PROCESS_JOB_VERSION
+    );
 
-    for (
-        const [
-            key,
-            value
-        ]
-        of Object.entries(
-            fields
+    headers.set(
+        "X-BPD-OCR-Job-ID",
+        jobId
+    );
+
+    const callbackUrl =
+        String(
+            env.OCR_JOB_PROGRESS_URL
+            || ""
         )
+            .trim();
+
+    if (
+        callbackUrl
     ) {
-        if (
-            value === null
-            || value === undefined
-        ) {
-            continue;
-        }
-
-        if (
-            Array.isArray(
-                value
-            )
-        ) {
-            for (
-                const item
-                of value
-            ) {
-                if (
-                    item === null
-                    || item === undefined
-                ) {
-                    continue;
-                }
-
-                formData.append(
-                    key,
-                    String(
-                        item
-                    )
-                );
-            }
-
-            continue;
-        }
-
-        formData.set(
-            key,
-            String(
-                value
-            )
+        headers.set(
+            "X-BPD-OCR-Progress-URL",
+            callbackUrl
         );
     }
 
-    return formData;
+    return headers;
 }
-
 // ============================================================
 // CLOUD RUN HEADERS
 // ============================================================
