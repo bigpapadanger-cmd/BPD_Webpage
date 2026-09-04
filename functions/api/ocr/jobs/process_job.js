@@ -4,7 +4,13 @@
 // ============================================================
 
 const PROCESS_JOB_VERSION =
-    "ocr-process-job-1.6";
+    "ocr-process-job-1.7";
+
+const PROCESSING_LEASE_MS =
+    120000;
+
+const OCR_PROVIDER_TIMEOUT_MS =
+    295000;
 
 const JOB_PROGRESS = Object.freeze({
     STARTING:
@@ -65,7 +71,8 @@ export async function onRequestPost(
                     publicMessage:
                         configError.message,
                     internalMessage:
-                        configError.message
+                        configError.internalMessage
+                        || configError.message
                 }
             );
 
@@ -87,11 +94,14 @@ export async function onRequestPost(
         // INTERNAL AUTHENTICATION
         // ====================================================
 
-        if (
-            !await isAuthorizedProcessorRequest(
+        const authorized =
+            await isAuthorizedProcessorRequest(
                 request,
                 env
-            )
+            );
+
+        if (
+            !authorized
         ) {
             const failure =
                 buildFailure(
@@ -108,7 +118,7 @@ export async function onRequestPost(
                     publicMessage:
                         failure.message,
                     internalMessage:
-                        "The supplied processor token did not match the configured processor token."
+                        "Processor authentication token was missing or invalid."
                 }
             );
 
@@ -127,7 +137,7 @@ export async function onRequestPost(
         }
 
         // ====================================================
-        // REQUEST
+        // PROCESS REQUEST
         // ====================================================
 
         const body =
@@ -138,33 +148,16 @@ export async function onRequestPost(
         if (
             !body
         ) {
-            const failure =
-                buildFailure(
-                    "PROCESS_REQUEST_INVALID_JSON",
-                    "The OCR processor received an invalid request."
-                );
-
-            logProcessError(
+            return loggedFailureResponse(
                 {
                     jobId:
                         null,
                     code:
-                        failure.code,
+                        "PROCESS_REQUEST_INVALID_JSON",
                     publicMessage:
-                        failure.message,
+                        "The OCR processor received an invalid request.",
                     internalMessage:
-                        "Processor request body was not valid JSON."
-                }
-            );
-
-            return failureResponse(
-                {
-                    jobId:
-                        null,
-                    code:
-                        failure.code,
-                    message:
-                        failure.message,
+                        "Processor request body was not a valid JSON object.",
                     httpStatus:
                         400
                 }
@@ -173,39 +166,22 @@ export async function onRequestPost(
 
         jobId =
             sanitizeJobId(
-                body?.jobId
+                body.jobId
             );
 
         if (
             !jobId
         ) {
-            const failure =
-                buildFailure(
-                    "PROCESS_JOB_ID_INVALID",
-                    "The OCR job identifier is missing or invalid."
-                );
-
-            logProcessError(
+            return loggedFailureResponse(
                 {
                     jobId:
                         null,
                     code:
-                        failure.code,
+                        "PROCESS_JOB_ID_INVALID",
                     publicMessage:
-                        failure.message,
+                        "The OCR job identifier is missing or invalid.",
                     internalMessage:
-                        `Received jobId: ${String(body?.jobId || "")}`
-                }
-            );
-
-            return failureResponse(
-                {
-                    jobId:
-                        null,
-                    code:
-                        failure.code,
-                    message:
-                        failure.message,
+                        `Received jobId=${String(body.jobId || "")}`,
                     httpStatus:
                         400
                 }
@@ -225,51 +201,34 @@ export async function onRequestPost(
             `${baseKey}/status.json`;
 
         // ====================================================
-        // LOAD CURRENT STATUS
+        // LOAD STATUS
         // ====================================================
 
         let currentStatus =
-            await readStatus(
+            await readRequiredJsonObject(
                 env,
-                statusKey
-            );
-
-        if (
-            !currentStatus
-        ) {
-            const failure =
-                buildFailure(
-                    "JOB_STATUS_NOT_FOUND",
-                    "The OCR job status could not be found."
-                );
-
-            logProcessError(
+                statusKey,
                 {
-                    jobId,
-                    code:
-                        failure.code,
-                    publicMessage:
-                        failure.message,
-                    internalMessage:
-                        `Status object was not found at ${statusKey}.`
+                    missingCode:
+                        "JOB_STATUS_NOT_FOUND",
+                    missingMessage:
+                        "The OCR job status could not be found.",
+                    invalidCode:
+                        "JOB_STATUS_INVALID",
+                    invalidMessage:
+                        "The stored OCR job status is invalid."
                 }
             );
 
-            return failureResponse(
-                {
-                    jobId,
-                    code:
-                        failure.code,
-                    message:
-                        failure.message,
-                    httpStatus:
-                        404
-                }
-            );
-        }
+        validateStatusIdentity(
+            currentStatus,
+            jobId,
+            inputKey,
+            requestKey
+        );
 
         // ====================================================
-        // IDEMPOTENCY
+        // COMPLETED IDEMPOTENCY
         // ====================================================
 
         if (
@@ -284,7 +243,9 @@ export async function onRequestPost(
                     status:
                         "completed",
                     matchId:
-                        currentStatus.matchId
+                        sanitizeMatchId(
+                            currentStatus.matchId
+                        )
                         || null,
                     message:
                         "OCR job is already completed.",
@@ -296,7 +257,43 @@ export async function onRequestPost(
         }
 
         // ====================================================
-        // PROCESSING START
+        // DUPLICATE PROCESSOR GUARD
+        // ====================================================
+
+        if (
+            currentStatus.status ===
+            "processing"
+            && isProcessingLeaseActive(
+                currentStatus
+            )
+        ) {
+            return jsonResponse(
+                {
+                    success:
+                        true,
+                    jobId,
+                    status:
+                        "processing",
+                    stage:
+                        String(
+                            currentStatus.stage
+                            || "processing"
+                        ),
+                    progress:
+                        normalizeProgress(
+                            currentStatus.progress
+                        ),
+                    message:
+                        "OCR job is already being processed.",
+                    version:
+                        PROCESS_JOB_VERSION
+                },
+                202
+            );
+        }
+
+        // ====================================================
+        // PROCESSING START / RETRY
         // ====================================================
 
         currentStatus =
@@ -322,12 +319,14 @@ export async function onRequestPost(
                     failureSummary:
                         null,
                     completedAt:
+                        null,
+                    cloudRuntimeSeconds:
                         null
                 }
             );
 
         // ====================================================
-        // LOAD STORED JOB DATA
+        // LOAD JOB FILES
         // ====================================================
 
         const [
@@ -350,30 +349,30 @@ export async function onRequestPost(
             throw createProcessError(
                 "JOB_FILES_INCOMPLETE",
                 "OCR job files are incomplete.",
-                `Missing stored job files. input=${Boolean(inputObject)}, request=${Boolean(requestObject)}`
+                `Missing stored objects: input=${Boolean(inputObject)}, request=${Boolean(requestObject)}`
             );
         }
 
-        let requestData;
-
-        try {
-            requestData =
-                JSON.parse(
-                    await requestObject.text()
-                );
-        }
-        catch (
-            error
-        ) {
-            throw createProcessError(
+        const requestData =
+            await parseStoredJsonObject(
+                requestObject,
                 "REQUEST_METADATA_INVALID",
-                "The stored OCR request data could not be read.",
-                String(
-                    error?.message
-                    || error
-                )
+                "The stored OCR request data could not be read."
             );
-        }
+
+        validateStoredRequestIdentity(
+            requestData,
+            jobId
+        );
+
+        const normalizedFields =
+            normalizeRequestFields(
+                requestData.fields
+            );
+
+        // ====================================================
+        // PREPARING IMAGE
+        // ====================================================
 
         currentStatus =
             await transitionStatus(
@@ -392,29 +391,26 @@ export async function onRequestPost(
                 }
             );
 
-        // ====================================================
-        // IMAGE
-        // ====================================================
-
         const imageBytes =
             await inputObject.arrayBuffer();
 
         if (
             !imageBytes
-            || imageBytes.byteLength === 0
+            || imageBytes.byteLength <= 0
         ) {
             throw createProcessError(
                 "INPUT_IMAGE_EMPTY",
                 "The stored scoreboard image is empty.",
-                `Stored input object ${inputKey} contained no image bytes.`
+                `Stored input ${inputKey} contained zero bytes.`
             );
         }
 
         const contentType =
-            inputObject
-                .httpMetadata
-                ?.contentType
-            || "image/png";
+            normalizeImageContentType(
+                inputObject
+                    .httpMetadata
+                    ?.contentType
+            );
 
         const imageBlob =
             new Blob(
@@ -428,7 +424,7 @@ export async function onRequestPost(
             );
 
         // ====================================================
-        // CLOUD RUN REQUEST
+        // BUILD CLOUD RUN REQUEST
         // ====================================================
 
         currentStatus =
@@ -451,7 +447,7 @@ export async function onRequestPost(
         const formData =
             buildCloudRunForm(
                 imageBlob,
-                requestData
+                normalizedFields
             );
 
         const upstreamHeaders =
@@ -477,10 +473,6 @@ export async function onRequestPost(
                 }
             );
 
-        // ====================================================
-        // CALL CLOUD RUN
-        // ====================================================
-
         currentStatus =
             await transitionStatus(
                 env,
@@ -498,60 +490,43 @@ export async function onRequestPost(
                 }
             );
 
-        let ocrResponse;
+        // ====================================================
+        // CALL CLOUD RUN
+        // ====================================================
 
-        try {
-            ocrResponse =
-                await fetch(
-                    env.OCR_API_URL,
-                    {
-                        method:
-                            "POST",
-                        headers:
-                            upstreamHeaders,
-                        body:
-                            formData
-                    }
-                );
-        }
-        catch (
-            error
-        ) {
-            throw createProcessError(
-                "OCR_PROVIDER_REQUEST_FAILED",
-                "The scoreboard reader could not be reached.",
-                String(
-                    error?.message
-                    || error
-                )
+        const ocrResponse =
+            await fetchWithTimeout(
+                env.OCR_API_URL,
+                {
+                    method:
+                        "POST",
+                    headers:
+                        upstreamHeaders,
+                    body:
+                        formData
+                },
+                OCR_PROVIDER_TIMEOUT_MS
             );
-        }
 
         const result =
             await readUpstreamResponse(
                 ocrResponse
             );
 
+        // ====================================================
+        // NORMALIZE PROVIDER RESULT
+        // ====================================================
+
         const cloudRuntimeSeconds =
-            Number(
+            normalizeRuntimeSeconds(
                 result?.runtimeSeconds
             );
-
-        const validCloudRuntimeSeconds =
-            Number.isFinite(
-                cloudRuntimeSeconds
-            )
-                ? cloudRuntimeSeconds
-                : null;
-
-        // ====================================================
-        // PROVIDER RESULT
-        // ====================================================
 
         const providerJobId =
             sanitizeProviderId(
                 result?.jobId
                 || result?.benchmark?.jobId
+                || jobId
             );
 
         const matchId =
@@ -559,10 +534,13 @@ export async function onRequestPost(
                 result?.matchId
             );
 
-        const resultKey =
+        const returnedResultKey =
             sanitizeStorageKey(
                 result?.storage?.reportKey
-            )
+            );
+
+        const resultKey =
+            returnedResultKey
             || (
                 matchId
                     ? `match-reports/${matchId}.json`
@@ -583,18 +561,13 @@ export async function onRequestPost(
             );
 
         // ====================================================
-        // UPSTREAM FAILURE
+        // PROVIDER FAILURE
         // ====================================================
 
         if (
             !ocrResponse.ok
             || result?.success !== true
         ) {
-            const providerMessage =
-                getSafeProviderMessage(
-                    result
-                );
-
             const providerCode =
                 sanitizeErrorCode(
                     result?.error?.code
@@ -602,13 +575,12 @@ export async function onRequestPost(
                     || `OCR_PROVIDER_HTTP_${ocrResponse.status}`
                 );
 
-            const failure =
-                buildFailure(
-                    providerCode,
-                    providerMessage
-                    || getProviderFallbackMessage(
-                        ocrResponse.status
-                    )
+            const providerMessage =
+                getSafeProviderMessage(
+                    result
+                )
+                || getProviderFallbackMessage(
+                    ocrResponse.status
                 );
 
             await markJobFailed(
@@ -616,12 +588,14 @@ export async function onRequestPost(
                 statusKey,
                 {
                     code:
-                        failure.code,
+                        providerCode,
                     publicMessage:
-                        failure.message,
+                        providerMessage,
                     internalMessage:
-                        providerMessage
-                        || `Cloud Run returned HTTP ${ocrResponse.status}.`,
+                        buildProviderFailureLogMessage(
+                            ocrResponse,
+                            result
+                        ),
                     providerJobId
                 }
             );
@@ -630,12 +604,14 @@ export async function onRequestPost(
                 {
                     jobId,
                     code:
-                        failure.code,
+                        providerCode,
                     publicMessage:
-                        failure.message,
+                        providerMessage,
                     internalMessage:
-                        providerMessage
-                        || `Cloud Run returned HTTP ${ocrResponse.status}.`,
+                        buildProviderFailureLogMessage(
+                            ocrResponse,
+                            result
+                        ),
                     httpStatus:
                         ocrResponse.status,
                     providerJobId
@@ -646,9 +622,9 @@ export async function onRequestPost(
                 {
                     jobId,
                     code:
-                        failure.code,
+                        providerCode,
                     message:
-                        failure.message,
+                        providerMessage,
                     httpStatus:
                         normalizeUpstreamErrorStatus(
                             ocrResponse.status
@@ -658,7 +634,7 @@ export async function onRequestPost(
         }
 
         // ====================================================
-        // VALIDATE SUCCESS RESULT
+        // SUCCESS VALIDATION
         // ====================================================
 
         if (
@@ -667,7 +643,36 @@ export async function onRequestPost(
             throw createProcessError(
                 "MATCH_ID_MISSING",
                 "The scoreboard was processed but the result could not be finalized.",
-                "OCR provider returned success without a valid matchId."
+                "OCR provider returned success=true without a valid 16-character matchId."
+            );
+        }
+
+        if (
+            !resultKey
+        ) {
+            throw createProcessError(
+                "RESULT_KEY_MISSING",
+                "The scoreboard result could not be located.",
+                "OCR provider returned success without a usable report storage key."
+            );
+        }
+
+        // ====================================================
+        // VERIFY RESULT WAS SAVED
+        // ====================================================
+
+        const resultObject =
+            await env.OCR_STORAGE.head(
+                resultKey
+            );
+
+        if (
+            !resultObject
+        ) {
+            throw createProcessError(
+                "RESULT_REPORT_NOT_FOUND",
+                "The scoreboard was processed but its saved result could not be verified.",
+                `Expected OCR result was not found in R2 at ${resultKey}.`
             );
         }
 
@@ -676,7 +681,7 @@ export async function onRequestPost(
         // ====================================================
 
         currentStatus =
-            await readStatus(
+            await readStatusSafe(
                 env,
                 statusKey
             )
@@ -702,6 +707,7 @@ export async function onRequestPost(
                     matchId,
                     resultKey,
                     benchmarkKey,
+                    cloudRuntimeSeconds,
                     error:
                         null,
                     failureSummary:
@@ -710,7 +716,7 @@ export async function onRequestPost(
             );
 
         // ====================================================
-        // COMPLETED
+        // COMPLETE
         // ====================================================
 
         const completedAt =
@@ -718,54 +724,63 @@ export async function onRequestPost(
                 .toISOString();
 
         currentStatus =
-            await readStatus(
+            await readStatusSafe(
                 env,
                 statusKey
             )
             || currentStatus;
 
+        const completedStatus = {
+            ...currentStatus,
+            status:
+                "completed",
+            stage:
+                "completed",
+            progress:
+                JOB_PROGRESS.COMPLETED,
+            message:
+                "Scoreboard ready. Nice shot!",
+            cloudRuntimeSeconds,
+            providerJobId:
+                providerJobId
+                || currentStatus.providerJobId
+                || null,
+            matchId,
+            resultKey,
+            benchmarkKey:
+                benchmarkKey
+                || currentStatus.benchmarkKey
+                || null,
+            error:
+                null,
+            failureSummary:
+                null,
+            updatedAt:
+                completedAt,
+            completedAt,
+            heartbeatAt:
+                completedAt
+        };
+
         await updateStatus(
             env,
             statusKey,
-            {
-                ...currentStatus,
-                status:
-                    "completed",
-                stage:
-                    "completed",
-                cloudRuntimeSeconds:
-                    validCloudRuntimeSeconds,
-                progress:
-                    JOB_PROGRESS.COMPLETED,
-                message:
-                    "Scoreboard ready. Nice shot!",
-                failureSummary:
-                    null,
-                updatedAt:
-                    completedAt,
-                completedAt,
-                heartbeatAt:
-                    completedAt,
-                providerJobId:
-                    providerJobId
-                    || currentStatus.providerJobId
-                    || null,
-                matchId,
-                resultKey:
-                    resultKey
-                    || currentStatus.resultKey
-                    || null,
-                benchmarkKey:
-                    benchmarkKey
-                    || currentStatus.benchmarkKey
-                    || null,
-                error:
-                    null
-            }
+            completedStatus
         );
 
         console.log(
-            `[OCR PROCESS][COMPLETED] ${jobId} -> ${matchId}`
+            `[OCR PROCESS][COMPLETED] ${jobId}`,
+            {
+                jobId,
+                matchId,
+                resultKey,
+                benchmarkKey:
+                    benchmarkKey
+                    || null,
+                cloudRuntimeSeconds,
+                version:
+                    PROCESS_JOB_VERSION
+            }
         );
 
         return jsonResponse(
@@ -792,11 +807,10 @@ export async function onRequestPost(
             );
 
         const publicMessage =
-            String(
+            normalizePublicMessage(
                 error?.publicMessage
                 || "The OCR job processor encountered an unexpected error."
-            )
-                .trim();
+            );
 
         const internalMessage =
             String(
@@ -806,21 +820,13 @@ export async function onRequestPost(
             )
                 .trim();
 
-        const failure =
-            buildFailure(
-                code,
-                publicMessage
-            );
-
         logProcessError(
             {
                 jobId:
                     jobId
                     || null,
-                code:
-                    failure.code,
-                publicMessage:
-                    failure.message,
+                code,
+                publicMessage,
                 internalMessage,
                 stack:
                     error?.stack
@@ -831,17 +837,15 @@ export async function onRequestPost(
         if (
             jobId
             && statusKey
-            && env.OCR_STORAGE
+            && env?.OCR_STORAGE
         ) {
             try {
                 await markJobFailed(
                     env,
                     statusKey,
                     {
-                        code:
-                            failure.code,
-                        publicMessage:
-                            failure.message,
+                        code,
+                        publicMessage,
                         internalMessage
                     }
                 );
@@ -852,13 +856,15 @@ export async function onRequestPost(
                 console.error(
                     `[OCR PROCESS][STATUS_WRITE_FAILED] ${jobId}`,
                     {
-                        errorCode:
-                            failure.code,
-                        message:
+                        originalErrorCode:
+                            code,
+                        statusWriteError:
                             String(
                                 statusError?.message
                                 || statusError
-                            )
+                            ),
+                        version:
+                            PROCESS_JOB_VERSION
                     }
                 );
             }
@@ -869,12 +875,13 @@ export async function onRequestPost(
                 jobId:
                     jobId
                     || null,
-                code:
-                    failure.code,
+                code,
                 message:
-                    failure.message,
+                    publicMessage,
                 httpStatus:
-                    500
+                    getProcessErrorHttpStatus(
+                        error
+                    )
             }
         );
     }
@@ -888,138 +895,140 @@ function validateConfiguration(
     env
 ) {
     if (
-        !env.OCR_STORAGE
+        !env?.OCR_STORAGE
     ) {
-        return {
-            code:
-                "CONFIG_OCR_STORAGE_MISSING",
-            message:
-                "OCR storage is not configured."
-        };
+        return configurationFailure(
+            "CONFIG_OCR_STORAGE_MISSING",
+            "OCR storage is not configured."
+        );
     }
 
     if (
-        !env.OCR_API_URL
+        !hasNonEmptyString(
+            env.OCR_API_URL
+        )
     ) {
-        return {
-            code:
-                "CONFIG_OCR_API_URL_MISSING",
-            message:
-                "OCR service URL is not configured."
-        };
+        return configurationFailure(
+            "CONFIG_OCR_API_URL_MISSING",
+            "OCR service URL is not configured."
+        );
     }
 
     if (
-        !env.OCR_API_KEY
+        !isValidServiceUrl(
+            env.OCR_API_URL
+        )
     ) {
-        return {
-            code:
-                "CONFIG_OCR_API_KEY_MISSING",
-            message:
-                "OCR service authentication is not configured."
-        };
+        return configurationFailure(
+            "CONFIG_OCR_API_URL_INVALID",
+            "OCR service URL is invalid."
+        );
     }
 
     if (
-        !env.OCR_JOB_PROCESS_SECURE_TOKEN
+        !hasNonEmptyString(
+            env.OCR_API_KEY
+        )
     ) {
-        return {
-            code:
-                "CONFIG_PROCESS_TOKEN_MISSING",
-            message:
-                "OCR processor authentication is not configured."
-        };
+        return configurationFailure(
+            "CONFIG_OCR_API_KEY_MISSING",
+            "OCR service authentication is not configured."
+        );
     }
 
     if (
-        !env.OCR_JOB_PROGRESS_URL
+        !hasNonEmptyString(
+            env.OCR_JOB_PROCESS_SECURE_TOKEN
+        )
     ) {
-        return {
-            code:
-                "CONFIG_PROGRESS_URL_MISSING",
-            message:
-                "OCR progress reporting is not configured."
-        };
+        return configurationFailure(
+            "CONFIG_PROCESS_TOKEN_MISSING",
+            "OCR processor authentication is not configured."
+        );
+    }
+
+    if (
+        !hasNonEmptyString(
+            env.OCR_JOB_PROGRESS_URL
+        )
+    ) {
+        return configurationFailure(
+            "CONFIG_PROGRESS_URL_MISSING",
+            "OCR progress reporting is not configured."
+        );
+    }
+
+    if (
+        !isValidServiceUrl(
+            env.OCR_JOB_PROGRESS_URL
+        )
+    ) {
+        return configurationFailure(
+            "CONFIG_PROGRESS_URL_INVALID",
+            "OCR progress reporting URL is invalid."
+        );
     }
 
     return null;
 }
 
+function configurationFailure(
+    code,
+    message
+) {
+    return {
+        code,
+        message,
+        internalMessage:
+            message
+    };
+}
+
+function hasNonEmptyString(
+    value
+) {
+    return String(
+        value
+        || ""
+    )
+        .trim()
+        .length > 0;
+}
+
+function isValidServiceUrl(
+    value
+) {
+    try {
+        const url =
+            new URL(
+                String(
+                    value
+                )
+                    .trim()
+            );
+
+        if (
+            url.protocol === "https:"
+        ) {
+            return true;
+        }
+
+        return (
+            url.protocol === "http:"
+            && (
+                url.hostname === "localhost"
+                || url.hostname === "127.0.0.1"
+            )
+        );
+    }
+    catch {
+        return false;
+    }
+}
+
 // ============================================================
 // INTERNAL AUTHENTICATION
 // ============================================================
-
-async function getTokenFingerprint(
-    value
-) {
-    const token =
-        String(
-            value
-            || ""
-        )
-            .trim();
-
-    if (
-        !token
-    ) {
-        return {
-            present:
-                false,
-            length:
-                0,
-            fingerprint:
-                null
-        };
-    }
-
-    const bytes =
-        new TextEncoder()
-            .encode(
-                token
-            );
-
-    const digest =
-        await crypto.subtle.digest(
-            "SHA-256",
-            bytes
-        );
-
-    const fingerprint =
-        Array.from(
-            new Uint8Array(
-                digest
-            )
-        )
-            .slice(
-                0,
-                6
-            )
-            .map(
-                function(
-                    byte
-                ) {
-                    return byte
-                        .toString(
-                            16
-                        )
-                        .padStart(
-                            2,
-                            "0"
-                        );
-                }
-            )
-            .join(
-                ""
-            );
-
-    return {
-        present:
-            true,
-        length:
-            token.length,
-        fingerprint
-    };
-}
 
 async function isAuthorizedProcessorRequest(
     request,
@@ -1042,39 +1051,79 @@ async function isAuthorizedProcessorRequest(
             .trim();
 
     if (
-        suppliedToken
-        && expectedToken
-        && suppliedToken === expectedToken
+        !suppliedToken
+        || !expectedToken
     ) {
-        return true;
+        return false;
     }
 
+    return secureStringEquals(
+        suppliedToken,
+        expectedToken
+    );
+}
+
+async function secureStringEquals(
+    left,
+    right
+) {
+    const encoder =
+        new TextEncoder();
+
     const [
-        supplied,
-        expected
+        leftDigest,
+        rightDigest
     ] =
         await Promise.all([
-            getTokenFingerprint(
-                suppliedToken
+            crypto.subtle.digest(
+                "SHA-256",
+                encoder.encode(
+                    left
+                )
             ),
-            getTokenFingerprint(
-                expectedToken
+            crypto.subtle.digest(
+                "SHA-256",
+                encoder.encode(
+                    right
+                )
             )
         ]);
 
-    console.error(
-        "[OCR PROCESS][PROCESSOR_UNAUTHORIZED] Processor authentication failed.",
-        {
-            supplied,
-            expected
-        }
-    );
+    const leftBytes =
+        new Uint8Array(
+            leftDigest
+        );
 
-    return false;
+    const rightBytes =
+        new Uint8Array(
+            rightDigest
+        );
+
+    if (
+        leftBytes.length !==
+        rightBytes.length
+    ) {
+        return false;
+    }
+
+    let difference =
+        0;
+
+    for (
+        let index = 0;
+        index < leftBytes.length;
+        index += 1
+    ) {
+        difference |=
+            leftBytes[index]
+            ^ rightBytes[index];
+    }
+
+    return difference === 0;
 }
 
 // ============================================================
-// REQUEST JSON
+// PROCESS REQUEST
 // ============================================================
 
 async function readJsonRequest(
@@ -1084,19 +1133,287 @@ async function readJsonRequest(
         const body =
             await request.json();
 
-        return (
-            body
-            && typeof body === "object"
-            && !Array.isArray(
+        if (
+            !body
+            || typeof body !== "object"
+            || Array.isArray(
                 body
             )
-        )
-            ? body
-            : null;
+        ) {
+            return null;
+        }
+
+        return body;
     }
     catch {
         return null;
     }
+}
+
+// ============================================================
+// STORED REQUEST VALIDATION
+// ============================================================
+
+function validateStoredRequestIdentity(
+    requestData,
+    jobId
+) {
+    if (
+        !requestData
+        || typeof requestData !== "object"
+        || Array.isArray(
+            requestData
+        )
+    ) {
+        throw createProcessError(
+            "REQUEST_METADATA_INVALID",
+            "The stored OCR request data is invalid.",
+            "Stored request.json was not a JSON object."
+        );
+    }
+
+    const storedJobId =
+        sanitizeJobId(
+            requestData.jobId
+        );
+
+    if (
+        !storedJobId
+    ) {
+        throw createProcessError(
+            "REQUEST_JOB_ID_MISSING",
+            "The stored OCR request is incomplete.",
+            "request.json did not contain a valid jobId."
+        );
+    }
+
+    if (
+        storedJobId !== jobId
+    ) {
+        throw createProcessError(
+            "REQUEST_JOB_ID_MISMATCH",
+            "The stored OCR request does not match this job.",
+            `Processor jobId=${jobId}, stored request jobId=${storedJobId}.`
+        );
+    }
+
+    if (
+        !requestData.fields
+        || typeof requestData.fields !== "object"
+        || Array.isArray(
+            requestData.fields
+        )
+    ) {
+        throw createProcessError(
+            "REQUEST_FIELDS_MISSING",
+            "The stored OCR request is incomplete.",
+            "request.json did not contain a valid fields object."
+        );
+    }
+}
+
+// ============================================================
+// REQUEST FIELD NORMALIZATION
+// ============================================================
+
+function normalizeRequestFields(
+    fields
+) {
+    if (
+        !fields
+        || typeof fields !== "object"
+        || Array.isArray(
+            fields
+        )
+    ) {
+        throw createProcessError(
+            "REQUEST_FIELDS_INVALID",
+            "The OCR request data is invalid.",
+            "Request fields were missing or were not an object."
+        );
+    }
+
+    const playersPerTeam =
+        Number(
+            fields.playersPerTeam
+        );
+
+    if (
+        !Number.isInteger(
+            playersPerTeam
+        )
+        || playersPerTeam < 1
+        || playersPerTeam > 4
+    ) {
+        throw createProcessError(
+            "PLAYERS_PER_TEAM_INVALID",
+            "The selected match size is invalid.",
+            `playersPerTeam received ${JSON.stringify(fields.playersPerTeam)}.`
+        );
+    }
+
+    const expectedPlayerNames =
+        parseExpectedPlayerNames(
+            fields.expectedPlayerNames
+        );
+
+    const expectedPlayerCount =
+        playersPerTeam * 2;
+
+    if (
+        expectedPlayerNames.length !==
+        expectedPlayerCount
+    ) {
+        throw createProcessError(
+            "EXPECTED_PLAYER_COUNT_INVALID",
+            "The submitted player list does not match the selected match size.",
+            `playersPerTeam=${playersPerTeam} requires ${expectedPlayerCount} names but received ${expectedPlayerNames.length}.`
+        );
+    }
+
+    const canonicalMatchType =
+        `${playersPerTeam}v${playersPerTeam}`;
+
+    const submittedMatchType =
+        String(
+            fields.matchType
+            || canonicalMatchType
+        )
+            .trim()
+            .toLowerCase();
+
+    if (
+        submittedMatchType !==
+        canonicalMatchType
+    ) {
+        throw createProcessError(
+            "MATCH_TYPE_MISMATCH",
+            "The selected match type is inconsistent.",
+            `playersPerTeam=${playersPerTeam}, matchType=${JSON.stringify(fields.matchType)}.`
+        );
+    }
+
+    const normalized = {
+        ...fields,
+        playersPerTeam:
+            String(
+                playersPerTeam
+            ),
+        expectedPlayerNames:
+            JSON.stringify(
+                expectedPlayerNames
+            ),
+        matchType:
+            canonicalMatchType
+    };
+
+    return normalized;
+}
+
+function parseExpectedPlayerNames(
+    value
+) {
+    let parsed =
+        value;
+
+    if (
+        typeof value === "string"
+    ) {
+        const trimmed =
+            value.trim();
+
+        if (
+            !trimmed
+        ) {
+            throw createProcessError(
+                "EXPECTED_PLAYER_NAMES_MISSING",
+                "The expected player list is missing.",
+                "expectedPlayerNames was an empty string."
+            );
+        }
+
+        try {
+            parsed =
+                JSON.parse(
+                    trimmed
+                );
+        }
+        catch (
+            error
+        ) {
+            throw createProcessError(
+                "EXPECTED_PLAYER_NAMES_INVALID_JSON",
+                "The submitted player list is invalid.",
+                `expectedPlayerNames could not be parsed: ${String(error?.message || error)}`
+            );
+        }
+    }
+
+    if (
+        !Array.isArray(
+            parsed
+        )
+    ) {
+        throw createProcessError(
+            "EXPECTED_PLAYER_NAMES_INVALID",
+            "The submitted player list is invalid.",
+            "expectedPlayerNames was not an array."
+        );
+    }
+
+    const normalizedNames =
+        parsed.map(
+            function(
+                value,
+                index
+            ) {
+                const name =
+                    String(
+                        value
+                        ?? ""
+                    )
+                        .replace(
+                            /\s+/g,
+                            " "
+                        )
+                        .trim();
+
+                if (
+                    !name
+                ) {
+                    throw createProcessError(
+                        "EXPECTED_PLAYER_NAME_EMPTY",
+                        "One of the submitted player names is empty.",
+                        `expectedPlayerNames[${index}] was empty.`
+                    );
+                }
+
+                if (
+                    name.length > 128
+                ) {
+                    throw createProcessError(
+                        "EXPECTED_PLAYER_NAME_TOO_LONG",
+                        "One of the submitted player names is invalid.",
+                        `expectedPlayerNames[${index}] exceeded 128 characters.`
+                    );
+                }
+
+                return name;
+            }
+        );
+
+    if (
+        normalizedNames.length < 2
+        || normalizedNames.length > 8
+    ) {
+        throw createProcessError(
+            "EXPECTED_PLAYER_NAMES_COUNT_INVALID",
+            "The submitted player list is invalid.",
+            `Received ${normalizedNames.length} expected player names.`
+        );
+    }
+
+    return normalizedNames;
 }
 
 // ============================================================
@@ -1105,8 +1422,33 @@ async function readJsonRequest(
 
 function buildCloudRunForm(
     imageBlob,
-    requestData
+    normalizedFields
 ) {
+    if (
+        !(imageBlob instanceof Blob)
+        || imageBlob.size <= 0
+    ) {
+        throw createProcessError(
+            "FORM_IMAGE_INVALID",
+            "The scoreboard image could not be prepared.",
+            "buildCloudRunForm received an empty or invalid Blob."
+        );
+    }
+
+    if (
+        !normalizedFields
+        || typeof normalizedFields !== "object"
+        || Array.isArray(
+            normalizedFields
+        )
+    ) {
+        throw createProcessError(
+            "FORM_FIELDS_INVALID",
+            "The OCR request could not be prepared.",
+            "buildCloudRunForm received invalid normalizedFields."
+        );
+    }
+
     const formData =
         new FormData();
 
@@ -1116,45 +1458,41 @@ function buildCloudRunForm(
         "scoreboard.png"
     );
 
-    if (
-        requestData
-        && typeof requestData === "object"
+    for (
+        const [
+            key,
+            value
+        ]
+        of Object.entries(
+            normalizedFields
+        )
     ) {
-        for (
-            const [
-                key,
-                value
-            ]
-            of Object.entries(
-                requestData
-            )
+        if (
+            value === undefined
+            || value === null
         ) {
-            if (
-                value === undefined
-                || value === null
-            ) {
-                continue;
-            }
-
-            if (
-                typeof value === "object"
-            ) {
-                formData.append(
-                    key,
-                    JSON.stringify(
-                        value
-                    )
-                );
-            }
-            else {
-                formData.append(
-                    key,
-                    String(
-                        value
-                    )
-                );
-            }
+            continue;
         }
+
+        if (
+            typeof value === "object"
+        ) {
+            formData.append(
+                key,
+                JSON.stringify(
+                    value
+                )
+            );
+
+            continue;
+        }
+
+        formData.append(
+            key,
+            String(
+                value
+            )
+        );
     }
 
     return formData;
@@ -1176,6 +1514,7 @@ function buildCloudRunHeaders(
         String(
             env.OCR_API_KEY
         )
+            .trim()
     );
 
     headers.set(
@@ -1188,30 +1527,260 @@ function buildCloudRunHeaders(
         jobId
     );
 
-    const callbackUrl =
+    headers.set(
+        "X-BPD-OCR-Progress-URL",
         String(
             env.OCR_JOB_PROGRESS_URL
-            || ""
         )
-            .trim();
-
-    if (
-        callbackUrl
-    ) {
-        headers.set(
-            "X-BPD-OCR-Progress-URL",
-            callbackUrl
-        );
-    }
+            .trim()
+    );
 
     return headers;
 }
 
 // ============================================================
-// STATUS
+// FETCH WITH TIMEOUT
 // ============================================================
 
-async function readStatus(
+async function fetchWithTimeout(
+    url,
+    options,
+    timeoutMs
+) {
+    const controller =
+        new AbortController();
+
+    const timeout =
+        setTimeout(
+            function() {
+                controller.abort(
+                    "OCR provider timeout"
+                );
+            },
+            timeoutMs
+        );
+
+    try {
+        return await fetch(
+            url,
+            {
+                ...options,
+                signal:
+                    controller.signal
+            }
+        );
+    }
+    catch (
+        error
+    ) {
+        if (
+            controller.signal.aborted
+        ) {
+            throw createProcessError(
+                "OCR_PROVIDER_TIMEOUT",
+                "The scoreboard reader took too long to respond.",
+                `OCR provider request exceeded ${timeoutMs}ms.`
+            );
+        }
+
+        throw createProcessError(
+            "OCR_PROVIDER_REQUEST_FAILED",
+            "The scoreboard reader could not be reached.",
+            String(
+                error?.message
+                || error
+            )
+        );
+    }
+    finally {
+        clearTimeout(
+            timeout
+        );
+    }
+}
+
+// ============================================================
+// STATUS IDENTITY
+// ============================================================
+
+function validateStatusIdentity(
+    status,
+    jobId,
+    inputKey,
+    requestKey
+) {
+    const storedJobId =
+        sanitizeJobId(
+            status?.jobId
+        );
+
+    if (
+        storedJobId
+        && storedJobId !== jobId
+    ) {
+        throw createProcessError(
+            "JOB_STATUS_ID_MISMATCH",
+            "The OCR job status does not match this request.",
+            `status.jobId=${storedJobId}, processor jobId=${jobId}.`
+        );
+    }
+
+    if (
+        status?.inputKey
+        && status.inputKey !== inputKey
+    ) {
+        throw createProcessError(
+            "JOB_INPUT_KEY_MISMATCH",
+            "The OCR job input reference is invalid.",
+            `status.inputKey=${String(status.inputKey)}, expected=${inputKey}.`
+        );
+    }
+
+    if (
+        status?.requestKey
+        && status.requestKey !== requestKey
+    ) {
+        throw createProcessError(
+            "JOB_REQUEST_KEY_MISMATCH",
+            "The OCR job request reference is invalid.",
+            `status.requestKey=${String(status.requestKey)}, expected=${requestKey}.`
+        );
+    }
+}
+
+// ============================================================
+// PROCESSING LEASE
+// ============================================================
+
+function isProcessingLeaseActive(
+    status
+) {
+    if (
+        status?.status !==
+        "processing"
+    ) {
+        return false;
+    }
+
+    const heartbeatTime =
+        Date.parse(
+            status.heartbeatAt
+            || status.updatedAt
+            || ""
+        );
+
+    if (
+        !Number.isFinite(
+            heartbeatTime
+        )
+    ) {
+        return false;
+    }
+
+    const ageMs =
+        Date.now()
+        - heartbeatTime;
+
+    return (
+        ageMs >= 0
+        && ageMs <
+            PROCESSING_LEASE_MS
+    );
+}
+
+// ============================================================
+// R2 JSON
+// ============================================================
+
+async function readRequiredJsonObject(
+    env,
+    key,
+    {
+        missingCode,
+        missingMessage,
+        invalidCode,
+        invalidMessage
+    }
+) {
+    const object =
+        await env.OCR_STORAGE.get(
+            key
+        );
+
+    if (
+        !object
+    ) {
+        throw createProcessError(
+            missingCode,
+            missingMessage,
+            `Required R2 object was not found at ${key}.`
+        );
+    }
+
+    return parseStoredJsonObject(
+        object,
+        invalidCode,
+        invalidMessage
+    );
+}
+
+async function parseStoredJsonObject(
+    object,
+    errorCode,
+    publicMessage
+) {
+    let text;
+
+    try {
+        text =
+            await object.text();
+    }
+    catch (
+        error
+    ) {
+        throw createProcessError(
+            errorCode,
+            publicMessage,
+            `Failed reading stored object: ${String(error?.message || error)}`
+        );
+    }
+
+    let parsed;
+
+    try {
+        parsed =
+            JSON.parse(
+                text
+            );
+    }
+    catch (
+        error
+    ) {
+        throw createProcessError(
+            errorCode,
+            publicMessage,
+            `Stored object contained invalid JSON: ${String(error?.message || error)}`
+        );
+    }
+
+    if (
+        !parsed
+        || typeof parsed !== "object"
+        || Array.isArray(
+            parsed
+        )
+    ) {
+        throw createProcessError(
+            errorCode,
+            publicMessage,
+            "Stored JSON root was not an object."
+        );
+    }
+
+    return parsed;
+}
+
+async function readStatusSafe(
     env,
     statusKey
 ) {
@@ -1227,31 +1796,51 @@ async function readStatus(
     }
 
     try {
-        const status =
+        const parsed =
             JSON.parse(
                 await object.text()
             );
 
-        return (
-            status
-            && typeof status === "object"
-            && !Array.isArray(
-                status
+        if (
+            !parsed
+            || typeof parsed !== "object"
+            || Array.isArray(
+                parsed
             )
-        )
-            ? status
-            : null;
+        ) {
+            return null;
+        }
+
+        return parsed;
     }
     catch {
         return null;
     }
 }
 
+// ============================================================
+// STATUS WRITE
+// ============================================================
+
 async function updateStatus(
     env,
     statusKey,
     statusData
 ) {
+    if (
+        !statusData
+        || typeof statusData !== "object"
+        || Array.isArray(
+            statusData
+        )
+    ) {
+        throw createProcessError(
+            "STATUS_WRITE_DATA_INVALID",
+            "OCR job status could not be updated.",
+            "updateStatus received invalid status data."
+        );
+    }
+
     await env.OCR_STORAGE.put(
         statusKey,
         JSON.stringify(
@@ -1270,6 +1859,10 @@ async function updateStatus(
     return statusData;
 }
 
+// ============================================================
+// STATUS TRANSITION
+// ============================================================
+
 async function transitionStatus(
     env,
     statusKey,
@@ -1285,10 +1878,16 @@ async function transitionStatus(
             currentStatus?.progress
         );
 
+    const hasRequestedProgress =
+        changes?.progress !==
+        undefined;
+
     const requestedProgress =
-        normalizeProgress(
-            changes?.progress
-        );
+        hasRequestedProgress
+            ? normalizeProgress(
+                changes.progress
+            )
+            : currentProgress;
 
     const progress =
         Math.max(
@@ -1348,7 +1947,7 @@ async function markJobFailed(
     }
 ) {
     const currentStatus =
-        await readStatus(
+        await readStatusSafe(
             env,
             statusKey
         )
@@ -1416,11 +2015,16 @@ async function markJobFailed(
         {
             errorCode:
                 failure.code,
+            jobId:
+                currentStatus.jobId
+                || null,
             internalMessage:
                 String(
                     internalMessage
                     || ""
-                )
+                ),
+            version:
+                PROCESS_JOB_VERSION
         }
     );
 
@@ -1428,8 +2032,38 @@ async function markJobFailed(
 }
 
 // ============================================================
-// FAILURE RESPONSE
+// FAILURE RESPONSE HELPERS
 // ============================================================
+
+function loggedFailureResponse(
+    {
+        jobId = null,
+        code,
+        publicMessage,
+        internalMessage,
+        httpStatus
+    }
+) {
+    logProcessError(
+        {
+            jobId,
+            code,
+            publicMessage,
+            internalMessage,
+            httpStatus
+        }
+    );
+
+    return failureResponse(
+        {
+            jobId,
+            code,
+            message:
+                publicMessage,
+            httpStatus
+        }
+    );
+}
 
 function failureResponse(
     {
@@ -1461,6 +2095,8 @@ function failureResponse(
             error: {
                 code:
                     failure.code,
+                message:
+                    failure.message,
                 summary:
                     failure.summary
             },
@@ -1484,27 +2120,11 @@ function buildFailure(
             code
         );
 
-    let safeMessage =
-        String(
+    const safeMessage =
+        normalizePublicMessage(
             message
             || "OCR processing failed."
-        )
-            .replace(
-                /\s+/g,
-                " "
-            )
-            .trim();
-
-    if (
-        safeMessage.length > 180
-    ) {
-        safeMessage =
-            safeMessage.slice(
-                0,
-                177
-            )
-            + "...";
-    }
+        );
 
     return {
         code:
@@ -1514,6 +2134,41 @@ function buildFailure(
         summary:
             `[${safeCode}] ${safeMessage}`
     };
+}
+
+function normalizePublicMessage(
+    value
+) {
+    let message =
+        String(
+            value
+            || "OCR processing failed."
+        )
+            .replace(
+                /\s+/g,
+                " "
+            )
+            .trim();
+
+    if (
+        !message
+    ) {
+        message =
+            "OCR processing failed.";
+    }
+
+    if (
+        message.length > 180
+    ) {
+        message =
+            message.slice(
+                0,
+                177
+            )
+            + "...";
+    }
+
+    return message;
 }
 
 // ============================================================
@@ -1577,8 +2232,15 @@ function logProcessError(
                 providerJobId
                 || null,
             httpStatus:
-                httpStatus
-                || null,
+                Number.isFinite(
+                    Number(
+                        httpStatus
+                    )
+                )
+                    ? Number(
+                        httpStatus
+                    )
+                    : null,
             publicMessage:
                 String(
                     publicMessage
@@ -1614,21 +2276,58 @@ async function readUpstreamResponse(
         )
             .toLowerCase();
 
+    const rawText =
+        await response.text();
+
+    if (
+        !rawText
+    ) {
+        return {
+            success:
+                false,
+            error: {
+                code:
+                    "OCR_PROVIDER_EMPTY_RESPONSE",
+                message:
+                    "OCR provider returned an empty response."
+            }
+        };
+    }
+
     if (
         contentType.includes(
             "application/json"
         )
+        || looksLikeJson(
+            rawText
+        )
     ) {
         try {
-            const data =
-                await response.json();
+            const parsed =
+                JSON.parse(
+                    rawText
+                );
 
-            return (
-                data
-                && typeof data === "object"
-            )
-                ? data
-                : {};
+            if (
+                parsed
+                && typeof parsed === "object"
+                && !Array.isArray(
+                    parsed
+                )
+            ) {
+                return parsed;
+            }
+
+            return {
+                success:
+                    false,
+                error: {
+                    code:
+                        "OCR_PROVIDER_INVALID_JSON_ROOT",
+                    message:
+                        "OCR provider returned an invalid JSON response."
+                }
+            };
         }
         catch {
             return {
@@ -1644,32 +2343,47 @@ async function readUpstreamResponse(
         }
     }
 
-    const text =
-        await response.text();
-
     return {
         success:
             response.ok,
         message:
-            text
-            || (
-                response.ok
-                    ? "OCR request completed."
-                    : "OCR provider failed."
+            rawText.slice(
+                0,
+                1000
             )
     };
 }
 
+function looksLikeJson(
+    text
+) {
+    const trimmed =
+        String(
+            text
+            || ""
+        )
+            .trim();
+
+    return (
+        trimmed.startsWith(
+            "{"
+        )
+        || trimmed.startsWith(
+            "["
+        )
+    );
+}
+
 // ============================================================
-// SAFE PROVIDER MESSAGE
+// PROVIDER FAILURE
 // ============================================================
 
 function getSafeProviderMessage(
     result
 ) {
-    const value =
-        result?.message
-        || result?.error?.message
+    const candidate =
+        result?.error?.message
+        || result?.message
         || result?.error?.summary
         || (
             typeof result?.error ===
@@ -1680,12 +2394,13 @@ function getSafeProviderMessage(
         || "";
 
     if (
-        typeof value !== "string"
+        typeof candidate !==
+        "string"
     ) {
         return "";
     }
 
-    return value
+    return candidate
         .replace(
             /\s+/g,
             " "
@@ -1693,13 +2408,32 @@ function getSafeProviderMessage(
         .trim()
         .slice(
             0,
-            1000
+            180
         );
 }
 
-// ============================================================
-// PROVIDER FALLBACK MESSAGE
-// ============================================================
+function buildProviderFailureLogMessage(
+    response,
+    result
+) {
+    const providerMessage =
+        getSafeProviderMessage(
+            result
+        );
+
+    return [
+        `Cloud Run returned HTTP ${response.status}.`,
+        providerMessage
+            ? `Provider message: ${providerMessage}`
+            : ""
+    ]
+        .filter(
+            Boolean
+        )
+        .join(
+            " "
+        );
+}
 
 function getProviderFallbackMessage(
     status
@@ -1762,10 +2496,6 @@ function getProviderFallbackMessage(
     return "OCR processing failed.";
 }
 
-// ============================================================
-// ERROR STATUS
-// ============================================================
-
 function normalizeUpstreamErrorStatus(
     status
 ) {
@@ -1791,7 +2521,8 @@ function normalizeUpstreamErrorStatus(
 function createProcessError(
     code,
     publicMessage,
-    internalMessage = ""
+    internalMessage = "",
+    httpStatus = null
 ) {
     const error =
         new Error(
@@ -1808,7 +2539,7 @@ function createProcessError(
         );
 
     error.publicMessage =
-        String(
+        normalizePublicMessage(
             publicMessage
             || "OCR processing failed."
         );
@@ -1819,7 +2550,133 @@ function createProcessError(
             || error.message
         );
 
+    if (
+        Number.isInteger(
+            httpStatus
+        )
+        && httpStatus >= 400
+        && httpStatus <= 599
+    ) {
+        error.httpStatus =
+            httpStatus;
+    }
+
     return error;
+}
+
+function getProcessErrorHttpStatus(
+    error
+) {
+    const explicitStatus =
+        Number(
+            error?.httpStatus
+        );
+
+    if (
+        Number.isInteger(
+            explicitStatus
+        )
+        && explicitStatus >= 400
+        && explicitStatus <= 599
+    ) {
+        return explicitStatus;
+    }
+
+    const code =
+        sanitizeErrorCode(
+            error?.code
+        );
+
+    if (
+        code.endsWith(
+            "_NOT_FOUND"
+        )
+    ) {
+        return 404;
+    }
+
+    if (
+        code.includes(
+            "INVALID"
+        )
+        || code.includes(
+            "MISSING"
+        )
+        || code.includes(
+            "MISMATCH"
+        )
+        || code.includes(
+            "INCOMPLETE"
+        )
+    ) {
+        return 400;
+    }
+
+    if (
+        code ===
+        "OCR_PROVIDER_TIMEOUT"
+    ) {
+        return 504;
+    }
+
+    if (
+        code ===
+        "OCR_PROVIDER_REQUEST_FAILED"
+    ) {
+        return 502;
+    }
+
+    return 500;
+}
+
+// ============================================================
+// IMAGE CONTENT TYPE
+// ============================================================
+
+function normalizeImageContentType(
+    value
+) {
+    const contentType =
+        String(
+            value
+            || ""
+        )
+            .trim()
+            .toLowerCase();
+
+    if (
+        contentType.startsWith(
+            "image/"
+        )
+    ) {
+        return contentType;
+    }
+
+    return "image/png";
+}
+
+// ============================================================
+// RUNTIME
+// ============================================================
+
+function normalizeRuntimeSeconds(
+    value
+) {
+    const numeric =
+        Number(
+            value
+        );
+
+    if (
+        !Number.isFinite(
+            numeric
+        )
+        || numeric < 0
+    ) {
+        return null;
+    }
+
+    return numeric;
 }
 
 // ============================================================
@@ -1906,6 +2763,14 @@ function sanitizeProviderId(
         return null;
     }
 
+    if (
+        /[\u0000-\u001f\u007f]/.test(
+            providerId
+        )
+    ) {
+        return null;
+    }
+
     return providerId;
 }
 
@@ -1922,8 +2787,17 @@ function sanitizeStorageKey(
     if (
         !key
         || key.length > 1024
+        || key.startsWith(
+            "/"
+        )
         || key.includes(
             ".."
+        )
+        || key.includes(
+            "\\"
+        )
+        || /[\u0000-\u001f\u007f]/.test(
+            key
         )
     ) {
         return null;
