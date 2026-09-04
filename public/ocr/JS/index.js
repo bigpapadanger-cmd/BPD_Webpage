@@ -1,5 +1,5 @@
 "use strict";
-
+import { OCR_SCRIPT_ID } from "../../scripts/cacheHandler";
 import {
     OCR_JOB_SUBMIT_URL,
     OCR_JOB_RESULT_URL,
@@ -18,14 +18,24 @@ const OCR_SCRIPTS = [
     "/ocr/JS/submit_onpage_items.js"
 ];
 
+
+
 function loadScript(
     src
 ) {
-    const absoluteSrc =
+    const scriptUrl =
         new URL(
             src,
             window.location.origin
-        ).href;
+        );
+
+    scriptUrl.searchParams.set(
+        "v",
+        OCR_SCRIPT_ID
+    );
+
+    const absoluteSrc =
+        scriptUrl.href;
 
     const existing =
         Array.from(
@@ -65,7 +75,14 @@ function loadScript(
                 false;
 
             script.onload =
-                resolve;
+                function() {
+                    console.log(
+                        "[OCR SCRIPT] Loaded:",
+                        absoluteSrc
+                    );
+
+                    resolve();
+                };
 
             script.onerror =
                 function() {
@@ -85,6 +102,8 @@ function loadScript(
         }
     );
 }
+
+
 
 async function loadOcrScripts() {
     for (

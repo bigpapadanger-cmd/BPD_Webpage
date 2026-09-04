@@ -1,7 +1,7 @@
 //
 // MOVE API CALLERS HERE
 //
-
+//ADDED CACHE BUFFER FIXING
 export const OCR_API_URL =
     "/api/ocr";
 

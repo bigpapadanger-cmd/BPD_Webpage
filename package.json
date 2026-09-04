@@ -4,9 +4,10 @@
     "private": true,
     "type": "module",
     "scripts": {
-        "build": "wrangler pages functions build functions --outdir=.wrangler/pages-build",
+        "cache:ids": "node scripts/generate-cache-ids.js",
+        "build": "npm run cache:ids && wrangler pages functions build functions --outdir=.wrangler/pages-build",
         "build:check": "wrangler pages functions build functions --outdir=.wrangler/pages-build",
-        "dev": "wrangler pages dev",
+        "dev": "npm run cache:ids && wrangler pages dev",
         "test": "npm run build:check"
     },
     "devDependencies": {

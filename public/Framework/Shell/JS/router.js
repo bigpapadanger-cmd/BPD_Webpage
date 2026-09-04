@@ -25,6 +25,7 @@ import {
     apiFetch
 } from "../../../scripts/apiConnection.js";
 
+import { APP_ASSET_ID } from "../../../scripts/cacheHandler.js";
 const DEFAULT_ROUTE =
     "/";
 
@@ -1109,6 +1110,11 @@ async function initializeLoadedRouteModule(
                 moduleFile,
                 window.location.origin
             );
+
+        moduleUrl.searchParams.set(
+            "v",
+            APP_ASSET_ID
+        );
 
         moduleUrl.searchParams.set(
             "routeLoad",
