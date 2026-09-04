@@ -31,6 +31,46 @@ const JOB_PROGRESS = Object.freeze({
         100
 });
 
+function isProcessorOwnedStage(
+    stage
+) {
+    const normalizedStage =
+        String(
+            stage
+            || ""
+        )
+            .trim()
+            .toLowerCase();
+
+    if (
+        !normalizedStage
+    ) {
+        return false;
+    }
+
+    if (
+        normalizedStage ===
+        "starting"
+    ) {
+        return false;
+    }
+
+    if (
+        normalizedStage ===
+        "queued"
+    ) {
+        return false;
+    }
+
+    if (
+        normalizedStage ===
+        "uploaded"
+    ) {
+        return false;
+    }
+
+    return true;
+}
 // ============================================================
 // MAIN
 // ============================================================
@@ -263,6 +303,9 @@ export async function onRequestPost(
         if (
             currentStatus.status ===
             "processing"
+            && isProcessorOwnedStage(
+                currentStatus.stage
+            )
             && isProcessingLeaseActive(
                 currentStatus
             )
@@ -295,7 +338,6 @@ export async function onRequestPost(
         // ====================================================
         // PROCESSING START / RETRY
         // ====================================================
-
         currentStatus =
             await transitionStatus(
                 env,

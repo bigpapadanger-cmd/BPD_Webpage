@@ -5,12 +5,19 @@
 // OCR DEBUG TRACE
 // ============================================================
 
+const DEBUG_DETAIL_MAX_BYTES =
+    12000;
+
+// ============================================================
+// ENABLED
+// ============================================================
+
 export function ocrDebugTraceEnabled(
     env
 ) {
     return (
         String(
-            env.OCR_DEBUG_TRACE_ENABLED
+            env?.OCR_DEBUG_TRACE_ENABLED
             || ""
         )
             .trim()
@@ -18,6 +25,10 @@ export function ocrDebugTraceEnabled(
         === "true"
     );
 }
+
+// ============================================================
+// NORMALIZATION
+// ============================================================
 
 function sanitizeDebugSegment(
     value,
@@ -42,6 +53,110 @@ function sanitizeDebugSegment(
         || fallback;
 }
 
+function normalizeJobId(
+    value
+) {
+    const jobId =
+        String(
+            value
+            || ""
+        )
+            .trim()
+            .toUpperCase();
+
+    return /^[A-Z0-9]{16}$/.test(
+        jobId
+    )
+        ? jobId
+        : "";
+}
+
+function sanitizeDebugDetail(
+    detail
+) {
+    if (
+        detail === undefined
+        || detail === null
+    ) {
+        return null;
+    }
+
+    try {
+        const serialized =
+            JSON.stringify(
+                detail
+            );
+
+        if (
+            serialized.length <=
+            DEBUG_DETAIL_MAX_BYTES
+        ) {
+            return JSON.parse(
+                serialized
+            );
+        }
+
+        return {
+            truncated:
+                true,
+            originalLength:
+                serialized.length,
+            preview:
+                serialized.slice(
+                    0,
+                    DEBUG_DETAIL_MAX_BYTES
+                )
+        };
+    }
+    catch (
+        error
+    ) {
+        return {
+            serializationFailed:
+                true,
+            message:
+                String(
+                    error?.message
+                    || error
+                )
+                    .slice(
+                        0,
+                        500
+                    )
+        };
+    }
+}
+
+function createTraceSuffix() {
+    try {
+        return crypto
+            .randomUUID()
+            .replace(
+                /-/g,
+                ""
+            )
+            .slice(
+                0,
+                8
+            );
+    }
+    catch {
+        return Math
+            .random()
+            .toString(
+                36
+            )
+            .slice(
+                2,
+                10
+            );
+    }
+}
+
+// ============================================================
+// WRITE TRACE
+// ============================================================
+
 export async function writeOcrDebugTrace(
     env,
     {
@@ -55,25 +170,20 @@ export async function writeOcrDebugTrace(
         !ocrDebugTraceEnabled(
             env
         )
-        || !env.OCR_STORAGE
+        || !env?.OCR_STORAGE
     ) {
-        return;
+        return false;
     }
 
     const normalizedJobId =
-        String(
+        normalizeJobId(
             jobId
-            || ""
-        )
-            .trim()
-            .toUpperCase();
+        );
 
     if (
-        !/^[A-Z0-9]{16}$/.test(
-            normalizedJobId
-        )
+        !normalizedJobId
     ) {
-        return;
+        return false;
     }
 
     const timestamp =
@@ -98,6 +208,9 @@ export async function writeOcrDebugTrace(
             "event"
         );
 
+    const suffix =
+        createTraceSuffix();
+
     const key =
         (
             "debug/"
@@ -105,30 +218,33 @@ export async function writeOcrDebugTrace(
             + "/"
             + safeTimestamp
             + "_"
+            + suffix
+            + "_"
             + safeComponent
             + "_"
             + safeEvent
             + ".json"
         );
 
+    const payload = {
+        timestamp,
+        jobId:
+            normalizedJobId,
+        component:
+            safeComponent,
+        event:
+            safeEvent,
+        detail:
+            sanitizeDebugDetail(
+                detail
+            )
+    };
+
     try {
         await env.OCR_STORAGE.put(
             key,
             JSON.stringify(
-                {
-                    timestamp,
-
-                    jobId:
-                        normalizedJobId,
-
-                    component:
-                        safeComponent,
-
-                    event:
-                        safeEvent,
-
-                    detail
-                },
+                payload,
                 null,
                 2
             ),
@@ -139,13 +255,29 @@ export async function writeOcrDebugTrace(
                 }
             }
         );
+
+        return true;
     }
     catch (
         error
     ) {
         console.warn(
             "[OCR DEBUG] Trace write failed.",
-            error
+            {
+                jobId:
+                    normalizedJobId,
+                component:
+                    safeComponent,
+                event:
+                    safeEvent,
+                message:
+                    String(
+                        error?.message
+                        || error
+                    )
+            }
         );
+
+        return false;
     }
 }
