@@ -1843,7 +1843,13 @@
         ) {
             return;
         }
+        console.log(
+            "[OCR SUBMIT] Read Scoreboard pressed."
+        );
 
+        setStatus(
+            "Reviewing image..."
+        );
         const playerNameValidation =
             validateExpectedPlayerNames();
 
