@@ -15,7 +15,7 @@ import {
 } from "/scripts/apiConnection.js";
 
 const OCR_NOTIFICATION_VERSION =
-    "ocr-notifications-1.2";
+    "ocr-notifications-1.3";
 
 const OCR_ACTIVE_JOB_KEY =
     "rocketLeagueOcrActiveJobV1";
@@ -836,7 +836,6 @@ async function getOcrJob(
         !response.ok
         || data?.success !==
             true
-        || !data?.job
     ) {
         const error =
             new Error(
@@ -850,9 +849,129 @@ async function getOcrJob(
         throw error;
     }
 
-    return data.job;
-}
+    const storedJob =
+        (
+            data?.job
+            && typeof data.job ===
+                "object"
+            && !Array.isArray(
+                data.job
+            )
+        )
+            ? data.job
+            : {};
 
+    const status =
+        String(
+            data?.status
+            || storedJob?.status
+            || ""
+        )
+            .trim()
+            .toLowerCase();
+
+    if (
+        !status
+    ) {
+        const error =
+            new Error(
+                "OCR job status was not returned."
+            );
+
+        error.status =
+            response.status;
+
+        throw error;
+    }
+
+    return {
+        ...storedJob,
+
+        status,
+
+        stage:
+            String(
+                data?.stage
+                || storedJob?.stage
+                || ""
+            )
+                .trim()
+                .toLowerCase(),
+
+        progress:
+            normalizeClientProgress(
+                data?.progress
+                ?? storedJob?.progress
+            ),
+
+        confirmedProgress:
+            normalizeClientProgress(
+                data?.confirmedProgress
+                ?? storedJob?.confirmedProgress
+                ?? data?.progress
+                ?? storedJob?.progress
+            ),
+
+        simulatedProgress:
+            normalizeClientProgress(
+                data?.simulatedProgress
+                ?? storedJob?.simulatedProgress
+                ?? 0
+            ),
+
+        progressSource:
+            String(
+                data?.progressSource
+                || storedJob?.progressSource
+                || "stored"
+            )
+                .trim()
+                .toLowerCase(),
+
+        message:
+            String(
+                data?.message
+                || storedJob?.message
+                || ""
+            )
+                .trim(),
+
+        startedAt:
+            data?.startedAt
+            || storedJob?.startedAt
+            || null,
+
+        ocrStartedAt:
+            data?.ocrStartedAt
+            || storedJob?.ocrStartedAt
+            || null,
+
+        updatedAt:
+            data?.updatedAt
+            || storedJob?.updatedAt
+            || null,
+
+        heartbeatAt:
+            data?.heartbeatAt
+            || storedJob?.heartbeatAt
+            || null,
+
+        completedAt:
+            data?.completedAt
+            || storedJob?.completedAt
+            || null,
+
+        matchId:
+            data?.matchId
+            || storedJob?.matchId
+            || null,
+
+        error:
+            data?.error
+            || storedJob?.error
+            || null
+    };
+}
 /* =========================================================
    GET RESULT
    ========================================================= */
@@ -1328,6 +1447,25 @@ function getOcrProgressSignature(
                 job?.progress
             )
         ),
+
+        String(
+            normalizeClientProgress(
+                job?.confirmedProgress
+            )
+        ),
+
+        String(
+            normalizeClientProgress(
+                job?.simulatedProgress
+            )
+        ),
+
+        String(
+            job?.progressSource
+            || ""
+        )
+            .trim()
+            .toLowerCase(),
 
         String(
             job?.updatedAt
@@ -1927,7 +2065,79 @@ async function runActiveOcrCheck() {
 
             return;
         }
+        document.dispatchEvent(
+            new CustomEvent(
+                "ocr:job-progress",
+                {
+                    detail: {
+                        jobId,
 
+                        job,
+
+                        status,
+
+                        stage:
+                            String(
+                                job?.stage
+                                || ""
+                            )
+                                .trim()
+                                .toLowerCase(),
+
+                        progress:
+                            normalizeClientProgress(
+                                job?.progress
+                            ),
+
+                        confirmedProgress:
+                            normalizeClientProgress(
+                                job?.confirmedProgress
+                                ?? job?.progress
+                            ),
+
+                        simulatedProgress:
+                            normalizeClientProgress(
+                                job?.simulatedProgress
+                                ?? 0
+                            ),
+
+                        progressSource:
+                            String(
+                                job?.progressSource
+                                || "stored"
+                            )
+                                .trim()
+                                .toLowerCase(),
+
+                        message:
+                            String(
+                                job?.message
+                                || ""
+                            )
+                                .trim(),
+
+                        startedAt:
+                            job?.startedAt
+                            || null,
+
+                        ocrStartedAt:
+                            job?.ocrStartedAt
+                            || null,
+
+                        updatedAt:
+                            job?.updatedAt
+                            || null,
+
+                        heartbeatAt:
+                            job?.heartbeatAt
+                            || null,
+
+                        version:
+                            OCR_NOTIFICATION_VERSION
+                    }
+                }
+            )
+        );
         document.dispatchEvent(
             new CustomEvent(
                 "ocr:job-progress",
