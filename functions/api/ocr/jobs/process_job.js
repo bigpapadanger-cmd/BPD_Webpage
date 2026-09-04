@@ -526,7 +526,7 @@ export async function onRequestPost(
                     progress:
                         JOB_PROGRESS.OCR_STARTED,
                     message:
-                        "Crunching scoreboard pixels.",
+                        "Connecting to Image Scanner...",
                     heartbeat:
                         true
                 }

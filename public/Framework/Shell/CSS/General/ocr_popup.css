@@ -58,6 +58,27 @@
 .ocr-notification-content {
     min-width: 0;
 }
+
+.ocr-notification-review {
+    border-color: #f59e0b;
+}
+
+.ocr-notification-review .ocr-notification-dot {
+    background: #f59e0b;
+}
+
+.ocr-review-cell-needs-review {
+    background: rgba(245, 158, 11, 0.14);
+}
+
+.ocr-review-cell-needs-review input {
+    border-color: #f59e0b;
+}
+
+.ocr-review-row-needs-review {
+    background: rgba(245, 158, 11, 0.06);
+}
+
 @keyframes ocr-notification-in {
     from {
         opacity: 0;

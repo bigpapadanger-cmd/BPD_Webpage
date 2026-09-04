@@ -19,10 +19,10 @@ const DEFAULT_OCR_RUNTIME_MS =
     75000;
 
 const MIN_OCR_RUNTIME_MS =
-    30000;
+   20000;
 
 const MAX_OCR_RUNTIME_MS =
-    180000;
+    35000;
 
 const REAL_PROGRESS_HOLD_MS =
     2500;
@@ -43,39 +43,47 @@ const OCR_PROGRESS_TIMELINE =
         },
         {
             fraction:
-                0.08,
+                0.10,
             progress:
-                18,
+                16,
             stage:
-                "normalization"
+                "ocr"
         },
         {
             fraction:
                 0.20,
             progress:
-                25,
+                21,
             stage:
-                "headers"
+                "ocr"
         },
         {
             fraction:
                 0.30,
             progress:
-                34,
+                27,
+            stage:
+                "normalization"
+        },
+        {
+            fraction:
+                0.40,
+            progress:
+                33,
             stage:
                 "headers"
         },
         {
             fraction:
-                0.36,
+                0.50,
             progress:
-                36,
+                39,
             stage:
                 "anchors"
         },
         {
             fraction:
-                0.44,
+                0.60,
             progress:
                 45,
             stage:
@@ -83,7 +91,15 @@ const OCR_PROGRESS_TIMELINE =
         },
         {
             fraction:
-                0.52,
+                0.66,
+            progress:
+                50,
+            stage:
+                "cells"
+        },
+        {
+            fraction:
+                0.72,
             progress:
                 56,
             stage:
@@ -91,7 +107,7 @@ const OCR_PROGRESS_TIMELINE =
         },
         {
             fraction:
-                0.59,
+                0.77,
             progress:
                 62,
             stage:
@@ -99,15 +115,7 @@ const OCR_PROGRESS_TIMELINE =
         },
         {
             fraction:
-                0.63,
-            progress:
-                64,
-            stage:
-                "numeric_matcher"
-        },
-        {
-            fraction:
-                0.67,
+                0.81,
             progress:
                 66,
             stage:
@@ -115,23 +123,15 @@ const OCR_PROGRESS_TIMELINE =
         },
         {
             fraction:
-                0.71,
+                0.85,
             progress:
-                69,
-            stage:
-                "numeric_matcher"
-        },
-        {
-            fraction:
-                0.75,
-            progress:
-                72,
+                70,
             stage:
                 "numeric_tesseract"
         },
         {
             fraction:
-                0.80,
+                0.89,
             progress:
                 76,
             stage:
@@ -139,15 +139,7 @@ const OCR_PROGRESS_TIMELINE =
         },
         {
             fraction:
-                0.84,
-            progress:
-                79,
-            stage:
-                "numeric_resolution"
-        },
-        {
-            fraction:
-                0.87,
+                0.92,
             progress:
                 82,
             stage:
@@ -155,15 +147,7 @@ const OCR_PROGRESS_TIMELINE =
         },
         {
             fraction:
-                0.90,
-            progress:
-                85,
-            stage:
-                "numeric_paddle"
-        },
-        {
-            fraction:
-                0.93,
+                0.95,
             progress:
                 86,
             stage:
@@ -171,7 +155,7 @@ const OCR_PROGRESS_TIMELINE =
         },
         {
             fraction:
-                0.96,
+                0.97,
             progress:
                 89,
             stage:
@@ -717,10 +701,13 @@ function calculateHybridProgress(
             )
         );
 
-    const simulatedProgress =
+    const simulated =
         calculateTimelineProgress(
             elapsedFraction
         );
+
+    const simulatedProgress =
+        simulated.progress;
 
     const progress =
         Math.min(
@@ -747,6 +734,8 @@ function calculateHybridProgress(
         progress,
         confirmedProgress,
         simulatedProgress,
+        simulatedStage:
+            simulated.stage,
         source
     };
 }
