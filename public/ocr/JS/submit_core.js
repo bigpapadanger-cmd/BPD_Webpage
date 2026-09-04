@@ -37,7 +37,33 @@ const OCR_MIN_SOURCE_CROP_WIDTH =
 
 const OCR_MIN_SOURCE_CROP_HEIGHT =
     120;
+const OCR_ALLOWED_IMAGE_TYPES =
+    new Set([
+        "image/png",
+        "image/jpeg",
+        "image/webp",
+        "image/heic",
+        "image/heif"
+    ]);
 
+const OCR_ALLOWED_IMAGE_EXTENSIONS =
+    new Set([
+        "png",
+        "jpg",
+        "jpeg",
+        "webp",
+        "heic",
+        "heif"
+    ]);
+
+const OCR_CONVERTIBLE_IMAGE_EXTENSIONS =
+    new Set([
+        "heic",
+        "heif"
+    ]);
+
+const OCR_NORMALIZED_JPEG_QUALITY =
+    0.94;
 /* =========================================================
    CURRENT PAGE ELEMENTS
    ========================================================= */
@@ -525,8 +551,461 @@ function readOcrFormState() {
 }
 
 /* =========================================================
-   DURABLE IMAGE STATE
+   IMAGE INPUT / VALIDATION
    ========================================================= */
+
+
+
+function getImageFileExtension(
+    file
+) {
+    const name =
+        String(
+            file?.name
+            || ""
+        )
+            .trim()
+            .toLowerCase();
+
+    const match =
+        name.match(
+            /\.([a-z0-9]+)$/
+        );
+
+    return match
+        ? match[1]
+        : "";
+}
+
+function isHeicImageFile(
+    file
+) {
+    const type =
+        String(
+            file?.type
+            || ""
+        )
+            .trim()
+            .toLowerCase();
+
+    const extension =
+        getImageFileExtension(
+            file
+        );
+
+    return (
+        type === "image/heic"
+        || type === "image/heif"
+        || OCR_CONVERTIBLE_IMAGE_EXTENSIONS.has(
+            extension
+        )
+    );
+}
+
+function validateImageFile(
+    file
+) {
+    if (
+        !(file instanceof File)
+    ) {
+        return {
+            valid:
+                false,
+            message:
+                "No valid image file was selected."
+        };
+    }
+
+    if (
+        file.size <= 0
+    ) {
+        return {
+            valid:
+                false,
+            message:
+                "The selected image file is empty."
+        };
+    }
+
+    const type =
+        String(
+            file.type
+            || ""
+        )
+            .trim()
+            .toLowerCase();
+
+    const extension =
+        getImageFileExtension(
+            file
+        );
+
+    const allowedByType =
+        OCR_ALLOWED_IMAGE_TYPES.has(
+            type
+        );
+
+    const allowedByExtension =
+        OCR_ALLOWED_IMAGE_EXTENSIONS.has(
+            extension
+        );
+
+    if (
+        !allowedByType
+        && !allowedByExtension
+    ) {
+        return {
+            valid:
+                false,
+            message:
+                "Only PNG, JPG/JPEG, WebP, HEIC, and HEIF images are supported."
+        };
+    }
+
+    return {
+        valid:
+            true,
+        type,
+        extension,
+        heic:
+            isHeicImageFile(
+                file
+            )
+    };
+}
+
+/* =========================================================
+   IMAGE DECODING
+   ========================================================= */
+
+function decodeImageFile(
+    file
+) {
+    return new Promise(
+        function(
+            resolve,
+            reject
+        ) {
+            const objectUrl =
+                URL.createObjectURL(
+                    file
+                );
+
+            const image =
+                new Image();
+
+            let settled =
+                false;
+
+            function cleanup() {
+                URL.revokeObjectURL(
+                    objectUrl
+                );
+            }
+
+            image.onload =
+                function() {
+                    if (
+                        settled
+                    ) {
+                        return;
+                    }
+
+                    settled =
+                        true;
+
+                    cleanup();
+
+                    if (
+                        !image.naturalWidth
+                        || !image.naturalHeight
+                    ) {
+                        reject(
+                            new Error(
+                                "The selected image has invalid dimensions."
+                            )
+                        );
+
+                        return;
+                    }
+
+                    resolve(
+                        image
+                    );
+                };
+
+            image.onerror =
+                function() {
+                    if (
+                        settled
+                    ) {
+                        return;
+                    }
+
+                    settled =
+                        true;
+
+                    cleanup();
+
+                    reject(
+                        new Error(
+                            "The browser could not decode the selected image."
+                        )
+                    );
+                };
+
+            image.src =
+                objectUrl;
+        }
+    );
+}
+
+/* =========================================================
+   IPHONE / HEIC NORMALIZATION
+   ========================================================= */
+
+function convertDecodedImageToJpeg(
+    image,
+    originalFile
+) {
+    return new Promise(
+        function(
+            resolve,
+            reject
+        ) {
+            if (
+                !image
+                || !image.naturalWidth
+                || !image.naturalHeight
+            ) {
+                reject(
+                    new Error(
+                        "The image could not be prepared for conversion."
+                    )
+                );
+
+                return;
+            }
+
+            const outputCanvas =
+                document.createElement(
+                    "canvas"
+                );
+
+            outputCanvas.width =
+                image.naturalWidth;
+
+            outputCanvas.height =
+                image.naturalHeight;
+
+            const outputContext =
+                outputCanvas.getContext(
+                    "2d",
+                    {
+                        alpha:
+                            false
+                    }
+                );
+
+            if (
+                !outputContext
+            ) {
+                reject(
+                    new Error(
+                        "The browser could not prepare the image for conversion."
+                    )
+                );
+
+                return;
+            }
+
+            outputContext.fillStyle =
+                "#ffffff";
+
+            outputContext.fillRect(
+                0,
+                0,
+                outputCanvas.width,
+                outputCanvas.height
+            );
+
+            try {
+                outputContext.drawImage(
+                    image,
+                    0,
+                    0,
+                    outputCanvas.width,
+                    outputCanvas.height
+                );
+            }
+            catch (
+                error
+            ) {
+                reject(
+                    new Error(
+                        "The selected image could not be converted."
+                    )
+                );
+
+                return;
+            }
+
+            outputCanvas.toBlob(
+                function(
+                    blob
+                ) {
+                    if (
+                        !blob
+                    ) {
+                        reject(
+                            new Error(
+                                "The selected image could not be converted to JPEG."
+                            )
+                        );
+
+                        return;
+                    }
+
+                    const originalName =
+                        String(
+                            originalFile?.name
+                            || "scoreboard"
+                        );
+
+                    const normalizedName =
+                        (
+                            originalName
+                                .replace(
+                                    /\.[^.]+$/,
+                                    ""
+                                )
+                            || "scoreboard"
+                        )
+                        + ".jpg";
+
+                    resolve(
+                        new File(
+                            [
+                                blob
+                            ],
+                            normalizedName,
+                            {
+                                type:
+                                    "image/jpeg",
+                                lastModified:
+                                    Date.now()
+                            }
+                        )
+                    );
+                },
+                "image/jpeg",
+                OCR_NORMALIZED_JPEG_QUALITY
+            );
+        }
+    );
+}
+
+/* =========================================================
+   PREPARE SELECTED IMAGE
+   ========================================================= */
+
+async function prepareSelectedImage(
+    file
+) {
+    const validation =
+        validateImageFile(
+            file
+        );
+
+    if (
+        !validation.valid
+    ) {
+        throw new Error(
+            validation.message
+        );
+    }
+
+    let decodedImage;
+
+    try {
+        decodedImage =
+            await decodeImageFile(
+                file
+            );
+    }
+    catch (
+        error
+    ) {
+        if (
+            validation.heic
+        ) {
+            throw new Error(
+                "This iPhone HEIC/HEIF image could not be decoded for conversion. Try selecting a screenshot or a JPG version of the image."
+            );
+        }
+
+        throw new Error(
+            "The selected image could not be opened. The file may be damaged or use an unsupported image format."
+        );
+    }
+
+    if (
+        validation.heic
+    ) {
+        setStatus(
+            "Reviewing image... Converting iPhone image."
+        );
+
+        let normalizedFile;
+
+        try {
+            normalizedFile =
+                await convertDecodedImageToJpeg(
+                    decodedImage,
+                    file
+                );
+        }
+        catch (
+            error
+        ) {
+            throw new Error(
+                error?.message
+                || "The iPhone image could not be converted to JPEG."
+            );
+        }
+
+        let normalizedImage;
+
+        try {
+            normalizedImage =
+                await decodeImageFile(
+                    normalizedFile
+                );
+        }
+        catch {
+            throw new Error(
+                "The iPhone image was converted, but the converted JPEG could not be opened."
+            );
+        }
+
+        return {
+            file:
+                normalizedFile,
+            image:
+                normalizedImage,
+            converted:
+                true
+        };
+    }
+
+    return {
+        file,
+        image:
+            decodedImage,
+        converted:
+            false
+    };
+}
 
 function openOcrImageDatabase() {
     return new Promise(
@@ -780,13 +1259,6 @@ async function readLastUploadedImage() {
 }
 
 async function restoreLastUploadedImage() {
-    if (
-        sourceImage
-        || ocrControlsLocked
-    ) {
-        return false;
-    }
-
     const file =
         await readLastUploadedImage();
 
@@ -796,19 +1268,21 @@ async function restoreLastUploadedImage() {
         return false;
     }
 
-    loadImageFile(
+    return loadImageFile(
         file,
         {
             persist:
                 false,
 
             restored:
-                true
+                true,
+
+            allowFallbackRestore:
+                false
         }
     );
-
-    return true;
 }
+
 function getNormalizedCrop() {
     if (
         !canvas ||
@@ -2202,134 +2676,241 @@ function createScoreboardCropBlob() {
    IMAGE LOADING
    ========================================================= */
 
-function loadImageFile(
+async function loadImageFile(
     file,
     options = {}
-) {
-    if (
-        !file ||
-        ocrControlsLocked
     ) {
-        return;
+    if (
+        !file
+        || ocrControlsLocked
+    ) {
+        return false;
     }
 
     const shouldPersist =
-        options?.persist
-        !== false;
+        options?.persist !==
+        false;
 
     const restored =
-        options?.restored
-        === true;
+        options?.restored ===
+        true;
+
+    const allowFallbackRestore =
+        options?.allowFallbackRestore !==
+        false
+        && !restored;
+
+    sourceImage =
+        null;
 
     sourceFile =
-        file;
+        null;
 
-    sourceFileName =
-        file.name
-        || "scoreboard.png";
-
-    const reader =
-        new FileReader();
-
-    reader.onload =
-        function(
-            event
-        ) {
-            const image =
-                new Image();
-
-            image.onload =
-                function() {
-                    sourceImage =
-                        image;
-
-                    fitCanvasToImage();
-
-                    if (
-                        emptyState
-                    ) {
-                        emptyState.hidden =
-                            true;
-                    }
-
-                    if (
-                        canvas
-                    ) {
-                        canvas.hidden =
-                            false;
-                    }
-
-                    cropFallbackVisible =
-                        false;
-
-                    crop = {
-                        x: 0,
-                        y: 0,
-                        width: 0,
-                        height: 0
-                    };
-
-                    draw();
-
-                    setOcrControlsLocked(
-                        false
-                    );
-
-                    setStatus(
-                        restored
-                            ? "Last uploaded image restored. Ready to read scoreboard."
-                            : "Image loaded. The first attempt will use the full uploaded image."
-                    );
-
-                    savePageState();
-
-                    if (
-                        shouldPersist
-                    ) {
-                        void saveLastUploadedImage(
-                            file
-                        );
-                    }
-                };
-
-            image.onerror =
-                function() {
-                    setStatus(
-                        "FAIL: Could not load the selected image."
-                    );
-                };
-
-            image.src =
-                event.target?.result
-                || "";
-        };
-
-    reader.onerror =
-        function() {
-            setStatus(
-                "FAIL: Could not read the selected image."
-            );
-        };
-
-    reader.readAsDataURL(
-        file
+    setOcrControlsLocked(
+        true
     );
+
+    setStatus(
+        restored
+            ? "Reviewing restored image..."
+            : "Reviewing image..."
+    );
+
+    try {
+        const prepared =
+            await prepareSelectedImage(
+                file
+            );
+
+        if (
+            !prepared?.image
+            || !(prepared.file instanceof File)
+        ) {
+            throw new Error(
+                "The selected image could not be prepared."
+            );
+        }
+
+        sourceImage =
+            prepared.image;
+
+        sourceFile =
+            prepared.file;
+
+        sourceFileName =
+            prepared.file.name
+            || "scoreboard.png";
+
+        fitCanvasToImage();
+
+        if (
+            !canvas?.width
+            || !canvas?.height
+        ) {
+            throw new Error(
+                "The selected image produced invalid display dimensions."
+            );
+        }
+
+        if (
+            emptyState
+        ) {
+            emptyState.hidden =
+                true;
+        }
+
+        if (
+            canvas
+        ) {
+            canvas.hidden =
+                false;
+        }
+
+        cropFallbackVisible =
+            false;
+
+        crop = {
+            x: 0,
+            y: 0,
+            width: 0,
+            height: 0
+        };
+
+        draw();
+
+        setOcrControlsLocked(
+            false
+        );
+
+        if (
+            restored
+        ) {
+            setStatus(
+                "Previous image restored. Ready to read scoreboard."
+            );
+        }
+        else if (
+            prepared.converted
+        ) {
+            setStatus(
+                "iPhone image reviewed and converted to JPEG. Ready to read scoreboard."
+            );
+        }
+        else {
+            setStatus(
+                "Image reviewed and ready. The first attempt will use the full uploaded image."
+            );
+        }
+
+        savePageState();
+
+        if (
+            shouldPersist
+        ) {
+            void saveLastUploadedImage(
+                prepared.file
+            );
+        }
+
+        return true;
+    }
+    catch (
+        error
+    ) {
+        console.error(
+            "[OCR IMAGE] IMAGE REVIEW FAILED:",
+            error
+        );
+
+        sourceImage =
+            null;
+
+        sourceFile =
+            null;
+
+        sourceFileName =
+            "scoreboard.png";
+
+        cropFallbackVisible =
+            false;
+
+        crop = {
+            x: 0,
+            y: 0,
+            width: 0,
+            height: 0
+        };
+
+        if (
+            canvas
+        ) {
+            canvas.hidden =
+                true;
+        }
+
+        if (
+            emptyState
+        ) {
+            emptyState.hidden =
+                false;
+        }
+
+        if (
+            allowFallbackRestore
+        ) {
+            setStatus(
+                "Image failed to load. Restoring previous image..."
+            );
+
+            const restoredPrevious =
+                await restoreLastUploadedImage();
+
+            if (
+                restoredPrevious
+            ) {
+                return true;
+            }
+        }
+
+        setOcrControlsLocked(
+            false
+        );
+
+        setStatus(
+            "FAIL: "
+            + (
+                error?.message
+                || "The selected image could not be reviewed."
+            )
+        );
+
+        return false;
+    }
 }
 
 /* =========================================================
    EVENTS
    ========================================================= */
 
-function handleImageInputChange() {
+async function handleImageInputChange() {
     if (
-        ocrControlsLocked ||
-        !imageInput
+        ocrControlsLocked
+        || !imageInput
     ) {
         return;
     }
 
-    loadImageFile(
-        imageInput.files?.[0]
+    const file =
+        imageInput.files?.[0];
+
+    if (
+        !file
+    ) {
+        return;
+    }
+
+    await loadImageFile(
+        file
     );
 }
 
@@ -2616,7 +3197,9 @@ function initializeOcrCore() {
                 true;
         }
 
-        void restoreLastUploadedImage();
+        setStatus(
+            "Select a scoreboard image to begin."
+        );
     }
 
     OCR_CORE_READY =
