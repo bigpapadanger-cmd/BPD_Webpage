@@ -21,8 +21,6 @@ const JOB_PROGRESS = Object.freeze({
     FINALIZING:
         96,
     COMPLETED:
-        100,
-    FAILED:
         100
 });
 
@@ -876,6 +874,66 @@ async function readJsonRequest(
     }
 }
 
+// ============================================================
+// CLOUD RUN FORM
+// ============================================================
+
+function buildCloudRunForm(
+    imageBlob,
+    requestData
+) {
+    const formData =
+        new FormData();
+
+    formData.append(
+        "image",
+        imageBlob,
+        "scoreboard.png"
+    );
+
+    if (
+        requestData
+        && typeof requestData === "object"
+    ) {
+        for (
+            const [
+                key,
+                value
+            ]
+            of Object.entries(
+                requestData
+            )
+        ) {
+            if (
+                value === undefined
+                || value === null
+            ) {
+                continue;
+            }
+
+            if (
+                typeof value === "object"
+            ) {
+                formData.append(
+                    key,
+                    JSON.stringify(
+                        value
+                    )
+                );
+            }
+            else {
+                formData.append(
+                    key,
+                    String(
+                        value
+                    )
+                );
+            }
+        }
+    }
+
+    return formData;
+}
 
 // ============================================================
 // CLOUD RUN HEADERS
@@ -1088,7 +1146,9 @@ async function markJobFailed(
         stage:
             "failed",
         progress:
-            JOB_PROGRESS.FAILED,
+            normalizeProgress(
+                currentStatus.progress
+            ),
         message:
             "The scoreboard reader hit a bump.",
         updatedAt:
