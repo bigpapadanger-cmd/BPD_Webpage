@@ -26,5 +26,20 @@ export const BPD_AUTH_LOGOUT_URL =
 export const EPIC_LOGIN_URL =
     "/api/auth/epic/epic_login";
 
-const OCR_CONFIRM_URL =
+export const OCR_JOB_SUBMIT_URL =
+    "/api/ocr/jobs/submit_job";
+
+export const OCR_JOB_RESULT_URL =
+    "/api/ocr/jobs/get_result";
+
+export const OCR_CONFIRM_URL =
     "/api/ocr/confirm";
+
+export const API_HEALTH_URL =
+    "/api/health/apihealth";
+
+export const CF_MOD_LIST_API =
+    "/api/curseforge/mods";
+export const OCR_JOB_STATUS_URL =
+    "/api/ocr/jobs/get_job";
+

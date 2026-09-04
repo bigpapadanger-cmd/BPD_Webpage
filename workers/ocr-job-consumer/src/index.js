@@ -1,5 +1,6 @@
 "use strict";
 
+import { apiFetch } from "../../../public/scripts/apiConnection.js";
 import {
     cleanupStaleOcrJobs
 } from "./cleanup.js";
@@ -678,7 +679,7 @@ async function fetchProcessor(
         );
 
     try {
-        return await fetch(
+        return await apiFetch(
             env.OCR_JOB_PROCESS_URL,
             {
                 method:

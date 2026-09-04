@@ -1,3 +1,9 @@
+//      import {
+//          requireApiConnection
+//      } from "/scripts/apiConnection.js";
+
+//THE ABOVE IS REQUIRED FOR ANY API CALLS FROM CLIENT
+
 export const EPIC_AUTHORIZE_URL =
     "https://www.epicgames.com/id/authorize";
 export const EPIC_TOKEN_URL =

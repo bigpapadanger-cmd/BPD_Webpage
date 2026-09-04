@@ -4,15 +4,10 @@
    BPD GAMING NETWORK
    OCR IMAGE SUBMISSION
    ========================================================= */
-
+import {OCR_JOB_SUBMIT_URL,OCR_JOB_RESULT_URL } from "../../scripts/apiRoutes.js";
+import { apiFetch } from "../../scripts/apiConnection.js";
 const OCR_SUBMISSION_VERSION =
     "ocr-submission-1.4";
-
-const OCR_JOB_SUBMIT_URL =
-    "/api/ocr/jobs/submit_job";
-
-const OCR_JOB_RESULT_URL =
-    "/api/ocr/jobs/get_result";
 
 const OCR_REVIEW_OPEN_REQUEST_KEY =
     "rocketLeagueOcrReviewOpenRequestV1";
@@ -937,7 +932,7 @@ async function getOcrJobResult(
     jobId
 ) {
     const response =
-        await fetch(
+        await apiFetch(
             (
                 OCR_JOB_RESULT_URL
                 + "?jobId="
@@ -1970,7 +1965,7 @@ async function submitScoreboard(
         );
 
         const response =
-            await fetch(
+            await apiFetch(
                 OCR_JOB_SUBMIT_URL,
                 {
                     method:

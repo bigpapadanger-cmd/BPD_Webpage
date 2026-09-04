@@ -20,14 +20,68 @@ import {
 import {
     BPD_AUTH_SESSION_URL
 } from "/scripts/apiRoutes.js";
-
+import { apiFetch } from "../../../scripts/apiConnection.js";
 const DEFAULT_ROUTE = "/";
 const ERROR_ROUTE = "/Error";
 const AUTH_FALLBACK_ROUTE = "/RocketLeague";
 
 let navigationId = 0;
 
+/* =========================================================
+   INITIAL SIDEBAR LAYOUT STATE
 
+   Apply the saved sidebar state immediately.
+
+   This runs before route HTML is fetched so the content
+   layout already knows whether to reserve expanded or
+   collapsed sidebar space during initial page load.
+
+   New users:
+       desktop -> expanded
+       mobile  -> collapsed
+
+   Existing user preference always wins.
+   ========================================================= */
+
+function applyInitialSidebarLayoutState() {
+    const savedSidebar =
+        localStorage.getItem(
+            "bpdSidebar"
+        );
+
+    let collapsed;
+
+    if (
+        savedSidebar ===
+        "collapsed"
+    ) {
+        collapsed =
+            true;
+    }
+    else if (
+        savedSidebar ===
+        "open"
+    ) {
+        collapsed =
+            false;
+    }
+    else {
+        collapsed =
+            window.innerWidth <=
+            700;
+    }
+
+    document.body.classList.toggle(
+        "sidebar-collapsed",
+        collapsed
+    );
+
+    document.body.dataset.sidebar =
+        collapsed
+            ? "collapsed"
+            : "open";
+}
+applyInitialSidebarLayoutState();
 /* =========================================================
    OCR GLOBAL NOTIFICATIONS
    ========================================================= */
@@ -512,7 +566,7 @@ async function loadRouterAuthSession() {
     }
     else {
         const response =
-            await fetch(
+            await apiFetch(
                 BPD_AUTH_SESSION_URL,
                 {
                     method:
@@ -1023,7 +1077,7 @@ async function loadShell() {
                 }
             )
         );
-
+        
         /* =================================================
            OCR ACTIVE SUBMISSION CHECK
 

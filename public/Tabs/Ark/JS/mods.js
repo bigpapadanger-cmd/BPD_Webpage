@@ -1,7 +1,8 @@
 import {
     renderHeader
 } from "/Framework/Shell/JS/renderHeader.js";
-
+import { CF_MOD_LIST_API } from "../../../scripts/apiRoutes.js";
+import { apiFetch } from "../../../scripts/apiConnection.js";
 
 const gameCategory =
     "ark";
@@ -109,12 +110,11 @@ async function loadModsForGame(
         modList
     );
 
-
     try {
 
         const response =
-            await fetch(
-                `/api/curseforge/mods?game=${encodeURIComponent(
+            await apiFetch(
+                `${CF_MOD_LIST_API}?game=${encodeURIComponent(
                     game
                 )}`,
                 {

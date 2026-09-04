@@ -15,6 +15,7 @@ import {
 import {
     renderUnavailableRanks
 } from "./ranks.js";
+import { apiFetch } from "../../../../scripts/apiConnection.js";
 
 const ROCKET_LEAGUE_PROFILE_PAGE =
     "/RocketLeague/Profile";
@@ -120,7 +121,7 @@ async function loadAuthenticatedUser() {
     }
 
     const response =
-        await fetch(
+        await apiFetch(
             ROCKET_LEAGUE_SESSION_URL,
             {
                 method:

@@ -6,11 +6,17 @@
     box-sizing: border-box;
 }
 
+/* =========================================================
+   SITE CONTENT
+   ========================================================= */
+
 .site-content {
     display: block;
     flex: 1 1 auto;
+
     width: 100%;
     max-width: 100%;
+
     min-width: 0;
     min-height: 60vh;
 
@@ -24,13 +30,21 @@
         );
 
     overflow-x: hidden;
-    background: transparent;
+
+    background:
+        transparent;
 
     transition:
         padding-left 0.25s ease;
 }
 
-body.sidebar-collapsed .site-content {
+
+/* =========================================================
+   COLLAPSED SIDEBAR
+   ========================================================= */
+
+body.sidebar-collapsed
+.site-content {
     padding-left:
         calc(
             var(--sidebar-collapsed-width)
@@ -38,19 +52,33 @@ body.sidebar-collapsed .site-content {
         );
 }
 
+
+/* =========================================================
+   PAGE CONTENT
+   ========================================================= */
+
 .site-content > section,
 .site-content > main,
 .site-content > article {
     display: block;
+
     width: 100%;
     max-width: 100%;
+
     min-width: 0;
     min-height: 60vh;
+
     margin: 0;
 }
 
-body[data-header="hidden"] .site-content {
-    min-height: calc(100dvh - 60px);
+
+body[data-header="hidden"]
+.site-content {
+    min-height:
+        calc(
+            100dvh
+            - 60px
+        );
 }
 
 
@@ -60,13 +88,17 @@ body[data-header="hidden"] .site-content {
 
 .route-load-error {
     display: flex;
+
     flex-direction: column;
+
     align-items: center;
     justify-content: center;
+
     gap: 12px;
 
     width: 100%;
     min-height: 60vh;
+
     padding: 24px;
 
     text-align: center;
@@ -78,31 +110,57 @@ body[data-header="hidden"] .site-content {
 }
 
 .route-load-error p {
-    color: #9299a8;
+    color:
+        #9299a8;
 }
 
 .route-load-error a {
     margin-top: 10px;
-    padding: 10px 18px;
 
-    border: 1px solid #8b5cf6;
+    padding:
+        10px
+        18px;
+
+    border:
+        1px solid
+        #8b5cf6;
+
     border-radius: 7px;
 
-    color: #ffffff;
+    color:
+        #ffffff;
+
     text-decoration: none;
 }
 
 
 /* =========================================================
-   MOBILE
+   VERY SMALL VIEWPORTS
+
+   Do NOT force collapsed content spacing here.
+
+   Sidebar state remains controlled by:
+       body.sidebar-collapsed
+
+   If the user expands the sidebar on mobile,
+   site-content respects the expanded width.
    ========================================================= */
 
 @media (max-width: 700px) {
     .site-content {
-        padding-left:
-            calc(
-                var(--sidebar-collapsed-width)
-                + var(--sidebar-content-gap)
-            );
+        transition:
+            padding-left
+            0.22s ease;
+    }
+}
+
+
+/* =========================================================
+   REDUCED MOTION
+   ========================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+    .site-content {
+        transition: none;
     }
 }

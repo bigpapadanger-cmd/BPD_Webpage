@@ -9,6 +9,7 @@ import {
     BPD_AUTH_SESSION_URL
 } from "/scripts/apiRoutes.js";
 
+import { apiFetch } from "../../../scripts/apiConnection";
 
 const FAQ_API_URL =
     "/api/faq";
@@ -86,7 +87,7 @@ LOAD FAQ DATA
 async function loadFaqs() {
     try {
         const response =
-            await fetch(
+            await apiFetch(
                 FAQ_API_URL,
                 {
                     credentials:
@@ -545,7 +546,7 @@ async function handleFaqUpvote(
 
     try {
         const response =
-            await fetch(
+            await apiFetch(
                 FAQ_UPVOTE_URL,
                 {
                     method:
@@ -713,7 +714,7 @@ async function getCurrentSession() {
         }
 
         const response =
-            await fetch(
+            await apiFetch(
                 BPD_AUTH_SESSION_URL,
                 {
                     credentials:

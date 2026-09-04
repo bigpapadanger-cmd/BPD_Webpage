@@ -1,10 +1,8 @@
 "use strict";
 import {TIMEZONE_DISPLAY_ALIASES} from "./timezone.js"
-const ROCKET_LEAGUE_PROFILE_URL =
-    "/api/auth/rocketleague/profile";
+import { ROCKET_LEAGUE_PROFILE_URL, ROCKET_LEAGUE_PROFILE_UPDATE_URL } from "../../../../scripts/apiRoutes.js";
+import { apiFetch } from "../../../../scripts/apiConnection.js";
 
-const ROCKET_LEAGUE_PROFILE_UPDATE_URL =
-    "/api/auth/rocketleague/profile";
 
 const REGISTRATION_DRAFT_KEY =
     "bpdRocketLeagueRegistrationDraft";
@@ -1707,7 +1705,7 @@ async function loadRocketLeagueProfile() {
 
     try {
         response =
-            await fetch(
+            await apiFetch(
                 ROCKET_LEAGUE_PROFILE_URL,
                 {
                     method:
@@ -2256,7 +2254,7 @@ async function submitRegistration(
 
     try {
         const response =
-            await fetch(
+            await apiFetch(
                 ROCKET_LEAGUE_PROFILE_UPDATE_URL,
                 {
                     method:

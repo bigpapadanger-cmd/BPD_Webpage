@@ -1,10 +1,68 @@
-/* BPD GAMING NETWORK - FLOATING SIDEBAR */
+/* BPD GAMING NETWORK - RESPONSIVE FLOATING SIDEBAR */
 
 :root {
-    --sidebar-width: 300px;
-    --sidebar-collapsed-width: 76px;
-    --sidebar-content-gap: 14px;
-    --sidebar-icon-width: var(--sidebar-collapsed-width);
+    /*
+    =========================================================
+    SIDEBAR SCALE
+
+    Expanded:
+        targets ~16% of viewport width
+        minimum keeps text usable on small screens
+        maximum prevents excessive width on large screens
+
+    Collapsed:
+        modestly scales with viewport
+    =========================================================
+    */
+
+    --sidebar-width:
+        clamp(
+            220px,
+            16vw,
+            360px
+        );
+
+    --sidebar-collapsed-width:
+        clamp(
+            64px,
+            5vw,
+            80px
+        );
+
+    --sidebar-edge-gap:
+        clamp(
+            6px,
+            1vw,
+            16px
+        );
+
+    --sidebar-vertical-gap:
+        clamp(
+            10px,
+            1.5vh,
+            20px
+        );
+
+    --sidebar-toggle-gap:
+        8px;
+
+    --sidebar-content-gap:
+        clamp(
+            10px,
+            1.2vw,
+            20px
+        );
+
+    --sidebar-icon-width:
+        var(
+            --sidebar-collapsed-width
+        );
+    --sidebar-row-height:
+        clamp(
+            46px,
+            5vh,
+            54px
+        );
 }
 
 
@@ -17,15 +75,25 @@
     display: flex;
     flex: 0 0 auto;
     flex-direction: column;
+
     width: 100%;
     min-width: 0;
+
     gap: 2px;
 }
 
 .sidebar-navigation-bottom {
     margin-top: auto;
     padding-top: 8px;
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
+
+    border-top:
+        1px solid
+        rgba(
+            255,
+            255,
+            255,
+            0.08
+        );
 }
 
 
@@ -35,24 +103,62 @@
 
 .site-sidebar {
     position: fixed;
-    top: 41.5%;
-    left: 6px;
+
+    top:
+        var(
+            --sidebar-vertical-gap
+        );
+
+    bottom:
+        var(
+            --sidebar-vertical-gap
+        );
+
+    left:
+        var(
+            --sidebar-edge-gap
+        );
+
     z-index: 100;
 
-    width: var(--sidebar-width);
-    min-width: var(--sidebar-width);
-    max-width: var(--sidebar-width);
+    width:
+        var(
+            --sidebar-width
+        );
 
-    height: 620px;
+    min-width:
+        var(
+            --sidebar-width
+        );
+
+    max-width:
+        var(
+            --sidebar-width
+        );
+
+    /*
+    Height now consumes all available viewport space between
+    the top and bottom gaps.
+    */
+    height: auto;
     min-height: 0;
+    max-height: none;
 
     overflow: visible;
 
     border: 0;
-    background: transparent;
-    box-shadow: none;
 
-    transform: translateY(-50%);
+    background:
+        transparent;
+
+    box-shadow:
+        none;
+
+    /*
+    No translateY because positioning is now based on
+    top + bottom rather than a fixed height.
+    */
+    transform: none;
 
     transition:
         width 0.33s ease,
@@ -60,10 +166,22 @@
         max-width 0.33s ease;
 }
 
-body.sidebar-collapsed .site-sidebar {
-    width: var(--sidebar-collapsed-width);
-    min-width: var(--sidebar-collapsed-width);
-    max-width: var(--sidebar-collapsed-width);
+body.sidebar-collapsed
+.site-sidebar {
+    width:
+        var(
+            --sidebar-collapsed-width
+        );
+
+    min-width:
+        var(
+            --sidebar-collapsed-width
+        );
+
+    max-width:
+        var(
+            --sidebar-collapsed-width
+        );
 }
 
 .site-sidebar::before,
@@ -79,19 +197,37 @@ body.sidebar-collapsed .site-sidebar {
 
 .sidebar-toggle-box {
     position: absolute;
+
     top: 0;
     left: 0;
+
     z-index: 110;
 
     display: flex;
+
     align-items: center;
     justify-content: center;
 
-    width: var(--sidebar-collapsed-width);
-    height: var(--sidebar-collapsed-width);
+    width:
+        var(
+            --sidebar-collapsed-width
+        );
 
-    border: 2px solid #303541;
-    border-radius: 14px;
+    height:
+        var(
+            --sidebar-collapsed-width
+        );
+
+    border:
+        2px solid
+        #303541;
+
+    border-radius:
+        clamp(
+            11px,
+            1vw,
+            14px
+        );
 
     background:
         linear-gradient(
@@ -101,33 +237,76 @@ body.sidebar-collapsed .site-sidebar {
         );
 
     box-shadow:
-        0 8px 24px rgba(0, 0, 0, 0.5),
-        0 0 14px rgba(139, 92, 246, 0.1);
+        0 8px 24px
+            rgba(
+                0,
+                0,
+                0,
+                0.5
+            ),
+        0 0 14px
+            rgba(
+                139,
+                92,
+                246,
+                0.1
+            );
 }
 
 .sidebar-toggle {
     position: relative;
 
     display: flex;
+
     flex-direction: column;
+
     align-items: center;
     justify-content: center;
+
     gap: 3px;
 
-    width: 32px;
-    height: 32px;
+    width:
+        clamp(
+            28px,
+            2.1vw,
+            34px
+        );
+
+    height:
+        clamp(
+            28px,
+            2.1vw,
+            34px
+        );
+
     padding: 0;
 
     cursor: pointer;
 
-    border: 2px solid #353b48;
+    border:
+        2px solid
+        #353b48;
+
     border-radius: 8px;
 
-    background: #1b1e25;
+    background:
+        #1b1e25;
 
     box-shadow:
-        0 6px 18px rgba(0, 0, 0, 0.45),
-        0 0 8px rgba(139, 92, 246, 0.18);
+        0 6px 18px
+            rgba(
+                0,
+                0,
+                0,
+                0.45
+            ),
+        0 0 8px
+            rgba(
+                139,
+                92,
+                246,
+                0.18
+            );
 
     transition:
         transform 0.2s ease,
@@ -139,12 +318,19 @@ body.sidebar-collapsed .site-sidebar {
 .sidebar-toggle span {
     display: block;
 
-    width: 15px;
+    width:
+        clamp(
+            13px,
+            1vw,
+            16px
+        );
+
     height: 2px;
 
     border-radius: 2px;
 
-    background: #ffffff;
+    background:
+        #ffffff;
 }
 
 .sidebar-toggle:hover {
@@ -152,16 +338,32 @@ body.sidebar-collapsed .site-sidebar {
         translateY(-2px)
         scale(1.04);
 
-    border-color: #8b5cf6;
-    background: #211936;
+    border-color:
+        #8b5cf6;
+
+    background:
+        #211936;
 
     box-shadow:
-        0 8px 22px rgba(0, 0, 0, 0.5),
-        0 0 14px rgba(139, 92, 246, 0.65);
+        0 8px 22px
+            rgba(
+                0,
+                0,
+                0,
+                0.5
+            ),
+        0 0 14px
+            rgba(
+                139,
+                92,
+                246,
+                0.65
+            );
 }
 
 .sidebar-toggle:active {
-    transform: scale(0.98);
+    transform:
+        scale(0.98);
 }
 
 
@@ -171,31 +373,63 @@ body.sidebar-collapsed .site-sidebar {
 
 .sidebar-navigation {
     position: absolute;
+
     top:
         calc(
-            var(--sidebar-collapsed-width)
-            + 8px
+            var(
+                --sidebar-collapsed-width
+            )
+            +
+            var(
+                --sidebar-toggle-gap
+            )
         );
+
     right: 0;
     bottom: 0;
     left: 0;
 
     display: flex;
+
     flex-direction: column;
     justify-content: flex-start;
+
     gap: 2px;
 
     width: 100%;
+
     min-width: 0;
     min-height: 0;
 
-    padding: 6px 3px 8px;
+    padding:
+        clamp(
+            6px,
+            0.6vw,
+            10px
+        )
+        3px
+        clamp(
+            8px,
+            1vh,
+            12px
+        );
 
     overflow-x: hidden;
     overflow-y: auto;
 
-    border: 2px solid #303541;
-    border-radius: 18px;
+    overscroll-behavior:
+        contain;
+
+    border:
+        2px solid
+        #303541;
+
+    border-radius:
+        clamp(
+            14px,
+            1.3vw,
+            18px
+        );
 
     background:
         linear-gradient(
@@ -204,9 +438,16 @@ body.sidebar-collapsed .site-sidebar {
             #01004e 100%
         );
 
-    scrollbar-width: thin;
+    scrollbar-width:
+        thin;
+
     scrollbar-color:
-        rgba(139, 92, 246, 0.45)
+        rgba(
+            139,
+            92,
+            246,
+            0.45
+        )
         transparent;
 }
 
@@ -215,12 +456,21 @@ body.sidebar-collapsed .site-sidebar {
 }
 
 .sidebar-navigation::-webkit-scrollbar-track {
-    background: transparent;
+    background:
+        transparent;
 }
 
 .sidebar-navigation::-webkit-scrollbar-thumb {
-    border-radius: 999px;
-    background: rgba(139, 92, 246, 0.45);
+    border-radius:
+        999px;
+
+    background:
+        rgba(
+            139,
+            92,
+            246,
+            0.45
+        );
 }
 
 
@@ -230,12 +480,28 @@ body.sidebar-collapsed .site-sidebar {
 
 .site-sidebar .nav-item {
     display: flex;
-    flex: 0 0 auto;
+    flex: 0 0 var(--sidebar-row-height);
+
     align-items: center;
 
     width: 100%;
     min-width: 0;
-    min-height: 40px;
+
+    height:
+        var(
+            --sidebar-row-height
+        );
+
+    min-height:
+        var(
+            --sidebar-row-height
+        );
+
+    max-height:
+        var(
+            --sidebar-row-height
+        );
+
     padding: 0;
 
     overflow: hidden;
@@ -265,13 +531,20 @@ body.sidebar-collapsed .site-sidebar {
 .site-sidebar .nav-item:focus-visible,
 .site-sidebar .nav-item.active,
 .site-sidebar .nav-item[aria-current="page"] {
-    color: #ffffff;
-    background: #24202f;
+    color:
+        #ffffff;
+
+    background:
+        #24202f;
 }
 
 .site-sidebar .nav-item:focus-visible {
-    outline: 2px solid #8b5cf6;
-    outline-offset: -2px;
+    outline:
+        2px solid
+        #8b5cf6;
+
+    outline-offset:
+        -2px;
 }
 
 
@@ -281,13 +554,30 @@ body.sidebar-collapsed .site-sidebar {
 
 .site-sidebar .nav-icon {
     display: grid;
-    flex: 0 0 var(--sidebar-icon-width);
+
+    flex:
+        0 0
+        var(
+            --sidebar-icon-width
+        );
 
     align-items: center;
     justify-content: center;
 
-    width: var(--sidebar-icon-width);
-    min-width: var(--sidebar-icon-width);
+    width:
+        var(
+            --sidebar-icon-width
+        );
+
+    min-width:
+        var(
+            --sidebar-icon-width
+        );
+
+    height:
+        var(
+            --sidebar-row-height
+        );
 }
 
 
@@ -296,94 +586,104 @@ body.sidebar-collapsed .site-sidebar {
    ========================================================= */
 
 .site-sidebar .nav-label {
-    display: inline-block;
-
+    display: flex;
     flex: 1 1 auto;
 
     min-width: 0;
-    max-width: 220px;
+    max-width: none;
+
+    padding-right: 10px;
 
     overflow: hidden;
 
-    white-space: nowrap;
+    white-space: normal;
+    overflow-wrap: break-word;
+
+    line-height: 1.2;
 
     opacity: 1;
 
     transition:
-        max-width 0.2s ease,
-        opacity 0.2s ease;
+        opacity 0.18s ease;
 }
 
-body.sidebar-collapsed .site-sidebar .nav-label {
+body.sidebar-collapsed
+.site-sidebar
+.nav-label {
     max-width: 0;
     opacity: 0;
 }
 
 
 /* =========================================================
-   EXPANSION DENIED
-   ========================================================= */
+   VERY SMALL VIEWPORTS
 
-.sidebar-toggle.expand-denied {
-    animation:
-        sidebarExpandDenied
-        0.45s ease;
-}
+   Expansion remains available.
 
-@keyframes sidebarExpandDenied {
-    0%,
-    100% {
-        transform: translateX(0);
-        border-color: #353b48;
-        background: #1b1e25;
-    }
-
-    20%,
-    60% {
-        transform: translateX(-5px);
-        border-color: #ff4d5e;
-        background: #4a151c;
-    }
-
-    40%,
-    80% {
-        transform: translateX(5px);
-    }
-}
-
-
-/* =========================================================
-   TABLET / MOBILE AUTO-COLLAPSE APPEARANCE
-   ========================================================= */
-
-@media (max-width: 900px) {
-    .site-sidebar {
-        width: var(--sidebar-collapsed-width);
-        min-width: var(--sidebar-collapsed-width);
-        max-width: var(--sidebar-collapsed-width);
-    }
-
-    .site-sidebar .nav-label {
-        max-width: 0;
-        opacity: 0;
-    }
-}
-
-
-/* =========================================================
-   SMALL MOBILE
+   An expanded sidebar is deliberately allowed to consume
+   substantial screen width on mobile.
    ========================================================= */
 
 @media (max-width: 700px) {
-    .site-sidebar {
-        left: 4px;
+    :root {
+        --sidebar-width:
+            clamp(
+                210px,
+                68vw,
+                300px
+            );
+
+        --sidebar-collapsed-width:
+            clamp(
+                58px,
+                16vw,
+                68px
+            );
+
+        --sidebar-edge-gap:
+            4px;
+
+        --sidebar-vertical-gap:
+            8px;
+    }
+}
+
+
+/* =========================================================
+   SHORT VIEWPORTS
+
+   Keep full vertical usage and allow navigation body to
+   scroll internally.
+   ========================================================= */
+
+@media (max-height: 600px) {
+    :root {
+        --sidebar-vertical-gap:
+            5px;
+
+        --sidebar-collapsed-width:
+            clamp(
+                56px,
+                10vh,
+                68px
+            );
     }
 
-    .sidebar-toggle-box {
-        border-radius: 12px;
+    .site-sidebar .nav-item {
+        min-height:
+            36px;
     }
+}
 
-    .sidebar-navigation {
-        border-radius: 14px;
+
+/* =========================================================
+   ACCESSIBILITY
+   ========================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+    .site-sidebar,
+    .site-sidebar .nav-label,
+    .sidebar-toggle {
+        transition: none;
     }
 }

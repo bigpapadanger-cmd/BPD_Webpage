@@ -4,9 +4,8 @@
    BPD GAMING NETWORK
    OCR RESULT REVIEW / CONFIRMATION
    ========================================================= */
-
-const OCR_CONFIRM_URL =
-    "/api/ocr/confirm";
+import { OCR_CONFIRM_URL } from "../../scripts/apiRoutes.js";
+import { apiFetch } from "../../scripts/apiConnection.js";
 
 let ocrTestingPanel =
     null;
@@ -513,7 +512,7 @@ async function confirmReviewedResults() {
 
     try {
         const response =
-            await fetch(
+            await apiFetch(
                 OCR_CONFIRM_URL,
                 {
                     method:

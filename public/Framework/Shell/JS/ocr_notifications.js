@@ -4,7 +4,8 @@
    BPD GAMING NETWORK
    GLOBAL OCR NOTIFICATIONS
    ========================================================= */
-
+import { OCR_JOB_RESULT_URL, OCR_JOB_STATUS_URL, OCR_CONFIRM_URL } from "../../../scripts/apiRoutes.js";
+import { apiFetch } from "../../../scripts/apiConnection.js";
 const OCR_NOTIFICATION_VERSION =
     "ocr-notifications-1.1";
 
@@ -20,25 +21,13 @@ const OCR_PENDING_REVIEW_KEY =
 const OCR_REVIEW_OPEN_REQUEST_KEY =
     "rocketLeagueOcrReviewOpenRequestV1";
 
-const OCR_JOB_STATUS_URL =
-    "/api/ocr/jobs/get_job";
-
-const OCR_JOB_RESULT_URL =
-    "/api/ocr/jobs/get_result";
-
-const OCR_CONFIRM_URL =
-    "/api/ocr/confirm";
-
 const OCR_NOTIFICATION_CONTAINER_ID =
     "ocrNotificationContainer";
 
 const OCR_NOTIFICATION_CHECK_SCHEDULE_MS = [
     2000,
-    3000,
     4000,
-    5000,
     6000,
-    7000,
     8000,
     10000,
     12000,
@@ -805,7 +794,7 @@ async function getOcrJob(
     jobId
 ) {
     const response =
-        await fetch(
+        await apiFetch(
             (
                 OCR_JOB_STATUS_URL
                 + "?jobId="
@@ -863,7 +852,7 @@ async function getOcrResult(
     jobId
 ) {
     const response =
-        await fetch(
+        await apiFetch(
             (
                 OCR_JOB_RESULT_URL
                 + "?jobId="
@@ -1124,7 +1113,7 @@ async function autoAcceptOcrResult(
         }
 
         const response =
-            await fetch(
+            await apiFetch(
                 OCR_CONFIRM_URL,
                 {
                     method:

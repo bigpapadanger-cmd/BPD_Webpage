@@ -1,6 +1,7 @@
 "use strict";
-const ROCKET_LEAGUE_SESSION_URL = "/api/auth/session";
-const ROCKET_LEAGUE_PROFILE_URL = "/api/rocketleague/profile";
+import { apiFetch } from "../../../../scripts/apiConnection.js";
+import { ROCKET_LEAGUE_SESSION_URL, ROCKET_LEAGUE_PROFILE_URL } from "../../../../scripts/apiRoutes.js";
+
 const ROCKET_LEAGUE_PLAYLISTS = [
     {
         key: "duel",
@@ -52,7 +53,7 @@ async function loadAuthenticatedRocketLeagueUser() {
     ) {
         return window.BPDAuth.getSession();
     }
-    const response = await fetch(
+    const response = await apiFetch(
         ROCKET_LEAGUE_SESSION_URL,
         {
             method: "GET",
@@ -249,7 +250,7 @@ async function loadRocketLeagueProfile(authUser) {
             authUser?.displayName ||
             "Epic Player";
     }
-    const response = await fetch(
+    const response = await apiFetch(
         ROCKET_LEAGUE_PROFILE_URL,
         {
             method: "GET",

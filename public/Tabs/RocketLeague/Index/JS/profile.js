@@ -5,6 +5,7 @@ import {
 import {
     renderRocketLeagueRanks
 } from "./ranks.js";
+import { apiFetch } from "../../../../scripts/apiConnection.js";
 
 function setProfileWarning(
     visible,
@@ -175,7 +176,7 @@ export async function loadRocketLeagueProfile(
     );
 
     const response =
-        await fetch(
+        await apiFetch(
             ROCKET_LEAGUE_PROFILE_URL,
             {
                 method:

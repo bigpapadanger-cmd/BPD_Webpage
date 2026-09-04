@@ -16,6 +16,7 @@
 html,
 body {
     width: 100%;
+    max-width: 100%;
     min-height: 100%;
     margin: 0;
 }
@@ -25,10 +26,14 @@ html {
 }
 
 body {
+    min-width: 0;
     min-height: 100dvh;
+
     overflow-x: hidden;
+
     background: #0d0f13;
     color: #ffffff;
+
     font-family:
         "Inter",
         "Segoe UI",
@@ -37,27 +42,118 @@ body {
 
 .site-shell {
     position: relative;
+
     display: block;
+
     width: 100%;
-    max-width: none;
-    min-width: fit-content;
+    max-width: 100%;
+    min-width: 0;
     min-height: 100dvh;
+
     margin: 0;
+
+    overflow-x: hidden;
+
     background: transparent;
-    box-sizing: border-box;
+
     isolation: isolate;
 }
 
 .site-page {
     position: relative;
     z-index: 1;
+
     display: flex;
     flex-direction: column;
+
     width: 100%;
-    max-width: none;
-    min-width: fit-content;
+    max-width: 100%;
+    min-width: 0;
     min-height: 100dvh;
+
     margin: 0;
+
+    overflow-x: hidden;
+
     background: transparent;
-    box-sizing: border-box;
+}
+.network-status-toast {
+    position: fixed;
+
+    right: 18px;
+    bottom: 18px;
+    left: auto;
+
+    z-index: 10000;
+
+    max-width:
+        min(
+            360px,
+            calc(
+                100vw
+                - 36px
+            )
+        );
+
+    padding:
+        10px
+        16px;
+
+    border:
+        1px solid
+        rgba(
+            255,
+            90,
+            110,
+            0.45
+        );
+
+    border-radius: 10px;
+
+    background:
+        rgba(
+            24,
+            10,
+            14,
+            0.96
+        );
+
+    color:
+        #ffd7dc;
+
+    font-size: 0.84rem;
+    font-weight: 600;
+
+    text-align: left;
+
+    box-shadow:
+        0 8px 28px
+        rgba(
+            0,
+            0,
+            0,
+            0.45
+        );
+
+    opacity: 0;
+
+    pointer-events: none;
+
+    transform:
+        translateY(
+            12px
+        );
+
+    transition:
+        opacity 0.2s ease,
+        transform 0.2s ease;
+}
+
+.network-status-toast.visible {
+    opacity: 1;
+
+    transform:
+        translateY(
+            0
+        );
 }

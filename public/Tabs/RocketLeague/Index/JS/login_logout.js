@@ -1,14 +1,29 @@
 "use strict";
 
+import { apiFetch, requireApiConnection } from "../../../../scripts/apiConnection.js";
 import {
     EPIC_LOGIN_URL,
     BPD_AUTH_LOGOUT_URL
 } from "/scripts/apiRoutes.js";
 
-function handleEpicLogin() {
-    window.location.assign(
-        EPIC_LOGIN_URL
-    );
+async function handleEpicLogin() {
+    try {
+        await requireApiConnection();
+
+        window.location.assign(
+            EPIC_LOGIN_URL
+        );
+    }
+    catch (
+        error
+    ) {
+        console.error(
+            "AUTH BUTTONS: Login connection check failed.",
+            error
+        );
+
+        return;
+    }
 }
 
 async function handleLogout() {
@@ -24,7 +39,7 @@ async function handleLogout() {
     logoutButton.disabled = true;
 
     try {
-        const response = await fetch(
+        const response = await apiFetch(
             BPD_AUTH_LOGOUT_URL,
             {
                 method: "POST",

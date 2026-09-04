@@ -1,9 +1,11 @@
 /* BPD GAMING NETWORK - FAQ */
 
+import { apiFetch } from "../../../scripts/apiConnection";
+
 const FAQ_API_URL = "/api/faq";
 const FAQ_UPVOTE_URL = "/api/faq/upvote";
 const FAQ_SUGGEST_URL = "/faq/suggest";
-
+const FUTURE_API_CALLER="/api/auth/session"
 const faqList =
     document.getElementById("faqList");
 
@@ -65,7 +67,7 @@ async function loadFaqs() {
     try {
 
         const response =
-            await fetch(
+            await apiFetch(
                 FAQ_API_URL,
                 {
                     credentials:
@@ -446,7 +448,7 @@ async function handleFaqUpvote(
     try {
 
         const response =
-            await fetch(
+            await apiFetch(
                 FAQ_UPVOTE_URL,
                 {
                     method:
@@ -607,8 +609,8 @@ async function getCurrentSession() {
 
 
         const response =
-            await fetch(
-                "/api/auth/session",
+            await apiFetch(
+                `${FUTURE_API_CALLER}`,
                 {
                     credentials:
                         "include",

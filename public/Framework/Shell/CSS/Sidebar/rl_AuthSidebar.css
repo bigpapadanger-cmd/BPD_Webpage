@@ -383,20 +383,6 @@ LOGIN ANIMATIONS
 }
 
 
-/*
-=========================================================
-TABLET / MOBILE
-=========================================================
-*/
-
-@media (max-width: 900px) {
-    .sidebar-view-rocketleague .sidebar-group-label,
-    .sidebar-view-rocketleague .submenu-arrow,
-    .sidebar-view-rocketleague .sidebar-submenu {
-        display: none;
-    }
-}
-
 
 /*
 =========================================================

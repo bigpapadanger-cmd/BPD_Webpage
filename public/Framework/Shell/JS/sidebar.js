@@ -3,14 +3,13 @@
 BPD GAMING NETWORK
 SPA SIDEBAR MODULE
 
-Authentication does not run from the global shell.
-Epic authentication begins only from the dedicated
-login control on the Rocket League page.
+Sidebar state is user-controlled at every viewport size.
+Mobile and tablet users may fully expand the sidebar.
 =========================================================
 */
 
-const SIDEBAR_AUTO_COLLAPSE_WIDTH = 900;
-let sidebarResizeInitialized = false;
+let sidebarResizeInitialized =
+    false;
 
 
 /*
@@ -22,7 +21,6 @@ Call after sidebar HTML and hover HTML are loaded.
 
 export function initializeSidebar() {
     applyGlobalSettings();
-    applyAutomaticSidebarState();
     setupSidebarToggle();
     setupActiveNavigation();
     setupDisabledNavigation();
@@ -43,9 +41,13 @@ export async function loadSidebarHover() {
 
     try {
         const response =
-            await fetch(hoverFile);
+            await fetch(
+                hoverFile
+            );
 
-        if (!response.ok) {
+        if (
+            !response.ok
+        ) {
             throw new Error(
                 `Hover failed: ${response.status}`
             );
@@ -59,22 +61,31 @@ export async function loadSidebarHover() {
                 "sidebarHover"
             );
 
-        if (existingHover) {
+        if (
+            existingHover
+        ) {
             existingHover.remove();
         }
 
         const container =
-            document.createElement("div");
+            document.createElement(
+                "div"
+            );
 
         container.innerHTML =
             hoverHTML;
 
-        while (container.firstElementChild) {
+        while (
+            container.firstElementChild
+        ) {
             document.body.appendChild(
                 container.firstElementChild
             );
         }
-    } catch (error) {
+    }
+    catch (
+        error
+    ) {
         console.error(
             "SIDEBAR HOVER LOAD FAILED:",
             error
@@ -87,6 +98,8 @@ export async function loadSidebarHover() {
 =========================================================
 GLOBAL SETTINGS
 Theme, animations and saved sidebar state.
+
+Sidebar preference is respected at every viewport size.
 =========================================================
 */
 
@@ -101,27 +114,60 @@ function applyGlobalSettings() {
             "sidebarToggle"
         );
 
-    if (!sidebar) {
+    if (
+        !sidebar
+    ) {
         return;
     }
 
     const savedSidebar =
         localStorage.getItem(
             "bpdSidebar"
-        ) || "open";
+        );
 
     const savedTheme =
         localStorage.getItem(
             "bpdTheme"
-        ) || "blue";
+        )
+        || "blue";
 
     const savedAnimations =
         localStorage.getItem(
             "bpdAnimations"
-        ) || "on";
+        )
+        || "on";
 
-    const shouldCollapse =
-        savedSidebar === "collapsed";
+    /*
+     * Existing users keep their preference.
+     *
+     * New users:
+     * desktop -> open
+     * small screen -> collapsed
+     *
+     * This is only the initial state.
+     * Expansion is NEVER blocked.
+     */
+    let shouldCollapse;
+
+    if (
+        savedSidebar ===
+        "collapsed"
+    ) {
+        shouldCollapse =
+            true;
+    }
+    else if (
+        savedSidebar ===
+        "open"
+    ) {
+        shouldCollapse =
+            false;
+    }
+    else {
+        shouldCollapse =
+            window.innerWidth <=
+            700;
+    }
 
     setSidebarCollapsed(
         sidebar,
@@ -137,51 +183,9 @@ function applyGlobalSettings() {
 
     document.body.classList.toggle(
         "animations-off",
-        savedAnimations === "off"
+        savedAnimations ===
+            "off"
     );
-}
-
-
-/*
-=========================================================
-AUTOMATIC SIDEBAR STATE
-Force collapse where screen space is limited.
-=========================================================
-*/
-
-function shouldAutoCollapseSidebar() {
-    return (
-        window.innerWidth <=
-        SIDEBAR_AUTO_COLLAPSE_WIDTH
-    );
-}
-
-function applyAutomaticSidebarState() {
-    if (!shouldAutoCollapseSidebar()) {
-        return;
-    }
-
-    const sidebar =
-        document.getElementById(
-            "sidebar"
-        );
-
-    const sidebarToggle =
-        document.getElementById(
-            "sidebarToggle"
-        );
-
-    if (!sidebar) {
-        return;
-    }
-
-    setSidebarCollapsed(
-        sidebar,
-        sidebarToggle,
-        true
-    );
-
-    hideSidebarTooltip();
 }
 
 
@@ -196,7 +200,9 @@ function setSidebarCollapsed(
     sidebarToggle,
     collapsed
 ) {
-    if (!sidebar) {
+    if (
+        !sidebar
+    ) {
         return;
     }
 
@@ -210,10 +216,26 @@ function setSidebarCollapsed(
         collapsed
     );
 
-    if (sidebarToggle) {
+    document.body.dataset.sidebar =
+        collapsed
+            ? "collapsed"
+            : "open";
+
+    if (
+        sidebarToggle
+    ) {
         sidebarToggle.setAttribute(
             "aria-expanded",
-            String(!collapsed)
+            String(
+                !collapsed
+            )
+        );
+
+        sidebarToggle.setAttribute(
+            "aria-label",
+            collapsed
+                ? "Expand navigation"
+                : "Collapse navigation"
         );
     }
 }
@@ -222,6 +244,8 @@ function setSidebarCollapsed(
 /*
 =========================================================
 SIDEBAR TOGGLE
+
+Expansion is available on every screen size.
 =========================================================
 */
 
@@ -237,8 +261,8 @@ function setupSidebarToggle() {
         );
 
     if (
-        !sidebar ||
-        !sidebarToggle
+        !sidebar
+        || !sidebarToggle
     ) {
         return;
     }
@@ -250,43 +274,6 @@ function setupSidebarToggle() {
                 sidebar.classList.contains(
                     "collapsed"
                 );
-
-            const expansionBlocked =
-                isCollapsed &&
-                shouldAutoCollapseSidebar();
-
-            if (expansionBlocked) {
-                sidebarToggle.classList.remove(
-                    "expand-denied"
-                );
-
-                void sidebarToggle.offsetWidth;
-
-                sidebarToggle.classList.add(
-                    "expand-denied"
-                );
-
-                sidebarToggle.setAttribute(
-                    "aria-label",
-                    "Navigation cannot expand at this screen size"
-                );
-
-                window.setTimeout(
-                    function() {
-                        sidebarToggle.classList.remove(
-                            "expand-denied"
-                        );
-
-                        sidebarToggle.setAttribute(
-                            "aria-label",
-                            "Toggle navigation"
-                        );
-                    },
-                    500
-                );
-
-                return;
-            }
 
             const willCollapse =
                 !isCollapsed;
@@ -304,9 +291,7 @@ function setupSidebarToggle() {
                     : "open"
             );
 
-            if (!willCollapse) {
-                hideSidebarTooltip();
-            }
+            hideSidebarTooltip();
         }
     );
 }
@@ -315,18 +300,22 @@ function setupSidebarToggle() {
 /*
 =========================================================
 WINDOW RESIZE
-Automatically collapse when entering a narrow viewport.
 
-The saved desktop preference is not overwritten.
+Do not force a sidebar state during resize.
+
+The user's explicit state remains authoritative.
 =========================================================
 */
 
 function setupSidebarResize() {
-    if (sidebarResizeInitialized) {
+    if (
+        sidebarResizeInitialized
+    ) {
         return;
     }
 
-    sidebarResizeInitialized = true;
+    sidebarResizeInitialized =
+        true;
 
     window.addEventListener(
         "resize",
@@ -345,32 +334,34 @@ function handleSidebarResize() {
             "sidebarToggle"
         );
 
-    if (!sidebar) {
-        return;
-    }
-
-    if (shouldAutoCollapseSidebar()) {
-        setSidebarCollapsed(
-            sidebar,
-            sidebarToggle,
-            true
-        );
-
-        hideSidebarTooltip();
-
+    if (
+        !sidebar
+    ) {
         return;
     }
 
     const savedSidebar =
         localStorage.getItem(
             "bpdSidebar"
-        ) || "open";
+        );
+
+    if (
+        savedSidebar !==
+            "open"
+        && savedSidebar !==
+            "collapsed"
+    ) {
+        return;
+    }
 
     setSidebarCollapsed(
         sidebar,
         sidebarToggle,
-        savedSidebar === "collapsed"
+        savedSidebar ===
+            "collapsed"
     );
+
+    hideSidebarTooltip();
 }
 
 
@@ -397,9 +388,9 @@ function setupSidebarTooltips() {
         );
 
     if (
-        !sidebar ||
-        !tooltip ||
-        !tooltipText
+        !sidebar
+        || !tooltip
+        || !tooltipText
     ) {
         return;
     }
@@ -410,23 +401,30 @@ function setupSidebarTooltips() {
         );
 
     tooltipItems.forEach(
-        function(item) {
+        function(
+            item
+        ) {
             item.addEventListener(
                 "mouseenter",
-                function(event) {
+                function(
+                    event
+                ) {
                     if (
                         !sidebar.classList.contains(
                             "collapsed"
                         )
                     ) {
                         hideSidebarTooltip();
+
                         return;
                     }
 
                     const text =
                         item.dataset.tooltip;
 
-                    if (!text) {
+                    if (
+                        !text
+                    ) {
                         return;
                     }
 
@@ -441,7 +439,9 @@ function setupSidebarTooltips() {
 
             item.addEventListener(
                 "mousemove",
-                function(event) {
+                function(
+                    event
+                ) {
                     if (
                         !sidebar.classList.contains(
                             "collapsed"
@@ -453,7 +453,9 @@ function setupSidebarTooltips() {
                     const text =
                         item.dataset.tooltip;
 
-                    if (!text) {
+                    if (
+                        !text
+                    ) {
                         return;
                     }
 
@@ -529,7 +531,9 @@ function hideSidebarTooltip() {
             "sidebarHover"
         );
 
-    if (!tooltip) {
+    if (
+        !tooltip
+    ) {
         return;
     }
 
@@ -562,24 +566,28 @@ function setupActiveNavigation() {
         );
 
     navItems.forEach(
-        function(item) {
+        function(
+            item
+        ) {
             const route =
                 normalizePath(
                     item.dataset.navRoute
                 );
 
             const exactMatch =
-                currentPath === route;
+                currentPath ===
+                route;
 
             const childMatch =
-                route !== "/" &&
-                currentPath.startsWith(
+                route !== "/"
+                && currentPath.startsWith(
                     `${route}/`
                 );
 
             item.classList.toggle(
                 "active",
-                exactMatch || childMatch
+                exactMatch
+                || childMatch
             );
         }
     );
@@ -592,17 +600,25 @@ NORMALIZE PATH
 =========================================================
 */
 
-function normalizePath(path) {
-    if (!path) {
+function normalizePath(
+    path
+) {
+    if (
+        !path
+    ) {
         return "/";
     }
 
     let normalizedPath =
-        String(path);
+        String(
+            path
+        );
 
     if (
-        normalizedPath.length > 1 &&
-        normalizedPath.endsWith("/")
+        normalizedPath.length > 1
+        && normalizedPath.endsWith(
+            "/"
+        )
     ) {
         normalizedPath =
             normalizedPath.slice(
@@ -635,10 +651,14 @@ function setupDisabledNavigation() {
         );
 
     disabledItems.forEach(
-        function(item) {
+        function(
+            item
+        ) {
             item.addEventListener(
                 "click",
-                function(event) {
+                function(
+                    event
+                ) {
                     event.preventDefault();
                 }
             );
