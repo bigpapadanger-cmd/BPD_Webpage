@@ -17,3 +17,6 @@ ocr_cloudData/
 Notes/
 V12/
 .wrangler/
+*.backup.json
+*.bak
+*.backup
