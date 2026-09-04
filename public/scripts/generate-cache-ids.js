@@ -35,14 +35,12 @@ const PROJECT_ROOT =
 
 const OUTPUT_FILE =
     resolve(
-        PROJECT_ROOT,
-        "public",
-        "scripts",
+        CURRENT_DIRECTORY,
         "cacheHandler.js"
     );
 
 const CACHE_ID_CHARACTERS =
-    "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    "ABCDEFGHJKLMNPQRSTUVWXYZ234567890";
 
 const CACHE_ID_LENGTH =
     10;
