@@ -139,30 +139,64 @@ function runInitializer(
 }
 
 function initializeOcrSystems() {
-    runInitializer(
-        "OCR Core",
-        window.initializeOcrCore
-    );
+    try {
+        runInitializer(
+            "OCR Core",
+            window.initializeOcrCore
+        );
 
-    runInitializer(
-        "OCR Review Policy",
-        window.initializeOcrReviewPolicy
-    );
+        runInitializer(
+            "OCR Review Policy",
+            window.initializeOcrReviewPolicy
+        );
 
-    runInitializer(
-        "OCR Submission",
-        window.initializeOcrSubmission
-    );
+        runInitializer(
+            "OCR Submission",
+            window.initializeOcrSubmission
+        );
 
-    runInitializer(
-        "OCR Testing",
-        window.initializeOcrTesting
-    );
+        runInitializer(
+            "OCR Testing",
+            window.initializeOcrTesting
+        );
 
-    runInitializer(
-        "OCR On-Page UI",
-        window.initializeOcrOnPageItems
-    );
+        runInitializer(
+            "OCR On-Page UI",
+            window.initializeOcrOnPageItems
+        );
+
+        console.log(
+            "[OCR PAGE] All OCR systems initialized."
+        );
+
+        return true;
+    }
+    catch (
+        error
+    ) {
+        console.error(
+            "[OCR PAGE] OCR system initialization failed.",
+            error
+        );
+
+        const status =
+            document.getElementById(
+                "status"
+            );
+
+        if (
+            status
+        ) {
+            status.textContent =
+                "FAIL: "
+                + (
+                    error?.message
+                    || "OCR initialization failed."
+                );
+        }
+
+        throw error;
+    }
 }
 
 export async function initializePage() {
@@ -186,8 +220,38 @@ export async function initializePage() {
 
         initializeOcrSystems();
 
+        document.addEventListener(
+            "pointerdown",
+            function(
+                event
+            ) {
+                console.log(
+                    "[POINTER DOWN]",
+                    event.target
+                );
+            },
+            true
+        );
+
+        document.addEventListener(
+            "click",
+            function(
+                event
+            ) {
+                console.log(
+                    "[CLICK]",
+                    event.target
+                );
+            },
+            true
+        );
+
         page.dataset.initialized =
             "true";
+
+        console.log(
+            "[OCR PAGE] Ready."
+        );
     }
     catch (
         error
@@ -196,7 +260,7 @@ export async function initializePage() {
             "false";
 
         console.error(
-            "OCR PAGE: Initialization failed.",
+            "[OCR PAGE] Initialization failed.",
             error
         );
 
