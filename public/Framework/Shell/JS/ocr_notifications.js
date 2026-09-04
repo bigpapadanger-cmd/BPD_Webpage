@@ -4,8 +4,8 @@
    BPD GAMING NETWORK
    GLOBAL OCR NOTIFICATIONS
    ========================================================= */
-import { OCR_JOB_RESULT_URL, OCR_JOB_STATUS_URL, OCR_CONFIRM_URL } from "../../../scripts/apiRoutes.js";
-import { apiFetch } from "../../../scripts/apiConnection.js";
+import { OCR_JOB_RESULT_URL, OCR_JOB_STATUS_URL, OCR_CONFIRM_URL } from "/scripts/apiRoutes.js";
+import { apiFetch } from "/scripts/apiConnection.js";
 const OCR_NOTIFICATION_VERSION =
     "ocr-notifications-1.1";
 

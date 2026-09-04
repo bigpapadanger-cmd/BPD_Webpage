@@ -1,5 +1,7 @@
 "use strict";
 
+(function() {
+
 /* =========================================================
    BPD GAMING NETWORK
    OCR REVIEW POLICY
@@ -8,18 +10,16 @@
 const OCR_RESULT_EDITS_LOCKED =
     false;
 
-
 /* =========================================================
    POLICY
    ========================================================= */
 
 function areOcrResultEditsLocked() {
     return (
-        OCR_RESULT_EDITS_LOCKED
-        === true
+        OCR_RESULT_EDITS_LOCKED ===
+        true
     );
 }
-
 
 /* =========================================================
    PUBLIC API
@@ -31,8 +31,9 @@ window.OCRReviewPolicy =
             areOcrResultEditsLocked
     });
 
-
 window.initializeOcrReviewPolicy =
     function() {
         return true;
     };
+
+})();

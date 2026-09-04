@@ -18,10 +18,7 @@ import {
 } from "./initialization.js";
 
 import {
-    BPD_AUTH_SESSION_URL,
-    OCR_JOB_SUBMIT_URL,
-    OCR_JOB_RESULT_URL,
-    OCR_CONFIRM_URL
+    BPD_AUTH_SESSION_URL
 } from "../../../scripts/apiRoutes.js";
 
 import {
@@ -54,14 +51,6 @@ let navigationId =
    Filesystem:
        /public/scripts/...
    ========================================================= */
-
-window.BPDOcrApi =
-    Object.freeze({
-        OCR_JOB_SUBMIT_URL,
-        OCR_JOB_RESULT_URL,
-        OCR_CONFIRM_URL,
-        apiFetch
-    });
 
 /* =========================================================
    INITIAL SIDEBAR LAYOUT
@@ -1337,9 +1326,7 @@ async function loadShell() {
          * Any classic scripts declared using data-route-script
          * must execute BEFORE the route ES module initializes.
          */
-        await activateRouteScripts(
-            contentElement
-        );
+  
 
         if (
             !isCurrentNavigation(

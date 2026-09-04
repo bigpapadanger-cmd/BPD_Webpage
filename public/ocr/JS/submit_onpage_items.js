@@ -4,289 +4,291 @@
    BPD GAMING NETWORK
    OCR ON-PAGE UI
    ========================================================= */
+(function() {
+    let exampleToggle = null;
+    let exampleContent = null;
+    let exampleToggleIcon = null;
+    let cropFallback = null;
+    let cropHelp = null;
 
-let exampleToggle = null;
-let exampleContent = null;
-let exampleToggleIcon = null;
-let cropFallback = null;
-let cropHelp = null;
-
-let ocrOnPageDocumentEventsBound =
-    false;
-
-
-/* =========================================================
-   DOM
-   ========================================================= */
-
-function resolveOcrOnPageElements() {
-    exampleToggle =
-        document.getElementById(
-            "exampleToggle"
-        );
-
-    exampleContent =
-        document.getElementById(
-            "exampleContent"
-        );
-
-    exampleToggleIcon =
-        document.getElementById(
-            "exampleToggleIcon"
-        );
-
-    cropFallback =
-        document.getElementById(
-            "cropFallback"
-        );
-
-    cropHelp =
-        document.querySelector(
-            ".crop-help"
-        );
-}
+    let ocrOnPageDocumentEventsBound =
+        false;
 
 
-/* =========================================================
-   EXAMPLE
-   ========================================================= */
+    /* =========================================================
+    DOM
+    ========================================================= */
 
-function handleExampleToggle() {
-    if (
-        !exampleToggle ||
-        !exampleContent ||
-        !exampleToggleIcon
-    ) {
-        return;
+    function resolveOcrOnPageElements() {
+        exampleToggle =
+            document.getElementById(
+                "exampleToggle"
+            );
+
+        exampleContent =
+            document.getElementById(
+                "exampleContent"
+            );
+
+        exampleToggleIcon =
+            document.getElementById(
+                "exampleToggleIcon"
+            );
+
+        cropFallback =
+            document.getElementById(
+                "cropFallback"
+            );
+
+        cropHelp =
+            document.querySelector(
+                ".crop-help"
+            );
     }
 
-    const isOpen =
-        !exampleContent.hidden;
 
-    exampleContent.hidden =
-        isOpen;
+    /* =========================================================
+    EXAMPLE
+    ========================================================= */
 
-    exampleToggle.setAttribute(
-        "aria-expanded",
-        String(!isOpen)
-    );
-
-    exampleToggleIcon.textContent =
-        isOpen
-            ? "▼"
-            : "▲";
-}
-
-function bindExampleToggle() {
-    if (
-        !exampleToggle ||
-        !exampleContent ||
-        !exampleToggleIcon
-    ) {
-        return;
-    }
-
-    if (
-        exampleToggle.dataset
-            .ocrExampleInitialized ===
-        "true"
-    ) {
-        return;
-    }
-
-    exampleToggle.addEventListener(
-        "click",
-        handleExampleToggle
-    );
-
-    exampleToggle.dataset
-        .ocrExampleInitialized =
-        "true";
-}
-
-
-/* =========================================================
-   RESULTS MODAL
-   ========================================================= */
-
-function closeResultsModal() {
-    if (!results) {
-        return;
-    }
-
-    if (
-        typeof results.close ===
-        "function"
-    ) {
-        if (results.open) {
-            results.close();
+    function handleExampleToggle() {
+        if (
+            !exampleToggle ||
+            !exampleContent ||
+            !exampleToggleIcon
+        ) {
+            return;
         }
 
-        return;
-    }
+        const isOpen =
+            !exampleContent.hidden;
 
-    results.removeAttribute(
-        "open"
-    );
-}
+        exampleContent.hidden =
+            isOpen;
 
-function handleResultsBackdropClick(
-    event
-) {
-    if (
-        results &&
-        event.target === results
-    ) {
-        closeResultsModal();
-    }
-}
-
-function bindResultsModal() {
-    if (
-        resultsCloseBtn &&
-        resultsCloseBtn.dataset
-            .ocrResultsCloseInitialized !==
-            "true"
-    ) {
-        resultsCloseBtn.addEventListener(
-            "click",
-            closeResultsModal
+        exampleToggle.setAttribute(
+            "aria-expanded",
+            String(!isOpen)
         );
 
-        resultsCloseBtn.dataset
-            .ocrResultsCloseInitialized =
+        exampleToggleIcon.textContent =
+            isOpen
+                ? "▼"
+                : "▲";
+    }
+
+    function bindExampleToggle() {
+        if (
+            !exampleToggle ||
+            !exampleContent ||
+            !exampleToggleIcon
+        ) {
+            return;
+        }
+
+        if (
+            exampleToggle.dataset
+                .ocrExampleInitialized ===
+            "true"
+        ) {
+            return;
+        }
+
+        exampleToggle.addEventListener(
+            "click",
+            handleExampleToggle
+        );
+
+        exampleToggle.dataset
+            .ocrExampleInitialized =
             "true";
     }
 
-    if (
-        results &&
-        results.dataset
-            .ocrResultsBackdropInitialized !==
-            "true"
+
+    /* =========================================================
+    RESULTS MODAL
+    ========================================================= */
+
+    function closeResultsModal() {
+        if (!results) {
+            return;
+        }
+
+        if (
+            typeof results.close ===
+            "function"
+        ) {
+            if (results.open) {
+                results.close();
+            }
+
+            return;
+        }
+
+        results.removeAttribute(
+            "open"
+        );
+    }
+
+    function handleResultsBackdropClick(
+        event
     ) {
-        results.addEventListener(
-            "click",
-            handleResultsBackdropClick
-        );
-
-        results.dataset
-            .ocrResultsBackdropInitialized =
-            "true";
-    }
-}
-
-
-/* =========================================================
-   CROP UI
-   ========================================================= */
-
-function configureCropFallbackState() {
-    if (cropFallback) {
-        cropFallback.hidden =
-            !cropFallbackVisible;
+        if (
+            results &&
+            event.target === results
+        ) {
+            closeResultsModal();
+        }
     }
 
-    if (cropHelp) {
-        cropHelp.textContent =
-            (
-                "The full-image attempt could not reliably locate "
-                + "the scoreboard. Move and resize the green box "
-                + "around the scoreboard, then retry."
+    function bindResultsModal() {
+        if (
+            resultsCloseBtn &&
+            resultsCloseBtn.dataset
+                .ocrResultsCloseInitialized !==
+                "true"
+        ) {
+            resultsCloseBtn.addEventListener(
+                "click",
+                closeResultsModal
             );
-    }
 
-    if (resetCropBtn) {
-        resetCropBtn.hidden =
-            !cropFallbackVisible;
+            resultsCloseBtn.dataset
+                .ocrResultsCloseInitialized =
+                "true";
+        }
 
-        resetCropBtn.disabled =
-            (
-                ocrControlsLocked ||
-                !sourceImage ||
-                !cropFallbackVisible
+        if (
+            results &&
+            results.dataset
+                .ocrResultsBackdropInitialized !==
+                "true"
+        ) {
+            results.addEventListener(
+                "click",
+                handleResultsBackdropClick
             );
+
+            results.dataset
+                .ocrResultsBackdropInitialized =
+                "true";
+        }
     }
 
-    if (submitBtn) {
-        submitBtn.textContent =
-            cropFallbackVisible
-                ? "Retry Cropped Scoreboard"
-                : "Read Scoreboard";
-    }
-}
 
-function handleCropFallbackShown() {
-    resolveOcrOnPageElements();
+    /* =========================================================
+    CROP UI
+    ========================================================= */
 
-    if (cropFallback) {
-        cropFallback.hidden =
-            false;
-    }
+    function configureCropFallbackState() {
+        if (cropFallback) {
+            cropFallback.hidden =
+                !cropFallbackVisible;
+        }
 
-    if (resetCropBtn) {
-        resetCropBtn.hidden =
-            false;
+        if (cropHelp) {
+            cropHelp.textContent =
+                (
+                    "The full-image attempt could not reliably locate "
+                    + "the scoreboard. Move and resize the green box "
+                    + "around the scoreboard, then retry."
+                );
+        }
 
-        resetCropBtn.disabled =
-            ocrControlsLocked;
-    }
+        if (resetCropBtn) {
+            resetCropBtn.hidden =
+                !cropFallbackVisible;
 
-    if (submitBtn) {
-        submitBtn.textContent =
-            "Retry Cropped Scoreboard";
-    }
-}
+            resetCropBtn.disabled =
+                (
+                    ocrControlsLocked ||
+                    !sourceImage ||
+                    !cropFallbackVisible
+                );
+        }
 
-function handleOcrSuccessfulResult() {
-    resolveOcrOnPageElements();
-
-    if (cropFallback) {
-        cropFallback.hidden =
-            true;
-    }
-
-    if (resetCropBtn) {
-        resetCropBtn.hidden =
-            true;
+        if (submitBtn) {
+            submitBtn.textContent =
+                cropFallbackVisible
+                    ? "Retry Cropped Scoreboard"
+                    : "Read Scoreboard";
+        }
     }
 
-    if (submitBtn) {
-        submitBtn.textContent =
-            "Read Scoreboard";
-    }
-}
+    function handleCropFallbackShown() {
+        resolveOcrOnPageElements();
 
+        if (cropFallback) {
+            cropFallback.hidden =
+                false;
+        }
 
-/* =========================================================
-   INITIALIZATION
-   ========================================================= */
+        if (resetCropBtn) {
+            resetCropBtn.hidden =
+                false;
 
-function initializeOcrOnPageItems() {
-    resolveOcrOnPageElements();
+            resetCropBtn.disabled =
+                ocrControlsLocked;
+        }
 
-    bindExampleToggle();
-    bindResultsModal();
-    configureCropFallbackState();
-
-    if (
-        !ocrOnPageDocumentEventsBound
-    ) {
-        document.addEventListener(
-            "ocr:crop-fallback-shown",
-            handleCropFallbackShown
-        );
-
-        document.addEventListener(
-            "ocr:successful-result",
-            handleOcrSuccessfulResult
-        );
-
-        ocrOnPageDocumentEventsBound =
-            true;
+        if (submitBtn) {
+            submitBtn.textContent =
+                "Retry Cropped Scoreboard";
+        }
     }
 
-    return true;
-}
+    function handleOcrSuccessfulResult() {
+        resolveOcrOnPageElements();
 
-window.initializeOcrOnPageItems =
-    initializeOcrOnPageItems;
+        if (cropFallback) {
+            cropFallback.hidden =
+                true;
+        }
+
+        if (resetCropBtn) {
+            resetCropBtn.hidden =
+                true;
+        }
+
+        if (submitBtn) {
+            submitBtn.textContent =
+                "Read Scoreboard";
+        }
+    }
+
+
+    /* =========================================================
+    INITIALIZATION
+    ========================================================= */
+
+    function initializeOcrOnPageItems() {
+        resolveOcrOnPageElements();
+
+        bindExampleToggle();
+        bindResultsModal();
+        configureCropFallbackState();
+
+        if (
+            !ocrOnPageDocumentEventsBound
+        ) {
+            document.addEventListener(
+                "ocr:crop-fallback-shown",
+                handleCropFallbackShown
+            );
+
+            document.addEventListener(
+                "ocr:successful-result",
+                handleOcrSuccessfulResult
+            );
+
+            ocrOnPageDocumentEventsBound =
+                true;
+        }
+
+        return true;
+    }
+
+    window.initializeOcrOnPageItems =
+        initializeOcrOnPageItems;
+
+})();
