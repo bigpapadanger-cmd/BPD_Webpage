@@ -25,7 +25,9 @@ import {
     apiFetch
 } from "../../../scripts/apiConnection.js";
 
-import { APP_ASSET_ID } from "../../../scripts/cacheHandler.js";
+import {
+    APP_ASSET_ID
+} from "/scripts/cacheHandler.js";
 const DEFAULT_ROUTE =
     "/";
 

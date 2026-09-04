@@ -1,5 +1,5 @@
 "use strict";
-import { OCR_SCRIPT_ID } from "../../scripts/cacheHandler";
+
 import {
     OCR_JOB_SUBMIT_URL,
     OCR_JOB_RESULT_URL,
@@ -17,7 +17,9 @@ const OCR_SCRIPTS = [
     "/ocr/JS/submit_testing.js",
     "/ocr/JS/submit_onpage_items.js"
 ];
-
+import {
+    OCR_SCRIPT_ID
+} from "/scripts/cacheHandler.js";
 
 
 function loadScript(

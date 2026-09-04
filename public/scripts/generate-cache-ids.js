@@ -17,6 +17,10 @@ import {
     fileURLToPath
 } from "node:url";
 
+/* =========================================================
+   CONFIGURATION
+   ========================================================= */
+
 const CURRENT_FILE =
     fileURLToPath(
         import.meta.url
@@ -27,84 +31,184 @@ const CURRENT_DIRECTORY =
         CURRENT_FILE
     );
 
-const PROJECT_ROOT =
-    resolve(
-        CURRENT_DIRECTORY,
-        ".."
-    );
-
 const OUTPUT_FILE =
     resolve(
         CURRENT_DIRECTORY,
         "cacheHandler.js"
     );
 
-const CACHE_ID_CHARACTERS =
-    "ABCDEFGHJKLMNPQRSTUVWXYZ234567890";
-
 const CACHE_ID_LENGTH =
     10;
 
-function createCacheId() {
-    let value =
-        "";
+const CACHE_LETTERS =
+    "ABCDEFGHJKLMNPQRSTUVWXYZ";
+
+const CACHE_NUMBERS =
+    "23456789";
+
+const CACHE_CHARACTERS =
+    CACHE_LETTERS +
+    CACHE_NUMBERS;
+
+/* =========================================================
+   RANDOM HELPERS
+   ========================================================= */
+
+function getRandomCharacter(
+    characters
+) {
+    return characters[
+        randomInt(
+            0,
+            characters.length
+        )
+    ];
+}
+
+function shuffleCharacters(
+    characters
+) {
+    const values =
+        Array.from(
+            characters
+        );
 
     for (
-        let index = 0;
-        index < CACHE_ID_LENGTH;
-        index += 1
+        let index =
+            values.length - 1;
+        index > 0;
+        index -= 1
     ) {
-        value +=
-            CACHE_ID_CHARACTERS[
-                randomInt(
-                    0,
-                    CACHE_ID_CHARACTERS.length
-                )
-            ];
+        const randomIndex =
+            randomInt(
+                0,
+                index + 1
+            );
+
+        [
+            values[index],
+            values[randomIndex]
+        ] = [
+            values[randomIndex],
+            values[index]
+        ];
     }
 
-    return value;
+    return values.join(
+        ""
+    );
 }
 
-const OCR_SCRIPT_ID =
-    createCacheId();
+/* =========================================================
+   CACHE ID
+   ========================================================= */
 
-let APP_ASSET_ID =
-    createCacheId();
+function createCacheId() {
+    const characters = [
+        getRandomCharacter(
+            CACHE_LETTERS
+        ),
+        getRandomCharacter(
+            CACHE_NUMBERS
+        )
+    ];
 
-while (
-    APP_ASSET_ID ===
-    OCR_SCRIPT_ID
-) {
-    APP_ASSET_ID =
+    while (
+        characters.length <
+        CACHE_ID_LENGTH
+    ) {
+        characters.push(
+            getRandomCharacter(
+                CACHE_CHARACTERS
+            )
+        );
+    }
+
+    return shuffleCharacters(
+        characters
+    );
+}
+
+function createUniqueCacheIds() {
+    const ocrScriptId =
         createCacheId();
+
+    let appAssetId =
+        createCacheId();
+
+    while (
+        appAssetId ===
+        ocrScriptId
+    ) {
+        appAssetId =
+            createCacheId();
+    }
+
+    return {
+        ocrScriptId,
+        appAssetId
+    };
 }
 
-const output = `"use strict";
+/* =========================================================
+   OUTPUT
+   ========================================================= */
+
+function buildCacheHandler(
+    ocrScriptId,
+    appAssetId
+) {
+    return `"use strict";
 
 export const OCR_SCRIPT_ID =
-    "${OCR_SCRIPT_ID}";
+    "${ocrScriptId}";
 
 export const APP_ASSET_ID =
-    "${APP_ASSET_ID}";
+    "${appAssetId}";
 `;
+}
 
-await writeFile(
-    OUTPUT_FILE,
-    output,
-    "utf8"
-);
+async function writeCacheHandler() {
+    const {
+        ocrScriptId,
+        appAssetId
+    } =
+        createUniqueCacheIds();
 
-console.log(
-    "[CACHE] Generated cache IDs."
-);
+    const output =
+        buildCacheHandler(
+            ocrScriptId,
+            appAssetId
+        );
 
-console.log(
-    "[CACHE] OCR_SCRIPT_ID:",
-    OCR_SCRIPT_ID
-);
+    await writeFile(
+        OUTPUT_FILE,
+        output,
+        "utf8"
+    );
 
-console.log(
-    "[CACHE] APP_ASSET_ID:",
-    APP_ASSET_ID
-);
+    console.log(
+        "[CACHE] Generated cache IDs."
+    );
+
+    console.log(
+        "[CACHE] OCR_SCRIPT_ID:",
+        ocrScriptId
+    );
+
+    console.log(
+        "[CACHE] APP_ASSET_ID:",
+        appAssetId
+    );
+
+    console.log(
+        "[CACHE] Output:",
+        OUTPUT_FILE
+    );
+}
+
+/* =========================================================
+   RUN
+   ========================================================= */
+
+await writeCacheHandler();
