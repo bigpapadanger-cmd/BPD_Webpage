@@ -6,27 +6,27 @@ import {
 import {
     initializeOcrNotifications,
     checkActiveOcrSubmission
-} from "/scripts/ocr_notifications.js";
+} from "./ocr_notifications.js";
 
 import {
     loadSidebarHover,
     initializeSidebar
-} from "/scripts/sidebar.js";
+} from "./sidebar.js";
 
 import {
     initializeRouteModule
-} from "/scripts/initialization.js";
+} from "./initialization.js";
 
 import {
     BPD_AUTH_SESSION_URL,
     OCR_JOB_SUBMIT_URL,
     OCR_JOB_RESULT_URL,
     OCR_CONFIRM_URL
-} from "/scripts/apiRoutes.js";
+} from "../../../scripts/apiRoutes.js";
 
 import {
     apiFetch
-} from "/scripts/apiConnection.js";
+} from "../../../scripts/apiConnection.js";
 
 const DEFAULT_ROUTE =
     "/";
