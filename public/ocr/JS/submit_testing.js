@@ -1,11 +1,24 @@
 "use strict";
 
+"use strict";
+
 /* =========================================================
    BPD GAMING NETWORK
    OCR RESULT REVIEW / CONFIRMATION
    ========================================================= */
-import { OCR_CONFIRM_URL } from "../../scripts/apiRoutes.js";
-import { apiFetch } from "../../scripts/apiConnection.js";
+
+if (
+    !window.BPDOcrApi
+) {
+    throw new Error(
+        "OCR API dependencies were not initialized."
+    );
+}
+
+const {
+    OCR_CONFIRM_URL,
+    apiFetch
+} = window.BPDOcrApi;
 
 let ocrTestingPanel =
     null;

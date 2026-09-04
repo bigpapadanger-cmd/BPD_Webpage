@@ -4,10 +4,24 @@
    BPD GAMING NETWORK
    OCR IMAGE SUBMISSION
    ========================================================= */
-import {OCR_JOB_SUBMIT_URL,OCR_JOB_RESULT_URL } from "../../scripts/apiRoutes.js";
-import { apiFetch } from "../../scripts/apiConnection.js";
+
+if (
+    !window.BPDOcrApi
+) {
+    throw new Error(
+        "OCR API dependencies were not initialized."
+    );
+}
+
+const {
+    OCR_JOB_SUBMIT_URL,
+    OCR_JOB_RESULT_URL,
+    apiFetch
+} = window.BPDOcrApi;
+
 const OCR_SUBMISSION_VERSION =
     "ocr-submission-1.4";
+
 
 const OCR_REVIEW_OPEN_REQUEST_KEY =
     "rocketLeagueOcrReviewOpenRequestV1";

@@ -1,110 +1,8 @@
 "use strict";
 
-const OCR_SCRIPT_PATHS = [
-    "/ocr/JS/submit_core.js",
-    "/ocr/JS/ocr_review_policy.js",
-    "/ocr/JS/submit_img.js",
-    "/ocr/JS/submit_testing.js",
-    "/ocr/JS/submit_onpage_items.js"
-];
 
-function createOcrScript(
-    src
-) {
-    return new Promise(
-        function(
-            resolve,
-            reject
-        ) {
-            const script =
-                document.createElement(
-                    "script"
-                );
 
-            script.src =
-                src;
 
-            script.async =
-                false;
-
-            script.dataset.ocrScript =
-                src;
-
-            script.addEventListener(
-                "load",
-                function() {
-                    script.dataset.loaded =
-                        "true";
-
-                    resolve();
-                },
-                {
-                    once:
-                        true
-                }
-            );
-
-            script.addEventListener(
-                "error",
-                function() {
-                    script.dataset.failed =
-                        "true";
-
-                    reject(
-                        new Error(
-                            `Failed to load OCR script: ${src}`
-                        )
-                    );
-                },
-                {
-                    once:
-                        true
-                }
-            );
-
-            document.head.appendChild(
-                script
-            );
-        }
-    );
-}
-
-function loadScript(
-    src
-) {
-    const existing =
-        document.querySelector(
-            `script[data-ocr-script="${src}"]`
-        );
-
-    if (
-        existing?.dataset.loaded
-        === "true"
-    ) {
-        return Promise.resolve();
-    }
-
-    if (
-        existing
-    ) {
-        existing.remove();
-    }
-
-    return createOcrScript(
-        src
-    );
-}
-
-async function loadOcrScripts() {
-    for (
-        const src
-        of OCR_SCRIPT_PATHS
-    ) {
-        await loadScript(
-            src
-        );
-    }
-}
 
 function runInitializer(
     name,
@@ -182,7 +80,6 @@ export async function initializePage() {
     }
 
     try {
-        await loadOcrScripts();
 
         initializeOcrSystems();
 
