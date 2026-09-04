@@ -21,6 +21,8 @@ export async function onRequestPost(
     } = context;
 
     try {
+
+
         if (
             !env.OCR_STORAGE
         ) {

@@ -720,11 +720,6 @@ function validateConfiguration(
         return "OCR progress callback URL is not configured.";
     }
 
-    if (
-        !env.OCR_JOB_PROGRESS_SECURE_TOKEN
-    ) {
-        return "OCR progress authentication is not configured.";
-    }
 
     return "";
 }
