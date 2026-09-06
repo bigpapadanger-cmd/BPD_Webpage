@@ -10,17 +10,20 @@ import {
     apiFetch
 } from "/scripts/apiConnection.js";
 
-const OCR_SCRIPTS = [
-    "/ocr/JS/submit_core.js",
-    "/ocr/JS/ocr_review_policy.js",
-    "/ocr/JS/submit_img.js",
-    "/ocr/JS/submit_testing.js",
-    "/ocr/JS/submit_onpage_items.js"
-];
 import {
     OCR_SCRIPT_ID
 } from "/scripts/cacheHandler.js";
 
+const OCR_SCRIPTS = [
+    "/ocr/JS/submit_core.js",
+    "/ocr/JS/submit_img.js",
+    "/ocr/JS/submit_testing.js",
+    "/ocr/JS/submit_onpage_items.js"
+];
+
+/* =========================================================
+   SCRIPT LOADING
+   ========================================================= */
 
 function loadScript(
     src
@@ -105,8 +108,6 @@ function loadScript(
     );
 }
 
-
-
 async function loadOcrScripts() {
     for (
         const src
@@ -117,6 +118,10 @@ async function loadOcrScripts() {
         );
     }
 }
+
+/* =========================================================
+   OCR API BRIDGE
+   ========================================================= */
 
 function initializeOcrApi() {
     if (
@@ -133,6 +138,10 @@ function initializeOcrApi() {
             apiFetch
         });
 }
+
+/* =========================================================
+   INITIALIZER SAFETY
+   ========================================================= */
 
 function runInitializer(
     name,
@@ -158,6 +167,10 @@ function runInitializer(
         );
     }
 }
+
+/* =========================================================
+   OCR SYSTEM INITIALIZATION
+   ========================================================= */
 
 function initializeOcrSystems() {
     try {
@@ -220,6 +233,10 @@ function initializeOcrSystems() {
     }
 }
 
+/* =========================================================
+   ROUTE INITIALIZATION
+   ========================================================= */
+
 export async function initializePage() {
     const page =
         document.querySelector(
@@ -234,6 +251,13 @@ export async function initializePage() {
         );
     }
 
+    if (
+        page.dataset.initialized ===
+        "true"
+    ) {
+        return true;
+    }
+
     try {
         initializeOcrApi();
 
@@ -241,38 +265,14 @@ export async function initializePage() {
 
         initializeOcrSystems();
 
-        document.addEventListener(
-            "pointerdown",
-            function(
-                event
-            ) {
-                console.log(
-                    "[POINTER DOWN]",
-                    event.target
-                );
-            },
-            true
-        );
-
-        document.addEventListener(
-            "click",
-            function(
-                event
-            ) {
-                console.log(
-                    "[CLICK]",
-                    event.target
-                );
-            },
-            true
-        );
-
         page.dataset.initialized =
             "true";
 
         console.log(
             "[OCR PAGE] Ready."
         );
+
+        return true;
     }
     catch (
         error
