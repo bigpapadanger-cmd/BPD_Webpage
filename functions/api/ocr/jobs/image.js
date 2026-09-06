@@ -2,7 +2,7 @@
 
 /* =========================================================
    BPD GAMING NETWORK
-   OCR JOB IMAGE
+   OCR MATCH IMAGE
    ========================================================= */
 
 import {
@@ -10,7 +10,7 @@ import {
 } from "../../../services/common_helpers/reload_sessions.js";
 
 const OCR_GET_IMAGE_VERSION =
-    "ocr-get-image-1.0";
+    "ocr-get-image-2.0";
 
 /* =========================================================
    MAIN
@@ -25,6 +25,10 @@ export async function onRequestGet(
     } = context;
 
     try {
+        // ====================================================
+        // CONFIGURATION
+        // ====================================================
+
         if (
             !env.OCR_STORAGE
         ) {
@@ -32,6 +36,9 @@ export async function onRequestGet(
                 {
                     success:
                         false,
+
+                    code:
+                        "OCR_STORAGE_MISSING",
 
                     message:
                         "OCR storage is not configured."
@@ -48,12 +55,19 @@ export async function onRequestGet(
                     success:
                         false,
 
+                    code:
+                        "OCR_OWNER_SECRET_MISSING",
+
                     message:
                         "OCR owner hashing is not configured."
                 },
                 503
             );
         }
+
+        // ====================================================
+        // AUTHENTICATION
+        // ====================================================
 
         const session =
             await getStoredSession(
@@ -69,6 +83,9 @@ export async function onRequestGet(
                 {
                     success:
                         false,
+
+                    code:
+                        "AUTHENTICATION_REQUIRED",
 
                     message:
                         "Authentication required."
@@ -94,6 +111,9 @@ export async function onRequestGet(
                     success:
                         false,
 
+                    code:
+                        "EPIC_ID_MISSING",
+
                     message:
                         "Authenticated account is missing an EpicUniqueId."
                 },
@@ -107,101 +127,20 @@ export async function onRequestGet(
                 env.OCR_OWNER_SECRET
             );
 
+        // ====================================================
+        // MATCH ID
+        // ====================================================
+
         const url =
             new URL(
                 request.url
             );
 
-        const jobId =
-            sanitizeJobId(
-                url.searchParams.get(
-                    "jobId"
-                )
-            );
-
-        if (
-            !jobId
-        ) {
-            return jsonResponse(
-                {
-                    success:
-                        false,
-
-                    message:
-                        "Missing or invalid jobId."
-                },
-                400
-            );
-        }
-
-        const statusObject =
-            await env.OCR_STORAGE.get(
-                `ocr-jobs/${jobId}/status.json`
-            );
-
-        if (
-            !statusObject
-        ) {
-            return jsonResponse(
-                {
-                    success:
-                        false,
-
-                    message:
-                        "OCR job was not found."
-                },
-                404
-            );
-        }
-
-        let statusData;
-
-        try {
-            statusData =
-                JSON.parse(
-                    await statusObject.text()
-                );
-        }
-        catch {
-            return jsonResponse(
-                {
-                    success:
-                        false,
-
-                    message:
-                        "Stored OCR job status is invalid."
-                },
-                500
-            );
-        }
-
-        const status =
-            String(
-                statusData?.status
-                || ""
-            )
-                .trim()
-                .toLowerCase();
-
-        if (
-            status !==
-                "completed"
-        ) {
-            return jsonResponse(
-                {
-                    success:
-                        false,
-
-                    message:
-                        "OCR job is not completed."
-                },
-                409
-            );
-        }
-
         const matchId =
             sanitizeMatchId(
-                statusData?.matchId
+                url.searchParams.get(
+                    "matchId"
+                )
             );
 
         if (
@@ -212,12 +151,19 @@ export async function onRequestGet(
                     success:
                         false,
 
+                    code:
+                        "MATCH_ID_INVALID",
+
                     message:
-                        "Completed OCR job does not contain a valid matchId."
+                        "Missing or invalid matchId."
                 },
-                409
+                400
             );
         }
+
+        // ====================================================
+        // LOAD MATCH REPORT
+        // ====================================================
 
         const reportObject =
             await env.OCR_STORAGE.get(
@@ -232,8 +178,11 @@ export async function onRequestGet(
                     success:
                         false,
 
+                    code:
+                        "MATCH_REPORT_NOT_FOUND",
+
                     message:
-                        "Match report was not found."
+                        "Stored match report was not found."
                 },
                 404
             );
@@ -253,12 +202,19 @@ export async function onRequestGet(
                     success:
                         false,
 
+                    code:
+                        "MATCH_REPORT_INVALID",
+
                     message:
                         "Stored match report is invalid."
                 },
                 500
             );
         }
+
+        // ====================================================
+        // MATCH ID VERIFICATION
+        // ====================================================
 
         const storedMatchId =
             sanitizeMatchId(
@@ -274,34 +230,19 @@ export async function onRequestGet(
                     success:
                         false,
 
+                    code:
+                        "MATCH_ID_MISMATCH",
+
                     message:
-                        "Stored match report does not match this OCR job."
+                        "Stored match report does not match this match ID."
                 },
                 409
             );
         }
 
-        const storedJobId =
-            sanitizeJobId(
-                matchReport?.jobId
-            );
-
-        if (
-            storedJobId
-            && storedJobId !==
-                jobId
-        ) {
-            return jsonResponse(
-                {
-                    success:
-                        false,
-
-                    message:
-                        "Stored match report does not match this OCR job."
-                },
-                409
-            );
-        }
+        // ====================================================
+        // OWNERSHIP VERIFICATION
+        // ====================================================
 
         const submittedBy =
             String(
@@ -317,6 +258,9 @@ export async function onRequestGet(
                 {
                     success:
                         false,
+
+                    code:
+                        "MATCH_OWNER_MISSING",
 
                     message:
                         "Stored match report has no owner."
@@ -336,12 +280,19 @@ export async function onRequestGet(
                     success:
                         false,
 
+                    code:
+                        "MATCH_IMAGE_ACCESS_DENIED",
+
                     message:
                         "You are not authorized to access this OCR image."
                 },
                 403
             );
         }
+
+        // ====================================================
+        // LOAD MATCH IMAGE
+        // ====================================================
 
         const imageObject =
             await env.OCR_STORAGE.get(
@@ -356,12 +307,19 @@ export async function onRequestGet(
                     success:
                         false,
 
+                    code:
+                        "MATCH_IMAGE_NOT_FOUND",
+
                     message:
                         "Stored match image was not found."
                 },
                 404
             );
         }
+
+        // ====================================================
+        // RESPONSE HEADERS
+        // ====================================================
 
         const headers =
             new Headers();
@@ -382,6 +340,11 @@ export async function onRequestGet(
         headers.set(
             "X-OCR-Image-Version",
             OCR_GET_IMAGE_VERSION
+        );
+
+        headers.set(
+            "X-OCR-Match-ID",
+            matchId
         );
 
         if (
@@ -415,6 +378,9 @@ export async function onRequestGet(
             {
                 success:
                     false,
+
+                code:
+                    "OCR_IMAGE_LOAD_FAILED",
 
                 message:
                     "Unable to load OCR image."
@@ -544,32 +510,6 @@ function constantTimeEqual(
 
     return difference ===
         0;
-}
-
-/* =========================================================
-   JOB ID
-   ========================================================= */
-
-function sanitizeJobId(
-    value
-) {
-    const jobId =
-        String(
-            value
-            || ""
-        )
-            .trim()
-            .toUpperCase();
-
-    if (
-        !/^[A-Z0-9]{16}$/.test(
-            jobId
-        )
-    ) {
-        return null;
-    }
-
-    return jobId;
 }
 
 /* =========================================================

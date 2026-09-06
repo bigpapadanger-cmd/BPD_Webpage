@@ -15,7 +15,7 @@ import {
 } from "/scripts/apiConnection.js";
 
 const OCR_RESULTS_VERSION =
-    "ocr-results-2.3";
+    "ocr-results-3.0";
 
 const OCR_RESULT_DIALOG_ID =
     "ocrGlobalResultDialog";
@@ -51,82 +51,6 @@ let OCR_RESULTS_CURRENT_RESPONSE =
 
 let OCR_RESULTS_CURRENT_EDIT_DEADLINE_AT =
     null;
-
-    /* =========================================================
-   SCOREBOARD IMAGE
-   ========================================================= */
-
-function createOcrResultImage() {
-    const imageUrl =
-        String(
-            OCR_RESULTS_CURRENT_RESPONSE
-                ?.imageUrl
-            || ""
-        )
-            .trim();
-
-    if (
-        !imageUrl
-    ) {
-        return null;
-    }
-
-    const wrapper =
-        document.createElement(
-            "div"
-        );
-
-    wrapper.className =
-        "ocr-result-image-wrap";
-
-    const image =
-        document.createElement(
-            "img"
-        );
-
-    image.className =
-        "ocr-result-image";
-
-    image.alt =
-        "Submitted Rocket League scoreboard";
-
-    image.loading =
-        "eager";
-
-    image.decoding =
-        "async";
-
-    image.src =
-        imageUrl;
-
-    image.addEventListener(
-        "error",
-        function() {
-            console.warn(
-                "[OCR RESULTS] Stored scoreboard image could not be loaded.",
-                {
-                    jobId:
-                        OCR_RESULTS_CURRENT_JOB_ID,
-
-                    matchId:
-                        OCR_RESULTS_CURRENT_MATCH_ID
-                }
-            );
-
-            wrapper.remove();
-        },
-        {
-            once:
-                true
-        }
-    );
-
-    wrapper.appendChild(
-        image
-    );
-
-    return wrapper;
-}
 
 /* =========================================================
    NORMALIZATION
@@ -273,18 +197,13 @@ function getCurrentReviewPolicyState() {
         return {
             locked:
                 true,
-
             canModify:
                 false,
-
             globallyLocked:
                 false,
-
             deadlineExpired:
                 true,
-
             editDeadlineAt,
-
             editDeadlineDisplay:
                 ""
         };
@@ -480,42 +399,48 @@ function unwrapOcrResult(
    ========================================================= */
 
 async function getOcrResult(
-    jobId
+    matchId
 ) {
-    const normalizedJobId =
+    const normalizedMatchId =
         normalizeId(
-            jobId
+            matchId
         );
 
     if (
-        !validJobId(
-            normalizedJobId
+        !validMatchId(
+            normalizedMatchId
         )
     ) {
-        throw new Error(
-            "A valid OCR job ID is required."
-        );
+        const error =
+            new Error(
+                "A valid match ID is required."
+            );
+
+        error.code =
+            "MATCH_ID_INVALID";
+
+        error.status =
+            400;
+
+        throw error;
     }
 
     const response =
         await apiFetch(
             (
                 OCR_JOB_RESULT_URL
-                + "?jobId="
+                + "?matchId="
                 + encodeURIComponent(
-                    normalizedJobId
+                    normalizedMatchId
                 )
             ),
             {
                 method:
                     "GET",
-
                 credentials:
                     "same-origin",
-
                 cache:
                     "no-store",
-
                 headers: {
                     "Accept":
                         "application/json"
@@ -557,9 +482,15 @@ async function getOcrResult(
     if (
         !result
     ) {
-        throw new Error(
-            "OCR result was not returned."
-        );
+        const error =
+            new Error(
+                "OCR result was not returned."
+            );
+
+        error.code =
+            "OCR_RESULT_MISSING";
+
+        throw error;
     }
 
     return {
@@ -595,7 +526,6 @@ function getOcrTeams(
         teams.push({
             team:
                 1,
-
             players:
                 result.team1
         });
@@ -609,7 +539,6 @@ function getOcrTeams(
         teams.push({
             team:
                 2,
-
             players:
                 result.team2
         });
@@ -646,33 +575,6 @@ function getOcrReviewFields(
     }
 
     return {};
-}
-
-/* =========================================================
-   REVIEW FIELD LIST
-   ========================================================= */
-
-function getReviewRequiredFields(
-    player
-) {
-    const reviewFields =
-        getOcrReviewFields(
-            player
-        );
-
-    return OCR_RESULT_FIELD_ORDER
-        .filter(
-            function(
-                fieldName
-            ) {
-                return Object.prototype
-                    .hasOwnProperty
-                    .call(
-                        reviewFields,
-                        fieldName
-                    );
-            }
-        );
 }
 
 function getResultDisplayFields(
@@ -754,31 +656,24 @@ function getOcrFieldReviewState(
             useEffectiveValue
                 ? effectiveValue
                 : ocrValue,
-
         ocrValue,
-
         effectiveValue,
-
         requiresVerification:
             reviewField
                 .requiresVerification ===
                 true,
-
         confidence:
             reviewField
                 .confidence
             ?? null,
-
         template:
             reviewField
                 .template
             ?? null,
-
         tesseract:
             reviewField
                 .tesseract
             ?? null,
-
         paddle:
             reviewField
                 .paddle
@@ -904,6 +799,83 @@ function createTextCell(
         );
 
     return cell;
+}
+
+/* =========================================================
+   SCOREBOARD IMAGE
+   ========================================================= */
+
+function createOcrResultImage() {
+    const imageUrl =
+        String(
+            OCR_RESULTS_CURRENT_RESPONSE
+                ?.imageUrl
+            || ""
+        )
+            .trim();
+
+    if (
+        !imageUrl
+    ) {
+        return null;
+    }
+
+    const wrapper =
+        document.createElement(
+            "div"
+        );
+
+    wrapper.className =
+        "ocr-result-image-wrap";
+
+    const image =
+        document.createElement(
+            "img"
+        );
+
+    image.className =
+        "ocr-result-image";
+
+    image.alt =
+        "Submitted Rocket League scoreboard";
+
+    image.loading =
+        "eager";
+
+    image.decoding =
+        "async";
+
+    image.src =
+        imageUrl;
+
+    image.addEventListener(
+        "error",
+        function() {
+            console.warn(
+                "[OCR RESULTS] Stored scoreboard image could not be loaded.",
+                {
+                    jobId:
+                        OCR_RESULTS_CURRENT_JOB_ID
+                        || null,
+                    matchId:
+                        OCR_RESULTS_CURRENT_MATCH_ID
+                        || null
+                }
+            );
+
+            wrapper.remove();
+        },
+        {
+            once:
+                true
+        }
+    );
+
+    wrapper.appendChild(
+        image
+    );
+
+    return wrapper;
 }
 
 /* =========================================================
@@ -1110,7 +1082,6 @@ function ensureOcrResultDialog() {
             && dialog.open
         ) {
             dialog.close();
-
             return;
         }
 
@@ -1237,7 +1208,6 @@ function openDialog() {
         }
 
         dialog.showModal();
-
         return;
     }
 
@@ -1257,7 +1227,6 @@ function closeDialog() {
         && dialog.open
     ) {
         dialog.close();
-
         return;
     }
 
@@ -1513,6 +1482,71 @@ function renderOcrResultTable(
         return;
     }
 
+    const scoreboardImage =
+        createOcrResultImage();
+
+    if (
+        scoreboardImage
+    ) {
+        content.appendChild(
+            scoreboardImage
+        );
+    }
+
+    const help =
+        document.createElement(
+            "div"
+        );
+
+    help.className =
+        "ocr-review-help";
+
+    const policyState =
+        getCurrentReviewPolicyState();
+
+    if (
+        mode ===
+            "review"
+    ) {
+        help.textContent =
+            policyState.locked
+                ? (
+                    "This scoreboard required review, but the review window is now closed. "
+                    + "The displayed OCR evidence is read-only."
+                )
+                : (
+                    "Highlighted values require review. "
+                    + "Verify every displayed value before submitting. "
+                    + "Changed OCR values will be recorded as disputes."
+                );
+    }
+    else if (
+        mode ===
+            "adjustment"
+    ) {
+        help.textContent =
+            (
+                "Edit only values that need correction. "
+                + "Your changes will be stored as an adjustment "
+                + "without replacing the original OCR evidence."
+            );
+    }
+    else {
+        help.textContent =
+            policyState.locked
+                ? (
+                    "This scoreboard is read-only because the modification window has closed."
+                )
+                : (
+                    "This scoreboard has already been accepted. "
+                    + "You can edit it if a value needs correction."
+                );
+    }
+
+    content.appendChild(
+        help
+    );
+
     const wrapper =
         document.createElement(
             "div"
@@ -1630,7 +1664,6 @@ function renderOcrResultTable(
                                     fieldName,
                                     {
                                         editable,
-
                                         useEffectiveValue:
                                             mode !==
                                             "review"
@@ -1652,69 +1685,7 @@ function renderOcrResultTable(
         table
     );
 
-    const help =
-        document.createElement(
-            "div"
-        );
-
-    help.className =
-        "ocr-review-help";
-
-    const policyState =
-        getCurrentReviewPolicyState();
-
-    if (
-        mode ===
-            "review"
-    ) {
-        help.textContent =
-            policyState.locked
-                ? (
-                    "This scoreboard required review, but the review window is now closed. "
-                    + "The displayed OCR evidence is read-only."
-                )
-                : (
-                    "Highlighted values require review. "
-                    + "Verify every displayed value before submitting. "
-                    + "Changed OCR values will be recorded as disputes."
-                );
-    }
-    else if (
-        mode ===
-            "adjustment"
-    ) {
-        help.textContent =
-            (
-                "Edit only values that need correction. "
-                + "Your changes will be stored as an adjustment "
-                + "without replacing the original OCR evidence."
-            );
-    }
-    else {
-        help.textContent =
-            policyState.locked
-                ? (
-                    "This scoreboard is read-only because the modification window has closed."
-                )
-                : (
-                    "This scoreboard has already been accepted. "
-                    + "You can edit it if a value needs correction."
-                );
-    }
-
-    const scoreboardImage =
-        createOcrResultImage();
-
-    if (
-        scoreboardImage
-    ) {
-        content.append(
-            scoreboardImage
-        );
-    }
-
-    content.append(
-        help,
+    content.appendChild(
         wrapper
     );
 
@@ -1726,16 +1697,13 @@ function renderOcrResultTable(
                     result,
                     editable,
                     mode,
-
                     jobId:
-                        OCR_RESULTS_CURRENT_JOB_ID,
-
+                        OCR_RESULTS_CURRENT_JOB_ID
+                        || null,
                     matchId:
                         OCR_RESULTS_CURRENT_MATCH_ID,
-
                     editDeadlineAt:
                         getCurrentEditDeadlineAt(),
-
                     editWindowOpen:
                         !policyState.locked
                 }
@@ -1812,7 +1780,6 @@ function buildReviewFields() {
             team,
             player,
             field,
-
             userValue:
                 value
         });
@@ -1911,7 +1878,6 @@ function buildAdjustmentFields() {
             team,
             player,
             field,
-
             userValue:
                 value
         });
@@ -1957,21 +1923,16 @@ async function submitOcrFields(
             {
                 method:
                     "POST",
-
                 credentials:
                     "same-origin",
-
                 cache:
                     "no-store",
-
                 headers: {
                     "Accept":
                         "application/json",
-
                     "Content-Type":
                         "application/json"
                 },
-
                 body:
                     JSON.stringify({
                         mode,
@@ -2001,6 +1962,9 @@ async function submitOcrFields(
                         : "Unable to submit OCR review."
                 )
             );
+
+        error.status =
+            response.status;
 
         error.code =
             data?.code
@@ -2032,35 +1996,29 @@ async function submitReview() {
             {
                 detail: {
                     jobId:
-                        OCR_RESULTS_CURRENT_JOB_ID,
-
+                        OCR_RESULTS_CURRENT_JOB_ID
+                        || null,
                     matchId:
                         OCR_RESULTS_CURRENT_MATCH_ID,
-
                     automatic:
                         false,
-
                     confirmationStatus:
                         normalizeConfirmationStatus(
                             data
                                 ?.confirmationStatus
                         )
                         || "confirmed",
-
                     hasDisputes:
                         data?.hasDisputes ===
                             true,
-
                     disputeCount:
                         Number(
                             data?.disputeCount
                             || 0
                         ),
-
                     confirmedAt:
                         data?.confirmedAt
                         || null,
-
                     editDeadlineAt:
                         data?.editDeadlineAt
                         || getCurrentEditDeadlineAt()
@@ -2092,33 +2050,28 @@ async function saveAdjustment() {
             {
                 detail: {
                     jobId:
-                        OCR_RESULTS_CURRENT_JOB_ID,
-
+                        OCR_RESULTS_CURRENT_JOB_ID
+                        || null,
                     matchId:
                         OCR_RESULTS_CURRENT_MATCH_ID,
-
                     adjustmentId:
                         data?.adjustmentId
                         || null,
-
                     adjustmentCount:
                         Number(
                             data
                                 ?.adjustmentCount
                             || 0
                         ),
-
                     changedFieldCount:
                         Number(
                             data
                                 ?.changedFieldCount
                             || fields.length
                         ),
-
                     adjustedAt:
                         data?.adjustedAt
                         || null,
-
                     editDeadlineAt:
                         data?.editDeadlineAt
                         || getCurrentEditDeadlineAt()
@@ -2138,10 +2091,8 @@ async function saveAdjustment() {
     setDialogText({
         title:
             "Scoreboard Result",
-
         subtitle:
             OCR_RESULTS_CURRENT_MATCH_ID,
-
         message:
             (
                 "Scoreboard correction saved. "
@@ -2164,7 +2115,6 @@ async function saveAdjustment() {
         {
             editable:
                 false,
-
             mode:
                 "result"
         }
@@ -2179,13 +2129,22 @@ async function saveAdjustment() {
 
 async function reloadCurrentResult() {
     if (
-        !validJobId(
-            OCR_RESULTS_CURRENT_JOB_ID
+        !validMatchId(
+            OCR_RESULTS_CURRENT_MATCH_ID
         )
     ) {
-        throw new Error(
-            "A valid OCR job ID is required."
-        );
+        const error =
+            new Error(
+                "A valid match ID is required."
+            );
+
+        error.code =
+            "MATCH_ID_INVALID";
+
+        error.status =
+            400;
+
+        throw error;
     }
 
     const {
@@ -2193,7 +2152,7 @@ async function reloadCurrentResult() {
         responseData
     } =
         await getOcrResult(
-            OCR_RESULTS_CURRENT_JOB_ID
+            OCR_RESULTS_CURRENT_MATCH_ID
         );
 
     OCR_RESULTS_CURRENT_RESULT =
@@ -2202,7 +2161,7 @@ async function reloadCurrentResult() {
     OCR_RESULTS_CURRENT_RESPONSE =
         responseData;
 
-    const resolvedMatchId =
+    const responseMatchId =
         normalizeId(
             responseData?.matchId
             || result?.matchId
@@ -2211,12 +2170,25 @@ async function reloadCurrentResult() {
 
     if (
         validMatchId(
-            resolvedMatchId
+            responseMatchId
         )
     ) {
         OCR_RESULTS_CURRENT_MATCH_ID =
-            resolvedMatchId;
+            responseMatchId;
     }
+
+    const responseJobId =
+        normalizeId(
+            responseData?.jobId
+            || OCR_RESULTS_CURRENT_JOB_ID
+        );
+
+    OCR_RESULTS_CURRENT_JOB_ID =
+        validJobId(
+            responseJobId
+        )
+            ? responseJobId
+            : "";
 
     const resolvedEditDeadlineAt =
         String(
@@ -2277,7 +2249,6 @@ function configureResultActions() {
     ) {
         primaryButton.hidden =
             true;
-
         return;
     }
 
@@ -2301,7 +2272,6 @@ function configureResultActions() {
                 );
 
                 configureResultActions();
-
                 return;
             }
 
@@ -2313,10 +2283,8 @@ function configureResultActions() {
             setDialogText({
                 title:
                     "Edit Scoreboard",
-
                 subtitle:
                     OCR_RESULTS_CURRENT_MATCH_ID,
-
                 message:
                     (
                         "Correct any accepted scoreboard value that does not match the image. "
@@ -2332,7 +2300,6 @@ function configureResultActions() {
                 {
                     editable:
                         true,
-
                     mode:
                         "adjustment"
                 }
@@ -2373,7 +2340,6 @@ function configureResultActions() {
                                 {
                                     editable:
                                         false,
-
                                     mode:
                                         "result"
                                 }
@@ -2432,7 +2398,6 @@ function configureReviewActions() {
     ) {
         primaryButton.hidden =
             true;
-
         return;
     }
 
@@ -2474,7 +2439,6 @@ function configureReviewActions() {
                         {
                             editable:
                                 false,
-
                             mode:
                                 "review"
                         }
@@ -2492,6 +2456,52 @@ function configureReviewActions() {
 }
 
 /* =========================================================
+   UNAVAILABLE RESULT
+   ========================================================= */
+
+function showUnavailableResult(
+    {
+        review = false,
+        message = ""
+    } = {}
+) {
+    const dialog =
+        ensureOcrResultDialog();
+
+    const content =
+        dialog.querySelector(
+            "#ocrGlobalResultContent"
+        );
+
+    const primaryButton =
+        dialog.querySelector(
+            "#ocrGlobalResultPrimary"
+        );
+
+    content.replaceChildren();
+
+    setDialogText({
+        title:
+            review
+                ? "Review Scoreboard"
+                : "Scoreboard Result",
+        subtitle:
+            OCR_RESULTS_CURRENT_MATCH_ID
+            || OCR_RESULTS_CURRENT_JOB_ID,
+        message:
+            ""
+    });
+
+    setDialogError(
+        message
+        || "This scoreboard result is no longer available."
+    );
+
+    primaryButton.hidden =
+        true;
+}
+
+/* =========================================================
    RESULT MODAL
    ========================================================= */
 
@@ -2501,7 +2511,7 @@ async function openResultModal(
         review = false
     } = {}
 ) {
-    const jobId =
+    const requestedJobId =
         normalizeId(
             detail?.jobId
         );
@@ -2512,24 +2522,48 @@ async function openResultModal(
         );
 
     if (
-        !validJobId(
-            jobId
+        !validMatchId(
+            requestedMatchId
         )
     ) {
-        throw new Error(
-            "OCR result is missing a valid job ID."
-        );
+        const dialog =
+            ensureOcrResultDialog();
+
+        OCR_RESULTS_CURRENT_JOB_ID =
+            validJobId(
+                requestedJobId
+            )
+                ? requestedJobId
+                : "";
+
+        OCR_RESULTS_CURRENT_MATCH_ID =
+            "";
+
+        OCR_RESULTS_CURRENT_MODE =
+            review
+                ? "review"
+                : "result";
+
+        openDialog();
+
+        showUnavailableResult({
+            review,
+            message:
+                "This scoreboard result does not contain a valid match ID."
+        });
+
+        return;
     }
 
     OCR_RESULTS_CURRENT_JOB_ID =
-        jobId;
+        validJobId(
+            requestedJobId
+        )
+            ? requestedJobId
+            : "";
 
     OCR_RESULTS_CURRENT_MATCH_ID =
-        validMatchId(
-            requestedMatchId
-        )
-            ? requestedMatchId
-            : "";
+        requestedMatchId;
 
     OCR_RESULTS_CURRENT_MODE =
         review
@@ -2596,10 +2630,8 @@ async function openResultModal(
             review
                 ? "Review Scoreboard"
                 : "Scoreboard Result",
-
         subtitle:
             OCR_RESULTS_CURRENT_MATCH_ID,
-
         message:
             review
                 ? "Loading scoreboard review..."
@@ -2646,10 +2678,8 @@ async function openResultModal(
             setDialogText({
                 title:
                     "Review Scoreboard",
-
                 subtitle:
                     OCR_RESULTS_CURRENT_MATCH_ID,
-
                 message:
                     policyState.locked
                         ? (
@@ -2674,14 +2704,12 @@ async function openResultModal(
                 {
                     editable:
                         !policyState.locked,
-
                     mode:
                         "review"
                 }
             );
 
             configureReviewActions();
-
             return;
         }
 
@@ -2700,10 +2728,8 @@ async function openResultModal(
         setDialogText({
             title:
                 "Scoreboard Result",
-
             subtitle:
                 OCR_RESULTS_CURRENT_MATCH_ID,
-
             message:
                 (
                     acceptedMessage
@@ -2727,7 +2753,6 @@ async function openResultModal(
             {
                 editable:
                     false,
-
                 mode:
                     "result"
             }
@@ -2738,29 +2763,46 @@ async function openResultModal(
     catch (
         error
     ) {
-        content.replaceChildren();
-
-        setDialogText({
-            title:
-                review
-                    ? "Review Scoreboard"
-                    : "Scoreboard Result",
-
-            subtitle:
-                OCR_RESULTS_CURRENT_MATCH_ID
-                || OCR_RESULTS_CURRENT_JOB_ID,
-
-            message:
-                ""
-        });
-
-        setDialogError(
-            error?.message
-            || "Unable to load OCR result."
+        console.error(
+            "[OCR RESULTS] Result load failed.",
+            {
+                jobId:
+                    OCR_RESULTS_CURRENT_JOB_ID
+                    || null,
+                matchId:
+                    OCR_RESULTS_CURRENT_MATCH_ID
+                    || null,
+                status:
+                    error?.status
+                    || null,
+                code:
+                    error?.code
+                    || null,
+                message:
+                    error?.message
+                    || null
+            }
         );
 
-        primaryButton.hidden =
-            true;
+        const unavailable = (
+            error?.code ===
+                "MATCH_ID_INVALID"
+            || error?.code ===
+                "MATCH_REPORT_NOT_FOUND"
+            || error?.status ===
+                404
+        );
+
+        showUnavailableResult({
+            review,
+            message:
+                unavailable
+                    ? "This scoreboard result is no longer available."
+                    : (
+                        error?.message
+                        || "Unable to load OCR result."
+                    )
+        });
     }
 }
 
@@ -2826,10 +2868,8 @@ function openFailureModal(
     setDialogText({
         title:
             "Scoreboard Processing Failed",
-
         subtitle:
             errorCode,
-
         message
     });
 
@@ -2886,17 +2926,7 @@ function handleResultOpen(
             review:
                 false
         }
-    )
-        .catch(
-            function(
-                error
-            ) {
-                console.error(
-                    "[OCR RESULTS] Could not open result.",
-                    error
-                );
-            }
-        );
+    );
 }
 
 function handlePendingReviewOpen(
@@ -2909,17 +2939,7 @@ function handlePendingReviewOpen(
             review:
                 true
         }
-    )
-        .catch(
-            function(
-                error
-            ) {
-                console.error(
-                    "[OCR RESULTS] Could not open review.",
-                    error
-                );
-            }
-        );
+    );
 }
 
 function handleFailureOpen(
@@ -2976,7 +2996,6 @@ export function initializeOcrResults() {
         OCR_RESULTS_READY
     ) {
         ensureOcrResultDialog();
-
         return true;
     }
 
