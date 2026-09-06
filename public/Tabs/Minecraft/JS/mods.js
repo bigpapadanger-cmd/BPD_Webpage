@@ -1,12 +1,24 @@
+/*
+=========================================================
+BPD GAMING NETWORK
+MINECRAFT MODS PAGE
+=========================================================
+*/
+
 import {
     renderHeader
 } from "/Framework/Shell/JS/renderHeader.js";
-import { CF_MOD_LIST_API } from "../../../scripts/apiRoutes.js";
-import { apiFetch } from "../../../scripts/apiConnection.js";
+
+import {
+    CF_MOD_LIST_API
+} from "/scripts/apiRoutes.js";
+
+import {
+    apiFetch
+} from "/scripts/apiConnection.js";
 
 const gameCategory =
     "minecraft";
-
 
 const MOD_GLOWS = [
     "34, 197, 94",
@@ -17,71 +29,76 @@ const MOD_GLOWS = [
     "234, 179, 8"
 ];
 
+/* =========================================================
+   INITIALIZE PAGE
+   ========================================================= */
 
-renderHeader({
-    eyebrow:
-        "BPD GAMING NETWORK",
+export function initializePage() {
+    renderHeader({
+        eyebrow:
+            "BPD GAMING NETWORK",
 
-    title:
-        "Minecraft Mods",
+        title:
+            "Minecraft Mods",
 
-    tabs: [
-        {
-            label:
-                "Home",
+        tabs: [
+            {
+                label:
+                    "Home",
 
-            href:
-                "/Minecraft"
-        },
-        {
-            label:
-                "Announcements",
+                href:
+                    "/Minecraft"
+            },
+            {
+                label:
+                    "Announcements",
 
-            href:
-                "/Minecraft/Announcements"
-        }
-    ]
-});
+                href:
+                    "/Minecraft/Announcements"
+            }
+        ]
+    });
 
+    initializeModsPage();
 
-initializeModsPage();
+    return true;
+}
 
+/* =========================================================
+   PAGE INITIALIZATION
+   ========================================================= */
 
 function initializeModsPage() {
-
     const retryButton =
         document.getElementById(
             "minecraftModRetry"
         );
 
-
-    if (retryButton) {
-
+    if (
+        retryButton
+    ) {
         retryButton.addEventListener(
             "click",
-            () => {
-
-                loadModsForGame(
+            function() {
+                void loadModsForGame(
                     gameCategory
                 );
-
             }
         );
-
     }
 
-
-    loadModsForGame(
+    void loadModsForGame(
         gameCategory
     );
-
 }
 
+/* =========================================================
+   LOAD MOD DATA
+   ========================================================= */
 
 async function loadModsForGame(
     game
 ) {
-
     const modList =
         document.getElementById(
             "minecraftModList"
@@ -92,26 +109,24 @@ async function loadModsForGame(
             "minecraftModError"
         );
 
-
-    if (!modList) {
+    if (
+        !modList
+    ) {
         return;
     }
 
-
-    if (errorSection) {
-
+    if (
+        errorSection
+    ) {
         errorSection.hidden =
             true;
-
     }
-
 
     renderLoadingState(
         modList
     );
 
     try {
-
         const response =
             await apiFetch(
                 `${CF_MOD_LIST_API}?game=${encodeURIComponent(
@@ -131,32 +146,26 @@ async function loadModsForGame(
                 }
             );
 
-
-        if (!response.ok) {
-
+        if (
+            !response.ok
+        ) {
             throw new Error(
                 `Mod API returned ${response.status}`
             );
-
         }
-
 
         const data =
             await response.json();
-
 
         if (
             data?.success !==
             true
         ) {
-
             throw new Error(
-                data?.message ||
-                "Unable to load mods."
+                data?.message
+                || "Unable to load mods."
             );
-
         }
-
 
         const mods =
             Array.isArray(
@@ -165,16 +174,13 @@ async function loadModsForGame(
                 ? data.mods
                 : [];
 
-
         modList.innerHTML =
             "";
-
 
         if (
             mods.length ===
             0
         ) {
-
             modList.innerHTML = `
                 <p class="minecraft-mod-empty">
                     No active mods are currently listed.
@@ -182,16 +188,13 @@ async function loadModsForGame(
             `;
 
             return;
-
         }
 
-
         mods.forEach(
-            (
+            function(
                 mod,
                 index
-            ) => {
-
+            ) {
                 modList.insertAdjacentHTML(
                     "beforeend",
                     createModCard(
@@ -199,118 +202,103 @@ async function loadModsForGame(
                         index
                     )
                 );
-
             }
         );
-
     }
     catch (
         error
     ) {
-
         console.error(
             "Minecraft: Unable to load CurseForge mods.",
             error
         );
 
-
         modList.innerHTML =
             "";
 
-
-        if (errorSection) {
-
+        if (
+            errorSection
+        ) {
             errorSection.hidden =
                 false;
-
         }
-
     }
-
 }
 
+/* =========================================================
+   LOADING STATE
+   ========================================================= */
 
 function renderLoadingState(
     modList
 ) {
-
     modList.innerHTML = `
         <div
             class="minecraft-mod-loading"
             id="minecraftModLoading"
         >
-
             <span
                 class="minecraft-mod-loading-spinner"
                 aria-hidden="true"
             ></span>
-
             <span>
                 Loading Minecraft mods...
             </span>
-
         </div>
     `;
-
 }
 
+/* =========================================================
+   MOD CARD
+   ========================================================= */
 
 function createModCard(
     mod,
     index
 ) {
-
     const glow =
         MOD_GLOWS[
             index %
             MOD_GLOWS.length
         ];
 
-
     const name =
         escapeHtml(
-            mod?.name ||
-            "Unnamed Mod"
+            mod?.name
+            || "Unnamed Mod"
         );
-
 
     const description =
         escapeHtml(
-            mod?.summary ||
-            "No description is currently available."
+            mod?.summary
+            || "No description is currently available."
         );
-
 
     const version =
         escapeHtml(
-            mod?.modVersion ||
-            "Unknown"
+            mod?.modVersion
+            || "Unknown"
         );
-
 
     const downloads =
         formatNumber(
             mod?.downloads
         );
 
-
     const updated =
         formatDate(
             mod?.lastUpdated
         );
-
 
     const websiteUrl =
         safeUrl(
             mod?.links?.websiteUrl
         );
 
-
     const logoUrl =
         safeUrl(
             mod?.logo?.thumbnailUrl
         );
-
 
     const imageHtml =
         logoUrl
@@ -335,7 +323,6 @@ function createModCard(
                 </div>
             `;
 
-
     const linkHtml =
         websiteUrl
             ? `
@@ -348,7 +335,6 @@ function createModCard(
                     rel="noopener noreferrer"
                 >
                     View on CurseForge
-
                     <span
                         aria-hidden="true"
                     >
@@ -358,28 +344,19 @@ function createModCard(
             `
             : "";
 
-
     return `
         <article
             class="minecraft-mod-card"
             style="--mod-glow: ${glow};"
         >
-
             <div class="minecraft-mod-banner">
-
                 <div class="minecraft-mod-image-wrap">
-
                     ${imageHtml}
-
                 </div>
 
-
                 <div class="minecraft-mod-main">
-
                     <div class="minecraft-mod-heading">
-
                         <div class="minecraft-mod-title-group">
-
                             <span class="minecraft-mod-label">
                                 MINECRAFT MOD
                             </span>
@@ -387,28 +364,19 @@ function createModCard(
                             <h3 class="minecraft-mod-name">
                                 ${name}
                             </h3>
-
                         </div>
 
-
                         ${linkHtml}
-
                     </div>
-
 
                     <p class="minecraft-mod-description">
                         ${description}
                     </p>
-
                 </div>
-
             </div>
 
-
             <div class="minecraft-mod-meta">
-
                 <div class="minecraft-mod-meta-item">
-
                     <span class="minecraft-mod-meta-label">
                         Mod Version
                     </span>
@@ -416,12 +384,9 @@ function createModCard(
                     <strong class="minecraft-mod-meta-value">
                         ${version}
                     </strong>
-
                 </div>
 
-
                 <div class="minecraft-mod-meta-item">
-
                     <span class="minecraft-mod-meta-label">
                         Downloads
                     </span>
@@ -429,12 +394,9 @@ function createModCard(
                     <strong class="minecraft-mod-meta-value">
                         ${downloads}
                     </strong>
-
                 </div>
 
-
                 <div class="minecraft-mod-meta-item">
-
                     <span class="minecraft-mod-meta-label">
                         Updated
                     </span>
@@ -442,74 +404,60 @@ function createModCard(
                     <strong class="minecraft-mod-meta-value">
                         ${updated}
                     </strong>
-
                 </div>
-
             </div>
-
         </article>
     `;
-
 }
 
+/* =========================================================
+   UTILITIES
+   ========================================================= */
 
 function formatNumber(
     value
 ) {
-
     const number =
         Number(
             value
         );
-
 
     if (
         !Number.isFinite(
             number
         )
     ) {
-
         return "—";
-
     }
-
 
     return new Intl.NumberFormat(
         "en-US"
     ).format(
         number
     );
-
 }
-
 
 function formatDate(
     value
 ) {
-
-    if (!value) {
-
+    if (
+        !value
+    ) {
         return "—";
-
     }
-
 
     const date =
         new Date(
             value
         );
 
-
     if (
         Number.isNaN(
             date.getTime()
         )
     ) {
-
         return "—";
-
     }
-
 
     return new Intl.DateTimeFormat(
         "en-US",
@@ -526,60 +474,46 @@ function formatDate(
     ).format(
         date
     );
-
 }
-
 
 function safeUrl(
     value
 ) {
-
-    if (!value) {
-
+    if (
+        !value
+    ) {
         return "";
-
     }
 
-
     try {
-
         const url =
             new URL(
                 value,
                 window.location.origin
             );
 
-
         if (
             url.protocol !==
-                "https:" &&
-            url.protocol !==
+                "https:"
+            && url.protocol !==
                 "http:"
         ) {
-
             return "";
-
         }
 
-
         return url.href;
-
     }
     catch {
-
         return "";
-
     }
-
 }
-
 
 function escapeHtml(
     value
 ) {
-
     return String(
-        value ?? ""
+        value
+        ?? ""
     )
         .replaceAll(
             "&",
@@ -601,16 +535,12 @@ function escapeHtml(
             "'",
             "&#039;"
         );
-
 }
-
 
 function escapeAttribute(
     value
 ) {
-
     return escapeHtml(
         value
     );
-
 }

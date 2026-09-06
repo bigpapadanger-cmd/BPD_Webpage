@@ -16,35 +16,17 @@
 
     const {
         OCR_JOB_SUBMIT_URL,
-        OCR_JOB_RESULT_URL,
         apiFetch
     } = window.BPDOcrApi;
 
     const OCR_SUBMISSION_VERSION =
-        "ocr-submission-1.6";
-
-    const OCR_REVIEW_OPEN_REQUEST_KEY =
-        "rocketLeagueOcrReviewOpenRequestV1";
-
-    const OCR_FAILURE_OPEN_REQUEST_KEY =
-        "rocketLeagueOcrFailureOpenRequestV1";
+        "ocr-submission-1.7";
 
     const OCR_ACTIVE_JOB_KEY =
         "rocketLeagueOcrActiveJobV1";
 
     const OCR_ACTIVE_JOB_ROUTE_KEY =
         "rocketLeagueOcrActiveJobRouteV1";
-
-    const OCR_RESULT_FIELD_ORDER = [
-        "score",
-        "goals",
-        "assists",
-        "demos",
-        "saves",
-        "shots",
-        "damage",
-        "ping"
-    ];
 
     /* =========================================================
        PROGRESS CONFIGURATION
@@ -69,7 +51,7 @@
         0.08;
 
     const OCR_PROGRESS_PROCESSING_MAX =
-        95;
+        97;
 
     const OCR_PROGRESS_COMPLETE =
         100;
@@ -236,6 +218,12 @@
             case "loading_job":
                 return "Loading your scoreboard...";
 
+            case "cloud_handoff":
+                return "Sending data to cloud...";
+
+            case "acceptance_checks":
+                return "Verifying image...";
+
             case "preparing_image":
                 return "Getting the pixels lined up...";
 
@@ -243,7 +231,8 @@
                 return "Building the OCR request...";
 
             case "contacting_ocr":
-                return "Waking up the scoreboard reader...";
+            case "ocr_provider":
+                return "Connecting to Image Scanner...";
 
             case "ocr":
                 return "Connecting to Image Scanner...";
@@ -330,26 +319,6 @@
             )
                 .trim()
                 .toLowerCase();
-
-        const source =
-            String(
-                detail?.progressSource
-                || detail?.source
-                || ""
-            )
-                .trim()
-                .toLowerCase();
-
-        if (
-            source === "simulated"
-            && eventStage
-        ) {
-            return getJobStageMessage({
-                ...job,
-                stage:
-                    eventStage
-            });
-        }
 
         if (
             eventMessage
@@ -659,25 +628,6 @@
         ensureOcrLoadingAnimation();
     }
 
-    function updateOcrLoading(
-        progress,
-        text = null
-    ) {
-        updateOcrLoadingFromProgress({
-            progress,
-            confirmedProgress:
-                progress,
-            simulatedProgress:
-                0,
-            progressSource:
-                "stored",
-            stage:
-                OCR_LOADING_STAGE,
-            message:
-                text
-        });
-    }
-
     function showOcrLoading(
         text =
             "Submitting scoreboard..."
@@ -788,176 +738,17 @@
     }
 
     /* =========================================================
-       RESTORE REQUESTS
-       ========================================================= */
-
-    function restoreRequestedOcrReview() {
-        let pending =
-            null;
-
-        try {
-            pending =
-                JSON.parse(
-                    sessionStorage.getItem(
-                        OCR_REVIEW_OPEN_REQUEST_KEY
-                    )
-                    || "null"
-                );
-
-            sessionStorage.removeItem(
-                OCR_REVIEW_OPEN_REQUEST_KEY
-            );
-        }
-        catch (
-            error
-        ) {
-            console.error(
-                "[OCR] Could not restore requested OCR review.",
-                error
-            );
-
-            return;
-        }
-
-        if (
-            !pending
-            || typeof pending !==
-                "object"
-            || Array.isArray(
-                pending
-            )
-        ) {
-            return;
-        }
-
-        const jobId =
-            String(
-                pending?.jobId
-                || ""
-            )
-                .trim()
-                .toUpperCase();
-
-        if (
-            !/^[A-Z0-9]{16}$/.test(
-                jobId
-            )
-        ) {
-            console.warn(
-                "[OCR] Ignoring invalid restored OCR review request."
-            );
-
-            return;
-        }
-
-        void handlePendingReviewOpen({
-            detail: {
-                ...pending,
-                jobId
-            }
-        });
-    }
-
-    function restoreRequestedOcrFailure() {
-        let detail =
-            null;
-
-        try {
-            detail =
-                JSON.parse(
-                    sessionStorage.getItem(
-                        OCR_FAILURE_OPEN_REQUEST_KEY
-                    )
-                    || "null"
-                );
-
-            sessionStorage.removeItem(
-                OCR_FAILURE_OPEN_REQUEST_KEY
-            );
-        }
-        catch (
-            error
-        ) {
-            console.error(
-                "[OCR] Could not restore requested OCR failure.",
-                error
-            );
-
-            return;
-        }
-
-        if (
-            !detail
-            || typeof detail !==
-                "object"
-            || Array.isArray(
-                detail
-            )
-        ) {
-            return;
-        }
-
-        handleOcrFailureOpen({
-            detail
-        });
-    }
-
-    /* =========================================================
-       FAILURE DETAIL
-       ========================================================= */
-
-    function handleOcrFailureOpen(
-        event
-    ) {
-        const message =
-            String(
-                event?.detail?.message
-                || event?.detail?.job
-                    ?.error
-                    ?.message
-                || event?.detail?.job
-                    ?.message
-                || "The scoreboard could not be processed."
-            )
-                .trim();
-
-        setOcrControlsLocked(
-            false
-        );
-
-        setStatus(
-            "FAIL: "
-            + message
-        );
-    }
-
-    /* =========================================================
        JOB PROGRESS FALLBACK
        ========================================================= */
 
     function getJobProgress(
         job
     ) {
-        const progress =
-            Number(
-                job?.progress
-            );
-
-        const confirmedProgress =
-            Number(
-                job?.confirmedProgress
-            );
-
-        const simulatedProgress =
-            Number(
-                job?.simulatedProgress
-            );
-
         const highest =
             getHighestProgressValue([
-                progress,
-                confirmedProgress,
-                simulatedProgress
+                job?.progress,
+                job?.confirmedProgress,
+                job?.simulatedProgress
             ]);
 
         if (
@@ -1034,6 +825,9 @@
             return;
         }
 
+        OCR_ACTIVE_JOB_ID =
+            jobId;
+
         const progress =
             Number.isFinite(
                 Number(
@@ -1086,7 +880,7 @@
             String(
                 detail?.progressSource
                 || job?.progressSource
-                || ""
+                || "stored"
             )
                 .trim()
                 .toLowerCase();
@@ -1126,10 +920,14 @@
                     {
                         key:
                             OCR_ACTIVE_JOB_KEY,
+
                         oldValue,
+
                         newValue,
+
                         storageArea:
                             localStorage,
+
                         url:
                             window.location.href
                     }
@@ -1158,12 +956,14 @@
                 .toUpperCase();
 
         if (
-            !OCR_ACTIVE_JOB_ID
+            !/^[A-Z0-9]{16}$/.test(
+                OCR_ACTIVE_JOB_ID
+            )
         ) {
             return;
         }
 
-        const reviewRoute =
+        const sourceRoute =
             String(
                 document.body
                     ?.dataset
@@ -1185,11 +985,11 @@
             );
 
             if (
-                reviewRoute
+                sourceRoute
             ) {
                 localStorage.setItem(
                     OCR_ACTIVE_JOB_ROUTE_KEY,
-                    reviewRoute
+                    sourceRoute
                 );
             }
 
@@ -1257,812 +1057,6 @@
                 "Server returned invalid JSON."
             );
         }
-    }
-
-    /* =========================================================
-       REVIEW FIELD STATE
-       ========================================================= */
-
-    function getOcrReviewFields(
-        player
-    ) {
-        if (
-            player?.reviewFields
-            && typeof player.reviewFields ===
-                "object"
-            && !Array.isArray(
-                player.reviewFields
-            )
-        ) {
-            return player.reviewFields;
-        }
-
-        return {};
-    }
-
-    function getOcrFieldReviewState(
-        player,
-        fieldName
-    ) {
-        const reviewFields =
-            getOcrReviewFields(
-                player
-            );
-
-        const reviewField =
-            reviewFields[
-                fieldName
-            ];
-
-        if (
-            reviewField
-            && typeof reviewField ===
-                "object"
-        ) {
-            return {
-                value:
-                    reviewField.value
-                    ?? player?.[
-                        fieldName
-                    ]
-                    ?? "",
-
-                confidence:
-                    Number(
-                        reviewField.confidence
-                    )
-                    || 0,
-
-                requiresVerification:
-                    reviewField
-                        .requiresVerification ===
-                    true,
-
-                warning:
-                    reviewField.warning
-                    || null,
-
-                reason:
-                    reviewField.reason
-                    || null
-            };
-        }
-
-        return {
-            value:
-                player?.[
-                    fieldName
-                ]
-                ?? "",
-
-            confidence:
-                1,
-
-            requiresVerification:
-                false,
-
-            warning:
-                null,
-
-            reason:
-                null
-        };
-    }
-
-    /* =========================================================
-       GET COMPLETED RESULT
-       ========================================================= */
-
-    async function getOcrJobResult(
-        jobId
-    ) {
-        const response =
-            await apiFetch(
-                (
-                    OCR_JOB_RESULT_URL
-                    + "?jobId="
-                    + encodeURIComponent(
-                        jobId
-                    )
-                ),
-                {
-                    method:
-                        "GET",
-
-                    credentials:
-                        "same-origin",
-
-                    cache:
-                        "no-store",
-
-                    headers: {
-                        "Accept":
-                            "application/json"
-                    }
-                }
-            );
-
-        const data =
-            await readJsonResponse(
-                response
-            );
-
-        if (
-            !response.ok
-            || data?.success !== true
-        ) {
-            throw new Error(
-                data?.message
-                || (
-                    "Unable to load completed OCR result. HTTP "
-                    + response.status
-                )
-            );
-        }
-
-        const result =
-            (
-                data?.matchReport
-                && typeof data.matchReport ===
-                    "object"
-            )
-                ? data.matchReport
-                : (
-                    data?.result
-                    && typeof data.result ===
-                        "object"
-                        ? data.result
-                        : null
-                );
-
-        if (
-            !result
-        ) {
-            throw new Error(
-                "Completed OCR result was not returned."
-            );
-        }
-
-        return {
-            data,
-            result
-        };
-    }
-
-    /* =========================================================
-       SCOREBOARD HELPERS
-       ========================================================= */
-
-    function getOcrTeams(
-        result
-    ) {
-        if (
-            Array.isArray(
-                result?.teams
-            )
-        ) {
-            return result.teams;
-        }
-
-        const teams =
-            [];
-
-        if (
-            Array.isArray(
-                result?.team1
-            )
-        ) {
-            teams.push({
-                team:
-                    1,
-                players:
-                    result.team1
-            });
-        }
-
-        if (
-            Array.isArray(
-                result?.team2
-            )
-        ) {
-            teams.push({
-                team:
-                    2,
-                players:
-                    result.team2
-            });
-        }
-
-        return teams;
-    }
-
-    function getOcrPlayerName(
-        player
-    ) {
-        return String(
-            player?.player
-            || player?.matchedName
-            || player?.username
-            || player?.name
-            || "Unknown Player"
-        );
-    }
-
-    function getVisibleScoreboardFields(
-        teams
-    ) {
-        const visibleFields =
-            new Set();
-
-        teams.forEach(
-            function(
-                team
-            ) {
-                const players =
-                    Array.isArray(
-                        team?.players
-                    )
-                        ? team.players
-                        : [];
-
-                players.forEach(
-                    function(
-                        player
-                    ) {
-                        const reviewFields =
-                            getOcrReviewFields(
-                                player
-                            );
-
-                        OCR_RESULT_FIELD_ORDER
-                            .forEach(
-                                function(
-                                    fieldName
-                                ) {
-                                    const directValue =
-                                        player?.[
-                                            fieldName
-                                        ];
-
-                                    const reviewValue =
-                                        reviewFields?.[
-                                            fieldName
-                                        ]?.value;
-
-                                    if (
-                                        (
-                                            directValue !==
-                                                null
-                                            && typeof directValue !==
-                                                "undefined"
-                                        )
-                                        || (
-                                            reviewValue !==
-                                                null
-                                            && typeof reviewValue !==
-                                                "undefined"
-                                        )
-                                    ) {
-                                        visibleFields.add(
-                                            fieldName
-                                        );
-                                    }
-                                }
-                            );
-                    }
-                );
-            }
-        );
-
-        return OCR_RESULT_FIELD_ORDER
-            .filter(
-                function(
-                    fieldName
-                ) {
-                    return visibleFields.has(
-                        fieldName
-                    );
-                }
-            );
-    }
-
-    function getOcrEditLockState() {
-        const policy =
-            Reflect.get(
-                window,
-                "OCRReviewPolicy"
-            );
-
-        if (
-            !policy
-            || typeof policy.areEditsLocked !==
-                "function"
-        ) {
-            return false;
-        }
-
-        return (
-            policy.areEditsLocked()
-            === true
-        );
-    }
-
-    /* =========================================================
-       SCOREBOARD RESULT TABLE
-       ========================================================= */
-
-    function renderOcrResultTable(
-        result
-    ) {
-        if (
-            !resultsSummary
-        ) {
-            return;
-        }
-
-        resultsSummary
-            .replaceChildren();
-
-        const teams =
-            getOcrTeams(
-                result
-            );
-
-        const fields =
-            getVisibleScoreboardFields(
-                teams
-            );
-
-        const editsLocked =
-            getOcrEditLockState();
-
-        teams.forEach(
-            function(
-                team,
-                teamArrayIndex
-            ) {
-                const teamIndex =
-                    Number(
-                        team?.team
-                        ?? team?.teamIndex
-                        ?? (
-                            teamArrayIndex
-                            + 1
-                        )
-                    );
-
-                const section =
-                    document.createElement(
-                        "section"
-                    );
-
-                section.className =
-                    "ocr-scoreboard-team";
-
-                const title =
-                    document.createElement(
-                        "h3"
-                    );
-
-                title.className =
-                    "ocr-scoreboard-team-title";
-
-                title.textContent =
-                    `TEAM ${teamIndex}`;
-
-                const wrapper =
-                    document.createElement(
-                        "div"
-                    );
-
-                wrapper.className =
-                    "ocr-review-table-wrap";
-
-                const table =
-                    document.createElement(
-                        "table"
-                    );
-
-                table.className =
-                    "ocr-review-table ocr-scoreboard-table";
-
-                const head =
-                    document.createElement(
-                        "thead"
-                    );
-
-                const headRow =
-                    document.createElement(
-                        "tr"
-                    );
-
-                const playerHeader =
-                    document.createElement(
-                        "th"
-                    );
-
-                playerHeader.textContent =
-                    "Player";
-
-                headRow.appendChild(
-                    playerHeader
-                );
-
-                fields.forEach(
-                    function(
-                        fieldName
-                    ) {
-                        const header =
-                            document.createElement(
-                                "th"
-                            );
-
-                        header.textContent =
-                            (
-                                fieldName
-                                    .charAt(
-                                        0
-                                    )
-                                    .toUpperCase()
-                                + fieldName.slice(
-                                    1
-                                )
-                            );
-
-                        headRow.appendChild(
-                            header
-                        );
-                    }
-                );
-
-                head.appendChild(
-                    headRow
-                );
-
-                table.appendChild(
-                    head
-                );
-
-                const body =
-                    document.createElement(
-                        "tbody"
-                    );
-
-                const players =
-                    Array.isArray(
-                        team?.players
-                    )
-                        ? team.players
-                        : [];
-
-                players.forEach(
-                    function(
-                        player
-                    ) {
-                        const row =
-                            document.createElement(
-                                "tr"
-                            );
-
-                        row.className =
-                            "ocr-review-row";
-
-                        const playerName =
-                            getOcrPlayerName(
-                                player
-                            );
-
-                        const playerCell =
-                            document.createElement(
-                                "td"
-                            );
-
-                        playerCell.textContent =
-                            playerName;
-
-                        row.appendChild(
-                            playerCell
-                        );
-
-                        fields.forEach(
-                            function(
-                                fieldName
-                            ) {
-                                const cell =
-                                    document.createElement(
-                                        "td"
-                                    );
-
-                                const input =
-                                    document.createElement(
-                                        "input"
-                                    );
-
-                                const fieldState =
-                                    getOcrFieldReviewState(
-                                        player,
-                                        fieldName
-                                    );
-
-                                const value =
-                                    (
-                                        fieldState.value
-                                        ?? (
-                                            fieldName ===
-                                                "ping"
-                                                ? 0
-                                                : ""
-                                        )
-                                    );
-
-                                input.type =
-                                    "number";
-
-                                input.step =
-                                    "1";
-
-                                input.min =
-                                    "0";
-
-                                input.inputMode =
-                                    "numeric";
-
-                                input.className =
-                                    "ocr-review-value-input";
-
-                                input.value =
-                                    String(
-                                        value
-                                    );
-
-                                input.dataset.team =
-                                    String(
-                                        teamIndex
-                                    );
-
-                                input.dataset.player =
-                                    playerName;
-
-                                input.dataset.field =
-                                    fieldName;
-
-                                input.dataset.originalValue =
-                                    String(
-                                        value
-                                    );
-
-                                input.dataset.requiresVerification =
-                                    String(
-                                        fieldState
-                                            .requiresVerification
-                                    );
-
-                                input.readOnly =
-                                    editsLocked;
-
-                                if (
-                                    fieldState
-                                        .requiresVerification
-                                ) {
-                                    cell.classList.add(
-                                        "ocr-review-cell-needs-review"
-                                    );
-
-                                    row.classList.add(
-                                        "ocr-review-row-needs-review"
-                                    );
-
-                                    input.title =
-                                        String(
-                                            fieldState.reason
-                                            || fieldState.warning
-                                            || "This OCR value needs review."
-                                        );
-                                }
-                                else {
-                                    cell.classList.add(
-                                        "ocr-review-cell-high-confidence"
-                                    );
-                                }
-
-                                input.addEventListener(
-                                    "input",
-                                    function() {
-                                        const changed =
-                                            (
-                                                input.value
-                                                    .trim()
-                                                !== String(
-                                                    input.dataset
-                                                        .originalValue
-                                                    ?? ""
-                                                )
-                                            );
-
-                                        row.classList.toggle(
-                                            "ocr-review-row-disputed",
-                                            changed
-                                        );
-
-                                        document.dispatchEvent(
-                                            new CustomEvent(
-                                                "ocr:review-value-changed"
-                                            )
-                                        );
-                                    }
-                                );
-
-                                cell.appendChild(
-                                    input
-                                );
-
-                                row.appendChild(
-                                    cell
-                                );
-                            }
-                        );
-
-                        body.appendChild(
-                            row
-                        );
-                    }
-                );
-
-                table.appendChild(
-                    body
-                );
-
-                wrapper.appendChild(
-                    table
-                );
-
-                section.append(
-                    title,
-                    wrapper
-                );
-
-                resultsSummary.appendChild(
-                    section
-                );
-            }
-        );
-
-        document.dispatchEvent(
-            new CustomEvent(
-                "ocr:review-table-rendered",
-                {
-                    detail: {
-                        result
-                    }
-                }
-            )
-        );
-    }
-
-    /* =========================================================
-       RESULT MODAL
-       ========================================================= */
-
-    function renderOcrResult(
-        result,
-        jobId,
-        matchId
-    ) {
-        if (
-            !results
-            || !resultsSummary
-        ) {
-            console.error(
-                "[OCR] Results UI was not found."
-            );
-
-            return;
-        }
-
-        renderOcrResultTable(
-            result
-        );
-
-        if (
-            resultsOutput
-        ) {
-            resultsOutput.textContent =
-                JSON.stringify(
-                    result,
-                    null,
-                    2
-                );
-
-            resultsOutput.hidden =
-                false;
-        }
-
-        document.dispatchEvent(
-            new CustomEvent(
-                "ocrtesting:result-rendered",
-                {
-                    detail: {
-                        jobId:
-                            String(
-                                jobId
-                                || ""
-                            )
-                                .trim()
-                                .toUpperCase(),
-
-                        matchId:
-                            String(
-                                matchId
-                                || result?.matchId
-                                || ""
-                            )
-                                .trim()
-                                .toUpperCase(),
-
-                        result
-                    }
-                }
-            )
-        );
-
-        if (
-            typeof results.showModal ===
-                "function"
-        ) {
-            if (
-                !results.open
-            ) {
-                results.showModal();
-            }
-
-            return;
-        }
-
-        results.setAttribute(
-            "open",
-            ""
-        );
-    }
-
-    function closeOcrResultsDialog() {
-        if (
-            !results
-        ) {
-            return;
-        }
-
-        if (
-            typeof results.close ===
-                "function"
-            && results.open
-        ) {
-            results.close();
-
-            return;
-        }
-
-        results.removeAttribute(
-            "open"
-        );
-    }
-
-    function handleOcrResultsConfirmed(
-        event
-    ) {
-        closeOcrResultsDialog();
-
-        if (
-            event?.detail?.automatic !==
-            true
-        ) {
-            setStatus(
-                "Scoreboard confirmed."
-            );
-        }
-
-        setOcrControlsLocked(
-            false
-        );
     }
 
     /* =========================================================
@@ -2146,10 +1140,6 @@
                 .trim()
                 .toUpperCase();
 
-        const job =
-            event?.detail?.job
-            || {};
-
         if (
             !/^[A-Z0-9]{16}$/.test(
                 jobId
@@ -2174,40 +1164,37 @@
             "Scoreboard scan completed."
         );
 
-        setStatus(
-            "Scoreboard processing complete. Review the returned values before confirming."
-        );
+        const confirmationStatus =
+            String(
+                event?.detail
+                    ?.confirmationStatus
+                || event?.detail
+                    ?.job
+                    ?.confirmationStatus
+                || ""
+            )
+                .trim()
+                .toLowerCase();
+
+        if (
+            confirmationStatus ===
+                "pending_review"
+        ) {
+            setStatus(
+                "Scoreboard processing complete. Review is required."
+            );
+        }
+        else {
+            setStatus(
+                "Scoreboard processing complete."
+            );
+        }
 
         setOcrControlsLocked(
             false
         );
 
         savePageState();
-
-        const matchId =
-            String(
-                event?.detail?.matchId
-                || job?.matchId
-                || ""
-            )
-                .trim()
-                .toUpperCase();
-
-        document.dispatchEvent(
-            new CustomEvent(
-                "ocr:successful-result",
-                {
-                    detail: {
-                        jobId,
-                        matchId,
-                        usedCrop:
-                            Boolean(
-                                cropFallbackVisible
-                            )
-                    }
-                }
-            )
-        );
     }
 
     /* =========================================================
@@ -2217,6 +1204,23 @@
     function handleGlobalOcrJobFailed(
         event
     ) {
+        const jobId =
+            String(
+                event?.detail?.jobId
+                || ""
+            )
+                .trim()
+                .toUpperCase();
+
+        if (
+            OCR_ACTIVE_JOB_ID
+            && jobId
+            && OCR_ACTIVE_JOB_ID !==
+                jobId
+        ) {
+            return;
+        }
+
         const job =
             event?.detail?.job
             || {};
@@ -2226,8 +1230,9 @@
 
         const message =
             String(
-                job?.error?.message
+                job?.error?.userMessage
                 || job?.message
+                || job?.error?.message
                 || event?.detail?.message
                 || "OCR processing failed."
             )
@@ -2248,6 +1253,10 @@
                 "The full-image scan could not reliably locate the scoreboard. Adjust the green crop box around the scoreboard, then press Read Scoreboard again."
             );
 
+            setStatus(
+                "Scoreboard could not be located reliably. Adjust the crop and try again."
+            );
+
             setOcrControlsLocked(
                 false
             );
@@ -2256,85 +1265,13 @@
         }
 
         setStatus(
-            `FAIL: ${message}`
+            "FAIL: "
+            + message
         );
 
         setOcrControlsLocked(
             false
         );
-    }
-
-    /* =========================================================
-       OPEN REVIEW
-       ========================================================= */
-
-    async function handlePendingReviewOpen(
-        event
-    ) {
-        const jobId =
-            String(
-                event?.detail?.jobId
-                || ""
-            )
-                .trim()
-                .toUpperCase();
-
-        if (
-            !/^[A-Z0-9]{16}$/.test(
-                jobId
-            )
-        ) {
-            return;
-        }
-
-        try {
-            setStatus(
-                "Loading scoreboard review..."
-            );
-
-            const completed =
-                await getOcrJobResult(
-                    jobId
-                );
-
-            const result =
-                completed.result;
-
-            const matchId =
-                String(
-                    event?.detail?.matchId
-                    || result?.matchId
-                    || ""
-                )
-                    .trim()
-                    .toUpperCase();
-
-            renderOcrResult(
-                result,
-                jobId,
-                matchId
-            );
-
-            setStatus(
-                "Scoreboard loaded for review."
-            );
-        }
-        catch (
-            error
-        ) {
-            console.error(
-                "[OCR] Pending scoreboard could not be restored.",
-                error
-            );
-
-            setStatus(
-                "FAIL: "
-                + (
-                    error?.message
-                    || "The completed scoreboard could not be loaded."
-                )
-            );
-        }
     }
 
     /* =========================================================
@@ -2399,6 +1336,20 @@
             Number(
                 matchSize.value
             );
+
+        if (
+            !Number.isInteger(
+                playersPerTeam
+            )
+            || playersPerTeam < 1
+            || playersPerTeam > 3
+        ) {
+            setStatus(
+                "FAIL: Match size is invalid."
+            );
+
+            return;
+        }
 
         const expectedPlayerNames =
             playerNameValidation.names;
@@ -2511,10 +1462,13 @@
                     {
                         method:
                             "POST",
+
                         body:
                             formData,
+
                         credentials:
                             "same-origin",
+
                         cache:
                             "no-store"
                     }
@@ -2575,17 +1529,25 @@
             updateOcrLoadingFromProgress({
                 progress:
                     submittedProgress,
+
                 confirmedProgress:
                     submittedProgress,
+
                 simulatedProgress:
                     0,
+
                 progressSource:
-                    "real",
+                    String(
+                        data?.progressSource
+                        || "stored"
+                    ),
+
                 stage:
                     String(
                         data?.stage
                         || "queued"
                     ),
+
                 message:
                     String(
                         data?.message
@@ -2690,21 +1652,6 @@
             handleGlobalOcrJobFailed
         );
 
-        document.addEventListener(
-            "ocr:pending-review-open",
-            handlePendingReviewOpen
-        );
-
-        document.addEventListener(
-            "ocr:failure-open",
-            handleOcrFailureOpen
-        );
-
-        document.addEventListener(
-            "ocr:results-confirmed",
-            handleOcrResultsConfirmed
-        );
-
         OCR_SUBMISSION_EVENTS_BOUND =
             true;
     }
@@ -2783,8 +1730,6 @@
         }
 
         restoreActiveOcrJob();
-        restoreRequestedOcrReview();
-        restoreRequestedOcrFailure();
 
         console.log(
             `[OCR SUBMISSION] ${OCR_SUBMISSION_VERSION} ready.`

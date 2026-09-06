@@ -1,0 +1,37 @@
+/*
+=========================================================
+BPD GAMING NETWORK
+MINECRAFT MASTER CSS
+=========================================================
+
+Used for all valid /Minecraft routes.
+*/
+
+/* =========================================================
+   SHELL
+   ========================================================= */
+
+@import url("../General/shell.css");
+@import url("../General/header.css");
+@import url("../General/body.css");
+@import url("../General/footer.css");
+@import url("../General/ocr_popup.css");
+
+/* =========================================================
+   SIDEBAR
+   ========================================================= */
+
+@import url("../Sidebar/sidebar.css");
+@import url("../Sidebar/hover.css");
+
+/* =========================================================
+   GLOBAL
+   ========================================================= */
+
+@import url("/Global/Links/links.css");
+
+/* =========================================================
+   MINECRAFT
+   ========================================================= */
+
+@import url("/Tabs/Minecraft/CSS/index.css");

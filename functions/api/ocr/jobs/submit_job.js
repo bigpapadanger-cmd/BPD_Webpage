@@ -1,3 +1,5 @@
+"use strict";
+
 // ============================================================
 // BPD GAMING NETWORK
 // OCR JOB SUBMISSION
@@ -8,13 +10,13 @@ import {
 } from "../../../services/common_helpers/reload_sessions.js";
 
 const SUBMIT_JOB_VERSION =
-    "ocr-submit-job-1.3";
+    "ocr-submit-job-1.4";
 
 const JOB_PROGRESS = Object.freeze({
     QUEUED:
         2,
     FAILED:
-        100
+        97
 });
 
 // ============================================================
@@ -30,6 +32,7 @@ export async function onRequestPost(
     } = context;
 
     try {
+
         // ====================================================
         // CONFIGURATION
         // ====================================================
@@ -44,9 +47,12 @@ export async function onRequestPost(
         ) {
             return jsonResponse(
                 {
-                    success: false,
+                    success:
+                        false,
+
                     message:
                         configurationError,
+
                     version:
                         SUBMIT_JOB_VERSION
                 },
@@ -75,9 +81,12 @@ export async function onRequestPost(
         ) {
             return jsonResponse(
                 {
-                    success: false,
+                    success:
+                        false,
+
                     message:
                         "Expected multipart/form-data.",
+
                     version:
                         SUBMIT_JOB_VERSION
                 },
@@ -100,9 +109,12 @@ export async function onRequestPost(
         ) {
             return jsonResponse(
                 {
-                    success: false,
+                    success:
+                        false,
+
                     message:
                         "Authentication required.",
+
                     version:
                         SUBMIT_JOB_VERSION
                 },
@@ -124,9 +136,12 @@ export async function onRequestPost(
         ) {
             return jsonResponse(
                 {
-                    success: false,
+                    success:
+                        false,
+
                     message:
                         "Authenticated account is missing an EpicUniqueId.",
+
                     version:
                         SUBMIT_JOB_VERSION
                 },
@@ -153,9 +168,12 @@ export async function onRequestPost(
         catch {
             return jsonResponse(
                 {
-                    success: false,
+                    success:
+                        false,
+
                     message:
                         "Unable to read submitted form data.",
+
                     version:
                         SUBMIT_JOB_VERSION
                 },
@@ -186,9 +204,12 @@ export async function onRequestPost(
         ) {
             return jsonResponse(
                 {
-                    success: false,
+                    success:
+                        false,
+
                     message:
                         "playersPerTeam must be 1, 2, 3, or 4.",
+
                     version:
                         SUBMIT_JOB_VERSION
                 },
@@ -257,13 +278,17 @@ export async function onRequestPost(
             )
             || new Set(
                 expectedPlayerNames
-            ).size !== expectedCount
+            ).size !==
+                expectedCount
         ) {
             return jsonResponse(
                 {
-                    success: false,
+                    success:
+                        false,
+
                     message:
                         `Player Names Must Contain Exactly ${expectedCount} Unique Names.`,
+
                     version:
                         SUBMIT_JOB_VERSION
                 },
@@ -290,9 +315,12 @@ export async function onRequestPost(
         ) {
             return jsonResponse(
                 {
-                    success: false,
+                    success:
+                        false,
+
                     message:
                         "Missing image.",
+
                     version:
                         SUBMIT_JOB_VERSION
                 },
@@ -312,9 +340,12 @@ export async function onRequestPost(
         ) {
             return jsonResponse(
                 {
-                    success: false,
+                    success:
+                        false,
+
                     message:
                         "Uploaded image is empty.",
+
                     version:
                         SUBMIT_JOB_VERSION
                 },
@@ -331,9 +362,12 @@ export async function onRequestPost(
         ) {
             return jsonResponse(
                 {
-                    success: false,
+                    success:
+                        false,
+
                     message:
                         "Image is empty or did not transfer correctly.",
+
                     version:
                         SUBMIT_JOB_VERSION
                 },
@@ -400,7 +434,7 @@ export async function onRequestPost(
 
         const requestData = {
             version:
-                "ocr-job-request-1.3",
+                "ocr-job-request-1.4",
 
             jobId,
 
@@ -416,7 +450,7 @@ export async function onRequestPost(
 
         const statusData = {
             version:
-                "ocr-job-state-1.3",
+                "ocr-job-state-1.4",
 
             jobId,
 
@@ -432,6 +466,9 @@ export async function onRequestPost(
             progress:
                 JOB_PROGRESS.QUEUED,
 
+            progressSource:
+                "worker",
+
             message:
                 "Scoreboard queued for processing.",
 
@@ -442,6 +479,9 @@ export async function onRequestPost(
                 now,
 
             startedAt:
+                null,
+
+            ocrStartedAt:
                 null,
 
             updatedAt:
@@ -473,6 +513,15 @@ export async function onRequestPost(
                 null,
 
             cloudRuntimeSeconds:
+                null,
+
+            requiresPlayerReview:
+                false,
+
+            reviewRequired:
+                false,
+
+            confirmationStatus:
                 null,
 
             error:
@@ -554,44 +603,67 @@ export async function onRequestPost(
                 new Date()
                     .toISOString();
 
+            const failedStatus = {
+                ...statusData,
+
+                status:
+                    "failed",
+
+                stage:
+                    "queue_failed",
+
+                progress:
+                    JOB_PROGRESS.FAILED,
+
+                progressSource:
+                    "worker",
+
+                message:
+                    "The scoreboard could not be queued for processing.",
+
+                updatedAt:
+                    failedAt,
+
+                completedAt:
+                    failedAt,
+
+                heartbeatAt:
+                    failedAt,
+
+                requiresPlayerReview:
+                    false,
+
+                reviewRequired:
+                    false,
+
+                confirmationStatus:
+                    null,
+
+                error: {
+                    code:
+                        "QUEUE_SEND_FAILED",
+
+                    message:
+                        String(
+                            queueError?.message
+                            || queueError
+                        )
+                            .replace(
+                                /\s+/g,
+                                " "
+                            )
+                            .trim()
+                            .slice(
+                                0,
+                                1200
+                            )
+                }
+            };
+
             await env.OCR_STORAGE.put(
                 statusKey,
                 JSON.stringify(
-                    {
-                        ...statusData,
-
-                        status:
-                            "failed",
-
-                        stage:
-                            "queue_failed",
-
-                        progress:
-                            JOB_PROGRESS.FAILED,
-
-                        message:
-                            "The scoreboard could not be queued for processing.",
-
-                        updatedAt:
-                            failedAt,
-
-                        completedAt:
-                            failedAt,
-
-                        heartbeatAt:
-                            failedAt,
-
-                        error: {
-                            code:
-                                "QUEUE_SEND_FAILED",
-
-                            message:
-                                String(
-                                    queueError?.message
-                                    || queueError
-                                )
-                        }
-                    },
+                    failedStatus,
                     null,
                     2
                 ),
@@ -603,7 +675,52 @@ export async function onRequestPost(
                 }
             );
 
-            throw queueError;
+            console.error(
+                "[OCR SUBMIT] Queue send failed.",
+                {
+                    jobId,
+
+                    message:
+                        failedStatus
+                            .error
+                            .message
+                }
+            );
+
+            return jsonResponse(
+                {
+                    success:
+                        false,
+
+                    version:
+                        SUBMIT_JOB_VERSION,
+
+                    jobId,
+
+                    status:
+                        failedStatus.status,
+
+                    stage:
+                        failedStatus.stage,
+
+                    progress:
+                        failedStatus.progress,
+
+                    message:
+                        failedStatus.message,
+
+                    uploadStatus:
+                        failedStatus.uploadStatus,
+
+                    error: {
+                        code:
+                            failedStatus
+                                .error
+                                .code
+                    }
+                },
+                503
+            );
         }
 
         // ====================================================
@@ -612,7 +729,8 @@ export async function onRequestPost(
 
         return jsonResponse(
             {
-                success: true,
+                success:
+                    true,
 
                 version:
                     SUBMIT_JOB_VERSION,
@@ -647,7 +765,8 @@ export async function onRequestPost(
 
         return jsonResponse(
             {
-                success: false,
+                success:
+                    false,
 
                 message:
                     "Unable to create OCR job.",

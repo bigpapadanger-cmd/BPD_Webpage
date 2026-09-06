@@ -5,11 +5,20 @@ FAQ PAGE
 =========================================================
 */
 
+/*
+=========================================================
+BPD GAMING NETWORK
+FAQ PAGE
+=========================================================
+*/
+
 import {
     BPD_AUTH_SESSION_URL
 } from "/scripts/apiRoutes.js";
 
-import { apiFetch } from "../../../scripts/apiConnection";
+import {
+    apiFetch
+} from "/scripts/apiConnection.js";
 
 const FAQ_API_URL =
     "/api/faq";

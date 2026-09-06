@@ -9,6 +9,9 @@ import {
     getStoredSession
 } from "../../../services/common_helpers/reload_sessions.js";
 
+const OCR_GET_RESULT_VERSION =
+    "ocr-get-result-2.1";
+
 const ALLOWED_SCOREBOARD_FIELDS =
     new Set([
         "score",
@@ -21,6 +24,13 @@ const ALLOWED_SCOREBOARD_FIELDS =
         "ping"
     ]);
 
+const ALLOWED_CONFIRMATION_STATUSES =
+    new Set([
+        "pending_review",
+        "auto_accepted",
+        "confirmed",
+        "confirmed_with_disputes"
+    ]);
 
 // ============================================================
 // MAIN
@@ -69,7 +79,6 @@ export async function onRequestGet(
                 503
             );
         }
-
 
         // ====================================================
         // AUTHENTICATION
@@ -127,7 +136,6 @@ export async function onRequestGet(
                 env.OCR_OWNER_SECRET
             );
 
-
         // ====================================================
         // JOB ID
         // ====================================================
@@ -158,7 +166,6 @@ export async function onRequestGet(
                 400
             );
         }
-
 
         // ====================================================
         // LOAD JOB STATUS
@@ -205,7 +212,6 @@ export async function onRequestGet(
             );
         }
 
-
         // ====================================================
         // JOB STATE
         // ====================================================
@@ -219,7 +225,8 @@ export async function onRequestGet(
                 .toLowerCase();
 
         if (
-            status === "failed"
+            status ===
+                "failed"
         ) {
             return jsonResponse(
                 {
@@ -228,6 +235,8 @@ export async function onRequestGet(
 
                     message:
                         statusData?.error
+                            ?.userMessage
+                        || statusData?.error
                             ?.message
                         || "OCR job failed."
                 },
@@ -236,7 +245,8 @@ export async function onRequestGet(
         }
 
         if (
-            status !== "completed"
+            status !==
+                "completed"
         ) {
             return jsonResponse(
                 {
@@ -249,7 +259,6 @@ export async function onRequestGet(
                 409
             );
         }
-
 
         // ====================================================
         // MATCH ID
@@ -274,7 +283,6 @@ export async function onRequestGet(
                 409
             );
         }
-
 
         // ====================================================
         // LOAD MATCH REPORT
@@ -321,7 +329,6 @@ export async function onRequestGet(
             );
         }
 
-
         // ====================================================
         // MATCH ID VERIFICATION
         // ====================================================
@@ -332,8 +339,8 @@ export async function onRequestGet(
             );
 
         if (
-            storedMatchId
-            !== matchId
+            storedMatchId !==
+                matchId
         ) {
             return jsonResponse(
                 {
@@ -347,6 +354,31 @@ export async function onRequestGet(
             );
         }
 
+        // ====================================================
+        // JOB ID VERIFICATION
+        // ====================================================
+
+        const storedJobId =
+            sanitizeJobId(
+                matchReport?.jobId
+            );
+
+        if (
+            storedJobId
+            && storedJobId !==
+                jobId
+        ) {
+            return jsonResponse(
+                {
+                    success:
+                        false,
+
+                    message:
+                        "Stored match report does not match this OCR job."
+                },
+                409
+            );
+        }
 
         // ====================================================
         // OWNERSHIP VERIFICATION
@@ -392,6 +424,61 @@ export async function onRequestGet(
             );
         }
 
+        // ====================================================
+        // CONFIRMATION STATE
+        // ====================================================
+
+        const confirmationStatus =
+            sanitizeConfirmationStatus(
+                matchReport
+                    ?.confirmationStatus
+                || statusData
+                    ?.confirmationStatus
+            );
+
+        const requiresPlayerReview = (
+            matchReport
+                ?.requiresPlayerReview ===
+                true
+            || matchReport
+                ?.reviewRequired ===
+                true
+            || confirmationStatus ===
+                "pending_review"
+        );
+
+        // ====================================================
+        // EDIT DEADLINE
+        // ====================================================
+
+        const editDeadlineAt =
+            sanitizeTimestamp(
+                matchReport
+                    ?.editDeadlineAt
+                || statusData
+                    ?.editDeadlineAt
+            );
+
+        if (
+            !editDeadlineAt
+        ) {
+            return jsonResponse(
+                {
+                    success:
+                        false,
+
+                    message:
+                        "Stored match report does not contain a valid edit deadline."
+                },
+                409
+            );
+        }
+
+        const editWindowOpen =
+            Date.now() <
+            Date.parse(
+                editDeadlineAt
+            );
 
         // ====================================================
         // SANITIZE SCOREBOARD
@@ -399,11 +486,18 @@ export async function onRequestGet(
 
         const result =
             sanitizePublicScoreboard(
-                matchReport
+                matchReport,
+                {
+                    includeReviewEvidence:
+                        requiresPlayerReview,
+
+                    editDeadlineAt
+                }
             );
 
         if (
-            result.teams.length === 0
+            result.teams.length ===
+                0
         ) {
             return jsonResponse(
                 {
@@ -417,7 +511,6 @@ export async function onRequestGet(
             );
         }
 
-
         // ====================================================
         // RESPONSE
         // ====================================================
@@ -427,7 +520,46 @@ export async function onRequestGet(
                 success:
                     true,
 
+                version:
+                    OCR_GET_RESULT_VERSION,
+
+                jobId,
+
                 matchId,
+
+                confirmationStatus,
+
+                requiresPlayerReview,
+
+                reviewRequired:
+                    requiresPlayerReview,
+
+                editDeadlineAt,
+
+                editWindowOpen,
+
+                hasDisputes:
+                    matchReport
+                        ?.hasDisputes ===
+                        true,
+
+                disputeCount:
+                    normalizeCount(
+                        matchReport
+                            ?.disputeCount
+                    ),
+
+                adjustmentCount:
+                    normalizeCount(
+                        matchReport
+                            ?.adjustmentCount
+                    ),
+
+                lastAdjustedAt:
+                    sanitizeTimestamp(
+                        matchReport
+                            ?.lastAdjustedAt
+                    ),
 
                 result
             },
@@ -455,13 +587,16 @@ export async function onRequestGet(
     }
 }
 
-
 // ============================================================
 // PUBLIC SCOREBOARD
 // ============================================================
 
 function sanitizePublicScoreboard(
-    matchReport
+    matchReport,
+    {
+        includeReviewEvidence = false,
+        editDeadlineAt = null
+    } = {}
 ) {
     const teams =
         Array.isArray(
@@ -535,62 +670,91 @@ function sanitizePublicScoreboard(
                     playerName
             };
 
+            const publicReviewFields =
+                {};
+
             for (
                 const field
                 of ALLOWED_SCOREBOARD_FIELDS
             ) {
-                let value =
+                const reviewField = (
+                    player
+                        ?.reviewFields
+                        ?.[
+                            field
+                        ]
+                );
+
+                let effectiveValue =
                     player?.[
                         field
                     ];
 
                 if (
                     (
-                        value === null
-                        || typeof value
-                            === "undefined"
+                        effectiveValue === null
+                        || typeof effectiveValue ===
+                            "undefined"
+                        || String(
+                            effectiveValue
+                        ).trim() === ""
                     )
-                    && player?.reviewFields?.[
-                        field
-                    ]
+                    && reviewField
                 ) {
-                    value =
-                        player
-                            .reviewFields[
-                                field
-                            ]
+                    effectiveValue =
+                        reviewField
                             ?.value;
                 }
 
-                if (
-                    value === null
-                    || typeof value
-                        === "undefined"
-                    || String(
-                        value
-                    ).trim() === ""
-                ) {
-                    continue;
-                }
-
-                const numeric =
-                    Number(
-                        value
+                const numericEffectiveValue =
+                    sanitizeScoreboardValue(
+                        effectiveValue
                     );
 
                 if (
-                    !Number.isInteger(
-                        numeric
-                    )
-                    || numeric < 0
+                    numericEffectiveValue !==
+                        null
                 ) {
-                    continue;
+                    publicPlayer[
+                        field
+                    ] =
+                        numericEffectiveValue;
                 }
 
-                publicPlayer[
-                    field
-                ] =
-                    numeric;
+                if (
+                    includeReviewEvidence
+                    && reviewField
+                    && typeof reviewField ===
+                        "object"
+                    && !Array.isArray(
+                        reviewField
+                    )
+                ) {
+                    const sanitizedReviewField =
+                        sanitizeReviewField(
+                            reviewField,
+                            numericEffectiveValue
+                        );
+
+                    if (
+                        sanitizedReviewField
+                    ) {
+                        publicReviewFields[
+                            field
+                        ] =
+                            sanitizedReviewField;
+                    }
+                }
+            }
+
+            if (
+                includeReviewEvidence
+                && Object.keys(
+                    publicReviewFields
+                ).length > 0
+            ) {
+                publicPlayer.reviewFields =
+                    publicReviewFields;
             }
 
             publicPlayers.push(
@@ -612,11 +776,332 @@ function sanitizePublicScoreboard(
     }
 
     return {
+        matchId:
+            sanitizeMatchId(
+                matchReport?.matchId
+            ),
+
+        editDeadlineAt,
+
         teams:
             publicTeams
     };
 }
 
+// ============================================================
+// REVIEW FIELD
+// ============================================================
+
+function sanitizeReviewField(
+    reviewField,
+    fallbackValue
+) {
+    const value =
+        sanitizeScoreboardValue(
+            reviewField?.value
+        );
+
+    const sanitizedValue = (
+        value !== null
+            ? value
+            : fallbackValue
+    );
+
+    if (
+        sanitizedValue ===
+            null
+    ) {
+        return null;
+    }
+
+    return {
+        value:
+            sanitizedValue,
+
+        requiresVerification:
+            reviewField
+                ?.requiresVerification ===
+                true,
+
+        engine:
+            sanitizeText(
+                reviewField?.engine
+            ),
+
+        confidence:
+            sanitizeConfidence(
+                reviewField?.confidence
+            ),
+
+        template:
+            sanitizeEngineEvidence(
+                reviewField?.template
+            ),
+
+        tesseract:
+            sanitizeEngineEvidence(
+                reviewField?.tesseract
+            ),
+
+        paddle:
+            sanitizeEngineEvidence(
+                reviewField?.paddle
+            )
+    };
+}
+
+// ============================================================
+// ENGINE EVIDENCE
+// ============================================================
+
+function sanitizeEngineEvidence(
+    evidence
+) {
+    if (
+        evidence === null
+        || typeof evidence ===
+            "undefined"
+    ) {
+        return null;
+    }
+
+    if (
+        typeof evidence !==
+            "object"
+        || Array.isArray(
+            evidence
+        )
+    ) {
+        const value =
+            sanitizeScoreboardValue(
+                evidence
+            );
+
+        return (
+            value !== null
+                ? value
+                : null
+        );
+    }
+
+    const sanitized =
+        {};
+
+    const value =
+        sanitizeScoreboardValue(
+            evidence?.value
+            ?? evidence?.selectedValue
+    );
+
+    if (
+        value !== null
+    ) {
+        sanitized.value =
+            value;
+    }
+
+    const text =
+        sanitizeText(
+            evidence?.text
+        );
+
+    if (
+        text
+    ) {
+        sanitized.text =
+            text;
+    }
+
+    const confidence =
+        sanitizeConfidence(
+            evidence?.confidence
+        );
+
+    if (
+        confidence !==
+            null
+    ) {
+        sanitized.confidence =
+            confidence;
+    }
+
+    if (
+        Object.keys(
+            sanitized
+        ).length ===
+            0
+    ) {
+        return null;
+    }
+
+    return sanitized;
+}
+
+// ============================================================
+// SCOREBOARD VALUE
+// ============================================================
+
+function sanitizeScoreboardValue(
+    value
+) {
+    if (
+        value === null
+        || typeof value ===
+            "undefined"
+        || String(
+            value
+        ).trim() === ""
+    ) {
+        return null;
+    }
+
+    const numeric =
+        Number(
+            value
+        );
+
+    if (
+        !Number.isInteger(
+            numeric
+        )
+        || numeric < 0
+    ) {
+        return null;
+    }
+
+    return numeric;
+}
+
+// ============================================================
+// CONFIRMATION STATUS
+// ============================================================
+
+function sanitizeConfirmationStatus(
+    value
+) {
+    const status =
+        String(
+            value
+            || ""
+        )
+            .trim()
+            .toLowerCase();
+
+    return (
+        ALLOWED_CONFIRMATION_STATUSES.has(
+            status
+        )
+            ? status
+            : null
+    );
+}
+
+// ============================================================
+// COUNT
+// ============================================================
+
+function normalizeCount(
+    value
+) {
+    const numeric =
+        Number(
+            value
+        );
+
+    if (
+        !Number.isInteger(
+            numeric
+        )
+        || numeric < 0
+    ) {
+        return 0;
+    }
+
+    return numeric;
+}
+
+// ============================================================
+// TIMESTAMP
+// ============================================================
+
+function sanitizeTimestamp(
+    value
+) {
+    const timestamp =
+        String(
+            value
+            || ""
+        )
+            .trim();
+
+    if (
+        !timestamp
+    ) {
+        return null;
+    }
+
+    const parsed =
+        Date.parse(
+            timestamp
+        );
+
+    if (
+        !Number.isFinite(
+            parsed
+        )
+    ) {
+        return null;
+    }
+
+    return new Date(
+        parsed
+    )
+        .toISOString();
+}
+
+// ============================================================
+// TEXT
+// ============================================================
+
+function sanitizeText(
+    value
+) {
+    const text =
+        String(
+            value
+            ?? ""
+        )
+            .trim();
+
+    return (
+        text
+        || null
+    );
+}
+
+// ============================================================
+// CONFIDENCE
+// ============================================================
+
+function sanitizeConfidence(
+    value
+) {
+    const numeric =
+        Number(
+            value
+        );
+
+    if (
+        !Number.isFinite(
+            numeric
+        )
+        || numeric < 0
+    ) {
+        return null;
+    }
+
+    return numeric;
+}
 
 // ============================================================
 // OWNER HASH
@@ -685,7 +1170,6 @@ async function createOwnerHash(
         );
 }
 
-
 // ============================================================
 // CONSTANT-TIME STRING COMPARE
 // ============================================================
@@ -714,8 +1198,8 @@ function constantTimeEqual(
         );
 
     if (
-        firstBytes.length
-        !== secondBytes.length
+        firstBytes.length !==
+            secondBytes.length
     ) {
         return false;
     }
@@ -737,9 +1221,9 @@ function constantTimeEqual(
             ];
     }
 
-    return difference === 0;
+    return difference ===
+        0;
 }
-
 
 // ============================================================
 // JOB ID
@@ -767,7 +1251,6 @@ function sanitizeJobId(
     return jobId;
 }
 
-
 // ============================================================
 // MATCH ID
 // ============================================================
@@ -793,7 +1276,6 @@ function sanitizeMatchId(
 
     return matchId;
 }
-
 
 // ============================================================
 // RESPONSE

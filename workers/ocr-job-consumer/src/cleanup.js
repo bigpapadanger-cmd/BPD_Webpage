@@ -4,10 +4,8 @@ import {
     writeOcrDebugTrace
 } from "./debug.js";
 
-// ============================================================
-// BPD GAMING NETWORK
-// OCR JOB CLEANUP
-// ============================================================
+const CLEANUP_VERSION =
+    "ocr-cleanup-1.2";
 
 const OCR_QUEUE_STALE_MS =
     2
@@ -15,22 +13,43 @@ const OCR_QUEUE_STALE_MS =
     * 1000;
 
 const OCR_PROCESSING_STALE_MS =
-    8
+    7
     * 60
     * 1000;
 
-const OCR_TERMINAL_RETENTION_MS =
+const OCR_FAILED_RETENTION_MS =
     24
     * 60
     * 60
     * 1000;
 
-const OCR_LIST_LIMIT =
-    1000;
+const OCR_COMPLETED_MIN_RETENTION_MS =
+    24
+    * 60
+    * 60
+    * 1000;
 
-// ============================================================
-// MAIN CLEANUP
-// ============================================================
+const OCR_EDIT_DEADLINE_GRACE_MS =
+    24
+    * 60
+    * 60
+    * 1000;
+
+const OCR_PROGRESS_STALE_MS =
+    24
+    * 60
+    * 60
+    * 1000;
+
+const OCR_PROGRESS_PREFIX =
+    "jobs";
+
+const FAILED_PROGRESS_MAX =
+    97;
+
+/* =========================================================
+   PUBLIC CLEANUP
+   ========================================================= */
 
 export async function cleanupStaleOcrJobs(
     env
@@ -38,39 +57,45 @@ export async function cleanupStaleOcrJobs(
     if (
         !env?.OCR_STORAGE
     ) {
-        console.warn(
-            "[OCR CLEANUP] OCR_STORAGE is not configured."
-        );
-
         return;
     }
 
     const now =
         Date.now();
 
+    await cleanupDurableJobs(
+        env,
+        now
+    );
+
+    await cleanupOrphanedProgress(
+        env,
+        now
+    );
+}
+
+/* =========================================================
+   DURABLE JOB SWEEP
+   ========================================================= */
+
+async function cleanupDurableJobs(
+    env,
+    now
+) {
     let cursor =
         undefined;
 
-    let scannedStatuses =
-        0;
-
-    let timedOutJobs =
-        0;
-
-    let deletedJobs =
-        0;
-
     do {
         const listed =
-            await env.OCR_STORAGE.list(
-                {
-                    prefix:
-                        "ocr-jobs/",
-                    cursor,
-                    limit:
-                        OCR_LIST_LIMIT
-                }
-            );
+            await env.OCR_STORAGE.list({
+                prefix:
+                    "ocr-jobs/",
+
+                cursor,
+
+                limit:
+                    1000
+            });
 
         const statusObjects =
             listed.objects.filter(
@@ -87,32 +112,12 @@ export async function cleanupStaleOcrJobs(
             const object
             of statusObjects
         ) {
-            scannedStatuses +=
-                1;
-
             try {
-                const result =
-                    await cleanupOneOcrJob(
-                        env,
-                        object.key,
-                        now
-                    );
-
-                if (
-                    result ===
-                    "timed_out"
-                ) {
-                    timedOutJobs +=
-                        1;
-                }
-
-                if (
-                    result ===
-                    "deleted"
-                ) {
-                    deletedJobs +=
-                        1;
-                }
+                await cleanupOneOcrJob(
+                    env,
+                    object.key,
+                    now
+                );
             }
             catch (
                 error
@@ -120,12 +125,12 @@ export async function cleanupStaleOcrJobs(
                 console.error(
                     "[OCR CLEANUP] Job cleanup failed.",
                     {
-                        statusKey:
+                        key:
                             object.key,
+
                         message:
-                            String(
-                                error?.message
-                                || error
+                            normalizeErrorMessage(
+                                error
                             )
                     }
                 );
@@ -140,20 +145,11 @@ export async function cleanupStaleOcrJobs(
     } while (
         cursor
     );
-
-    console.log(
-        "[OCR CLEANUP] Sweep complete.",
-        {
-            scannedStatuses,
-            timedOutJobs,
-            deletedJobs
-        }
-    );
 }
 
-// ============================================================
-// ONE JOB
-// ============================================================
+/* =========================================================
+   ONE JOB
+   ========================================================= */
 
 async function cleanupOneOcrJob(
     env,
@@ -168,66 +164,84 @@ async function cleanupOneOcrJob(
     if (
         !statusObject
     ) {
-        return "missing";
+        return;
     }
 
-    const status =
-        await readStatusObject(
-            statusObject
-        );
+    let status;
 
-    if (
-        !status
+    try {
+        status =
+            await statusObject.json();
+    }
+    catch (
+        error
     ) {
-        console.warn(
-            "[OCR CLEANUP] Invalid status object.",
+        await safeWriteOcrDebugTrace(
+            env,
             {
-                statusKey
+                component:
+                    "cleanup",
+
+                event:
+                    "invalid_status_skipped",
+
+                detail: {
+                    version:
+                        CLEANUP_VERSION,
+
+                    statusKey,
+
+                    message:
+                        normalizeErrorMessage(
+                            error
+                        )
+                }
             }
         );
 
-        return "invalid";
+        return;
+    }
+
+    if (
+        !status
+        || typeof status !==
+            "object"
+        || Array.isArray(
+            status
+        )
+    ) {
+        return;
     }
 
     const jobId =
-        normalizeJobId(
-            status.jobId
+        sanitizeJobId(
+            status?.jobId
         );
 
     if (
         !jobId
     ) {
-        console.warn(
-            "[OCR CLEANUP] Invalid jobId in status.",
-            {
-                statusKey
-            }
-        );
-
-        return "invalid";
+        return;
     }
 
-    const expectedStatusKey =
-        `ocr-jobs/${jobId}/status.json`;
+    const baseKey =
+        `ocr-jobs/${jobId}`;
 
-    if (
-        expectedStatusKey !==
-        statusKey
-    ) {
-        console.warn(
-            "[OCR CLEANUP] Status path/jobId mismatch.",
-            {
-                statusKey,
-                expectedStatusKey
-            }
-        );
+    const inputKey =
+        `${baseKey}/input.png`;
 
-        return "invalid";
-    }
+    const requestKey =
+        `${baseKey}/request.json`;
+
+    const resultKey =
+        `${baseKey}/result.json`;
+
+    const progressKey =
+        `${OCR_PROGRESS_PREFIX}/${jobId}.json`;
 
     const normalizedStatus =
         String(
-            status.status
+            status?.status
             || ""
         )
             .trim()
@@ -235,248 +249,629 @@ async function cleanupOneOcrJob(
 
     const createdAt =
         parseTimestamp(
-            status.createdAt
+            status?.createdAt
         );
 
     const heartbeatAt =
         parseTimestamp(
-            status.heartbeatAt
-            || status.updatedAt
-            || status.startedAt
+            status?.heartbeatAt
+            || status?.updatedAt
+            || status?.startedAt
         );
 
     const completedAt =
         parseTimestamp(
-            status.completedAt
-            || status.updatedAt
+            status?.completedAt
+            || status?.updatedAt
         );
 
-    // ========================================================
-    // QUEUE TIMEOUT
-    // ========================================================
+    const editDeadlineAt =
+        parseTimestamp(
+            status?.editDeadlineAt
+        );
+
+    /* =====================================================
+       QUEUED TOO LONG
+       ===================================================== */
 
     if (
         normalizedStatus ===
-        "queued"
+            "queued"
         && Number.isFinite(
             createdAt
         )
         && now - createdAt >=
             OCR_QUEUE_STALE_MS
     ) {
-        await failStaleOcrJob(
+        await failAndTrimOcrJob(
             env,
             statusKey,
             status,
             {
                 stage:
                     "queue_timeout",
+
                 code:
                     "QUEUE_TIMEOUT",
+
                 message:
                     "OCR job expired before processing started."
-            }
+            },
+            inputKey,
+            requestKey,
+            progressKey
         );
 
-        await safeCleanupTrace(
+        await safeWriteOcrDebugTrace(
             env,
             {
                 jobId,
+
                 component:
                     "cleanup",
+
                 event:
                     "queue_timeout",
+
                 detail: {
+                    version:
+                        CLEANUP_VERSION,
+
                     createdAt:
-                        status.createdAt
+                        status?.createdAt
                         || null,
+
                     previousStatus:
-                        normalizedStatus,
-                    previousProgress:
-                        status.progress
-                        ?? null
+                        normalizedStatus
                 }
             }
         );
 
-        return "timed_out";
+        return;
     }
 
-    // ========================================================
-    // PROCESSING TIMEOUT
-    // ========================================================
+    /* =====================================================
+       PROCESSING TOO LONG
+       ===================================================== */
 
     if (
         normalizedStatus ===
-        "processing"
+            "processing"
         && Number.isFinite(
             heartbeatAt
         )
         && now - heartbeatAt >=
             OCR_PROCESSING_STALE_MS
     ) {
-        await failStaleOcrJob(
+        await failAndTrimOcrJob(
             env,
             statusKey,
             status,
             {
                 stage:
                     "processing_timeout",
+
                 code:
                     "PROCESSING_TIMEOUT",
+
                 message:
                     "OCR processing stopped reporting progress."
-            }
+            },
+            inputKey,
+            requestKey,
+            progressKey
         );
 
-        await safeCleanupTrace(
+        await safeWriteOcrDebugTrace(
             env,
             {
                 jobId,
+
                 component:
                     "cleanup",
+
                 event:
                     "processing_timeout",
+
                 detail: {
+                    version:
+                        CLEANUP_VERSION,
+
                     heartbeatAt:
-                        status.heartbeatAt
+                        status?.heartbeatAt
                         || null,
+
                     updatedAt:
-                        status.updatedAt
+                        status?.updatedAt
                         || null,
+
                     previousStage:
-                        status.stage
+                        status?.stage
                         || null,
+
                     previousProgress:
-                        status.progress
+                        status?.progress
                         ?? null
                 }
             }
         );
 
-        return "timed_out";
+        return;
     }
 
-    // ========================================================
-    // TERMINAL RETENTION
-    // ========================================================
+    /* =====================================================
+       COMPLETED EDIT WINDOW EXPIRED
+       ===================================================== */
 
     if (
-        (
-            normalizedStatus ===
-            "failed"
-            || normalizedStatus ===
+        normalizedStatus ===
             "completed"
+        && Number.isFinite(
+            editDeadlineAt
         )
+        && now >=
+            editDeadlineAt
+    ) {
+        status =
+            await sealExpiredEditWindow(
+                env,
+                statusKey,
+                status,
+                now
+            );
+    }
+
+    /* =====================================================
+       FAILED RETENTION
+       ===================================================== */
+
+    if (
+        normalizedStatus ===
+            "failed"
         && Number.isFinite(
             completedAt
         )
         && now - completedAt >=
-            OCR_TERMINAL_RETENTION_MS
+            OCR_FAILED_RETENTION_MS
     ) {
-        await deleteJobArtifacts(
+        await safeWriteOcrDebugTrace(
             env,
-            jobId
-        );
-
-        console.log(
-            "[OCR CLEANUP] Deleted expired terminal job.",
             {
                 jobId,
-                status:
-                    normalizedStatus
+
+                component:
+                    "cleanup",
+
+                event:
+                    "failed_job_deleted",
+
+                detail: {
+                    version:
+                        CLEANUP_VERSION,
+
+                    completedAt:
+                        status?.completedAt
+                        || null
+                }
             }
         );
 
-        return "deleted";
-    }
+        await Promise.all([
+            env.OCR_STORAGE.delete(
+                statusKey
+            ),
 
-    return "unchanged";
-}
+            env.OCR_STORAGE.delete(
+                inputKey
+            ),
 
-// ============================================================
-// STATUS READ
-// ============================================================
+            env.OCR_STORAGE.delete(
+                requestKey
+            ),
 
-async function readStatusObject(
-    object
-) {
-    try {
-        const status =
-            await object.json();
+            env.OCR_STORAGE.delete(
+                resultKey
+            ),
 
-        if (
-            !status
-            || typeof status !==
-                "object"
-            || Array.isArray(
-                status
+            deleteProgressObject(
+                env,
+                progressKey
             )
-        ) {
-            return null;
-        }
+        ]);
 
-        return status;
+        return;
     }
-    catch {
-        return null;
+
+    /* =====================================================
+       COMPLETED RETENTION
+       ===================================================== */
+
+    if (
+        normalizedStatus ===
+            "completed"
+        && shouldDeleteCompletedJob(
+            status,
+            now
+        )
+    ) {
+        await safeWriteOcrDebugTrace(
+            env,
+            {
+                jobId,
+
+                component:
+                    "cleanup",
+
+                event:
+                    "completed_job_trimmed",
+
+                detail: {
+                    version:
+                        CLEANUP_VERSION,
+
+                    completedAt:
+                        status?.completedAt
+                        || null,
+
+                    editDeadlineAt:
+                        status?.editDeadlineAt
+                        || null,
+
+                    resultPreserved:
+                        true
+                }
+            }
+        );
+
+        /*
+         * Preserve:
+         *
+         * ocr-jobs/{jobId}/result.json
+         * match-reports/{matchId}.json
+         *
+         * Those are the immutable evidence and durable
+         * effective match report.
+         */
+        await Promise.all([
+            env.OCR_STORAGE.delete(
+                statusKey
+            ),
+
+            env.OCR_STORAGE.delete(
+                inputKey
+            ),
+
+            env.OCR_STORAGE.delete(
+                requestKey
+            ),
+
+            deleteProgressObject(
+                env,
+                progressKey
+            )
+        ]);
     }
 }
 
-// ============================================================
-// FAIL STALE JOB
-// ============================================================
+/* =========================================================
+   COMPLETED RETENTION POLICY
+   ========================================================= */
 
-async function failStaleOcrJob(
+function shouldDeleteCompletedJob(
+    status,
+    now
+) {
+    const completedAt =
+        parseTimestamp(
+            status?.completedAt
+            || status?.updatedAt
+        );
+
+    if (
+        !Number.isFinite(
+            completedAt
+        )
+    ) {
+        return false;
+    }
+
+    const minimumRetentionUntil =
+        completedAt
+        + OCR_COMPLETED_MIN_RETENTION_MS;
+
+    const editDeadlineAt =
+        parseTimestamp(
+            status?.editDeadlineAt
+        );
+
+    let retentionUntil =
+        minimumRetentionUntil;
+
+    if (
+        Number.isFinite(
+            editDeadlineAt
+        )
+    ) {
+        retentionUntil =
+            Math.max(
+                retentionUntil,
+                editDeadlineAt
+                + OCR_EDIT_DEADLINE_GRACE_MS
+            );
+    }
+
+    return (
+        now >=
+        retentionUntil
+    );
+}
+
+/* =========================================================
+   SEAL EXPIRED EDIT WINDOW
+   ========================================================= */
+
+async function sealExpiredEditWindow(
     env,
     statusKey,
     status,
-    failure
+    now
 ) {
     if (
-        status.status ===
-        "completed"
-        || status.status ===
-        "failed"
+        status?.editWindowOpen ===
+            false
+        && status?.editWindowClosedAt
     ) {
         return status;
     }
 
+    const closedAt =
+        new Date(
+            now
+        )
+            .toISOString();
+
+    const nextStatus = {
+        ...status,
+
+        editWindowOpen:
+            false,
+
+        editWindowClosedAt:
+            status?.editWindowClosedAt
+            || closedAt,
+
+        updatedAt:
+            closedAt
+    };
+
+    await env.OCR_STORAGE.put(
+        statusKey,
+        JSON.stringify(
+            nextStatus,
+            null,
+            2
+        ),
+        {
+            httpMetadata: {
+                contentType:
+                    "application/json"
+            }
+        }
+    );
+
+    await synchronizeExpiredMatchReport(
+        env,
+        nextStatus,
+        closedAt
+    );
+
+    await safeWriteOcrDebugTrace(
+        env,
+        {
+            jobId:
+                nextStatus.jobId,
+
+            component:
+                "cleanup",
+
+            event:
+                "edit_window_closed",
+
+            detail: {
+                version:
+                    CLEANUP_VERSION,
+
+                matchId:
+                    nextStatus?.matchId
+                    || null,
+
+                editDeadlineAt:
+                    nextStatus
+                        ?.editDeadlineAt
+                    || null,
+
+                editWindowClosedAt:
+                    closedAt,
+
+                confirmationStatus:
+                    nextStatus
+                        ?.confirmationStatus
+                    || null,
+
+                requiresPlayerReview:
+                    nextStatus
+                        ?.requiresPlayerReview ===
+                    true
+            }
+        }
+    );
+
+    return nextStatus;
+}
+
+/* =========================================================
+   MATCH REPORT DEADLINE SYNC
+   ========================================================= */
+
+async function synchronizeExpiredMatchReport(
+    env,
+    status,
+    closedAt
+) {
+    const matchId =
+        sanitizeMatchId(
+            status?.matchId
+        );
+
+    if (
+        !matchId
+    ) {
+        return;
+    }
+
+    const reportKey =
+        `match-reports/${matchId}.json`;
+
+    const reportObject =
+        await env.OCR_STORAGE.get(
+            reportKey
+        );
+
+    if (
+        !reportObject
+    ) {
+        return;
+    }
+
+    let report;
+
+    try {
+        report =
+            await reportObject.json();
+    }
+    catch {
+        return;
+    }
+
+    if (
+        !report
+        || typeof report !==
+            "object"
+        || Array.isArray(
+            report
+        )
+    ) {
+        return;
+    }
+
+    if (
+        report?.editWindowOpen ===
+            false
+        && report?.editWindowClosedAt
+    ) {
+        return;
+    }
+
+    const nextReport = {
+        ...report,
+
+        editWindowOpen:
+            false,
+
+        editWindowClosedAt:
+            report?.editWindowClosedAt
+            || closedAt
+    };
+
+    await env.OCR_STORAGE.put(
+        reportKey,
+        JSON.stringify(
+            nextReport,
+            null,
+            2
+        ),
+        {
+            httpMetadata: {
+                contentType:
+                    "application/json"
+            }
+        }
+    );
+}
+
+/* =========================================================
+   FAIL + TRIM
+   ========================================================= */
+
+async function failAndTrimOcrJob(
+    env,
+    statusKey,
+    status,
+    failure,
+    inputKey,
+    requestKey,
+    progressKey
+) {
     const now =
         new Date()
             .toISOString();
 
-    const progress =
+    const currentProgress =
         normalizeProgress(
-            status.progress
+            status?.progress
         );
-
-    const summary =
-        `[${failure.code}] ${failure.message}`;
 
     const nextStatus = {
         ...status,
+
         status:
             "failed",
+
         stage:
             failure.stage,
-        progress,
+
+        progress:
+            Math.min(
+                FAILED_PROGRESS_MAX,
+                currentProgress
+            ),
+
+        progressSource:
+            "worker",
+
         message:
-            "The scoreboard reader hit a bump.",
-        failureSummary:
-            summary,
+            failure.message,
+
+        requiresPlayerReview:
+            false,
+
+        reviewRequired:
+            false,
+
+        confirmationStatus:
+            null,
+
+        editDeadlineAt:
+            null,
+
+        editWindowOpen:
+            false,
+
         updatedAt:
             now,
+
         completedAt:
             now,
+
         heartbeatAt:
             now,
+
         error: {
             code:
                 failure.code,
+
             message:
-                failure.message,
-            summary
+                failure.message
         }
     };
 
@@ -495,56 +890,79 @@ async function failStaleOcrJob(
         }
     );
 
-    return nextStatus;
+    await Promise.all([
+        env.OCR_STORAGE.delete(
+            inputKey
+        ),
+
+        env.OCR_STORAGE.delete(
+            requestKey
+        ),
+
+        deleteProgressObject(
+            env,
+            progressKey
+        )
+    ]);
 }
 
-// ============================================================
-// TERMINAL ARTIFACT DELETION
-// ============================================================
+/* =========================================================
+   ORPHANED TEMPORARY PROGRESS
+   ========================================================= */
 
-async function deleteJobArtifacts(
+async function cleanupOrphanedProgress(
     env,
-    jobId
+    now
 ) {
-    await deletePrefix(
-        env.OCR_STORAGE,
-        `ocr-jobs/${jobId}/`
-    );
-
-    await deletePrefix(
-        env.OCR_STORAGE,
-        `debug/${jobId}/`
-    );
-}
-
-async function deletePrefix(
-    bucket,
-    prefix
-) {
-    const keys =
-        [];
+    if (
+        !env?.OCR_PROGRESS
+    ) {
+        return;
+    }
 
     let cursor =
         undefined;
 
     do {
         const listed =
-            await bucket.list(
-                {
-                    prefix,
-                    cursor,
-                    limit:
-                        OCR_LIST_LIMIT
-                }
-            );
+            await env.OCR_PROGRESS.list({
+                prefix:
+                    `${OCR_PROGRESS_PREFIX}/`,
+
+                cursor,
+
+                limit:
+                    1000
+            });
 
         for (
             const object
             of listed.objects
         ) {
-            keys.push(
-                object.key
-            );
+            try {
+                await cleanupOneProgressObject(
+                    env,
+                    object,
+                    now
+                );
+            }
+            catch (
+                error
+            ) {
+                console.warn(
+                    "[OCR CLEANUP] Progress sweep failed.",
+                    {
+                        key:
+                            object?.key
+                            || null,
+
+                        message:
+                            normalizeErrorMessage(
+                                error
+                            )
+                    }
+                );
+            }
         }
 
         cursor =
@@ -555,64 +973,167 @@ async function deletePrefix(
     } while (
         cursor
     );
-
-    for (
-        let index = 0;
-        index < keys.length;
-        index += OCR_LIST_LIMIT
-    ) {
-        const chunk =
-            keys.slice(
-                index,
-                index
-                + OCR_LIST_LIMIT
-            );
-
-        if (
-            chunk.length
-        ) {
-            await bucket.delete(
-                chunk
-            );
-        }
-    }
 }
 
-// ============================================================
-// DEBUG
-// ============================================================
+/* =========================================================
+   ONE TEMPORARY PROGRESS OBJECT
+   ========================================================= */
 
-async function safeCleanupTrace(
+async function cleanupOneProgressObject(
     env,
-    trace
+    object,
+    now
 ) {
+    const progressKey =
+        String(
+            object?.key
+            || ""
+        )
+            .trim();
+
+    const jobId =
+        extractProgressJobId(
+            progressKey
+        );
+
+    if (
+        !jobId
+    ) {
+        return;
+    }
+
+    const durableStatus =
+        await env.OCR_STORAGE.get(
+            `ocr-jobs/${jobId}/status.json`
+        );
+
+    if (
+        durableStatus
+    ) {
+        return;
+    }
+
+    const uploadedAt =
+        parseTimestamp(
+            object?.uploaded
+        );
+
+    /*
+     * If R2 returned no usable upload timestamp, do not
+     * aggressively delete the object.
+     */
+    if (
+        !Number.isFinite(
+            uploadedAt
+        )
+    ) {
+        return;
+    }
+
+    if (
+        now - uploadedAt <
+            OCR_PROGRESS_STALE_MS
+    ) {
+        return;
+    }
+
+    await deleteProgressObject(
+        env,
+        progressKey
+    );
+
+    await safeWriteOcrDebugTrace(
+        env,
+        {
+            jobId,
+
+            component:
+                "cleanup",
+
+            event:
+                "orphan_progress_deleted",
+
+            detail: {
+                version:
+                    CLEANUP_VERSION,
+
+                progressKey,
+
+                uploadedAt:
+                    new Date(
+                        uploadedAt
+                    )
+                        .toISOString()
+            }
+        }
+    );
+}
+
+/* =========================================================
+   PROGRESS CLEANUP
+   ========================================================= */
+
+async function deleteProgressObject(
+    env,
+    progressKey
+) {
+    if (
+        !env?.OCR_PROGRESS
+        || !progressKey
+    ) {
+        return;
+    }
+
     try {
-        await writeOcrDebugTrace(
-            env,
-            trace
+        await env.OCR_PROGRESS.delete(
+            progressKey
         );
     }
     catch (
         error
     ) {
         console.warn(
-            "[OCR CLEANUP] Debug trace failed.",
+            "[OCR CLEANUP] Could not delete temporary progress.",
             {
+                progressKey,
+
                 message:
-                    String(
-                        error?.message
-                        || error
+                    normalizeErrorMessage(
+                        error
                     )
             }
         );
     }
 }
 
-// ============================================================
-// HELPERS
-// ============================================================
+/* =========================================================
+   PROGRESS JOB ID
+   ========================================================= */
 
-function normalizeJobId(
+function extractProgressJobId(
+    progressKey
+) {
+    const match =
+        /^jobs\/([A-Z0-9]{16})\.json$/i.exec(
+            progressKey
+        );
+
+    if (
+        !match
+    ) {
+        return "";
+    }
+
+    return sanitizeJobId(
+        match[1]
+    );
+}
+
+/* =========================================================
+   JOB ID
+   ========================================================= */
+
+function sanitizeJobId(
     value
 ) {
     const jobId =
@@ -629,6 +1150,32 @@ function normalizeJobId(
         ? jobId
         : "";
 }
+
+/* =========================================================
+   MATCH ID
+   ========================================================= */
+
+function sanitizeMatchId(
+    value
+) {
+    const matchId =
+        String(
+            value
+            || ""
+        )
+            .trim()
+            .toUpperCase();
+
+    return /^[A-Z0-9]{16}$/.test(
+        matchId
+    )
+        ? matchId
+        : "";
+}
+
+/* =========================================================
+   PROGRESS NORMALIZATION
+   ========================================================= */
 
 function normalizeProgress(
     value
@@ -657,13 +1204,93 @@ function normalizeProgress(
     );
 }
 
+/* =========================================================
+   TIMESTAMP
+   ========================================================= */
+
 function parseTimestamp(
     value
 ) {
-    return Date.parse(
-        String(
-            value
-            || ""
+    if (
+        value instanceof Date
+    ) {
+        const timestamp =
+            value.getTime();
+
+        return Number.isFinite(
+            timestamp
         )
-    );
+            ? timestamp
+            : NaN;
+    }
+
+    const timestamp =
+        Date.parse(
+            String(
+                value
+                || ""
+            )
+        );
+
+    return timestamp;
+}
+
+/* =========================================================
+   ERROR
+   ========================================================= */
+
+function normalizeErrorMessage(
+    error
+) {
+    return String(
+        error?.message
+        || error
+        || "Unknown cleanup error."
+    )
+        .replace(
+            /\s+/g,
+            " "
+        )
+        .trim()
+        .slice(
+            0,
+            1000
+        );
+}
+
+/* =========================================================
+   NON-BLOCKING DEBUG SAFETY
+   ========================================================= */
+
+async function safeWriteOcrDebugTrace(
+    env,
+    trace
+) {
+    try {
+        await writeOcrDebugTrace(
+            env,
+            trace
+        );
+    }
+    catch (
+        error
+    ) {
+        console.warn(
+            "[OCR CLEANUP] Debug trace failed.",
+            {
+                jobId:
+                    trace?.jobId
+                    || null,
+
+                event:
+                    trace?.event
+                    || null,
+
+                message:
+                    normalizeErrorMessage(
+                        error
+                    )
+            }
+        );
+    }
 }

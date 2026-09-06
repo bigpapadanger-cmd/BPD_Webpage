@@ -1,4 +1,3 @@
-
 "use strict";
 
 // ============================================================
@@ -54,6 +53,21 @@ export async function onRequestGet(
                     success: false,
                     message:
                         "OCR storage is not configured.",
+                    version:
+                        GET_JOB_VERSION
+                },
+                503
+            );
+        }
+
+        if (
+            !env.OCR_PROGRESS
+        ) {
+            return jsonResponse(
+                {
+                    success: false,
+                    message:
+                        "OCR progress storage is not configured.",
                     version:
                         GET_JOB_VERSION
                 },
@@ -161,6 +175,7 @@ export async function onRequestGet(
                 400
             );
         }
+
         const baseKey =
             `ocr-jobs/${jobId}`;
 
@@ -345,6 +360,7 @@ export async function onRequestGet(
                 )
                     .trim();
         }
+
         if (
             !submittedBy
         ) {
@@ -383,6 +399,17 @@ export async function onRequestGet(
         }
 
         // ====================================================
+        // MERGE TEMPORARY CLOUD OCR PROGRESS
+        // ====================================================
+
+        const responseStatusData =
+            await mergeCloudProgress(
+                env,
+                jobId,
+                statusData
+            );
+
+        // ====================================================
         // RESPONSE
         // ====================================================
 
@@ -393,7 +420,7 @@ export async function onRequestGet(
                     GET_JOB_VERSION,
                 job:
                     sanitizeJobResponse(
-                        statusData
+                        responseStatusData
                     )
             },
             200
@@ -435,7 +462,8 @@ async function readStoredJson(
 
         if (
             !data
-            || typeof data !== "object"
+            || typeof data !==
+                "object"
             || Array.isArray(
                 data
             )
@@ -451,30 +479,129 @@ async function readStoredJson(
 }
 
 // ============================================================
-// SAFE JOB RESPONSE
+// TEMPORARY CLOUD OCR PROGRESS
 // ============================================================
-function normalizeRuntimeSeconds(
-    value
+
+async function mergeCloudProgress(
+    env,
+    jobId,
+    statusData
 ) {
-    const seconds =
-        Number(
-            value
+    const status =
+        normalizeStatus(
+            statusData?.status
         );
 
     if (
-        !Number.isFinite(
-            seconds
-        )
-        || seconds < 0
+        status === "completed"
+        || status === "failed"
     ) {
-        return null;
+        return statusData;
     }
 
-    return Math.round(
-        seconds
-        * 10000
-    ) / 10000;
+    let progressObject;
+
+    try {
+        progressObject =
+            await env.OCR_PROGRESS.get(
+                `jobs/${jobId}.json`
+            );
+    }
+    catch (
+        error
+    ) {
+        console.warn(
+            `[OCR GET JOB] Progress read failed for ${jobId}.`,
+            error
+        );
+
+        return statusData;
+    }
+
+    if (
+        !progressObject
+    ) {
+        return statusData;
+    }
+
+    const cloudProgress =
+        await readStoredJson(
+            progressObject
+        );
+
+    if (
+        !cloudProgress
+        || sanitizeJobId(
+            cloudProgress.jobId
+        ) !== jobId
+    ) {
+        return statusData;
+    }
+
+    const storedProgress =
+        normalizeProgress(
+            statusData?.progress
+        );
+
+    const providerProgress =
+        Math.min(
+            97,
+            normalizeProgress(
+                cloudProgress?.progress
+            )
+        );
+
+    const progress =
+        Math.max(
+            storedProgress,
+            providerProgress
+        );
+
+    const useProvider =
+        providerProgress >=
+            storedProgress;
+
+    return {
+        ...statusData,
+        status:
+            "processing",
+        stage:
+            useProvider
+                ? cloudProgress.stage
+                : statusData.stage,
+        progress,
+        message:
+            useProvider
+                ? cloudProgress.message
+                : statusData.message,
+        updatedAt:
+            useProvider
+                ? (
+                    cloudProgress.updatedAt
+                    || statusData.updatedAt
+                )
+                : statusData.updatedAt,
+        heartbeatAt:
+            useProvider
+                ? (
+                    cloudProgress.updatedAt
+                    || statusData.heartbeatAt
+                )
+                : statusData.heartbeatAt,
+        work:
+            useProvider
+                ? cloudProgress.work
+                : statusData.work,
+        progressSource:
+            useProvider
+                ? "cloud_run"
+                : "worker"
+    };
 }
+
+// ============================================================
+// SAFE JOB RESPONSE
+// ============================================================
 
 function sanitizeJobResponse(
     statusData
@@ -542,19 +669,207 @@ function sanitizeJobResponse(
                 statusData?.heartbeatAt
             ),
 
+        progressSource:
+            normalizeProgressSource(
+                statusData?.progressSource,
+                status
+            ),
+
+        work:
+            sanitizeWork(
+                statusData?.work
+            ),
+
+        reviewRequired:
+            statusData?.reviewRequired ===
+                true
+            || statusData?.requiresPlayerReview ===
+                true
+            || normalizeConfirmationStatus(
+                statusData?.confirmationStatus
+            ) === "pending_review",
+
+        confirmationStatus:
+            normalizeConfirmationStatus(
+                statusData?.confirmationStatus
+            ),
+
+        error:
+            status === "failed"
+                ? sanitizeError(
+                    statusData?.error
+                )
+                : null,
+
         matchId:
             status === "completed"
                 ? sanitizeMatchId(
                     statusData?.matchId
                 )
-                : null,
-
-        cloudRuntimeSeconds:
-            status === "completed"
-                ? normalizeRuntimeSeconds(
-                    statusData?.cloudRuntimeSeconds
-                )
                 : null
+    };
+}
+
+// ============================================================
+// PROGRESS DETAILS
+// ============================================================
+
+function normalizeProgressSource(
+    value,
+    status
+) {
+    if (
+        status === "completed"
+        || status === "failed"
+    ) {
+        return "stored";
+    }
+
+    const source =
+        String(
+            value
+            || "stored"
+        )
+            .trim()
+            .toLowerCase();
+
+    return [
+        "stored",
+        "worker",
+        "cloud_run"
+    ].includes(
+        source
+    )
+        ? source
+        : "stored";
+}
+
+function sanitizeWork(
+    work
+) {
+    if (
+        !work
+        || typeof work !==
+            "object"
+        || Array.isArray(
+            work
+        )
+    ) {
+        return null;
+    }
+
+    const allowedKeys = [
+        "totalFields",
+        "totalUnits",
+        "completedUnits",
+        "completedFields",
+        "successfulFields",
+        "reviewFields",
+        "warningFields",
+        "failedFields",
+        "inputBytes"
+    ];
+
+    const safe = {};
+
+    for (
+        const key
+        of allowedKeys
+    ) {
+        const numeric =
+            Number(
+                work[key]
+            );
+
+        if (
+            !Number.isFinite(
+                numeric
+            )
+            || numeric < 0
+        ) {
+            continue;
+        }
+
+        safe[key] =
+            Math.round(
+                numeric
+            );
+    }
+
+    return Object.keys(
+        safe
+    ).length > 0
+        ? safe
+        : null;
+}
+
+function normalizeConfirmationStatus(
+    value
+) {
+    const status =
+        String(
+            value
+            || ""
+        )
+            .trim()
+            .toLowerCase();
+
+    return [
+        "pending_review",
+        "auto_accepted",
+        "confirmed",
+        "confirmed_with_disputes"
+    ].includes(
+        status
+    )
+        ? status
+        : null;
+}
+
+function sanitizeError(
+    error
+) {
+    if (
+        !error
+        || typeof error !==
+            "object"
+        || Array.isArray(
+            error
+        )
+    ) {
+        return null;
+    }
+
+    const code =
+        String(
+            error.code
+            || "OCR_FAILED"
+        )
+            .trim()
+            .toUpperCase()
+            .slice(
+                0,
+                80
+            );
+
+    const message =
+        String(
+            error.message
+            || "The image could not be processed."
+        )
+            .replace(
+                /\s+/g,
+                " "
+            )
+            .trim()
+            .slice(
+                0,
+                MAX_MESSAGE_LENGTH
+            );
+
+    return {
+        code,
+        message
     };
 }
 
@@ -947,4 +1262,3 @@ function jsonResponse(
         }
     );
 }
-

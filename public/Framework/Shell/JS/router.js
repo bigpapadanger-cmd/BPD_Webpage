@@ -1,12 +1,17 @@
 import {
     ROUTES,
-    HEADER_MAP
+    HEADER_MAP,
+    getMasterCssForRoute
 } from "/routes.js";
 
 import {
     initializeOcrNotifications,
     checkActiveOcrSubmission
 } from "./ocr_notifications.js";
+
+import {
+    initializeOcrResults
+} from "./ocr_results.js";
 
 import {
     loadSidebarHover,
@@ -28,6 +33,12 @@ import {
 import {
     APP_ASSET_ID
 } from "/scripts/cacheHandler.js";
+
+/* =========================================================
+   BPD GAMING NETWORK
+   SPA ROUTER
+   ========================================================= */
+
 const DEFAULT_ROUTE =
     "/";
 
@@ -37,26 +48,17 @@ const ERROR_ROUTE =
 const AUTH_FALLBACK_ROUTE =
     "/RocketLeague";
 
+const MASTER_CSS_LINK_ID =
+    "bpdMasterCss";
+
 let navigationId =
     0;
 
-/* =========================================================
-   SHARED OCR API BRIDGE
-
-   Route-owned OCR scripts are currently classic scripts.
-
-   They cannot directly import ES modules, so the router exposes
-   only the API dependencies they need through this object.
-
-   Browser URL:
-       /scripts/...
-
-   Filesystem:
-       /public/scripts/...
-   ========================================================= */
+let globalOcrInitialized =
+    false;
 
 /* =========================================================
-   INITIAL SIDEBAR LAYOUT
+   INITIAL SHELL STATE
    ========================================================= */
 
 function applyInitialSidebarLayoutState() {
@@ -98,13 +100,29 @@ function applyInitialSidebarLayoutState() {
             : "open";
 }
 
-applyInitialSidebarLayoutState();
-
 /* =========================================================
-   OCR GLOBAL NOTIFICATIONS
+   GLOBAL OCR
    ========================================================= */
 
-function initializeGlobalOcrNotifications() {
+function initializeGlobalOcr() {
+    if (
+        globalOcrInitialized
+    ) {
+        return;
+    }
+
+    try {
+        initializeOcrResults();
+    }
+    catch (
+        error
+    ) {
+        console.error(
+            "ROUTER: OCR result initialization failed.",
+            error
+        );
+    }
+
     try {
         initializeOcrNotifications();
     }
@@ -116,6 +134,9 @@ function initializeGlobalOcrNotifications() {
             error
         );
     }
+
+    globalOcrInitialized =
+        true;
 }
 
 async function checkGlobalOcrSubmission() {
@@ -145,19 +166,17 @@ function normalizePath(
         pathname =
             new URL(
                 String(
-                    path ||
-                    "/"
+                    path
+                    || "/"
                 ),
                 window.location.origin
             ).pathname;
     }
-    catch (
-        error
-    ) {
+    catch {
         pathname =
             String(
-                path ||
-                "/"
+                path
+                || "/"
             );
     }
 
@@ -170,13 +189,13 @@ function normalizePath(
         )
     ) {
         pathname =
-            "/" +
-            pathname;
+            "/"
+            + pathname;
     }
 
-    if (
-        pathname.length > 1 &&
-        pathname.endsWith(
+    while (
+        pathname.length > 1
+        && pathname.endsWith(
             "/"
         )
     ) {
@@ -194,7 +213,10 @@ function normalizePath(
         return "/";
     }
 
-    return pathname;
+    return (
+        pathname
+        || "/"
+    );
 }
 
 function normalizeDestination(
@@ -203,21 +225,18 @@ function normalizeDestination(
     const url =
         new URL(
             String(
-                destination ||
-                "/"
+                destination
+                || "/"
             ),
             window.location.origin
         );
 
-    const pathname =
+    return (
         normalizePath(
             url.pathname
-        );
-
-    return (
-        pathname +
-        url.search +
-        url.hash
+        )
+        + url.search
+        + url.hash
     );
 }
 
@@ -225,72 +244,71 @@ function normalizeDestination(
    ROUTE RESOLUTION
    ========================================================= */
 
+function routeExists(
+    path
+) {
+    return Object.prototype
+        .hasOwnProperty
+        .call(
+            ROUTES,
+            normalizePath(
+                path
+            )
+        );
+}
+
 function resolveRoute(
     path
 ) {
-    const normalizedPath =
+    const requestedPath =
         normalizePath(
             path
         );
 
     if (
-        Object.prototype.hasOwnProperty.call(
-            ROUTES,
-            normalizedPath
+        routeExists(
+            requestedPath
         )
     ) {
         return {
-            requestedPath:
-                normalizedPath,
-
+            requestedPath,
             routePath:
-                normalizedPath,
-
+                requestedPath,
             config:
                 ROUTES[
-                    normalizedPath
+                    requestedPath
                 ],
-
             found:
                 true
         };
     }
 
     if (
-        Object.prototype.hasOwnProperty.call(
-            ROUTES,
+        routeExists(
             ERROR_ROUTE
         )
     ) {
         return {
-            requestedPath:
-                normalizedPath,
-
+            requestedPath,
             routePath:
                 ERROR_ROUTE,
-
             config:
                 ROUTES[
                     ERROR_ROUTE
                 ],
-
             found:
                 false
         };
     }
 
     return {
-        requestedPath:
-            normalizedPath,
-
+        requestedPath,
         routePath:
             DEFAULT_ROUTE,
-
         config:
             ROUTES[
                 DEFAULT_ROUTE
             ],
-
         found:
             false
     };
@@ -307,10 +325,12 @@ function findInheritedMapValue(
         );
 
     if (
-        Object.prototype.hasOwnProperty.call(
-            map,
-            normalizedPath
-        )
+        Object.prototype
+            .hasOwnProperty
+            .call(
+                map,
+                normalizedPath
+            )
     ) {
         return map[
             normalizedPath
@@ -332,10 +352,10 @@ function findInheritedMapValue(
 
                     return (
                         normalizedRoute !==
-                            "/" &&
-                        normalizedPath.startsWith(
-                            normalizedRoute +
                             "/"
+                        && normalizedPath.startsWith(
+                            normalizedRoute
+                            + "/"
                         )
                     );
                 }
@@ -346,14 +366,14 @@ function findInheritedMapValue(
                     secondRoute
                 ) {
                     return (
-                        secondRoute.length -
-                        firstRoute.length
+                        secondRoute.length
+                        - firstRoute.length
                     );
                 }
             );
 
     if (
-        matchingRoutes.length > 0
+        matchingRoutes.length
     ) {
         return map[
             matchingRoutes[
@@ -363,10 +383,12 @@ function findInheritedMapValue(
     }
 
     if (
-        Object.prototype.hasOwnProperty.call(
-            map,
-            DEFAULT_ROUTE
-        )
+        Object.prototype
+            .hasOwnProperty
+            .call(
+                map,
+                DEFAULT_ROUTE
+            )
     ) {
         return map[
             DEFAULT_ROUTE
@@ -374,6 +396,257 @@ function findInheritedMapValue(
     }
 
     return fallbackValue;
+}
+
+/* =========================================================
+   MASTER CSS
+   ========================================================= */
+
+function normalizeCssPath(
+    value
+) {
+    try {
+        return new URL(
+            String(
+                value
+                || ""
+            ),
+            window.location.origin
+        ).pathname;
+    }
+    catch {
+        return String(
+            value
+            || ""
+        )
+            .trim();
+    }
+}
+
+function createAssetUrl(
+    path
+) {
+    const url =
+        new URL(
+            path,
+            window.location.origin
+        );
+
+    if (
+        APP_ASSET_ID
+    ) {
+        url.searchParams.set(
+            "v",
+            APP_ASSET_ID
+        );
+    }
+
+    return url.href;
+}
+
+function getCurrentMasterCssLink() {
+    return document.getElementById(
+        MASTER_CSS_LINK_ID
+    );
+}
+
+function createPendingStylesheet(
+    href
+) {
+    return new Promise(
+        function(
+            resolve,
+            reject
+        ) {
+            const link =
+                document.createElement(
+                    "link"
+                );
+
+            link.rel =
+                "stylesheet";
+
+            link.href =
+                href;
+
+            link.dataset.masterCss =
+                "pending";
+
+            link.addEventListener(
+                "load",
+                function() {
+                    resolve(
+                        link
+                    );
+                },
+                {
+                    once:
+                        true
+                }
+            );
+
+            link.addEventListener(
+                "error",
+                function() {
+                    link.remove();
+
+                    reject(
+                        new Error(
+                            "Master stylesheet failed to load: "
+                            + href
+                        )
+                    );
+                },
+                {
+                    once:
+                        true
+                }
+            );
+
+            document.head.appendChild(
+                link
+            );
+        }
+    );
+}
+
+async function applyMasterCss(
+    routePath,
+    currentNavigationId
+) {
+    let desiredCss =
+        getMasterCssForRoute(
+            routePath
+        );
+
+    let desiredPath =
+        normalizeCssPath(
+            desiredCss
+        );
+
+    const currentLink =
+        getCurrentMasterCssLink();
+
+    const currentPath =
+        normalizeCssPath(
+            currentLink?.href
+            || ""
+        );
+
+    if (
+        currentLink
+        && currentPath ===
+            desiredPath
+    ) {
+        document.body.dataset.masterCss =
+            desiredPath;
+
+        return;
+    }
+
+    let nextLink;
+
+    try {
+        nextLink =
+            await createPendingStylesheet(
+                createAssetUrl(
+                    desiredCss
+                )
+            );
+    }
+    catch (
+        error
+    ) {
+        const fallbackCss =
+            getMasterCssForRoute(
+                ERROR_ROUTE
+            );
+
+        const fallbackPath =
+            normalizeCssPath(
+                fallbackCss
+            );
+
+        console.warn(
+            "ROUTER: Master CSS failed to load.",
+            {
+                routePath,
+                desiredCss,
+                fallbackCss,
+                error
+            }
+        );
+
+        if (
+            desiredPath ===
+            fallbackPath
+        ) {
+            throw error;
+        }
+
+        const existingLink =
+            getCurrentMasterCssLink();
+
+        const existingPath =
+            normalizeCssPath(
+                existingLink?.href
+                || ""
+            );
+
+        if (
+            existingLink
+            && existingPath ===
+                fallbackPath
+        ) {
+            document.body.dataset.masterCss =
+                fallbackPath;
+
+            return;
+        }
+
+        desiredCss =
+            fallbackCss;
+
+        desiredPath =
+            fallbackPath;
+
+        nextLink =
+            await createPendingStylesheet(
+                createAssetUrl(
+                    fallbackCss
+                )
+            );
+    }
+
+    if (
+        !isCurrentNavigation(
+            currentNavigationId
+        )
+    ) {
+        nextLink.remove();
+
+        return;
+    }
+
+    const previousLink =
+        getCurrentMasterCssLink();
+
+    if (
+        previousLink
+        && previousLink !==
+            nextLink
+    ) {
+        previousLink.remove();
+    }
+
+    nextLink.id =
+        MASTER_CSS_LINK_ID;
+
+    nextLink.dataset.masterCss =
+        "active";
+
+    document.body.dataset.masterCss =
+        desiredPath;
 }
 
 /* =========================================================
@@ -407,8 +680,8 @@ function getRoutingDestination(
     }
 
     const destination =
-        control.dataset.route ||
-        control.getAttribute(
+        control.dataset.route
+        || control.getAttribute(
             "href"
         );
 
@@ -451,19 +724,20 @@ async function handleRoutingButtonPressed(
     }
 
     if (
-        event.defaultPrevented ||
-        event.button !== 0 ||
-        event.ctrlKey ||
-        event.metaKey ||
-        event.shiftKey ||
-        event.altKey ||
-        control.hasAttribute(
+        event.defaultPrevented
+        || event.button !==
+            0
+        || event.ctrlKey
+        || event.metaKey
+        || event.shiftKey
+        || event.altKey
+        || control.hasAttribute(
             "download"
-        ) ||
-        control.target ===
-            "_blank" ||
-        control.disabled ||
-        control.classList.contains(
+        )
+        || control.target ===
+            "_blank"
+        || control.disabled
+        || control.classList.contains(
             "disabled"
         )
     ) {
@@ -487,11 +761,6 @@ async function handleRoutingButtonPressed(
         testRoute(
             destination
         );
-
-    console.info(
-        "ROUTER: Navigation button pressed.",
-        routeTest
-    );
 
     document.dispatchEvent(
         new CustomEvent(
@@ -546,33 +815,38 @@ export function testRoute(
 
         title:
             route.config
-                ?.title ||
-            null,
+                ?.title
+            || null,
 
         body:
             route.config
-                ?.body ||
-            null,
+                ?.body
+            || null,
 
         header:
             route.config
-                ?.header ||
-            null,
+                ?.header
+            || null,
 
         sidebar:
             route.config
-                ?.sidebar ||
-            null,
+                ?.sidebar
+            || null,
 
         footer:
             route.config
-                ?.footer ||
-            null,
+                ?.footer
+            || null,
 
         module:
             route.config
-                ?.module ||
-            null
+                ?.module
+            || null,
+
+        masterCss:
+            getMasterCssForRoute(
+                route.routePath
+            )
     };
 
     console.table(
@@ -598,10 +872,7 @@ export async function testRouteNavigation(
 }
 
 /* =========================================================
-   STATIC HTML LOADING
-
-   Static page fragments intentionally use native fetch().
-   API calls use apiFetch().
+   STATIC HTML
    ========================================================= */
 
 async function fetchHTML(
@@ -635,12 +906,12 @@ async function fetchHTML(
         !response.ok
     ) {
         throw new Error(
-            label +
-            " failed to load: " +
-            response.status +
-            " (" +
-            file +
-            ")"
+            label
+            + " failed to load: "
+            + response.status
+            + " ("
+            + file
+            + ")"
         );
     }
 
@@ -648,19 +919,7 @@ async function fetchHTML(
 }
 
 /* =========================================================
-   ROUTE-DECLARED CLASSIC SCRIPTS
-
-   Route HTML may contain:
-
-   <script
-       data-route-script
-       src="/ocr/JS/example.js">
-   </script>
-
-   Scripts inserted through innerHTML do not execute
-   automatically, so the router recreates them here.
-
-   Scripts are loaded sequentially in their HTML order.
+   ROUTE CLASSIC SCRIPTS
    ========================================================= */
 
 function isRouteScriptLoaded(
@@ -692,8 +951,8 @@ function loadRouteScript(
         ) {
             const src =
                 String(
-                    placeholder.src ||
-                    ""
+                    placeholder.src
+                    || ""
                 )
                     .trim();
 
@@ -701,9 +960,7 @@ function loadRouteScript(
                 !src
             ) {
                 placeholder.remove();
-
                 resolve();
-
                 return;
             }
 
@@ -713,9 +970,7 @@ function loadRouteScript(
                 )
             ) {
                 placeholder.remove();
-
                 resolve();
-
                 return;
             }
 
@@ -730,15 +985,13 @@ function loadRouteScript(
             script.async =
                 false;
 
-            script.dataset
-                .loadedRouteScript =
+            script.dataset.loadedRouteScript =
                 src;
 
             script.addEventListener(
                 "load",
                 function() {
                     placeholder.remove();
-
                     resolve();
                 },
                 {
@@ -751,13 +1004,12 @@ function loadRouteScript(
                 "error",
                 function() {
                     script.remove();
-
                     placeholder.remove();
 
                     reject(
                         new Error(
-                            "Failed to load route script: " +
-                            src
+                            "Failed to load route script: "
+                            + src
                         )
                     );
                 },
@@ -808,8 +1060,8 @@ async function loadRouterAuthSession() {
     let result;
 
     if (
-        window.BPDAuth &&
-        typeof window.BPDAuth
+        window.BPDAuth
+        && typeof window.BPDAuth
             .getSession ===
             "function"
     ) {
@@ -864,14 +1116,13 @@ async function loadRouterAuthSession() {
         ...result,
 
         authenticated:
-            result
-                ?.authenticated ===
+            result?.authenticated ===
             true,
 
         user:
-            result?.user ||
-            result?.sessionData ||
-            null
+            result?.user
+            || result?.sessionData
+            || null
     };
 }
 
@@ -885,10 +1136,8 @@ async function enforceRouteAuthentication(
     ) {
         return {
             route,
-
             authSession:
                 null,
-
             redirected:
                 false
         };
@@ -904,7 +1153,7 @@ async function enforceRouteAuthentication(
         error
     ) {
         console.warn(
-            "ROUTER: Unable to verify authentication.",
+            "ROUTER: Authentication check failed.",
             error
         );
 
@@ -918,30 +1167,22 @@ async function enforceRouteAuthentication(
     }
 
     if (
-        authSession
-            ?.authenticated ===
+        authSession.authenticated ===
         true
     ) {
         return {
             route,
-
             authSession,
-
             redirected:
                 false
         };
     }
 
-    const requestedPath =
-        route.requestedPath;
-
     const fallbackUrl =
-        (
-            AUTH_FALLBACK_ROUTE +
-            "?returnTo=" +
-            encodeURIComponent(
-                requestedPath
-            )
+        AUTH_FALLBACK_ROUTE
+        + "?returnTo="
+        + encodeURIComponent(
+            route.requestedPath
         );
 
     window.history.replaceState(
@@ -955,7 +1196,8 @@ async function enforceRouteAuthentication(
             "bpd:route-auth-denied",
             {
                 detail: {
-                    requestedPath,
+                    requestedPath:
+                        route.requestedPath,
 
                     fallbackPath:
                         AUTH_FALLBACK_ROUTE
@@ -992,14 +1234,12 @@ function dispatchAuthState(
             {
                 detail: {
                     authenticated:
-                        authSession
-                            ?.authenticated ===
+                        authSession.authenticated ===
                         true,
 
                     user:
-                        authSession
-                            ?.user ||
-                        null
+                        authSession.user
+                        || null
                 }
             }
         )
@@ -1046,7 +1286,7 @@ function setHeaderVisibility(
 }
 
 /* =========================================================
-   PAGE LOADING STATE
+   PAGE LOADING
    ========================================================= */
 
 function setPageLoading(
@@ -1064,7 +1304,7 @@ function setPageLoading(
 }
 
 /* =========================================================
-   SIDEBAR INITIALIZATION
+   SIDEBAR
    ========================================================= */
 
 async function initializeLoadedSidebar(
@@ -1090,11 +1330,7 @@ async function initializeLoadedSidebar(
 }
 
 /* =========================================================
-   ROUTE MODULE INITIALIZATION
-
-   The routeLoad query parameter forces a fresh route-module
-   execution for each SPA navigation while still allowing
-   initialization.js to own the actual module initialization.
+   ROUTE MODULE
    ========================================================= */
 
 async function initializeLoadedRouteModule(
@@ -1113,10 +1349,14 @@ async function initializeLoadedRouteModule(
                 window.location.origin
             );
 
-        moduleUrl.searchParams.set(
-            "v",
+        if (
             APP_ASSET_ID
-        );
+        ) {
+            moduleUrl.searchParams.set(
+                "v",
+                APP_ASSET_ID
+            );
+        }
 
         moduleUrl.searchParams.set(
             "routeLoad",
@@ -1155,9 +1395,6 @@ async function initializeLoadedRouteModule(
 
 /* =========================================================
    NAVIGATION VALIDITY
-
-   Stops an older asynchronous navigation from continuing
-   after a newer navigation has already begun.
    ========================================================= */
 
 function isCurrentNavigation(
@@ -1167,6 +1404,138 @@ function isCurrentNavigation(
         currentNavigationId ===
         navigationId
     );
+}
+
+/* =========================================================
+   ROUTE CONTENT
+   ========================================================= */
+
+function getShellElements() {
+    return {
+        header:
+            document.getElementById(
+                "header"
+            ),
+
+        sidebar:
+            document.getElementById(
+                "sidebar"
+            ),
+
+        content:
+            document.getElementById(
+                "siteContent"
+            ),
+
+        footer:
+            document.getElementById(
+                "footer"
+            )
+    };
+}
+
+async function loadRouteFragments(
+    routeConfig,
+    showHeader
+) {
+    const [
+        headerHTML,
+        sidebarHTML,
+        pageHTML,
+        footerHTML
+    ] =
+        await Promise.all([
+            showHeader
+                ? fetchHTML(
+                    routeConfig.header,
+                    "Header"
+                )
+                : Promise.resolve(
+                    ""
+                ),
+
+            fetchHTML(
+                routeConfig.sidebar,
+                "Sidebar"
+            ),
+
+            fetchHTML(
+                routeConfig.body,
+                "Page"
+            ),
+
+            fetchHTML(
+                routeConfig.footer,
+                "Footer"
+            )
+        ]);
+
+    return {
+        headerHTML,
+        sidebarHTML,
+        pageHTML,
+        footerHTML
+    };
+}
+
+function injectRouteFragments(
+    elements,
+    fragments,
+    showHeader
+) {
+    if (
+        elements.header
+        && showHeader
+    ) {
+        elements.header.innerHTML =
+            fragments.headerHTML;
+    }
+
+    elements.sidebar.innerHTML =
+        fragments.sidebarHTML;
+
+    elements.content.innerHTML =
+        fragments.pageHTML;
+
+    if (
+        elements.footer
+    ) {
+        elements.footer.innerHTML =
+            fragments.footerHTML;
+    }
+}
+
+/* =========================================================
+   ROUTE ERROR
+   ========================================================= */
+
+function renderRouteLoadError() {
+    const contentElement =
+        document.getElementById(
+            "siteContent"
+        );
+
+    if (
+        !contentElement
+    ) {
+        return;
+    }
+
+    contentElement.innerHTML = `
+        <section class="route-load-error">
+            <h1>
+                Unable to load this page
+            </h1>
+            <p>
+                Please refresh the page or return to the main menu.
+            </p>
+            <a
+                href="/"
+                data-router-link>
+                Main Menu
+            </a>
+        </section>
+    `;
 }
 
 /* =========================================================
@@ -1187,6 +1556,10 @@ async function loadShell() {
         );
 
     try {
+        /* -------------------------------------------------
+           AUTH
+           ------------------------------------------------- */
+
         const authCheck =
             await enforceRouteAuthentication(
                 route
@@ -1214,6 +1587,27 @@ async function loadShell() {
             );
         }
 
+        /* -------------------------------------------------
+           MASTER CSS
+           ------------------------------------------------- */
+
+        await applyMasterCss(
+            route.routePath,
+            currentNavigationId
+        );
+
+        if (
+            !isCurrentNavigation(
+                currentNavigationId
+            )
+        ) {
+            return;
+        }
+
+        /* -------------------------------------------------
+           SHELL CONFIG
+           ------------------------------------------------- */
+
         const showHeader =
             findInheritedMapValue(
                 HEADER_MAP,
@@ -1222,29 +1616,12 @@ async function loadShell() {
             ) !==
             false;
 
-        const headerElement =
-            document.getElementById(
-                "header"
-            );
-
-        const sidebarElement =
-            document.getElementById(
-                "sidebar"
-            );
-
-        const contentElement =
-            document.getElementById(
-                "siteContent"
-            );
-
-        const footerElement =
-            document.getElementById(
-                "footer"
-            );
+        const elements =
+            getShellElements();
 
         if (
-            !sidebarElement ||
-            !contentElement
+            !elements.sidebar
+            || !elements.content
         ) {
             throw new Error(
                 "Required shell elements were not found."
@@ -1256,40 +1633,18 @@ async function loadShell() {
         );
 
         document.title =
-            routeConfig.title ||
-            "BPD Gaming Network";
+            routeConfig.title
+            || "BPD Gaming Network";
 
-        const [
-            headerHTML,
-            sidebarHTML,
-            pageHTML,
-            footerHTML
-        ] =
-            await Promise.all([
+        /* -------------------------------------------------
+           LOAD FRAGMENTS
+           ------------------------------------------------- */
+
+        const fragments =
+            await loadRouteFragments(
+                routeConfig,
                 showHeader
-                    ? fetchHTML(
-                        routeConfig.header,
-                        "Header"
-                    )
-                    : Promise.resolve(
-                        ""
-                    ),
-
-                fetchHTML(
-                    routeConfig.sidebar,
-                    "Sidebar"
-                ),
-
-                fetchHTML(
-                    routeConfig.body,
-                    "Page"
-                ),
-
-                fetchHTML(
-                    routeConfig.footer,
-                    "Footer"
-                )
-            ]);
+            );
 
         if (
             !isCurrentNavigation(
@@ -1299,26 +1654,15 @@ async function loadShell() {
             return;
         }
 
-        if (
-            headerElement &&
+        /* -------------------------------------------------
+           INJECT FRAGMENTS
+           ------------------------------------------------- */
+
+        injectRouteFragments(
+            elements,
+            fragments,
             showHeader
-        ) {
-            headerElement.innerHTML =
-                headerHTML;
-        }
-
-        sidebarElement.innerHTML =
-            sidebarHTML;
-
-        contentElement.innerHTML =
-            pageHTML;
-
-        if (
-            footerElement
-        ) {
-            footerElement.innerHTML =
-                footerHTML;
-        }
+        );
 
         document.body.dataset.currentRoute =
             route.routePath;
@@ -1328,13 +1672,13 @@ async function loadShell() {
                 route.found
             );
 
-        /*
-         * Route HTML has now been inserted.
-         *
-         * Any classic scripts declared using data-route-script
-         * must execute BEFORE the route ES module initializes.
-         */
-  
+        /* -------------------------------------------------
+           CLASSIC ROUTE SCRIPTS
+           ------------------------------------------------- */
+
+        await activateRouteScripts(
+            elements.content
+        );
 
         if (
             !isCurrentNavigation(
@@ -1343,6 +1687,10 @@ async function loadShell() {
         ) {
             return;
         }
+
+        /* -------------------------------------------------
+           SIDEBAR
+           ------------------------------------------------- */
 
         await initializeLoadedSidebar(
             authCheck.authSession
@@ -1356,6 +1704,10 @@ async function loadShell() {
             return;
         }
 
+        /* -------------------------------------------------
+           ROUTE MODULE
+           ------------------------------------------------- */
+
         await initializeLoadedRouteModule(
             routeConfig.module
         );
@@ -1368,12 +1720,10 @@ async function loadShell() {
             return;
         }
 
-        /*
-         * Resume/check an active OCR submission if one exists.
-         *
-         * If there is no OCR job in localStorage,
-         * this is effectively a no-op.
-         */
+        /* -------------------------------------------------
+           OCR RESUME
+           ------------------------------------------------- */
+
         await checkGlobalOcrSubmission();
 
         if (
@@ -1384,7 +1734,11 @@ async function loadShell() {
             return;
         }
 
-        contentElement.focus({
+        /* -------------------------------------------------
+           FINISH NAVIGATION
+           ------------------------------------------------- */
+
+        elements.content.focus({
             preventScroll:
                 true
         });
@@ -1415,7 +1769,12 @@ async function loadShell() {
                             route.found,
 
                         redirected:
-                            authCheck.redirected
+                            authCheck.redirected,
+
+                        masterCss:
+                            getMasterCssForRoute(
+                                route.routePath
+                            )
                     }
                 }
             )
@@ -1437,33 +1796,7 @@ async function loadShell() {
             error
         );
 
-        const contentElement =
-            document.getElementById(
-                "siteContent"
-            );
-
-        if (
-            contentElement
-        ) {
-            contentElement.innerHTML = `
-                <section class="route-load-error">
-                    <h1>
-                        Unable to load this page
-                    </h1>
-
-                    <p>
-                        Please refresh the page or return
-                        to the main menu.
-                    </p>
-
-                    <a
-                        href="/"
-                        data-router-link>
-                        Main Menu
-                    </a>
-                </section>
-            `;
-        }
+        renderRouteLoadError();
     }
     finally {
         if (
@@ -1479,7 +1812,7 @@ async function loadShell() {
 }
 
 /* =========================================================
-   NAVIGATE
+   NAVIGATION
    ========================================================= */
 
 async function navigate(
@@ -1497,16 +1830,16 @@ async function navigate(
             window.location.origin
         );
 
-    const currentUrl =
+    const currentDestination =
         (
-            window.location.pathname +
-            window.location.search +
-            window.location.hash
+            window.location.pathname
+            + window.location.search
+            + window.location.hash
         );
 
     if (
         normalizedDestination !==
-        currentUrl
+        currentDestination
     ) {
         if (
             options.replace ===
@@ -1561,19 +1894,12 @@ window.BPDRouter =
     });
 
 /* =========================================================
-   GLOBAL OCR NOTIFICATIONS
-
-   Initializes once when router.js loads.
-
-   ocr_notifications.js owns its polling behavior and should
-   only poll while an OCR job actually exists.
+   STARTUP
    ========================================================= */
 
-initializeGlobalOcrNotifications();
+applyInitialSidebarLayoutState();
 
-/* =========================================================
-   INITIAL PAGE LOAD
-   ========================================================= */
+initializeGlobalOcr();
 
 if (
     !window.location.pathname.startsWith(

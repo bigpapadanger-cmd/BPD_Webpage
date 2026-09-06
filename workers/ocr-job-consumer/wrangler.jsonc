@@ -33,6 +33,10 @@
         {
             "binding": "OCR_STORAGE",
             "bucket_name": "ocr-storage"
+        },
+        {
+            "binding": "OCR_PROGRESS",
+            "bucket_name": "ocr-progress"
         }
     ],
     "observability": {

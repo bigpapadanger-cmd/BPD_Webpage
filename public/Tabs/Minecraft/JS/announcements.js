@@ -1,7 +1,13 @@
+/*
+=========================================================
+BPD GAMING NETWORK
+MINECRAFT ANNOUNCEMENTS PAGE
+=========================================================
+*/
+
 import {
     renderHeader
 } from "/Framework/Shell/JS/renderHeader.js";
-
 
 const announcements = [
     {
@@ -20,7 +26,6 @@ const announcements = [
         description:
             "Updates and improvements have been released for one of our Minecraft projects."
     },
-
     {
         id:
             "minecraft-development",
@@ -37,7 +42,6 @@ const announcements = [
         description:
             "Development has started on another project for the Minecraft community."
     },
-
     {
         id:
             "minecraft-section-launch",
@@ -56,82 +60,85 @@ const announcements = [
     }
 ];
 
+/* =========================================================
+   INITIALIZE PAGE
+   ========================================================= */
 
-renderHeader({
-    eyebrow:
-        "BPD GAMING NETWORK",
+export function initializePage() {
+    renderHeader({
+        eyebrow:
+            "BPD GAMING NETWORK",
 
-    title:
-        "Minecraft Announcements",
+        title:
+            "Minecraft Announcements",
 
-    tabs: [
-        {
-            label:
-                "Home",
+        tabs: [
+            {
+                label:
+                    "Home",
 
-            href:
-                "/Minecraft"
-        },
-        {
-            label:
-                "Mods",
+                href:
+                    "/Minecraft"
+            },
+            {
+                label:
+                    "Mods",
 
-            href:
-                "/Minecraft/Mods"
-        }
-    ]
-});
+                href:
+                    "/Minecraft/Mods"
+            }
+        ]
+    });
 
+    renderAnnouncements();
 
-renderAnnouncements();
+    return true;
+}
 
+/* =========================================================
+   RENDER ANNOUNCEMENTS
+   ========================================================= */
 
 function renderAnnouncements() {
-
     const announcementList =
         document.getElementById(
             "minecraftAnnouncementList"
         );
 
-
-    if (!announcementList) {
-
+    if (
+        !announcementList
+    ) {
         return;
-
     }
-
 
     const sortedAnnouncements =
         [...announcements]
             .sort(
-                (
+                function(
                     first,
                     second
-                ) => {
-
-                    return new Date(
-                        second.date
-                    ).getTime() -
-                    new Date(
-                        first.date
-                    ).getTime();
-
+                ) {
+                    return (
+                        new Date(
+                            second.date
+                        ).getTime()
+                        -
+                        new Date(
+                            first.date
+                        ).getTime()
+                    );
                 }
             );
 
-
     announcementList.innerHTML =
         "";
-
 
     if (
         sortedAnnouncements.length ===
         0
     ) {
-
         announcementList.innerHTML = `
             <div class="minecraft-announcement-empty">
-
                 <span class="minecraft-content-eyebrow">
                     NO ANNOUNCEMENTS
                 </span>
@@ -139,84 +146,74 @@ function renderAnnouncements() {
                 <p>
                     There are currently no Minecraft announcements.
                 </p>
-
             </div>
         `;
 
         return;
-
     }
 
-
     sortedAnnouncements.forEach(
-        announcement => {
-
+        function(
+            announcement
+        ) {
             announcementList.insertAdjacentHTML(
                 "beforeend",
                 createAnnouncement(
                     announcement
                 )
             );
-
         }
     );
-
 }
 
+/* =========================================================
+   ANNOUNCEMENT CARD
+   ========================================================= */
 
 function createAnnouncement(
     announcement
 ) {
-
     const title =
         escapeHtml(
-            announcement?.title ||
-            "Announcement"
+            announcement?.title
+            || "Announcement"
         );
-
 
     const type =
         escapeHtml(
-            announcement?.type ||
-            "General"
+            announcement?.type
+            || "General"
         );
-
 
     const description =
         escapeHtml(
-            announcement?.description ||
-            ""
+            announcement?.description
+            || ""
         );
-
 
     const date =
         formatAnnouncementDate(
             announcement?.date
         );
 
-
     const isoDate =
         escapeAttribute(
-            announcement?.date ||
-            ""
+            announcement?.date
+            || ""
         );
-
 
     const id =
         escapeAttribute(
-            announcement?.id ||
-            ""
+            announcement?.id
+            || ""
         );
-
 
     return `
         <article
             class="minecraft-announcement-item"
             id="${id}"
         >
-
             <div class="minecraft-announcement-marker">
-
                 <span
                     class="minecraft-announcement-dot"
                     aria-hidden="true"
@@ -226,14 +223,10 @@ function createAnnouncement(
                     class="minecraft-announcement-line"
                     aria-hidden="true"
                 ></span>
-
             </div>
 
-
             <div class="minecraft-announcement-content">
-
                 <div class="minecraft-announcement-meta">
-
                     <time
                         datetime="${isoDate}"
                     >
@@ -243,54 +236,45 @@ function createAnnouncement(
                     <span class="minecraft-announcement-type">
                         ${type}
                     </span>
-
                 </div>
-
 
                 <h3 class="minecraft-announcement-title">
                     ${title}
                 </h3>
 
-
                 <p class="minecraft-announcement-description">
                     ${description}
                 </p>
-
             </div>
-
         </article>
     `;
-
 }
 
+/* =========================================================
+   UTILITIES
+   ========================================================= */
 
 function formatAnnouncementDate(
     value
 ) {
-
-    if (!value) {
-
+    if (
+        !value
+    ) {
         return "Unknown Date";
-
     }
-
 
     const date =
         new Date(
             `${value}T12:00:00`
         );
 
-
     if (
         Number.isNaN(
             date.getTime()
         )
     ) {
-
         return "Unknown Date";
-
     }
-
 
     return new Intl.DateTimeFormat(
         "en-US",
@@ -309,16 +293,14 @@ function formatAnnouncementDate(
             date
         )
         .toUpperCase();
-
 }
-
 
 function escapeHtml(
     value
 ) {
-
     return String(
-        value ?? ""
+        value
+        ?? ""
     )
         .replaceAll(
             "&",
@@ -340,16 +322,12 @@ function escapeHtml(
             "'",
             "&#039;"
         );
-
 }
-
 
 function escapeAttribute(
     value
 ) {
-
     return escapeHtml(
         value
     );
-
 }

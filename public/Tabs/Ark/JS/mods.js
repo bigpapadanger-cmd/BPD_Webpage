@@ -1,12 +1,24 @@
+/*
+=========================================================
+BPD GAMING NETWORK
+ARK MODS PAGE
+=========================================================
+*/
+
 import {
     renderHeader
 } from "/Framework/Shell/JS/renderHeader.js";
-import { CF_MOD_LIST_API } from "../../../scripts/apiRoutes.js";
-import { apiFetch } from "../../../scripts/apiConnection.js";
+
+import {
+    CF_MOD_LIST_API
+} from "/scripts/apiRoutes.js";
+
+import {
+    apiFetch
+} from "/scripts/apiConnection.js";
 
 const gameCategory =
     "ark";
-
 
 const MOD_GLOWS = [
     "139, 92, 246",
@@ -17,71 +29,76 @@ const MOD_GLOWS = [
     "16, 185, 129"
 ];
 
+/* =========================================================
+   INITIALIZE PAGE
+   ========================================================= */
 
-renderHeader({
-    eyebrow:
-        "BPD GAMING NETWORK",
+export async function initializePage() {
+    renderHeader({
+        eyebrow:
+            "BPD GAMING NETWORK",
 
-    title:
-        "Ark Ascended Mods List",
+        title:
+            "Ark Ascended Mods List",
 
-    tabs: [
-        {
-            label:
-                "Home",
+        tabs: [
+            {
+                label:
+                    "Home",
 
-            href:
-                "/Ark"
-        },
-        {
-            label:
-                "Announcements",
+                href:
+                    "/Ark"
+            },
+            {
+                label:
+                    "Announcements",
 
-            href:
-                "/Ark/Announcements"
-        }
-    ]
-});
+                href:
+                    "/Ark/Announcements"
+            }
+        ]
+    });
 
+    initializeModsPage();
 
-initializeModsPage();
+    return true;
+}
 
+/* =========================================================
+   PAGE INITIALIZATION
+   ========================================================= */
 
 function initializeModsPage() {
-
     const retryButton =
         document.getElementById(
             "arkModRetry"
         );
 
-
-    if (retryButton) {
-
+    if (
+        retryButton
+    ) {
         retryButton.addEventListener(
             "click",
-            () => {
-
-                loadModsForGame(
+            function() {
+                void loadModsForGame(
                     gameCategory
                 );
-
             }
         );
-
     }
 
-
-    loadModsForGame(
+    void loadModsForGame(
         gameCategory
     );
-
 }
 
+/* =========================================================
+   LOAD MOD DATA
+   ========================================================= */
 
 async function loadModsForGame(
     game
 ) {
-
     const modList =
         document.getElementById(
             "arkModList"
@@ -92,26 +109,24 @@ async function loadModsForGame(
             "arkModError"
         );
 
-
-    if (!modList) {
+    if (
+        !modList
+    ) {
         return;
     }
 
-
-    if (errorSection) {
-
+    if (
+        errorSection
+    ) {
         errorSection.hidden =
             true;
-
     }
-
 
     renderLoadingState(
         modList
     );
 
     try {
-
         const response =
             await apiFetch(
                 `${CF_MOD_LIST_API}?game=${encodeURIComponent(
@@ -131,32 +146,26 @@ async function loadModsForGame(
                 }
             );
 
-
-        if (!response.ok) {
-
+        if (
+            !response.ok
+        ) {
             throw new Error(
                 `Mod API returned ${response.status}`
             );
-
         }
-
 
         const data =
             await response.json();
-
 
         if (
             data?.success !==
             true
         ) {
-
             throw new Error(
-                data?.message ||
-                "Unable to load mods."
+                data?.message
+                || "Unable to load mods."
             );
-
         }
-
 
         const mods =
             Array.isArray(
@@ -165,16 +174,13 @@ async function loadModsForGame(
                 ? data.mods
                 : [];
 
-
         modList.innerHTML =
             "";
-
 
         if (
             mods.length ===
             0
         ) {
-
             modList.innerHTML = `
                 <p class="ark-mod-empty">
                     No active mods are currently listed.
@@ -182,16 +188,13 @@ async function loadModsForGame(
             `;
 
             return;
-
         }
 
-
         mods.forEach(
-            (
+            function(
                 mod,
                 index
-            ) => {
-
+            ) {
                 modList.insertAdjacentHTML(
                     "beforeend",
                     createModCard(
@@ -199,118 +202,103 @@ async function loadModsForGame(
                         index
                     )
                 );
-
             }
         );
-
     }
     catch (
         error
     ) {
-
         console.error(
             "ARK: Unable to load CurseForge mods.",
             error
         );
 
-
         modList.innerHTML =
             "";
 
-
-        if (errorSection) {
-
+        if (
+            errorSection
+        ) {
             errorSection.hidden =
                 false;
-
         }
-
     }
-
 }
 
+/* =========================================================
+   LOADING STATE
+   ========================================================= */
 
 function renderLoadingState(
     modList
 ) {
-
     modList.innerHTML = `
         <div
             class="ark-mod-loading"
             id="arkModLoading"
         >
-
             <span
                 class="ark-mod-loading-spinner"
                 aria-hidden="true"
             ></span>
-
             <span>
                 Loading ARK mods...
             </span>
-
         </div>
     `;
-
 }
 
+/* =========================================================
+   MOD CARD
+   ========================================================= */
 
 function createModCard(
     mod,
     index
 ) {
-
     const glow =
         MOD_GLOWS[
             index %
             MOD_GLOWS.length
         ];
 
-
     const name =
         escapeHtml(
-            mod?.name ||
-            "Unnamed Mod"
+            mod?.name
+            || "Unnamed Mod"
         );
-
 
     const description =
         escapeHtml(
-            mod?.summary ||
-            "No description is currently available."
+            mod?.summary
+            || "No description is currently available."
         );
-
 
     const ue5Version =
         escapeHtml(
-            mod?.ue5Version ||
-            "Unknown"
+            mod?.ue5Version
+            || "Unknown"
         );
-
 
     const downloads =
         formatNumber(
             mod?.downloads
         );
 
-
     const updated =
         formatDate(
             mod?.lastUpdated
         );
-
 
     const websiteUrl =
         safeUrl(
             mod?.links?.websiteUrl
         );
 
-
     const logoUrl =
         safeUrl(
             mod?.logo?.thumbnailUrl
         );
-
 
     const imageHtml =
         logoUrl
@@ -335,7 +323,6 @@ function createModCard(
                 </div>
             `;
 
-
     const linkHtml =
         websiteUrl
             ? `
@@ -348,7 +335,6 @@ function createModCard(
                     rel="noopener noreferrer"
                 >
                     View on CurseForge
-
                     <span
                         aria-hidden="true"
                     >
@@ -358,158 +344,114 @@ function createModCard(
             `
             : "";
 
-
     return `
         <article
             class="ark-mod-card"
             style="--mod-glow: ${glow};"
         >
-
             <div class="ark-mod-banner">
-
                 <div class="ark-mod-image-wrap">
-
                     ${imageHtml}
-
                 </div>
-
-
                 <div class="ark-mod-main">
-
                     <div class="ark-mod-heading">
-
                         <div class="ark-mod-title-group">
-
                             <span class="ark-mod-label">
                                 ARK ASCENDED MOD
                             </span>
-
                             <h3 class="ark-mod-name">
                                 ${name}
                             </h3>
-
                         </div>
-
-
                         ${linkHtml}
-
                     </div>
-
-
                     <p class="ark-mod-description">
                         ${description}
                     </p>
-
                 </div>
-
             </div>
-
-
             <div class="ark-mod-meta">
-
-                    <div class="ark-mod-meta-item">
-
-                        <span class="ark-mod-meta-label">
-                            UE5 Version
-                        </span>
-
-                        <strong class="ark-mod-meta-value">
-                            ${ue5Version}
-                        </strong>
-
-                    </div>
-
-
                 <div class="ark-mod-meta-item">
-
+                    <span class="ark-mod-meta-label">
+                        UE5 Version
+                    </span>
+                    <strong class="ark-mod-meta-value">
+                        ${ue5Version}
+                    </strong>
+                </div>
+                <div class="ark-mod-meta-item">
                     <span class="ark-mod-meta-label">
                         Downloads
                     </span>
-
                     <strong class="ark-mod-meta-value">
                         ${downloads}
                     </strong>
-
                 </div>
-
-
                 <div class="ark-mod-meta-item">
-
                     <span class="ark-mod-meta-label">
                         Updated
                     </span>
-
                     <strong class="ark-mod-meta-value">
                         ${updated}
                     </strong>
-
                 </div>
-
             </div>
-
         </article>
     `;
-
 }
 
+/* =========================================================
+   NUMBER FORMAT
+   ========================================================= */
 
 function formatNumber(
     value
 ) {
-
     const number =
         Number(
             value
         );
-
 
     if (
         !Number.isFinite(
             number
         )
     ) {
-
         return "—";
-
     }
-
 
     return new Intl.NumberFormat(
         "en-US"
     ).format(
         number
     );
-
 }
 
+/* =========================================================
+   DATE FORMAT
+   ========================================================= */
 
 function formatDate(
     value
 ) {
-
-    if (!value) {
-
+    if (
+        !value
+    ) {
         return "—";
-
     }
-
 
     const date =
         new Date(
             value
         );
 
-
     if (
         Number.isNaN(
             date.getTime()
         )
     ) {
-
         return "—";
-
     }
-
 
     return new Intl.DateTimeFormat(
         "en-US",
@@ -526,60 +468,54 @@ function formatDate(
     ).format(
         date
     );
-
 }
 
+/* =========================================================
+   SAFE URL
+   ========================================================= */
 
 function safeUrl(
     value
 ) {
-
-    if (!value) {
-
+    if (
+        !value
+    ) {
         return "";
-
     }
 
-
     try {
-
         const url =
             new URL(
                 value,
                 window.location.origin
             );
 
-
         if (
             url.protocol !==
-                "https:" &&
-            url.protocol !==
+                "https:"
+            && url.protocol !==
                 "http:"
         ) {
-
             return "";
-
         }
 
-
         return url.href;
-
     }
     catch {
-
         return "";
-
     }
-
 }
 
+/* =========================================================
+   HTML ESCAPING
+   ========================================================= */
 
 function escapeHtml(
     value
 ) {
-
     return String(
-        value ?? ""
+        value
+        ?? ""
     )
         .replaceAll(
             "&",
@@ -601,16 +537,12 @@ function escapeHtml(
             "'",
             "&#039;"
         );
-
 }
-
 
 function escapeAttribute(
     value
 ) {
-
     return escapeHtml(
         value
     );
-
 }

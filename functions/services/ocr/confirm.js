@@ -2,7 +2,7 @@
 
 /* =========================================================
    BPD GAMING NETWORK
-   OCR RESULT CONFIRMATION
+   OCR RESULT CONFIRMATION / ADJUSTMENT
    ========================================================= */
 
 import {
@@ -13,6 +13,22 @@ import {
     getStoredSession
 } from "../common_helpers/reload_sessions.js";
 
+/* =========================================================
+   VERSION
+   ========================================================= */
+
+const OCR_CONFIRM_VERSION =
+    "ocr-confirm-2.0";
+
+/* =========================================================
+   MODES
+   ========================================================= */
+
+const CONFIRM_MODE_REVIEW =
+    "review";
+
+const CONFIRM_MODE_ADJUSTMENT =
+    "adjustment";
 
 /* =========================================================
    ALLOWED REVIEW FIELDS
@@ -29,6 +45,15 @@ const ALLOWED_REVIEW_FIELDS = new Set([
     "ping"
 ]);
 
+/* =========================================================
+   ADJUSTMENT ID
+   ========================================================= */
+
+const ADJUSTMENT_ID_LENGTH =
+    16;
+
+const ADJUSTMENT_ID_ALPHABET =
+    "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
 
 /* =========================================================
    RESPONSE
@@ -46,18 +71,16 @@ function jsonResponse(
             status:
                 status,
 
-            headers:
-                {
-                    "Content-Type":
-                        "application/json",
+            headers: {
+                "Content-Type":
+                    "application/json",
 
-                    "Cache-Control":
-                        "no-store"
-                }
+                "Cache-Control":
+                    "no-store"
+            }
         }
     );
 }
-
 
 /* =========================================================
    OWNER HASH
@@ -126,7 +149,6 @@ async function createOwnerHash(
         );
 }
 
-
 /* =========================================================
    HELPERS
    ========================================================= */
@@ -145,7 +167,6 @@ function normalizeString(
         || null
     );
 }
-
 
 function normalizeInteger(
     value
@@ -167,7 +188,6 @@ function normalizeInteger(
     return numeric;
 }
 
-
 function normalizeMatchId(
     value
 ) {
@@ -179,7 +199,6 @@ function normalizeMatchId(
         .toUpperCase();
 }
 
-
 function validMatchId(
     value
 ) {
@@ -187,7 +206,6 @@ function validMatchId(
         value
     );
 }
-
 
 function normalizePlayerName(
     value
@@ -200,6 +218,73 @@ function normalizePlayerName(
         .toUpperCase();
 }
 
+function normalizeConfirmationStatus(
+    value
+) {
+    return String(
+        value
+        ?? ""
+    )
+        .trim()
+        .toLowerCase();
+}
+
+function normalizeMode(
+    value
+) {
+    const normalized =
+        String(
+            value
+            ?? ""
+        )
+            .trim()
+            .toLowerCase();
+
+    if (
+        normalized ===
+        CONFIRM_MODE_ADJUSTMENT
+    ) {
+        return CONFIRM_MODE_ADJUSTMENT;
+    }
+
+    return CONFIRM_MODE_REVIEW;
+}
+
+/* =========================================================
+   RANDOM ADJUSTMENT ID
+   ========================================================= */
+
+function randomAdjustmentCharacter() {
+    const values =
+        new Uint32Array(
+            1
+        );
+
+    crypto.getRandomValues(
+        values
+    );
+
+    return ADJUSTMENT_ID_ALPHABET[
+        values[0]
+        % ADJUSTMENT_ID_ALPHABET.length
+    ];
+}
+
+function generateAdjustmentId() {
+    let value =
+        "";
+
+    for (
+        let index = 0;
+        index < ADJUSTMENT_ID_LENGTH;
+        index += 1
+    ) {
+        value +=
+            randomAdjustmentCharacter();
+    }
+
+    return value;
+}
 
 /* =========================================================
    VALIDATE FIELD ENTRY
@@ -210,7 +295,8 @@ function normalizeFieldEntry(
 ) {
     if (
         !entry
-        || typeof entry !== "object"
+        || typeof entry !==
+            "object"
         || Array.isArray(
             entry
         )
@@ -257,8 +343,8 @@ function normalizeFieldEntry(
 
     const userValue = (
         entry.userValue === null
-        || typeof entry.userValue
-            === "undefined"
+        || typeof entry.userValue ===
+            "undefined"
         || String(
             entry.userValue
         ).trim() === ""
@@ -293,6 +379,30 @@ function normalizeFieldEntry(
     };
 }
 
+/* =========================================================
+   FIELD KEY
+   ========================================================= */
+
+function buildFieldKey(
+    team,
+    player,
+    field
+) {
+    return [
+        Number(
+            team
+        ),
+        normalizePlayerName(
+            player
+        ),
+        String(
+            field
+            || ""
+        ).trim()
+    ].join(
+        "|"
+    );
+}
 
 /* =========================================================
    FIND TEAM
@@ -320,7 +430,6 @@ function findStoredTeam(
         || null
     );
 }
-
 
 /* =========================================================
    FIND PLAYER
@@ -358,8 +467,8 @@ function findStoredPlayer(
                     );
 
                 return (
-                    storedName
-                    === normalizedRequestedPlayer
+                    storedName ===
+                    normalizedRequestedPlayer
                 );
             }
         )
@@ -367,6 +476,1021 @@ function findStoredPlayer(
     );
 }
 
+/* =========================================================
+   CURRENT EFFECTIVE VALUE
+   ========================================================= */
+
+function getCurrentPlayerValue(
+    player,
+    field
+) {
+    const storedValue =
+        player?.[
+            field
+        ];
+
+    if (
+        storedValue === null
+        || typeof storedValue ===
+            "undefined"
+        || String(
+            storedValue
+        ).trim() === ""
+    ) {
+        return (
+            field === "ping"
+                ? 0
+                : null
+        );
+    }
+
+    return normalizeInteger(
+        storedValue
+    );
+}
+
+/* =========================================================
+   REVIEW FIELD
+   ========================================================= */
+
+function getStoredReviewField(
+    player,
+    field
+) {
+    const reviewField =
+        player
+            ?.reviewFields
+            ?.[
+                field
+            ];
+
+    if (
+        !reviewField
+        || typeof reviewField !==
+            "object"
+        || Array.isArray(
+            reviewField
+        )
+    ) {
+        return null;
+    }
+
+    return reviewField;
+}
+
+/* =========================================================
+   ORIGINAL OCR VALUE
+   ========================================================= */
+
+function getConfirmationOcrValue(
+    report,
+    team,
+    player,
+    field
+) {
+    const fields = (
+        Array.isArray(
+            report
+                ?.confirmation
+                ?.fields
+        )
+            ? report.confirmation.fields
+            : []
+    );
+
+    const requestedKey =
+        buildFieldKey(
+            team,
+            player,
+            field
+        );
+
+    for (
+        const entry
+        of fields
+    ) {
+        if (
+            buildFieldKey(
+                entry?.team,
+                entry?.player,
+                entry?.field
+            )
+            !== requestedKey
+        ) {
+            continue;
+        }
+
+        const value =
+            normalizeInteger(
+                entry?.ocrValue
+            );
+
+        if (
+            value !== null
+        ) {
+            return value;
+        }
+    }
+
+    return null;
+}
+
+function getAdjustmentOcrValue(
+    report,
+    team,
+    player,
+    field
+) {
+    const adjustments = (
+        Array.isArray(
+            report?.adjustments
+        )
+            ? report.adjustments
+            : []
+    );
+
+    const requestedKey =
+        buildFieldKey(
+            team,
+            player,
+            field
+        );
+
+    for (
+        const adjustment
+        of adjustments
+    ) {
+        const fields = (
+            Array.isArray(
+                adjustment?.fields
+            )
+                ? adjustment.fields
+                : []
+        );
+
+        for (
+            const entry
+            of fields
+        ) {
+            if (
+                buildFieldKey(
+                    entry?.team,
+                    entry?.player,
+                    entry?.field
+                )
+                !== requestedKey
+            ) {
+                continue;
+            }
+
+            const value =
+                normalizeInteger(
+                    entry?.ocrValue
+                );
+
+            if (
+                value !== null
+            ) {
+                return value;
+            }
+        }
+    }
+
+    return null;
+}
+
+function getOriginalOcrValue(
+    report,
+    player,
+    team,
+    playerName,
+    field
+) {
+    const reviewField =
+        getStoredReviewField(
+            player,
+            field
+        );
+
+    if (
+        reviewField
+    ) {
+        const reviewValue =
+            normalizeInteger(
+                reviewField.value
+            );
+
+        if (
+            reviewValue !== null
+        ) {
+            return reviewValue;
+        }
+
+        if (
+            field === "ping"
+            && (
+                reviewField.value === null
+                || typeof reviewField.value ===
+                    "undefined"
+            )
+        ) {
+            return 0;
+        }
+    }
+
+    const confirmationValue =
+        getConfirmationOcrValue(
+            report,
+            team,
+            playerName,
+            field
+        );
+
+    if (
+        confirmationValue !== null
+    ) {
+        return confirmationValue;
+    }
+
+    const adjustmentValue =
+        getAdjustmentOcrValue(
+            report,
+            team,
+            playerName,
+            field
+        );
+
+    if (
+        adjustmentValue !== null
+    ) {
+        return adjustmentValue;
+    }
+
+    return getCurrentPlayerValue(
+        player,
+        field
+    );
+}
+
+/* =========================================================
+   OCR EVIDENCE
+   ========================================================= */
+
+function buildOcrEvidence(
+    reviewField,
+    ocrValue
+) {
+    if (
+        !reviewField
+    ) {
+        return {
+            selectedValue:
+                ocrValue,
+
+            selectedEngine:
+                null,
+
+            confidence:
+                null,
+
+            template:
+                null,
+
+            tesseract:
+                null,
+
+            paddle:
+                null
+        };
+    }
+
+    return {
+        selectedValue:
+            reviewField.value
+            ?? ocrValue,
+
+        selectedEngine:
+            reviewField.engine
+            ?? null,
+
+        confidence:
+            reviewField.confidence
+            ?? null,
+
+        template:
+            reviewField.template
+            ?? null,
+
+        tesseract:
+            reviewField.tesseract
+            ?? null,
+
+        paddle:
+            reviewField.paddle
+            ?? null
+    };
+}
+
+/* =========================================================
+   EXPECTED REVIEW FIELD SET
+   ========================================================= */
+
+function buildExpectedReviewFieldKeys(
+    teams
+) {
+    const expectedFieldKeys =
+        new Set();
+
+    for (
+        let teamArrayIndex = 0;
+        teamArrayIndex < teams.length;
+        teamArrayIndex += 1
+    ) {
+        const team =
+            teams[
+                teamArrayIndex
+            ];
+
+        const teamIndex =
+            Number(
+                team?.team
+                ?? team?.teamIndex
+                ?? (
+                    teamArrayIndex
+                    + 1
+                )
+            );
+
+        const players = (
+            Array.isArray(
+                team?.players
+            )
+                ? team.players
+                : []
+        );
+
+        for (
+            const player
+            of players
+        ) {
+            const playerName =
+                normalizePlayerName(
+                    player?.player
+                    || player?.matchedName
+                    || player?.username
+                    || ""
+                );
+
+            if (
+                !playerName
+            ) {
+                continue;
+            }
+
+            const reviewFields = (
+                player?.reviewFields
+                && typeof player.reviewFields ===
+                    "object"
+                && !Array.isArray(
+                    player.reviewFields
+                )
+                    ? player.reviewFields
+                    : {}
+            );
+
+            for (
+                const fieldName
+                of Object.keys(
+                    reviewFields
+                )
+            ) {
+                if (
+                    !ALLOWED_REVIEW_FIELDS.has(
+                        fieldName
+                    )
+                ) {
+                    continue;
+                }
+
+                expectedFieldKeys.add(
+                    buildFieldKey(
+                        teamIndex,
+                        playerName,
+                        fieldName
+                    )
+                );
+            }
+        }
+    }
+
+    return expectedFieldKeys;
+}
+
+/* =========================================================
+   REVIEW MODE
+   ========================================================= */
+
+function processReviewConfirmation(
+    existingReport,
+    teams,
+    fields,
+    submittedFieldKeys
+) {
+    const currentStatus =
+        normalizeConfirmationStatus(
+            existingReport
+                ?.confirmationStatus
+        );
+
+    if (
+        currentStatus
+        && currentStatus !==
+            "pending_review"
+    ) {
+        return {
+            error: {
+                status:
+                    409,
+
+                message:
+                    "This scoreboard is no longer awaiting review."
+            }
+        };
+    }
+
+    const expectedFieldKeys =
+        buildExpectedReviewFieldKeys(
+            teams
+        );
+
+    if (
+        expectedFieldKeys.size === 0
+    ) {
+        return {
+            error: {
+                status:
+                    409,
+
+                message:
+                    "Stored match report contains no reviewable fields."
+            }
+        };
+    }
+
+    if (
+        submittedFieldKeys.size !==
+        expectedFieldKeys.size
+    ) {
+        return {
+            error: {
+                status:
+                    400,
+
+                message:
+                    "All scoreboard fields must be reviewed before confirmation."
+            }
+        };
+    }
+
+    for (
+        const expectedKey
+        of expectedFieldKeys
+    ) {
+        if (
+            !submittedFieldKeys.has(
+                expectedKey
+            )
+        ) {
+            return {
+                error: {
+                    status:
+                        400,
+
+                    message:
+                        "All scoreboard fields must be reviewed before confirmation."
+                }
+            };
+        }
+    }
+
+    const authoritativeFields =
+        [];
+
+    for (
+        const entry
+        of fields
+    ) {
+        const team =
+            findStoredTeam(
+                teams,
+                entry.team
+            );
+
+        if (
+            !team
+        ) {
+            return {
+                error: {
+                    status:
+                        409,
+
+                    message:
+                        (
+                            "Stored team could not be matched "
+                            + `for team ${entry.team}.`
+                        )
+                }
+            };
+        }
+
+        const player =
+            findStoredPlayer(
+                team,
+                entry.player
+            );
+
+        if (
+            !player
+        ) {
+            return {
+                error: {
+                    status:
+                        409,
+
+                    message:
+                        (
+                            "Stored player could not be matched: "
+                            + entry.player
+                        )
+                }
+            };
+        }
+
+        const reviewField =
+            getStoredReviewField(
+                player,
+                entry.field
+            );
+
+        if (
+            !reviewField
+        ) {
+            return {
+                error: {
+                    status:
+                        409,
+
+                    message:
+                        (
+                            "Stored OCR review evidence is missing "
+                            + `for ${entry.player} / ${entry.field}.`
+                        )
+                }
+            };
+        }
+
+        const ocrValue =
+            getOriginalOcrValue(
+                existingReport,
+                player,
+                entry.team,
+                entry.player,
+                entry.field
+            );
+
+        if (
+            ocrValue === null
+        ) {
+            return {
+                error: {
+                    status:
+                        409,
+
+                    message:
+                        (
+                            "Stored OCR value is invalid "
+                            + `for ${entry.player} / ${entry.field}.`
+                        )
+                }
+            };
+        }
+
+        const disputed = (
+            entry.userValue !==
+            ocrValue
+        );
+
+        authoritativeFields.push({
+            team:
+                entry.team,
+
+            player:
+                String(
+                    player?.player
+                    || entry.player
+                ),
+
+            field:
+                entry.field,
+
+            ocrValue:
+                ocrValue,
+
+            userValue:
+                entry.userValue,
+
+            finalValue:
+                entry.userValue,
+
+            disputed:
+                disputed,
+
+            requiresVerification:
+                reviewField
+                    .requiresVerification ===
+                true,
+
+            ocrEvidence:
+                buildOcrEvidence(
+                    reviewField,
+                    ocrValue
+                )
+        });
+
+        player[
+            entry.field
+        ] = entry.userValue;
+    }
+
+    const disputes =
+        authoritativeFields.filter(
+            function(
+                entry
+            ) {
+                return (
+                    entry.disputed ===
+                    true
+                );
+            }
+        );
+
+    const confirmationStatus = (
+        disputes.length > 0
+            ? "confirmed_with_disputes"
+            : "confirmed"
+    );
+
+    const confirmedAt =
+        new Date()
+            .toISOString();
+
+    existingReport.confirmationStatus =
+        confirmationStatus;
+
+    existingReport.requiresPlayerReview =
+        false;
+
+    existingReport.reviewRequired =
+        false;
+
+    existingReport.hasDisputes =
+        disputes.length > 0;
+
+    existingReport.disputeCount =
+        disputes.length;
+
+    existingReport.confirmation = {
+        status:
+            confirmationStatus,
+
+        confirmedAt:
+            confirmedAt,
+
+        hasDisputes:
+            disputes.length > 0,
+
+        disputeCount:
+            disputes.length,
+
+        fields:
+            authoritativeFields,
+
+        disputes:
+            disputes
+    };
+
+    return {
+        success:
+            true,
+
+        mode:
+            CONFIRM_MODE_REVIEW,
+
+        confirmationStatus:
+            confirmationStatus,
+
+        confirmedAt:
+            confirmedAt,
+
+        hasDisputes:
+            disputes.length > 0,
+
+        disputeCount:
+            disputes.length
+    };
+}
+
+/* =========================================================
+   ADJUSTMENT MODE
+   ========================================================= */
+
+function processAdjustment(
+    existingReport,
+    teams,
+    fields
+) {
+    const currentStatus =
+        normalizeConfirmationStatus(
+            existingReport
+                ?.confirmationStatus
+        );
+
+    if (
+        currentStatus ===
+        "pending_review"
+    ) {
+        return {
+            error: {
+                status:
+                    409,
+
+                message:
+                    "This scoreboard must complete review before adjustments can be made."
+            }
+        };
+    }
+
+    if (
+        ![
+            "auto_accepted",
+            "confirmed",
+            "confirmed_with_disputes",
+            "adjusted"
+        ].includes(
+            currentStatus
+        )
+    ) {
+        return {
+            error: {
+                status:
+                    409,
+
+                message:
+                    "This scoreboard is not in a state that can be adjusted."
+            }
+        };
+    }
+
+    const adjustmentFields =
+        [];
+
+    for (
+        const entry
+        of fields
+    ) {
+        const team =
+            findStoredTeam(
+                teams,
+                entry.team
+            );
+
+        if (
+            !team
+        ) {
+            return {
+                error: {
+                    status:
+                        409,
+
+                    message:
+                        (
+                            "Stored team could not be matched "
+                            + `for team ${entry.team}.`
+                        )
+                }
+            };
+        }
+
+        const player =
+            findStoredPlayer(
+                team,
+                entry.player
+            );
+
+        if (
+            !player
+        ) {
+            return {
+                error: {
+                    status:
+                        409,
+
+                    message:
+                        (
+                            "Stored player could not be matched: "
+                            + entry.player
+                        )
+                }
+            };
+        }
+
+        const previousValue =
+            getCurrentPlayerValue(
+                player,
+                entry.field
+            );
+
+        if (
+            previousValue === null
+        ) {
+            return {
+                error: {
+                    status:
+                        409,
+
+                    message:
+                        (
+                            "Stored scoreboard value is invalid "
+                            + `for ${entry.player} / ${entry.field}.`
+                        )
+                }
+            };
+        }
+
+        if (
+            previousValue ===
+            entry.userValue
+        ) {
+            continue;
+        }
+
+        const reviewField =
+            getStoredReviewField(
+                player,
+                entry.field
+            );
+
+        const ocrValue =
+            getOriginalOcrValue(
+                existingReport,
+                player,
+                entry.team,
+                entry.player,
+                entry.field
+            );
+
+        if (
+            ocrValue === null
+        ) {
+            return {
+                error: {
+                    status:
+                        409,
+
+                    message:
+                        (
+                            "Original OCR value could not be established "
+                            + `for ${entry.player} / ${entry.field}.`
+                        )
+                }
+            };
+        }
+
+        adjustmentFields.push({
+            team:
+                entry.team,
+
+            player:
+                String(
+                    player?.player
+                    || entry.player
+                ),
+
+            field:
+                entry.field,
+
+            ocrValue:
+                ocrValue,
+
+            previousValue:
+                previousValue,
+
+            newValue:
+                entry.userValue,
+
+            differsFromOcr:
+                entry.userValue !==
+                ocrValue,
+
+            ocrEvidence:
+                buildOcrEvidence(
+                    reviewField,
+                    ocrValue
+                )
+        });
+
+        player[
+            entry.field
+        ] = entry.userValue;
+    }
+
+    if (
+        adjustmentFields.length === 0
+    ) {
+        return {
+            error: {
+                status:
+                    400,
+
+                message:
+                    "No scoreboard values were changed."
+            }
+        };
+    }
+
+    const adjustmentId =
+        generateAdjustmentId();
+
+    const adjustedAt =
+        new Date()
+            .toISOString();
+
+    const adjustments = (
+        Array.isArray(
+            existingReport
+                ?.adjustments
+        )
+            ? existingReport.adjustments
+            : []
+    );
+
+    adjustments.push({
+        adjustmentId:
+            adjustmentId,
+
+        adjustedAt:
+            adjustedAt,
+
+        previousConfirmationStatus:
+            currentStatus,
+
+        fields:
+            adjustmentFields
+    });
+
+    existingReport.adjustments =
+        adjustments;
+
+    existingReport.lastAdjustedAt =
+        adjustedAt;
+
+    existingReport.adjustmentCount =
+        adjustments.length;
+
+    /*
+     * Keep confirmationStatus as the acceptance lineage.
+     *
+     * auto_accepted remains auto_accepted.
+     * confirmed remains confirmed.
+     * confirmed_with_disputes remains confirmed_with_disputes.
+     *
+     * The presence of adjustments[] tells us the effective
+     * scoreboard has been edited after acceptance.
+     */
+
+    return {
+        success:
+            true,
+
+        mode:
+            CONFIRM_MODE_ADJUSTMENT,
+
+        confirmationStatus:
+            currentStatus,
+
+        adjustedAt:
+            adjustedAt,
+
+        adjustmentId:
+            adjustmentId,
+
+        adjustmentCount:
+            adjustments.length,
+
+        changedFieldCount:
+            adjustmentFields.length
+    };
+}
 
 /* =========================================================
    MAIN
@@ -385,7 +1509,8 @@ export async function handleOcrConfirmation(
            ================================================= */
 
         if (
-            request.method !== "POST"
+            request.method !==
+            "POST"
         ) {
             return jsonResponse(
                 {
@@ -398,7 +1523,6 @@ export async function handleOcrConfirmation(
                 405
             );
         }
-
 
         /* =================================================
            STORAGE
@@ -418,7 +1542,6 @@ export async function handleOcrConfirmation(
                 503
             );
         }
-
 
         /* =================================================
            AUTHENTICATED SESSION
@@ -469,9 +1592,8 @@ export async function handleOcrConfirmation(
             );
         }
 
-
         /* =================================================
-           OWNER HASH CONFIGURATION
+           OWNER HASH
            ================================================= */
 
         const ownerSecret =
@@ -501,18 +1623,18 @@ export async function handleOcrConfirmation(
                 ownerSecret
             );
 
-
         /* =================================================
            REQUEST BODY
            ================================================= */
 
-        let body = null;
+        let body =
+            null;
 
         try {
             body =
                 await request.json();
-
-        } catch {
+        }
+        catch {
             return jsonResponse(
                 {
                     success:
@@ -525,6 +1647,14 @@ export async function handleOcrConfirmation(
             );
         }
 
+        /* =================================================
+           MODE
+           ================================================= */
+
+        const mode =
+            normalizeMode(
+                body?.mode
+            );
 
         /* =================================================
            MATCH ID
@@ -552,7 +1682,6 @@ export async function handleOcrConfirmation(
             );
         }
 
-
         /* =================================================
            FIELD DATA
            ================================================= */
@@ -574,7 +1703,12 @@ export async function handleOcrConfirmation(
                         false,
 
                     message:
-                        "At least one reviewed field is required."
+                        (
+                            mode ===
+                            CONFIRM_MODE_ADJUSTMENT
+                                ? "At least one adjusted field is required."
+                                : "At least one reviewed field is required."
+                        )
                 },
                 400
             );
@@ -590,8 +1724,8 @@ export async function handleOcrConfirmation(
                 );
 
         if (
-            fields.length
-            !== rawFields.length
+            fields.length !==
+            rawFields.length
         ) {
             return jsonResponse(
                 {
@@ -599,15 +1733,14 @@ export async function handleOcrConfirmation(
                         false,
 
                     message:
-                        "One or more confirmation fields are invalid."
+                        "One or more scoreboard fields are invalid."
                 },
                 400
             );
         }
 
-
         /* =================================================
-           SUBMITTED FIELD SET / DUPLICATES
+           DUPLICATES
            ================================================= */
 
         const submittedFieldKeys =
@@ -617,15 +1750,12 @@ export async function handleOcrConfirmation(
             const entry
             of fields
         ) {
-            const key = [
-                entry.team,
-                normalizePlayerName(
-                    entry.player
-                ),
-                entry.field
-            ].join(
-                "|"
-            );
+            const key =
+                buildFieldKey(
+                    entry.team,
+                    entry.player,
+                    entry.field
+                );
 
             if (
                 submittedFieldKeys.has(
@@ -638,7 +1768,7 @@ export async function handleOcrConfirmation(
                             false,
 
                         message:
-                            "Duplicate review fields were submitted."
+                            "Duplicate scoreboard fields were submitted."
                     },
                     400
                 );
@@ -648,7 +1778,6 @@ export async function handleOcrConfirmation(
                 key
             );
         }
-
 
         /* =================================================
            LOAD STORED REPORT
@@ -677,15 +1806,16 @@ export async function handleOcrConfirmation(
             );
         }
 
-        let existingReport = null;
+        let existingReport =
+            null;
 
         try {
             existingReport =
                 JSON.parse(
                     await existingObject.text()
                 );
-
-        } catch {
+        }
+        catch {
             return jsonResponse(
                 {
                     success:
@@ -697,7 +1827,6 @@ export async function handleOcrConfirmation(
                 500
             );
         }
-
 
         /* =================================================
            VERIFY STORED MATCH
@@ -721,9 +1850,8 @@ export async function handleOcrConfirmation(
             );
         }
 
-
         /* =================================================
-           OWNERSHIP CHECK
+           OWNERSHIP
            ================================================= */
 
         const submittedBy =
@@ -748,8 +1876,8 @@ export async function handleOcrConfirmation(
         }
 
         if (
-            submittedBy
-            !== authenticatedOwnerId
+            submittedBy !==
+            authenticatedOwnerId
         ) {
             return jsonResponse(
                 {
@@ -757,12 +1885,16 @@ export async function handleOcrConfirmation(
                         false,
 
                     message:
-                        "You are not authorized to confirm this match."
+                        (
+                            mode ===
+                            CONFIRM_MODE_ADJUSTMENT
+                                ? "You are not authorized to adjust this match."
+                                : "You are not authorized to confirm this match."
+                        )
                 },
                 403
             );
         }
-
 
         /* =================================================
            STORED TEAMS
@@ -790,101 +1922,24 @@ export async function handleOcrConfirmation(
                 409
             );
         }
-
-
         /* =================================================
-           EXPECTED REVIEW FIELD SET
+           EXPIRATION CHECK MODE
            ================================================= */
+        const editDeadlineAt =
+            String(
+                existingReport?.editDeadlineAt
+                || ""
+            ).trim();
 
-        const expectedFieldKeys =
-            new Set();
-
-        for (
-            let teamArrayIndex = 0;
-            teamArrayIndex < teams.length;
-            teamArrayIndex += 1
-        ) {
-            const team =
-                teams[
-                    teamArrayIndex
-                ];
-
-            const teamIndex =
-                Number(
-                    team?.team
-                    ?? team?.teamIndex
-                    ?? (
-                        teamArrayIndex
-                        + 1
-                    )
-                );
-
-            const players = (
-                Array.isArray(
-                    team?.players
-                )
-                    ? team.players
-                    : []
+        const editDeadlineMs =
+            Date.parse(
+                editDeadlineAt
             );
 
-            for (
-                const player
-                of players
-            ) {
-                const playerName =
-                    normalizePlayerName(
-                        player?.player
-                        || player?.matchedName
-                        || player?.username
-                        || ""
-                    );
-
-                if (
-                    !playerName
-                ) {
-                    continue;
-                }
-
-                const reviewFields = (
-                    player?.reviewFields
-                    && typeof player.reviewFields
-                        === "object"
-                    && !Array.isArray(
-                        player.reviewFields
-                    )
-                        ? player.reviewFields
-                        : {}
-                );
-
-                for (
-                    const fieldName
-                    of Object.keys(
-                        reviewFields
-                    )
-                ) {
-                    if (
-                        !ALLOWED_REVIEW_FIELDS.has(
-                            fieldName
-                        )
-                    ) {
-                        continue;
-                    }
-
-                    expectedFieldKeys.add(
-                        [
-                            teamIndex,
-                            playerName,
-                            fieldName
-                        ].join(
-                            "|"
-                        )
-                    );
-                }
-            }
-        }
-
         if (
-            expectedFieldKeys.size === 0
+            !Number.isFinite(
+                editDeadlineMs
+            )
         ) {
             return jsonResponse(
                 {
@@ -892,20 +1947,54 @@ export async function handleOcrConfirmation(
                         false,
 
                     message:
-                        "Stored match report contains no reviewable fields."
+                        "The scoreboard modification deadline is unavailable."
                 },
                 409
             );
         }
 
+        if (
+            Date.now() >
+                editDeadlineMs
+        ) {
+            return jsonResponse(
+                {
+                    success:
+                        false,
 
+                    code:
+                        "EDIT_WINDOW_CLOSED",
+
+                    message:
+                        "The deadline to review or modify this scoreboard has passed.",
+
+                    editDeadlineAt
+                },
+                409
+            );
+        }
         /* =================================================
-           REQUIRE COMPLETE REVIEW
+           PROCESS MODE
            ================================================= */
 
+        const result = (
+            mode ===
+            CONFIRM_MODE_ADJUSTMENT
+                ? processAdjustment(
+                    existingReport,
+                    teams,
+                    fields
+                )
+                : processReviewConfirmation(
+                    existingReport,
+                    teams,
+                    fields,
+                    submittedFieldKeys
+                )
+        );
+
         if (
-            submittedFieldKeys.size
-            !== expectedFieldKeys.size
+            result?.error
         ) {
             return jsonResponse(
                 {
@@ -913,374 +2002,88 @@ export async function handleOcrConfirmation(
                         false,
 
                     message:
-                        "All scoreboard fields must be reviewed before confirmation."
+                        result.error.message
                 },
-                400
+                result.error.status
             );
         }
-
-        for (
-            const expectedKey
-            of expectedFieldKeys
-        ) {
-            if (
-                !submittedFieldKeys.has(
-                    expectedKey
-                )
-            ) {
-                return jsonResponse(
-                    {
-                        success:
-                            false,
-
-                        message:
-                            "All scoreboard fields must be reviewed before confirmation."
-                    },
-                    400
-                );
-            }
-        }
-
 
         /* =================================================
-           BUILD AUTHORITATIVE REVIEW DATA
+           STORE UPDATED REPORT
            ================================================= */
 
-        const authoritativeFields = [];
+        await putMatchReport(
+            env.OCR_STORAGE,
+            {
+                matchId:
+                    matchId,
 
-        for (
-            const entry
-            of fields
-        ) {
-            const team =
-                findStoredTeam(
-                    teams,
-                    entry.team
-                );
-
-            if (
-                !team
-            ) {
-                return jsonResponse(
-                    {
-                        success:
-                            false,
-
-                        message:
-                            (
-                                "Stored team could not be matched "
-                                + `for team ${entry.team}.`
-                            )
-                    },
-                    409
-                );
+                report:
+                    existingReport
             }
+        );
 
-            const player =
-                findStoredPlayer(
-                    team,
-                    entry.player
-                );
+        /* =================================================
+           RESPONSE
+           ================================================= */
 
-            if (
-                !player
-            ) {
-                return jsonResponse(
-                    {
-                        success:
-                            false,
+        return jsonResponse(
+            {
+                success:
+                    true,
 
-                        message:
-                            (
-                                "Stored player could not be matched: "
-                                + entry.player
-                            )
-                    },
-                    409
-                );
-            }
+                version:
+                    OCR_CONFIRM_VERSION,
 
-            const reviewField = (
-                player?.reviewFields?.[
-                    entry.field
-                ]
-            );
+                matchId:
+                    matchId,
 
-            if (
-                !reviewField
-                || typeof reviewField
-                    !== "object"
-                || Array.isArray(
-                    reviewField
-                )
-            ) {
-                return jsonResponse(
-                    {
-                        success:
-                            false,
+                mode:
+                    result.mode,
 
-                        message:
-                            (
-                                "Stored OCR review evidence is missing "
-                                + `for ${entry.player} / ${entry.field}.`
-                            )
-                    },
-                    409
-                );
-            }
+                confirmationStatus:
+                    result.confirmationStatus,
 
+                confirmedAt:
+                    result.confirmedAt
+                    || null,
 
-            /* =============================================
-               ORIGINAL OCR VALUE
-               ============================================= */
+                adjustedAt:
+                    result.adjustedAt
+                    || null,
 
-            const storedOcrValue = (
-                reviewField.value
-                ?? player?.[
-                    entry.field
-                ]
-                ?? null
-            );
+                hasDisputes:
+                    result.hasDisputes ===
+                    true,
 
-            const ocrValue = (
-                storedOcrValue === null
-                || typeof storedOcrValue
-                    === "undefined"
-                    ? (
-                        entry.field === "ping"
-                            ? 0
-                            : null
-                    )
-                    : normalizeInteger(
-                        storedOcrValue
-                    )
-            );
-
-            if (
-                ocrValue === null
-            ) {
-                return jsonResponse(
-                    {
-                        success:
-                            false,
-
-                        message:
-                            (
-                                "Stored OCR value is invalid "
-                                + `for ${entry.player} / ${entry.field}.`
-                            )
-                    },
-                    409
-                );
-            }
-
-
-            /* =============================================
-               USER VALUE
-               ============================================= */
-
-            let userValue =
-                entry.userValue;
-
-            if (
-                entry.field === "ping"
-                && (
-                    userValue === null
-                    || typeof userValue
-                        === "undefined"
-                )
-            ) {
-                userValue = 0;
-            }
-
-
-            /* =============================================
-               DISPUTE
-               ============================================= */
-
-            const disputed = (
-                userValue
-                !== ocrValue
-            );
-
-            const authoritativeEntry = {
-                team:
-                    entry.team,
-
-                player:
-                    String(
-                        player?.player
-                        || entry.player
+                disputeCount:
+                    Number(
+                        result.disputeCount
+                        || 0
                     ),
 
-                field:
-                    entry.field,
+                adjustmentId:
+                    result.adjustmentId
+                    || null,
 
-                ocrValue:
-                    ocrValue,
-
-                userValue:
-                    userValue,
-
-                finalValue:
-                    userValue,
-
-                disputed:
-                    disputed,
-
-                requiresVerification:
-                    (
-                        reviewField.requiresVerification
-                        === true
+                adjustmentCount:
+                    Number(
+                        result.adjustmentCount
+                        || existingReport
+                            ?.adjustmentCount
+                        || 0
                     ),
 
-                ocrEvidence:
-                    {
-                        selectedValue:
-                            reviewField.value
-                            ?? null,
-
-                        selectedEngine:
-                            reviewField.engine
-                            ?? null,
-
-                        confidence:
-                            reviewField.confidence
-                            ?? null,
-
-                        template:
-                            reviewField.template
-                            ?? null,
-
-                        tesseract:
-                            reviewField.tesseract
-                            ?? null,
-
-                        paddle:
-                            reviewField.paddle
-                            ?? null
-                    }
-            };
-
-            authoritativeFields.push(
-                authoritativeEntry
-            );
-
-
-            /* =============================================
-               APPLY FINAL VALUE
-               ============================================= */
-
-            player[
-                entry.field
-            ] = userValue;
-        }
-
-
-        /* =================================================
-           DISPUTES
-           ================================================= */
-
-        const disputes =
-            authoritativeFields.filter(
-                function(
-                    entry
-                ) {
-                    return (
-                        entry.disputed
-                        === true
-                    );
-                }
-            );
-
-
-        /* =================================================
-           SERVER-DERIVED STATUS
-           ================================================= */
-
-        const confirmationStatus = (
-            disputes.length > 0
-                ? "confirmed_with_disputes"
-                : "confirmed"
+                changedFieldCount:
+                    Number(
+                        result.changedFieldCount
+                        || 0
+                    )
+            },
+            200
         );
-
-
-        /* =================================================
-           CONFIRMATION METADATA
-           ================================================= */
-
-        const confirmedAt =
-            new Date().toISOString();
-
-        existingReport.confirmationStatus =
-            confirmationStatus;
-
-        existingReport.hasDisputes = (
-            disputes.length > 0
-        );
-
-        existingReport.disputeCount = (
-            disputes.length
-        );
-
-        existingReport.confirmation = {
-            status:
-                confirmationStatus,
-
-            confirmedAt:
-                confirmedAt,
-
-            hasDisputes:
-                disputes.length > 0,
-
-            disputeCount:
-                disputes.length,
-
-            fields:
-                authoritativeFields,
-
-            disputes:
-                disputes
-        };
-
-
-    /* =================================================
-    STORE UPDATED REPORT
-    ================================================= */
-
-    await putMatchReport(
-        env.OCR_STORAGE,
-        {
-            matchId:
-                matchId,
-
-            report:
-                existingReport
-        }
-    );
-
-
-    /* =================================================
-    RESPONSE
-
-    Successful confirmation intentionally returns
-    no OCR or storage metadata to the browser.
-    ================================================= */
-
-    return new Response(
-        null,
-        {
-            status:
-                204,
-
-            headers: {
-                "Cache-Control":
-                    "no-store"
-            }
-        }
-    );
-
-    } catch (
+    }
+    catch (
         error
     ) {
         console.error(

@@ -2,7 +2,6 @@ import {
     renderHeader
 } from "/Framework/Shell/JS/renderHeader.js";
 
-
 const announcements = [
     {
         id:
@@ -20,7 +19,6 @@ const announcements = [
         description:
             "Updates and improvements have been released for one of our ARK Ascended projects."
     },
-
     {
         id:
             "example-development",
@@ -37,7 +35,6 @@ const announcements = [
         description:
             "Development has started on another project for the ARK Ascended community."
     },
-
     {
         id:
             "ark-section-launch",
@@ -56,180 +53,156 @@ const announcements = [
     }
 ];
 
+export function initializePage() {
+    renderHeader({
+        eyebrow:
+            "BPD GAMING NETWORK",
 
-renderHeader({
-    eyebrow:
-        "BPD GAMING NETWORK",
+        title:
+            "ARK Announcements",
 
-    title:
-        "ARK Announcements",
+        tabs: [
+            {
+                label:
+                    "Home",
 
-    tabs: [
-        {
-            label:
-                "Home",
+                href:
+                    "/Ark"
+            },
+            {
+                label:
+                    "Mods",
 
-            href:
-                "/Ark"
-        },
-        {
-            label:
-                "Mods",
+                href:
+                    "/Ark/Mods"
+            }
+        ]
+    });
 
-            href:
-                "/Ark/Mods"
-        }
-    ]
-});
+    renderAnnouncements();
 
-
-renderAnnouncements();
-
+    return true;
+}
 
 function renderAnnouncements() {
-
     const announcementList =
         document.getElementById(
             "arkAnnouncementList"
         );
 
-
-    if (!announcementList) {
-
+    if (
+        !announcementList
+    ) {
         return;
-
     }
-
 
     const sortedAnnouncements =
         [...announcements]
             .sort(
-                (
+                function(
                     first,
                     second
-                ) => {
-
-                    return new Date(
-                        second.date
-                    ).getTime() -
-                    new Date(
-                        first.date
-                    ).getTime();
-
+                ) {
+                    return (
+                        new Date(
+                            second.date
+                        ).getTime()
+                        -
+                        new Date(
+                            first.date
+                        ).getTime()
+                    );
                 }
             );
 
-
     announcementList.innerHTML =
         "";
-
 
     if (
         sortedAnnouncements.length ===
         0
     ) {
-
         announcementList.innerHTML = `
             <div class="ark-announcement-empty">
-
                 <span class="ark-content-eyebrow">
                     NO ANNOUNCEMENTS
                 </span>
-
                 <p>
                     There are currently no ARK announcements.
                 </p>
-
             </div>
         `;
 
         return;
-
     }
 
-
     sortedAnnouncements.forEach(
-        announcement => {
-
+        function(
+            announcement
+        ) {
             announcementList.insertAdjacentHTML(
                 "beforeend",
                 createAnnouncement(
                     announcement
                 )
             );
-
         }
     );
-
 }
-
 
 function createAnnouncement(
     announcement
 ) {
-
     const title =
         escapeHtml(
-            announcement?.title ||
-            "Announcement"
+            announcement?.title
+            || "Announcement"
         );
-
 
     const type =
         escapeHtml(
-            announcement?.type ||
-            "General"
+            announcement?.type
+            || "General"
         );
-
 
     const description =
         escapeHtml(
-            announcement?.description ||
-            ""
+            announcement?.description
+            || ""
         );
-
 
     const date =
         formatAnnouncementDate(
             announcement?.date
         );
 
-
     const isoDate =
         escapeAttribute(
-            announcement?.date ||
-            ""
+            announcement?.date
+            || ""
         );
-
 
     return `
         <article
             class="ark-announcement-item"
             id="${escapeAttribute(
-                announcement?.id ||
-                ""
+                announcement?.id
+                || ""
             )}"
         >
-
             <div class="ark-announcement-marker">
-
                 <span
                     class="ark-announcement-dot"
                     aria-hidden="true"
                 ></span>
-
                 <span
                     class="ark-announcement-line"
                     aria-hidden="true"
                 ></span>
-
             </div>
 
-
             <div class="ark-announcement-content">
-
                 <div class="ark-announcement-meta">
-
                     <time
                         datetime="${isoDate}"
                     >
@@ -239,54 +212,41 @@ function createAnnouncement(
                     <span class="ark-announcement-type">
                         ${type}
                     </span>
-
                 </div>
-
 
                 <h3 class="ark-announcement-title">
                     ${title}
                 </h3>
 
-
                 <p class="ark-announcement-description">
                     ${description}
                 </p>
-
             </div>
-
         </article>
     `;
-
 }
-
 
 function formatAnnouncementDate(
     value
 ) {
-
-    if (!value) {
-
+    if (
+        !value
+    ) {
         return "Unknown Date";
-
     }
-
 
     const date =
         new Date(
             `${value}T12:00:00`
         );
 
-
     if (
         Number.isNaN(
             date.getTime()
         )
     ) {
-
         return "Unknown Date";
-
     }
-
 
     return new Intl.DateTimeFormat(
         "en-US",
@@ -305,16 +265,14 @@ function formatAnnouncementDate(
             date
         )
         .toUpperCase();
-
 }
-
 
 function escapeHtml(
     value
 ) {
-
     return String(
-        value ?? ""
+        value
+        ?? ""
     )
         .replaceAll(
             "&",
@@ -336,16 +294,12 @@ function escapeHtml(
             "'",
             "&#039;"
         );
-
 }
-
 
 function escapeAttribute(
     value
 ) {
-
     return escapeHtml(
         value
     );
-
 }

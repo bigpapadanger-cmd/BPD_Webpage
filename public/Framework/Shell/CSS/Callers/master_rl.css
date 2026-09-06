@@ -1,0 +1,46 @@
+/*
+=========================================================
+BPD GAMING NETWORK
+ROCKET LEAGUE MASTER CSS
+=========================================================
+
+Used for all valid /RocketLeague routes.
+*/
+
+/* =========================================================
+   SHELL
+   ========================================================= */
+
+@import url("../General/shell.css");
+@import url("../General/header.css");
+@import url("../General/body.css");
+@import url("../General/footer.css");
+@import url("../General/ocr_popup.css");
+
+/* =========================================================
+   SIDEBAR
+   ========================================================= */
+
+@import url("../Sidebar/sidebar.css");
+@import url("../Sidebar/hover.css");
+@import url("../Sidebar/rl_AuthSidebar.css");
+
+/* =========================================================
+   GLOBAL
+   ========================================================= */
+
+@import url("/Global/Links/links.css");
+
+/* =========================================================
+   ROCKET LEAGUE
+   ========================================================= */
+
+@import url("/Tabs/RocketLeague/Index/CSS/index.css");
+@import url("/Tabs/RocketLeague/Registration/CSS/index.css");
+
+/* =========================================================
+   OCR / MATCH RESULTS
+   ========================================================= */
+
+@import url("/ocr/CSS/disputes.css");
+@import url("/ocr/CSS/submitimg.css");

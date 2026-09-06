@@ -75,3 +75,67 @@ FOR UPLOADING GIT CHANGES:
         git push
 
 
+    <link rel="stylesheet" href="/Framework/Shell/CSS/General/ocr_popup.css">  
+    <link
+        rel="stylesheet"
+        href="/Framework/Shell/CSS/General/shell.css"
+    >
+    <link
+        rel="stylesheet"
+        href="/Framework/Shell/CSS/General/header.css"
+    >
+    <link
+        rel="stylesheet"
+        href="/Framework/Shell/CSS/Sidebar/sidebar.css"
+    >
+    <link
+        rel="stylesheet"
+        href="/Framework/Shell/CSS/General/body.css"
+    >
+    <link
+        rel="stylesheet"
+        href="/Framework/Shell/CSS/General/footer.css"
+    >
+    <link
+        rel="stylesheet"
+        href="/Framework/Shell/CSS/Sidebar/hover.css"
+    >
+    <link
+        rel="stylesheet"
+        href="/Framework/Shell/CSS/Sidebar/rl_AuthSidebar.css"
+    >
+    <link
+        rel="stylesheet"
+        href="/Global/Index/CSS/index.css"
+    >
+    <link
+        rel="stylesheet"
+        href="/Global/404/CSS/404.css"
+    >
+    <link
+        rel="stylesheet"
+        href="/Global/Links/links.css"
+    >
+ 
+    <link
+        rel="stylesheet"
+        href="/Tabs/RocketLeague/Index/CSS/index.css"
+    >
+    <link
+        rel="stylesheet"
+        href="/Required/PrivacyPolicy/CSS/index.css"
+    >
+    <link
+        rel="stylesheet"
+        href="/Required/TOS/CSS/index.css"
+    >
+    <link
+        rel="stylesheet"
+        href="/Required/FAQ/CSS/index.css"
+    >
+    <link rel="stylesheet" href="/Required/About/CSS/index.css">
+    <link rel="stylesheet" href="/Tabs/Ark/CSS/index.css">
+    <link rel="stylesheet" href="/Tabs/RocketLeague/Registration/CSS/index.css">
+    <link rel="stylesheet" href="/Tabs/Minecraft/CSS/index.css">
+    <link rel="stylesheet" href="/ocr/CSS/disputes.css">    
+    <link rel="stylesheet" href="/ocr/CSS/submitimg.css">  

@@ -1,6 +1,9 @@
 "use strict";
 
-import { apiFetch } from "../../../public/scripts/apiConnection.js";
+import {
+    apiFetch
+} from "../../../public/scripts/apiConnection.js";
+
 import {
     cleanupStaleOcrJobs
 } from "./cleanup.js";
@@ -15,10 +18,13 @@ import {
 // ============================================================
 
 const CONSUMER_VERSION =
-    "ocr-job-consumer-1.5";
+    "ocr-job-consumer-1.7";
 
 const OCR_JOB_STATUS_PREFIX =
     "ocr-jobs";
+
+const OCR_PROGRESS_PREFIX =
+    "jobs";
 
 const PROCESSOR_FETCH_TIMEOUT_MS =
     300000;
@@ -28,6 +34,9 @@ const PROCESSING_LEASE_MS =
 
 const MAX_PROCESSOR_RESPONSE_LENGTH =
     8000;
+
+const FAILED_PROGRESS_MAX =
+    97;
 
 // ============================================================
 // NORMALIZATION
@@ -133,7 +142,7 @@ function isProcessingLeaseActive(
 ) {
     if (
         status?.status !==
-        "processing"
+            "processing"
     ) {
         return false;
     }
@@ -306,6 +315,52 @@ async function writeJobStatus(
 }
 
 // ============================================================
+// TEMPORARY PROGRESS CLEANUP
+// ============================================================
+
+function getProgressKey(
+    jobId
+) {
+    return (
+        `${OCR_PROGRESS_PREFIX}/${jobId}.json`
+    );
+}
+
+async function deleteProgressObject(
+    jobId,
+    env
+) {
+    if (
+        !jobId
+        || !env?.OCR_PROGRESS
+    ) {
+        return;
+    }
+
+    try {
+        await env.OCR_PROGRESS.delete(
+            getProgressKey(
+                jobId
+            )
+        );
+    }
+    catch (
+        error
+    ) {
+        console.warn(
+            "[OCR QUEUE] Temporary progress cleanup failed.",
+            {
+                jobId,
+                message:
+                    normalizeErrorMessage(
+                        error
+                    )
+            }
+        );
+    }
+}
+
+// ============================================================
 // START JOB
 // ============================================================
 
@@ -322,9 +377,18 @@ async function markJobStarting(
             env
         );
 
+    /*
+     * Both terminal states stay terminal.
+     *
+     * Transient queue/processor failures are never written
+     * as failed, so a stored failed status represents a job
+     * that should not be restarted by a duplicate delivery.
+     */
     if (
         status.status ===
-        "completed"
+            "completed"
+        || status.status ===
+            "failed"
     ) {
         return {
             statusKey,
@@ -340,11 +404,12 @@ async function markJobStarting(
      * Never reset a genuinely active processor-owned stage
      * back to "starting".
      *
-     * This protects against duplicate queue deliveries.
+     * The queue message must remain retryable until that
+     * processor reaches a terminal state.
      */
     if (
         status.status ===
-        "processing"
+            "processing"
         && isProcessorOwnedStage(
             status.stage
         )
@@ -378,31 +443,48 @@ async function markJobStarting(
 
     const nextStatus = {
         ...status,
+
         status:
             "processing",
+
         stage:
             "starting",
+
         progress:
             Math.max(
-                2,
-                normalizeProgress(
-                    status.progress
+                15,
+                Math.min(
+                    FAILED_PROGRESS_MAX,
+                    normalizeProgress(
+                        status.progress
+                    )
                 )
             ),
+
+        progressSource:
+            "worker",
+
         message:
-            "Starting scoreboard reader.",
+            "Sending data to cloud...",
+
         startedAt:
             status.startedAt
             || now,
+
         updatedAt:
             now,
+
         heartbeatAt:
             now,
+
         completedAt:
             null,
+
         attempt,
+
         error:
             null,
+
         failureSummary:
             null
     };
@@ -468,9 +550,9 @@ async function markJobFailed(
 
     if (
         current.status.status ===
-        "completed"
+            "completed"
         || current.status.status ===
-        "failed"
+            "failed"
     ) {
         return;
     }
@@ -497,24 +579,48 @@ async function markJobFailed(
 
     const nextStatus = {
         ...current.status,
+
         status:
             "failed",
+
         stage:
             "consumer_failed",
+
         progress:
-            normalizeProgress(
-                current.status.progress
+            Math.min(
+                FAILED_PROGRESS_MAX,
+                normalizeProgress(
+                    current.status.progress
+                )
             ),
+
+        progressSource:
+            "worker",
+
         message:
-            "The scoreboard reader hit a bump.",
+            "The scoreboard could not be processed.",
+
         failureSummary:
             summary,
+
+        requiresPlayerReview:
+            false,
+
+        reviewRequired:
+            false,
+
+        confirmationStatus:
+            null,
+
         updatedAt:
             now,
+
         completedAt:
             now,
+
         heartbeatAt:
             now,
+
         error: {
             code,
             message,
@@ -526,6 +632,11 @@ async function markJobFailed(
         await writeJobStatus(
             current.statusKey,
             nextStatus,
+            env
+        );
+
+        await deleteProgressObject(
+            jobId,
             env
         );
     }
@@ -569,9 +680,11 @@ function scheduleDebugTrace(
                             jobId:
                                 trace?.jobId
                                 || null,
+
                             event:
                                 trace?.event
                                 || null,
+
                             message:
                                 normalizeErrorMessage(
                                     error
@@ -684,22 +797,28 @@ async function fetchProcessor(
             {
                 method:
                     "POST",
+
                 headers: {
                     "Accept":
                         "application/json",
+
                     "Content-Type":
                         "application/json",
+
                     "X-OCR-Job-Token":
                         env.OCR_JOB_PROCESS_SECURE_TOKEN,
+
                     "X-BPD-OCR-Queue-Version":
                         CONSUMER_VERSION
                 },
+
                 body:
                     JSON.stringify(
                         {
                             jobId
                         }
                     ),
+
                 signal:
                     controller.signal
             }
@@ -796,13 +915,17 @@ async function processMessage(
         env,
         {
             jobId,
+
             component:
                 "consumer",
+
             event:
                 "message_received",
+
             detail: {
                 version:
                     CONSUMER_VERSION,
+
                 queueAttempt:
                     Number(
                         message?.attempts
@@ -830,14 +953,18 @@ async function processMessage(
             env,
             {
                 jobId,
+
                 component:
                     "consumer",
+
                 event:
                     "terminal_job_skipped",
+
                 detail: {
                     status:
                         starting.status?.status
                         || null,
+
                     stage:
                         starting.status?.stage
                         || null
@@ -848,15 +975,23 @@ async function processMessage(
 
         return {
             jobId,
+
             skipped:
                 true,
+
+            terminal:
+                true,
+
+            retry:
+                false,
+
             reason:
                 "terminal"
         };
     }
 
     // ========================================================
-    // DUPLICATE ACTIVE DELIVERY
+    // DUPLICATE / STILL-ACTIVE DELIVERY
     // ========================================================
 
     if (
@@ -866,17 +1001,22 @@ async function processMessage(
             env,
             {
                 jobId,
+
                 component:
                     "consumer",
+
                 event:
-                    "processor_already_active",
+                    "processor_still_active",
+
                 detail: {
                     stage:
                         starting.status?.stage
                         || null,
+
                     progress:
                         starting.status?.progress
                         ?? null,
+
                     version:
                         CONSUMER_VERSION
                 }
@@ -885,13 +1025,29 @@ async function processMessage(
         );
 
         console.log(
-            `[OCR QUEUE] Active job skipped ${jobId}`
+            `[OCR QUEUE] Processor still active ${jobId}`
         );
 
+        /*
+         * Do not ACK this delivery.
+         *
+         * If an earlier processor request later dies after
+         * setting its lease, ACKing here could leave the job
+         * permanently stuck in processing with no queue
+         * message left to retry it.
+         */
         return {
             jobId,
+
             skipped:
                 true,
+
+            terminal:
+                false,
+
+            retry:
+                true,
+
             reason:
                 "already_active"
         };
@@ -901,14 +1057,18 @@ async function processMessage(
         env,
         {
             jobId,
+
             component:
                 "consumer",
+
             event:
                 "processing_started",
+
             detail: {
                 attempt:
                     starting.status?.attempt
                     || 1,
+
                 version:
                     CONSUMER_VERSION
             }
@@ -935,6 +1095,9 @@ async function processMessage(
         error.code =
             "PROCESS_URL_NOT_CONFIGURED";
 
+        error.permanent =
+            false;
+
         throw error;
     }
 
@@ -952,6 +1115,9 @@ async function processMessage(
 
         error.code =
             "PROCESS_TOKEN_NOT_CONFIGURED";
+
+        error.permanent =
+            false;
 
         throw error;
     }
@@ -976,17 +1142,21 @@ async function processMessage(
             env,
             {
                 jobId,
+
                 component:
                     "consumer",
+
                 event:
                     error?.code ===
                     "PROCESSOR_FETCH_TIMEOUT"
                         ? "processor_fetch_timeout"
                         : "processor_fetch_failed",
+
                 detail: {
                     code:
                         error?.code
                         || null,
+
                     message:
                         normalizeErrorMessage(
                             error
@@ -1019,30 +1189,36 @@ async function processMessage(
         );
 
     // ========================================================
-    // PROCESSOR ALREADY ACTIVE
+    // PROCESSOR STILL ACTIVE
     // ========================================================
 
     if (
         response.status ===
-        202
+            202
     ) {
         scheduleDebugTrace(
             env,
             {
                 jobId,
+
                 component:
                     "consumer",
+
                 event:
-                    "processor_already_active",
+                    "processor_still_active",
+
                 detail: {
                     httpStatus:
                         response.status,
+
                     stage:
                         responseData?.stage
                         || null,
+
                     progress:
                         responseData?.progress
                         ?? null,
+
                     version:
                         CONSUMER_VERSION
                 }
@@ -1051,15 +1227,24 @@ async function processMessage(
         );
 
         console.log(
-            `[OCR QUEUE] Processor already active ${jobId}`
+            `[OCR QUEUE] Processor still active ${jobId}`
         );
 
         return {
             jobId,
+
             skipped:
                 true,
+
+            terminal:
+                false,
+
+            retry:
+                true,
+
             reason:
                 "processor_already_active",
+
             response:
                 responseData
         };
@@ -1102,17 +1287,23 @@ async function processMessage(
             env,
             {
                 jobId,
+
                 component:
                     "consumer",
+
                 event:
                     "processor_rejected",
+
                 detail: {
                     code:
                         error.code,
+
                     httpStatus:
                         response.status,
+
                     permanent:
                         error.permanent,
+
                     response:
                         responseText
                 }
@@ -1158,17 +1349,23 @@ async function processMessage(
             env,
             {
                 jobId,
+
                 component:
                     "consumer",
+
                 event:
                     "processor_rejected",
+
                 detail: {
                     code:
                         error.code,
+
                     httpStatus:
                         response.status,
+
                     permanent:
                         error.permanent,
+
                     response:
                         responseText
                 }
@@ -1187,16 +1384,31 @@ async function processMessage(
         env,
         {
             jobId,
+
             component:
                 "consumer",
+
             event:
                 "processor_completed",
+
             detail: {
                 httpStatus:
                     response.status,
+
                 matchId:
                     responseData.matchId
                     || null,
+
+                confirmationStatus:
+                    responseData
+                        .confirmationStatus
+                    || null,
+
+                requiresPlayerReview:
+                    responseData
+                        .requiresPlayerReview ===
+                    true,
+
                 version:
                     CONSUMER_VERSION
             }
@@ -1210,8 +1422,16 @@ async function processMessage(
 
     return {
         jobId,
+
         skipped:
             false,
+
+        terminal:
+            true,
+
+        retry:
+            false,
+
         response:
             responseData
     };
@@ -1242,23 +1462,29 @@ function traceMessageFailure(
         env,
         {
             jobId,
+
             component:
                 "consumer",
+
             event:
                 "message_failed",
+
             detail: {
                 code:
                     String(
                         error?.code
                         || "QUEUE_PROCESSING_FAILED"
                     ),
+
                 message:
                     normalizeErrorMessage(
                         error
                     ),
+
                 permanent:
                     error?.permanent ===
                     true,
+
                 httpStatus:
                     Number.isFinite(
                         Number(
@@ -1269,6 +1495,7 @@ function traceMessageFailure(
                             error.httpStatus
                         )
                         : null,
+
                 queueAttempt:
                     Number(
                         message?.attempts
@@ -1299,11 +1526,21 @@ async function handleQueueBatch(
             );
 
         try {
-            await processMessage(
-                message,
-                env,
-                ctx
-            );
+            const result =
+                await processMessage(
+                    message,
+                    env,
+                    ctx
+                );
+
+            if (
+                result?.retry ===
+                    true
+            ) {
+                message.retry();
+
+                continue;
+            }
 
             message.ack();
         }
@@ -1316,16 +1553,20 @@ async function handleQueueBatch(
                     jobId:
                         jobId
                         || null,
+
                     code:
                         error?.code
                         || null,
+
                     message:
                         normalizeErrorMessage(
                             error
                         ),
+
                     permanent:
                         error?.permanent ===
                         true,
+
                     queueAttempt:
                         Number(
                             message?.attempts
@@ -1343,7 +1584,7 @@ async function handleQueueBatch(
 
             if (
                 error?.permanent ===
-                true
+                    true
             ) {
                 await markJobFailed(
                     jobId,
@@ -1359,8 +1600,9 @@ async function handleQueueBatch(
             /*
              * Transient failures remain retryable.
              *
-             * Do not force them to 100%.
-             * Cloudflare will redeliver the message.
+             * No failed terminal state is written here.
+             * The durable processing lease protects against
+             * duplicate simultaneous processor execution.
              */
             message.retry();
         }

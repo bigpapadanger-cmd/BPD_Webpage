@@ -1,0 +1,51 @@
+/*
+=========================================================
+BPD GAMING NETWORK
+DEFAULT MASTER CSS
+=========================================================
+
+Used for:
+/
+ /Dashboard
+ /About
+ /FAQ
+ /Privacy
+ /TOS
+ /Error
+
+Also used as the fallback for unknown routes.
+*/
+
+/* =========================================================
+   SHELL
+   ========================================================= */
+
+@import url("../General/shell.css");
+@import url("../General/header.css");
+@import url("../General/body.css");
+@import url("../General/footer.css");
+@import url("../General/ocr_popup.css");
+
+/* =========================================================
+   SIDEBAR
+   ========================================================= */
+
+@import url("../Sidebar/sidebar.css");
+@import url("../Sidebar/hover.css");
+
+/* =========================================================
+   GLOBAL
+   ========================================================= */
+
+@import url("/Global/Links/links.css");
+@import url("/Global/Index/CSS/index.css");
+@import url("/Global/404/CSS/404.css");
+
+/* =========================================================
+   REQUIRED / INFORMATION
+   ========================================================= */
+
+@import url("/Required/About/CSS/index.css");
+@import url("/Required/FAQ/CSS/index.css");
+@import url("/Required/PrivacyPolicy/CSS/index.css");
+@import url("/Required/TOS/CSS/index.css");
