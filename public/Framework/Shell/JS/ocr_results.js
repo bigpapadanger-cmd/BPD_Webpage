@@ -15,7 +15,7 @@ import {
 } from "/scripts/apiConnection.js";
 
 const OCR_RESULTS_VERSION =
-    "ocr-results-2.2";
+    "ocr-results-2.3";
 
 const OCR_RESULT_DIALOG_ID =
     "ocrGlobalResultDialog";
@@ -533,10 +533,20 @@ async function getOcrResult(
         || data?.success !==
             true
     ) {
-        throw new Error(
-            data?.message
-            || "Unable to load OCR result."
-        );
+        const error =
+            new Error(
+                data?.message
+                || "Unable to load OCR result."
+            );
+
+        error.status =
+            response.status;
+
+        error.code =
+            data?.code
+            || null;
+
+        throw error;
     }
 
     const result =
@@ -2729,6 +2739,20 @@ async function openResultModal(
         error
     ) {
         content.replaceChildren();
+
+        setDialogText({
+            title:
+                review
+                    ? "Review Scoreboard"
+                    : "Scoreboard Result",
+
+            subtitle:
+                OCR_RESULTS_CURRENT_MATCH_ID
+                || OCR_RESULTS_CURRENT_JOB_ID,
+
+            message:
+                ""
+        });
 
         setDialogError(
             error?.message

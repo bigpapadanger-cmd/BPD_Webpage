@@ -2,7 +2,7 @@
 
 // ============================================================
 // BPD GAMING NETWORK
-// OCR JOB RESULT
+// OCR MATCH RESULT
 // ============================================================
 
 import {
@@ -10,7 +10,7 @@ import {
 } from "../../../services/common_helpers/reload_sessions.js";
 
 const OCR_GET_RESULT_VERSION =
-    "ocr-get-result-2.1";
+    "ocr-get-result-3.0";
 
 const ALLOWED_SCOREBOARD_FIELDS =
     new Set([
@@ -45,7 +45,6 @@ export async function onRequestGet(
     } = context;
 
     try {
-
         // ====================================================
         // CONFIGURATION
         // ====================================================
@@ -137,7 +136,7 @@ export async function onRequestGet(
             );
 
         // ====================================================
-        // JOB ID
+        // MATCH ID
         // ====================================================
 
         const url =
@@ -145,128 +144,11 @@ export async function onRequestGet(
                 request.url
             );
 
-        const jobId =
-            sanitizeJobId(
-                url.searchParams.get(
-                    "jobId"
-                )
-            );
-
-        if (
-            !jobId
-        ) {
-            return jsonResponse(
-                {
-                    success:
-                        false,
-
-                    message:
-                        "Missing or invalid jobId."
-                },
-                400
-            );
-        }
-
-        // ====================================================
-        // LOAD JOB STATUS
-        // ====================================================
-
-        const statusObject =
-            await env.OCR_STORAGE.get(
-                `ocr-jobs/${jobId}/status.json`
-            );
-
-        if (
-            !statusObject
-        ) {
-            return jsonResponse(
-                {
-                    success:
-                        false,
-
-                    message:
-                        "OCR job was not found."
-                },
-                404
-            );
-        }
-
-        let statusData;
-
-        try {
-            statusData =
-                JSON.parse(
-                    await statusObject.text()
-                );
-        }
-        catch {
-            return jsonResponse(
-                {
-                    success:
-                        false,
-
-                    message:
-                        "Stored OCR job status is invalid."
-                },
-                500
-            );
-        }
-
-        // ====================================================
-        // JOB STATE
-        // ====================================================
-
-        const status =
-            String(
-                statusData?.status
-                || ""
-            )
-                .trim()
-                .toLowerCase();
-
-        if (
-            status ===
-                "failed"
-        ) {
-            return jsonResponse(
-                {
-                    success:
-                        false,
-
-                    message:
-                        statusData?.error
-                            ?.userMessage
-                        || statusData?.error
-                            ?.message
-                        || "OCR job failed."
-                },
-                409
-            );
-        }
-
-        if (
-            status !==
-                "completed"
-        ) {
-            return jsonResponse(
-                {
-                    success:
-                        false,
-
-                    message:
-                        "OCR job is not completed yet."
-                },
-                409
-            );
-        }
-
-        // ====================================================
-        // MATCH ID
-        // ====================================================
-
         const matchId =
             sanitizeMatchId(
-                statusData?.matchId
+                url.searchParams.get(
+                    "matchId"
+                )
             );
 
         if (
@@ -277,10 +159,13 @@ export async function onRequestGet(
                     success:
                         false,
 
+                    code:
+                        "MATCH_ID_INVALID",
+
                     message:
-                        "Completed OCR job does not contain a valid matchId."
+                        "Missing or invalid matchId."
                 },
-                409
+                400
             );
         }
 
@@ -301,8 +186,11 @@ export async function onRequestGet(
                     success:
                         false,
 
+                    code:
+                        "MATCH_REPORT_NOT_FOUND",
+
                     message:
-                        "Completed match report was not found."
+                        "Stored match report was not found."
                 },
                 404
             );
@@ -321,6 +209,9 @@ export async function onRequestGet(
                 {
                     success:
                         false,
+
+                    code:
+                        "MATCH_REPORT_INVALID",
 
                     message:
                         "Stored match report is invalid."
@@ -347,34 +238,11 @@ export async function onRequestGet(
                     success:
                         false,
 
-                    message:
-                        "Stored match report does not match this OCR job."
-                },
-                409
-            );
-        }
-
-        // ====================================================
-        // JOB ID VERIFICATION
-        // ====================================================
-
-        const storedJobId =
-            sanitizeJobId(
-                matchReport?.jobId
-            );
-
-        if (
-            storedJobId
-            && storedJobId !==
-                jobId
-        ) {
-            return jsonResponse(
-                {
-                    success:
-                        false,
+                    code:
+                        "MATCH_ID_MISMATCH",
 
                     message:
-                        "Stored match report does not match this OCR job."
+                        "Stored match report does not match this match ID."
                 },
                 409
             );
@@ -399,6 +267,9 @@ export async function onRequestGet(
                     success:
                         false,
 
+                    code:
+                        "MATCH_OWNER_MISSING",
+
                     message:
                         "Stored match report has no owner."
                 },
@@ -417,6 +288,9 @@ export async function onRequestGet(
                     success:
                         false,
 
+                    code:
+                        "MATCH_ACCESS_DENIED",
+
                     message:
                         "You are not authorized to access this OCR result."
                 },
@@ -425,14 +299,21 @@ export async function onRequestGet(
         }
 
         // ====================================================
+        // JOB LINEAGE
+        // ====================================================
+
+        const jobId =
+            sanitizeJobId(
+                matchReport?.jobId
+            );
+
+        // ====================================================
         // CONFIRMATION STATE
         // ====================================================
 
         const confirmationStatus =
             sanitizeConfirmationStatus(
                 matchReport
-                    ?.confirmationStatus
-                || statusData
                     ?.confirmationStatus
             );
 
@@ -455,8 +336,6 @@ export async function onRequestGet(
             sanitizeTimestamp(
                 matchReport
                     ?.editDeadlineAt
-                || statusData
-                    ?.editDeadlineAt
             );
 
         if (
@@ -466,6 +345,9 @@ export async function onRequestGet(
                 {
                     success:
                         false,
+
+                    code:
+                        "EDIT_DEADLINE_MISSING",
 
                     message:
                         "Stored match report does not contain a valid edit deadline."
@@ -504,6 +386,9 @@ export async function onRequestGet(
                     success:
                         false,
 
+                    code:
+                        "SCOREBOARD_EMPTY",
+
                     message:
                         "Stored match report contains no scoreboard values."
                 },
@@ -526,10 +411,12 @@ export async function onRequestGet(
                 jobId,
 
                 matchId,
+
                 imageUrl:
-                    `/api/ocr/jobs/image?jobId=${encodeURIComponent(
-                        jobId
+                    `/api/ocr/jobs/image?matchId=${encodeURIComponent(
+                        matchId
                     )}`,
+
                 confirmationStatus,
 
                 requiresPlayerReview,
@@ -581,6 +468,9 @@ export async function onRequestGet(
             {
                 success:
                     false,
+
+                code:
+                    "OCR_RESULT_LOAD_FAILED",
 
                 message:
                     "Unable to load OCR result."
@@ -680,13 +570,10 @@ function sanitizePublicScoreboard(
                 const field
                 of ALLOWED_SCOREBOARD_FIELDS
             ) {
-                const reviewField = (
+                const reviewField =
                     player
                         ?.reviewFields
-                        ?.[
-                            field
-                        ]
-                );
+                        ?.[field];
 
                 let effectiveValue =
                     player?.[
@@ -804,11 +691,10 @@ function sanitizeReviewField(
             reviewField?.value
         );
 
-    const sanitizedValue = (
+    const sanitizedValue =
         value !== null
             ? value
-            : fallbackValue
-    );
+            : fallbackValue;
 
     if (
         sanitizedValue ===
@@ -894,7 +780,7 @@ function sanitizeEngineEvidence(
         sanitizeScoreboardValue(
             evidence?.value
             ?? evidence?.selectedValue
-    );
+        );
 
     if (
         value !== null
