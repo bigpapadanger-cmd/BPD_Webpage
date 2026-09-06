@@ -28,6 +28,7 @@ const OCR_SCRIPTS = [
 function loadScript(
     src
 ) {
+
     const scriptUrl =
         new URL(
             src,

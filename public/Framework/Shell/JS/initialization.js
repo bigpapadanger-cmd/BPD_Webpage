@@ -20,6 +20,15 @@ export async function initializeRouteModule(
             window.location.origin
         );
 
+    if (
+        moduleUrl.pathname ===
+        "/Framework/Shell/JS/initialization.js"
+    ) {
+        throw new Error(
+            "initialization.js cannot be used as a route page module."
+        );
+    }
+
     const pageModule =
         await import(
             moduleUrl.href
