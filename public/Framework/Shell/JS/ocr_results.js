@@ -15,7 +15,7 @@ import {
 } from "/scripts/apiConnection.js";
 
 const OCR_RESULTS_VERSION =
-    "ocr-results-2.1";
+    "ocr-results-2.2";
 
 const OCR_RESULT_DIALOG_ID =
     "ocrGlobalResultDialog";
@@ -51,6 +51,82 @@ let OCR_RESULTS_CURRENT_RESPONSE =
 
 let OCR_RESULTS_CURRENT_EDIT_DEADLINE_AT =
     null;
+
+    /* =========================================================
+   SCOREBOARD IMAGE
+   ========================================================= */
+
+function createOcrResultImage() {
+    const imageUrl =
+        String(
+            OCR_RESULTS_CURRENT_RESPONSE
+                ?.imageUrl
+            || ""
+        )
+            .trim();
+
+    if (
+        !imageUrl
+    ) {
+        return null;
+    }
+
+    const wrapper =
+        document.createElement(
+            "div"
+        );
+
+    wrapper.className =
+        "ocr-result-image-wrap";
+
+    const image =
+        document.createElement(
+            "img"
+        );
+
+    image.className =
+        "ocr-result-image";
+
+    image.alt =
+        "Submitted Rocket League scoreboard";
+
+    image.loading =
+        "eager";
+
+    image.decoding =
+        "async";
+
+    image.src =
+        imageUrl;
+
+    image.addEventListener(
+        "error",
+        function() {
+            console.warn(
+                "[OCR RESULTS] Stored scoreboard image could not be loaded.",
+                {
+                    jobId:
+                        OCR_RESULTS_CURRENT_JOB_ID,
+
+                    matchId:
+                        OCR_RESULTS_CURRENT_MATCH_ID
+                }
+            );
+
+            wrapper.remove();
+        },
+        {
+            once:
+                true
+        }
+    );
+
+    wrapper.appendChild(
+        image
+    );
+
+    return wrapper;
+}
 
 /* =========================================================
    NORMALIZATION
@@ -1528,16 +1604,10 @@ function renderOcrResultTable(
                 function(
                     player
                 ) {
-                    const fields = (
-                        mode ===
-                            "review"
-                            ? getReviewRequiredFields(
-                                player
-                            )
-                            : getResultDisplayFields(
-                                player
-                            )
-                    );
+                    const fields =
+                        getResultDisplayFields(
+                            player
+                        );
 
                     fields.forEach(
                         function(
@@ -1620,6 +1690,17 @@ function renderOcrResultTable(
                     "This scoreboard has already been accepted. "
                     + "You can edit it if a value needs correction."
                 );
+    }
+
+    const scoreboardImage =
+        createOcrResultImage();
+
+    if (
+        scoreboardImage
+    ) {
+        content.append(
+            scoreboardImage
+        );
     }
 
     content.append(

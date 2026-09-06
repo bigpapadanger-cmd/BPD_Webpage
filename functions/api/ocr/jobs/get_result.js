@@ -526,7 +526,10 @@ export async function onRequestGet(
                 jobId,
 
                 matchId,
-
+                imageUrl:
+                    `/api/ocr/jobs/image?jobId=${encodeURIComponent(
+                        jobId
+                    )}`,
                 confirmationStatus,
 
                 requiresPlayerReview,

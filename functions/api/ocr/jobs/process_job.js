@@ -1,6 +1,7 @@
 "use strict";
 
 import {
+    putMatchImage,
     putMatchReport
 } from "../../../services/ocr/storage.js";
 
@@ -1372,8 +1373,9 @@ async function persistResult(
     env,
     jobId,
     providerData,
-    requestData
-) {
+    requestData,
+    imageBytes
+){
     const result =
         getProviderResult(
             providerData
@@ -1528,6 +1530,23 @@ async function persistResult(
         storedAt
     };
 
+        await putMatchImage(
+        env.OCR_STORAGE,
+        {
+            matchId,
+
+            image:
+                imageBytes,
+
+            contentType:
+                "image/png",
+
+            metadata: {
+                jobId,
+                submittedBy
+            }
+        }
+    );
     await putMatchReport(
         env.OCR_STORAGE,
         {
@@ -2061,7 +2080,8 @@ async function processJob(
                 env,
                 jobId,
                 providerData,
-                requestData
+                requestData,
+                imageBytes
             );
 
         currentStatus =
