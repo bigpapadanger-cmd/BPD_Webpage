@@ -6,7 +6,8 @@
    ========================================================= */
 
 import {
-    putMatchReport
+    getCurrentMatchReport,
+    updateCurrentMatchReport
 } from "./storage.js";
 
 import {
@@ -18,7 +19,7 @@ import {
    ========================================================= */
 
 const OCR_CONFIRM_VERSION =
-    "ocr-confirm-2.0";
+    "ocr-confirm-2.1";
 
 /* =========================================================
    MODES
@@ -70,11 +71,9 @@ function jsonResponse(
         {
             status:
                 status,
-
             headers: {
                 "Content-Type":
                     "application/json",
-
                 "Cache-Control":
                     "no-store"
             }
@@ -104,7 +103,6 @@ async function createOwnerHash(
             {
                 name:
                     "HMAC",
-
                 hash:
                     "SHA-256"
             },
@@ -160,7 +158,8 @@ function normalizeString(
         String(
             value
             ?? ""
-        ).trim();
+        )
+            .trim();
 
     return (
         normalized
@@ -171,6 +170,18 @@ function normalizeString(
 function normalizeInteger(
     value
 ) {
+    if (
+        value === null
+        || value === undefined
+        || String(
+            value
+        )
+            .trim() ===
+            ""
+    ) {
+        return null;
+    }
+
     const numeric =
         Number(
             value
@@ -347,9 +358,12 @@ function normalizeFieldEntry(
             "undefined"
         || String(
             entry.userValue
-        ).trim() === ""
+        )
+            .trim() ===
+            ""
             ? (
-                field === "ping"
+                field ===
+                    "ping"
                     ? 0
                     : null
             )
@@ -367,13 +381,10 @@ function normalizeFieldEntry(
     return {
         team:
             team,
-
         player:
             player,
-
         field:
             field,
-
         userValue:
             userValue
     };
@@ -398,10 +409,12 @@ function buildFieldKey(
         String(
             field
             || ""
-        ).trim()
-    ].join(
-        "|"
-    );
+        )
+            .trim()
+    ]
+        .join(
+            "|"
+        );
 }
 
 /* =========================================================
@@ -495,10 +508,13 @@ function getCurrentPlayerValue(
             "undefined"
         || String(
             storedValue
-        ).trim() === ""
+        )
+            .trim() ===
+            ""
     ) {
         return (
-            field === "ping"
+            field ===
+                "ping"
                 ? 0
                 : null
         );
@@ -687,9 +703,11 @@ function getOriginalOcrValue(
         }
 
         if (
-            field === "ping"
+            field ===
+                "ping"
             && (
-                reviewField.value === null
+                reviewField.value ===
+                    null
                 || typeof reviewField.value ===
                     "undefined"
             )
@@ -707,7 +725,8 @@ function getOriginalOcrValue(
         );
 
     if (
-        confirmationValue !== null
+        confirmationValue !==
+        null
     ) {
         return confirmationValue;
     }
@@ -721,7 +740,8 @@ function getOriginalOcrValue(
         );
 
     if (
-        adjustmentValue !== null
+        adjustmentValue !==
+        null
     ) {
         return adjustmentValue;
     }
@@ -746,19 +766,14 @@ function buildOcrEvidence(
         return {
             selectedValue:
                 ocrValue,
-
             selectedEngine:
                 null,
-
             confidence:
                 null,
-
             template:
                 null,
-
             tesseract:
                 null,
-
             paddle:
                 null
         };
@@ -768,29 +783,23 @@ function buildOcrEvidence(
         selectedValue:
             reviewField.value
             ?? ocrValue,
-
         selectedEngine:
             reviewField.engine
             ?? null,
-
         confidence:
             reviewField.confidence
             ?? null,
-
         template:
             reviewField.template
             ?? null,
-
         tesseract:
             reviewField.tesseract
             ?? null,
-
         paddle:
             reviewField.paddle
             ?? null
     };
 }
-
 /* =========================================================
    EXPECTED REVIEW FIELD SET
    ========================================================= */
@@ -911,7 +920,6 @@ function processReviewConfirmation(
             error: {
                 status:
                     409,
-
                 message:
                     "This scoreboard is no longer awaiting review."
             }
@@ -924,13 +932,13 @@ function processReviewConfirmation(
         );
 
     if (
-        expectedFieldKeys.size === 0
+        expectedFieldKeys.size ===
+            0
     ) {
         return {
             error: {
                 status:
                     409,
-
                 message:
                     "Stored match report contains no reviewable fields."
             }
@@ -945,7 +953,6 @@ function processReviewConfirmation(
             error: {
                 status:
                     400,
-
                 message:
                     "All scoreboard fields must be reviewed before confirmation."
             }
@@ -965,7 +972,6 @@ function processReviewConfirmation(
                 error: {
                     status:
                         400,
-
                     message:
                         "All scoreboard fields must be reviewed before confirmation."
                 }
@@ -993,7 +999,6 @@ function processReviewConfirmation(
                 error: {
                     status:
                         409,
-
                     message:
                         (
                             "Stored team could not be matched "
@@ -1016,7 +1021,6 @@ function processReviewConfirmation(
                 error: {
                     status:
                         409,
-
                     message:
                         (
                             "Stored player could not be matched: "
@@ -1039,7 +1043,6 @@ function processReviewConfirmation(
                 error: {
                     status:
                         409,
-
                     message:
                         (
                             "Stored OCR review evidence is missing "
@@ -1059,13 +1062,13 @@ function processReviewConfirmation(
             );
 
         if (
-            ocrValue === null
+            ocrValue ===
+                null
         ) {
             return {
                 error: {
                     status:
                         409,
-
                     message:
                         (
                             "Stored OCR value is invalid "
@@ -1083,33 +1086,25 @@ function processReviewConfirmation(
         authoritativeFields.push({
             team:
                 entry.team,
-
             player:
                 String(
                     player?.player
                     || entry.player
                 ),
-
             field:
                 entry.field,
-
             ocrValue:
                 ocrValue,
-
             userValue:
                 entry.userValue,
-
             finalValue:
                 entry.userValue,
-
             disputed:
                 disputed,
-
             requiresVerification:
                 reviewField
                     .requiresVerification ===
                 true,
-
             ocrEvidence:
                 buildOcrEvidence(
                     reviewField,
@@ -1119,7 +1114,8 @@ function processReviewConfirmation(
 
         player[
             entry.field
-        ] = entry.userValue;
+        ] =
+            entry.userValue;
     }
 
     const disputes =
@@ -1162,19 +1158,14 @@ function processReviewConfirmation(
     existingReport.confirmation = {
         status:
             confirmationStatus,
-
         confirmedAt:
             confirmedAt,
-
         hasDisputes:
             disputes.length > 0,
-
         disputeCount:
             disputes.length,
-
         fields:
             authoritativeFields,
-
         disputes:
             disputes
     };
@@ -1182,19 +1173,14 @@ function processReviewConfirmation(
     return {
         success:
             true,
-
         mode:
             CONFIRM_MODE_REVIEW,
-
         confirmationStatus:
             confirmationStatus,
-
         confirmedAt:
             confirmedAt,
-
         hasDisputes:
             disputes.length > 0,
-
         disputeCount:
             disputes.length
     };
@@ -1223,7 +1209,6 @@ function processAdjustment(
             error: {
                 status:
                     409,
-
                 message:
                     "This scoreboard must complete review before adjustments can be made."
             }
@@ -1244,7 +1229,6 @@ function processAdjustment(
             error: {
                 status:
                     409,
-
                 message:
                     "This scoreboard is not in a state that can be adjusted."
             }
@@ -1271,7 +1255,6 @@ function processAdjustment(
                 error: {
                     status:
                         409,
-
                     message:
                         (
                             "Stored team could not be matched "
@@ -1294,7 +1277,6 @@ function processAdjustment(
                 error: {
                     status:
                         409,
-
                     message:
                         (
                             "Stored player could not be matched: "
@@ -1311,13 +1293,13 @@ function processAdjustment(
             );
 
         if (
-            previousValue === null
+            previousValue ===
+                null
         ) {
             return {
                 error: {
                     status:
                         409,
-
                     message:
                         (
                             "Stored scoreboard value is invalid "
@@ -1350,13 +1332,13 @@ function processAdjustment(
             );
 
         if (
-            ocrValue === null
+            ocrValue ===
+                null
         ) {
             return {
                 error: {
                     status:
                         409,
-
                     message:
                         (
                             "Original OCR value could not be established "
@@ -1369,29 +1351,22 @@ function processAdjustment(
         adjustmentFields.push({
             team:
                 entry.team,
-
             player:
                 String(
                     player?.player
                     || entry.player
                 ),
-
             field:
                 entry.field,
-
             ocrValue:
                 ocrValue,
-
             previousValue:
                 previousValue,
-
             newValue:
                 entry.userValue,
-
             differsFromOcr:
                 entry.userValue !==
                 ocrValue,
-
             ocrEvidence:
                 buildOcrEvidence(
                     reviewField,
@@ -1401,17 +1376,18 @@ function processAdjustment(
 
         player[
             entry.field
-        ] = entry.userValue;
+        ] =
+            entry.userValue;
     }
 
     if (
-        adjustmentFields.length === 0
+        adjustmentFields.length ===
+            0
     ) {
         return {
             error: {
                 status:
                     400,
-
                 message:
                     "No scoreboard values were changed."
             }
@@ -1437,13 +1413,10 @@ function processAdjustment(
     adjustments.push({
         adjustmentId:
             adjustmentId,
-
         adjustedAt:
             adjustedAt,
-
         previousConfirmationStatus:
             currentStatus,
-
         fields:
             adjustmentFields
     });
@@ -1471,22 +1444,16 @@ function processAdjustment(
     return {
         success:
             true,
-
         mode:
             CONFIRM_MODE_ADJUSTMENT,
-
         confirmationStatus:
             currentStatus,
-
         adjustedAt:
             adjustedAt,
-
         adjustmentId:
             adjustmentId,
-
         adjustmentCount:
             adjustments.length,
-
         changedFieldCount:
             adjustmentFields.length
     };
@@ -1503,7 +1470,6 @@ export async function handleOcrConfirmation(
     }
 ) {
     try {
-
         /* =================================================
            METHOD
            ================================================= */
@@ -1516,7 +1482,6 @@ export async function handleOcrConfirmation(
                 {
                     success:
                         false,
-
                     message:
                         "Method not allowed."
                 },
@@ -1535,7 +1500,6 @@ export async function handleOcrConfirmation(
                 {
                     success:
                         false,
-
                     message:
                         "OCR storage binding is not configured."
                 },
@@ -1561,7 +1525,6 @@ export async function handleOcrConfirmation(
                 {
                     success:
                         false,
-
                     message:
                         "Authentication required."
                 },
@@ -1575,7 +1538,8 @@ export async function handleOcrConfirmation(
                     .sessionData
                     .EpicUniqueId
                 || ""
-            ).trim();
+            )
+                .trim();
 
         if (
             !epicUniqueId
@@ -1584,7 +1548,6 @@ export async function handleOcrConfirmation(
                 {
                     success:
                         false,
-
                     message:
                         "Authenticated account is missing an EpicUniqueId."
                 },
@@ -1600,7 +1563,8 @@ export async function handleOcrConfirmation(
             String(
                 env.OCR_OWNER_SECRET
                 || ""
-            ).trim();
+            )
+                .trim();
 
         if (
             !ownerSecret
@@ -1609,7 +1573,6 @@ export async function handleOcrConfirmation(
                 {
                     success:
                         false,
-
                     message:
                         "OCR owner hashing is not configured."
                 },
@@ -1639,7 +1602,6 @@ export async function handleOcrConfirmation(
                 {
                     success:
                         false,
-
                     message:
                         "Invalid JSON body."
                 },
@@ -1674,7 +1636,6 @@ export async function handleOcrConfirmation(
                 {
                     success:
                         false,
-
                     message:
                         "A valid 16-character matchId is required."
                 },
@@ -1695,13 +1656,13 @@ export async function handleOcrConfirmation(
         );
 
         if (
-            rawFields.length === 0
+            rawFields.length ===
+                0
         ) {
             return jsonResponse(
                 {
                     success:
                         false,
-
                     message:
                         (
                             mode ===
@@ -1731,7 +1692,6 @@ export async function handleOcrConfirmation(
                 {
                     success:
                         false,
-
                     message:
                         "One or more scoreboard fields are invalid."
                 },
@@ -1766,7 +1726,6 @@ export async function handleOcrConfirmation(
                     {
                         success:
                             false,
-
                         message:
                             "Duplicate scoreboard fields were submitted."
                     },
@@ -1780,15 +1739,13 @@ export async function handleOcrConfirmation(
         }
 
         /* =================================================
-           LOAD STORED REPORT
+           LOAD CURRENT STORED REPORT
            ================================================= */
 
-        const reportKey =
-            `match-reports/${matchId}.json`;
-
         const existingObject =
-            await env.OCR_STORAGE.get(
-                reportKey
+            await getCurrentMatchReport(
+                env.OCR_STORAGE,
+                matchId
             );
 
         if (
@@ -1798,7 +1755,6 @@ export async function handleOcrConfirmation(
                 {
                     success:
                         false,
-
                     message:
                         "Stored match report was not found."
                 },
@@ -1811,16 +1767,32 @@ export async function handleOcrConfirmation(
 
         try {
             existingReport =
-                JSON.parse(
-                    await existingObject.text()
-                );
+                await existingObject.json();
         }
         catch {
             return jsonResponse(
                 {
                     success:
                         false,
+                    message:
+                        "Stored match report is invalid."
+                },
+                500
+            );
+        }
 
+        if (
+            !existingReport
+            || typeof existingReport !==
+                "object"
+            || Array.isArray(
+                existingReport
+            )
+        ) {
+            return jsonResponse(
+                {
+                    success:
+                        false,
                     message:
                         "Stored match report is invalid."
                 },
@@ -1835,14 +1807,13 @@ export async function handleOcrConfirmation(
         if (
             normalizeMatchId(
                 existingReport?.matchId
-            )
-            !== matchId
+            ) !==
+            matchId
         ) {
             return jsonResponse(
                 {
                     success:
                         false,
-
                     message:
                         "Stored match report ID does not match the request."
                 },
@@ -1858,7 +1829,8 @@ export async function handleOcrConfirmation(
             String(
                 existingReport?.submittedBy
                 || ""
-            ).trim();
+            )
+                .trim();
 
         if (
             !submittedBy
@@ -1867,7 +1839,6 @@ export async function handleOcrConfirmation(
                 {
                     success:
                         false,
-
                     message:
                         "Stored match report has no owner."
                 },
@@ -1883,7 +1854,6 @@ export async function handleOcrConfirmation(
                 {
                     success:
                         false,
-
                     message:
                         (
                             mode ===
@@ -1909,27 +1879,30 @@ export async function handleOcrConfirmation(
         );
 
         if (
-            teams.length === 0
+            teams.length ===
+                0
         ) {
             return jsonResponse(
                 {
                     success:
                         false,
-
                     message:
                         "Stored match report contains no teams."
                 },
                 409
             );
         }
+
         /* =================================================
            EXPIRATION CHECK MODE
            ================================================= */
+
         const editDeadlineAt =
             String(
                 existingReport?.editDeadlineAt
                 || ""
-            ).trim();
+            )
+                .trim();
 
         const editDeadlineMs =
             Date.parse(
@@ -1945,7 +1918,6 @@ export async function handleOcrConfirmation(
                 {
                     success:
                         false,
-
                     message:
                         "The scoreboard modification deadline is unavailable."
                 },
@@ -1955,24 +1927,22 @@ export async function handleOcrConfirmation(
 
         if (
             Date.now() >
-                editDeadlineMs
+            editDeadlineMs
         ) {
             return jsonResponse(
                 {
                     success:
                         false,
-
                     code:
                         "EDIT_WINDOW_CLOSED",
-
                     message:
                         "The deadline to review or modify this scoreboard has passed.",
-
                     editDeadlineAt
                 },
                 409
             );
         }
+
         /* =================================================
            PROCESS MODE
            ================================================= */
@@ -2000,7 +1970,6 @@ export async function handleOcrConfirmation(
                 {
                     success:
                         false,
-
                     message:
                         result.error.message
                 },
@@ -2009,19 +1978,15 @@ export async function handleOcrConfirmation(
         }
 
         /* =================================================
-           STORE UPDATED REPORT
+           STORE UPDATED CURRENT REPORT
            ================================================= */
 
-        await putMatchReport(
-            env.OCR_STORAGE,
-            {
-                matchId:
-                    matchId,
-
-                report:
-                    existingReport
-            }
-        );
+        const storageResult =
+            await updateCurrentMatchReport(
+                env.OCR_STORAGE,
+                matchId,
+                existingReport
+            );
 
         /* =================================================
            RESPONSE
@@ -2031,41 +1996,31 @@ export async function handleOcrConfirmation(
             {
                 success:
                     true,
-
                 version:
                     OCR_CONFIRM_VERSION,
-
                 matchId:
                     matchId,
-
                 mode:
                     result.mode,
-
                 confirmationStatus:
                     result.confirmationStatus,
-
                 confirmedAt:
                     result.confirmedAt
                     || null,
-
                 adjustedAt:
                     result.adjustedAt
                     || null,
-
                 hasDisputes:
                     result.hasDisputes ===
                     true,
-
                 disputeCount:
                     Number(
                         result.disputeCount
                         || 0
                     ),
-
                 adjustmentId:
                     result.adjustmentId
                     || null,
-
                 adjustmentCount:
                     Number(
                         result.adjustmentCount
@@ -2073,12 +2028,13 @@ export async function handleOcrConfirmation(
                             ?.adjustmentCount
                         || 0
                     ),
-
                 changedFieldCount:
                     Number(
                         result.changedFieldCount
                         || 0
-                    )
+                    ),
+                currentReportKey:
+                    storageResult.objectKey
             },
             200
         );
@@ -2095,7 +2051,6 @@ export async function handleOcrConfirmation(
             {
                 success:
                     false,
-
                 message:
                     "OCR result confirmation failed."
             },

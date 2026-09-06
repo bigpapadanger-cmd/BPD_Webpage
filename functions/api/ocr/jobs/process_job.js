@@ -6,7 +6,7 @@ import {
 } from "../../../services/ocr/storage.js";
 
 const PROCESS_JOB_VERSION =
-    "ocr-process-job-2.1";
+    "ocr-process-job-2.2";
 
 const OCR_JOB_STATUS_PREFIX =
     "ocr-jobs";
@@ -140,28 +140,20 @@ function getEasternDateParts(
             {
                 timeZone:
                     OCR_EDIT_TIME_ZONE,
-
                 year:
                     "numeric",
-
                 month:
                     "2-digit",
-
                 day:
                     "2-digit",
-
                 weekday:
                     "short",
-
                 hour:
                     "2-digit",
-
                 minute:
                     "2-digit",
-
                 second:
                     "2-digit",
-
                 hourCycle:
                     "h23"
             }
@@ -197,33 +189,27 @@ function getEasternDateParts(
             Number(
                 values.year
             ),
-
         month:
             Number(
                 values.month
             ),
-
         day:
             Number(
                 values.day
             ),
-
         weekday:
             String(
                 values.weekday
                 || ""
             ),
-
         hour:
             Number(
                 values.hour
             ),
-
         minute:
             Number(
                 values.minute
             ),
-
         second:
             Number(
                 values.second
@@ -420,11 +406,9 @@ function jsonResponse(
         ),
         {
             status,
-
             headers: {
                 "Content-Type":
                     "application/json; charset=utf-8",
-
                 "Cache-Control":
                     "no-store"
             }
@@ -981,7 +965,6 @@ async function fetchWithTimeout(
             url,
             {
                 ...options,
-
                 signal:
                     controller.signal
             }
@@ -1099,7 +1082,6 @@ async function callOcrProvider(
         "scoreboard.png"
     );
 
-
     if (
         fields?.expectedPlayerNames !==
             undefined
@@ -1187,20 +1169,18 @@ async function callOcrProvider(
             {
                 method:
                     "POST",
-
                 headers:
                     buildProviderHeaders(
                         env,
                         jobId
                     ),
-
                 body:
                     formData
             },
             OCR_PROVIDER_TIMEOUT_MS
         );
 
-    const data =
+    const responseData =
         await readJsonResponse(
             response
         );
@@ -1210,60 +1190,49 @@ async function callOcrProvider(
     ) {
         const error =
             new Error(
-                data?.message
-                || data?.error?.message
-                || (
-                    "OCR provider returned HTTP "
-                    + response.status
-                )
+                responseData?.message
+                || responseData?.error?.message
+                || `OCR provider returned HTTP ${response.status}.`
             );
 
         error.code =
-            String(
-                data?.error?.code
-                || data?.code
-                || `OCR_PROVIDER_HTTP_${response.status}`
-            );
+            responseData?.code
+            || responseData?.error?.code
+            || "OCR_PROVIDER_REJECTED";
 
         error.httpStatus =
             response.status;
 
         error.providerData =
-            data;
+            responseData;
 
         throw error;
     }
 
     if (
-        !data
-        || data.success !==
-            true
+        !responseData
+        || typeof responseData !==
+            "object"
+        || Array.isArray(
+            responseData
+        )
     ) {
         const error =
             new Error(
-                data?.message
-                || "OCR provider returned an unsuccessful result."
+                "OCR provider returned an invalid JSON response."
             );
 
         error.code =
-            String(
-                data?.error?.code
-                || data?.code
-                || "OCR_PROVIDER_FAILED"
-            );
+            "OCR_PROVIDER_INVALID_RESPONSE";
 
         error.httpStatus =
-            422;
-
-        error.providerData =
-            data;
+            502;
 
         throw error;
     }
 
-    return data;
+    return responseData;
 }
-
 /* =========================================================
    RESULT EXTRACTION
    ========================================================= */
@@ -1373,7 +1342,7 @@ async function persistResult(
     providerData,
     requestData,
     imageBytes
-){
+) {
     const result =
         getProviderResult(
             providerData
@@ -1528,7 +1497,7 @@ async function persistResult(
         storedAt
     };
 
-        await putMatchImage(
+    await putMatchImage(
         env.OCR_STORAGE,
         {
             matchId,
@@ -1545,15 +1514,21 @@ async function persistResult(
             }
         }
     );
-    await putMatchReport(
-        env.OCR_STORAGE,
-        {
-            matchId,
 
-            report:
-                matchReport
-        }
-    );
+    const matchReportStorage =
+        await putMatchReport(
+            env.OCR_STORAGE,
+            {
+                matchId,
+                jobId,
+
+                report:
+                    matchReport,
+
+                preserveOriginal:
+                    true
+            }
+        );
 
     return {
         matchId,
@@ -1567,7 +1542,13 @@ async function persistResult(
         resultKey:
             getResultKey(
                 jobId
-            )
+            ),
+
+        currentReportKey:
+            matchReportStorage.currentKey,
+
+        originalReportKey:
+            matchReportStorage.originalKey
     };
 }
 
@@ -1853,7 +1834,7 @@ async function processJob(
                     false,
 
                 message:
-                    "Invalid jobId."
+                    "Missing or invalid jobId."
             },
             400
         );
@@ -1878,7 +1859,7 @@ async function processJob(
 
                 code:
                     error?.code
-                    || "JOB_STATUS_ERROR",
+                    || "JOB_STATUS_NOT_FOUND",
 
                 message:
                     normalizeErrorMessage(
@@ -1887,68 +1868,74 @@ async function processJob(
             },
             Number(
                 error?.httpStatus
+                || 404
             )
-            || 500
         );
     }
 
+    const normalizedStatus =
+        String(
+            currentStatus?.status
+            || ""
+        )
+            .trim()
+            .toLowerCase();
+
     if (
-        currentStatus.status ===
+        normalizedStatus ===
             "completed"
+        || normalizedStatus ===
+            "failed"
     ) {
         return jsonResponse(
             {
                 success:
                     true,
 
+                duplicate:
+                    true,
+
+                terminal:
+                    true,
+
                 jobId,
 
-                matchId:
-                    currentStatus.matchId
-                    || null,
-
                 status:
-                    "completed",
+                    normalizedStatus,
 
-                stage:
-                    currentStatus.stage
-                    || "completed",
-
-                progress:
-                    100,
-
-                requiresPlayerReview:
-                    currentStatus
-                        .requiresPlayerReview ===
-                    true,
-
-                reviewRequired:
-                    currentStatus
-                        .reviewRequired ===
-                    true,
+                matchId:
+                    currentStatus?.matchId
+                    || null,
 
                 confirmationStatus:
                     currentStatus
-                        .confirmationStatus
+                        ?.confirmationStatus
                     || null,
+
+                requiresPlayerReview:
+                    currentStatus
+                        ?.requiresPlayerReview ===
+                    true,
 
                 editDeadlineAt:
                     currentStatus
-                        .editDeadlineAt
+                        ?.editDeadlineAt
+                    || null,
+
+                resultKey:
+                    currentStatus
+                        ?.resultKey
                     || null,
 
                 version:
                     PROCESS_JOB_VERSION
-            }
+            },
+            200
         );
     }
 
     if (
-        currentStatus.status ===
-            "processing"
-        && currentStatus.stage !==
-            "starting"
-        && isLeaseActive(
+        isLeaseActive(
             currentStatus
         )
     ) {
@@ -1957,22 +1944,25 @@ async function processJob(
                 success:
                     true,
 
+                duplicate:
+                    true,
+
+                processing:
+                    true,
+
                 jobId,
 
                 status:
-                    currentStatus.status,
+                    "processing",
 
                 stage:
-                    currentStatus.stage,
+                    currentStatus?.stage
+                    || null,
 
                 progress:
                     normalizeProgress(
-                        currentStatus.progress
+                        currentStatus?.progress
                     ),
-
-                message:
-                    currentStatus.message
-                    || "",
 
                 version:
                     PROCESS_JOB_VERSION
@@ -1981,6 +1971,44 @@ async function processJob(
         );
     }
 
+    currentStatus =
+        await transitionStatus(
+            env,
+            jobId,
+            currentStatus,
+            {
+                status:
+                    "processing",
+
+                stage:
+                    "starting",
+
+                progress:
+                    JOB_PROGRESS.STARTING,
+
+                message:
+                    "Starting OCR processing.",
+
+                requiresPlayerReview:
+                    false,
+
+                reviewRequired:
+                    false,
+
+                confirmationStatus:
+                    null,
+
+                editDeadlineAt:
+                    null,
+
+                error:
+                    null
+            }
+        );
+
+    let requestData;
+    let imageBytes;
+
     try {
         currentStatus =
             await transitionStatus(
@@ -1988,25 +2016,32 @@ async function processJob(
                 jobId,
                 currentStatus,
                 {
-                    status:
-                        "processing",
-
                     stage:
-                        "cloud_handoff",
+                        "accepting",
 
                     progress:
                         JOB_PROGRESS.ACCEPTING,
 
                     message:
-                        "Sending data to cloud..."
+                        "Loading OCR submission."
                 }
             );
 
-        const requestData =
-            await readJobRequest(
-                env,
-                jobId
-            );
+        [
+            requestData,
+            imageBytes
+        ] =
+            await Promise.all([
+                readJobRequest(
+                    env,
+                    jobId
+                ),
+
+                readJobImage(
+                    env,
+                    jobId
+                )
+            ]);
 
         currentStatus =
             await transitionStatus(
@@ -2015,36 +2050,13 @@ async function processJob(
                 currentStatus,
                 {
                     stage:
-                        "acceptance_checks",
+                        "verifying",
 
                     progress:
                         JOB_PROGRESS.VERIFYING,
 
                     message:
-                        "Verifying image..."
-                }
-            );
-
-        const imageBytes =
-            await readJobImage(
-                env,
-                jobId
-            );
-
-        currentStatus =
-            await transitionStatus(
-                env,
-                jobId,
-                currentStatus,
-                {
-                    stage:
-                        "ocr_provider",
-
-                    progress:
-                        JOB_PROGRESS.OCR_ACCEPTED,
-
-                    message:
-                        "Validating image..."
+                        "Verifying OCR submission."
                 }
             );
 
@@ -2063,13 +2075,30 @@ async function processJob(
                 currentStatus,
                 {
                     stage:
+                        "ocr_accepted",
+
+                    progress:
+                        JOB_PROGRESS.OCR_ACCEPTED,
+
+                    message:
+                        "OCR result received."
+                }
+            );
+
+        currentStatus =
+            await transitionStatus(
+                env,
+                jobId,
+                currentStatus,
+                {
+                    stage:
                         "finalizing",
 
                     progress:
                         JOB_PROGRESS.FINALIZING,
 
                     message:
-                        "Preparing results..."
+                        "Saving OCR result."
                 }
             );
 
@@ -2082,51 +2111,71 @@ async function processJob(
                 imageBytes
             );
 
-        currentStatus =
-            await transitionStatus(
-                env,
-                jobId,
-                currentStatus,
-                {
-                    status:
-                        "completed",
+        const completedAt =
+            new Date()
+                .toISOString();
 
-                    stage:
-                        "completed",
+        const completedStatus = {
+            ...currentStatus,
 
-                    progress:
-                        JOB_PROGRESS.COMPLETED,
+            status:
+                "completed",
 
-                    message:
-                        persisted.requiresPlayerReview
-                            ? "Scoreboard requires review."
-                            : "Scoreboard processed successfully.",
+            stage:
+                "completed",
 
-                    completed:
-                        true,
+            progress:
+                JOB_PROGRESS.COMPLETED,
 
-                    matchId:
-                        persisted.matchId,
+            progressSource:
+                "cloudflare",
 
-                    resultKey:
-                        persisted.resultKey,
+            message:
+                persisted.requiresPlayerReview
+                    ? "OCR complete. Player review is required."
+                    : "OCR complete.",
 
-                    editDeadlineAt:
-                        persisted.editDeadlineAt,
+            matchId:
+                persisted.matchId,
 
-                    requiresPlayerReview:
-                        persisted.requiresPlayerReview,
+            resultKey:
+                persisted.resultKey,
 
-                    reviewRequired:
-                        persisted.requiresPlayerReview,
+            currentReportKey:
+                persisted.currentReportKey,
 
-                    confirmationStatus:
-                        persisted.confirmationStatus,
+            originalReportKey:
+                persisted.originalReportKey,
 
-                    error:
-                        null
-                }
-            );
+            requiresPlayerReview:
+                persisted.requiresPlayerReview,
+
+            reviewRequired:
+                persisted.requiresPlayerReview,
+
+            confirmationStatus:
+                persisted.confirmationStatus,
+
+            editDeadlineAt:
+                persisted.editDeadlineAt,
+
+            error:
+                null,
+
+            updatedAt:
+                completedAt,
+
+            heartbeatAt:
+                completedAt,
+
+            completedAt
+        };
+
+        await writeJobStatus(
+            env,
+            jobId,
+            completedStatus
+        );
 
         await deleteProgressObject(
             env,
@@ -2146,11 +2195,17 @@ async function processJob(
                 status:
                     "completed",
 
-                stage:
-                    "completed",
-
                 progress:
-                    100,
+                    JOB_PROGRESS.COMPLETED,
+
+                resultKey:
+                    persisted.resultKey,
+
+                currentReportKey:
+                    persisted.currentReportKey,
+
+                originalReportKey:
+                    persisted.originalReportKey,
 
                 requiresPlayerReview:
                     persisted.requiresPlayerReview,
@@ -2166,14 +2221,15 @@ async function processJob(
 
                 version:
                     PROCESS_JOB_VERSION
-            }
+            },
+            200
         );
     }
     catch (
         error
     ) {
         console.error(
-            "[OCR PROCESS] Job failed.",
+            "[OCR PROCESS] Job processing failed.",
             {
                 jobId,
 
@@ -2189,19 +2245,18 @@ async function processJob(
         );
 
         try {
-            currentStatus =
-                await markFailed(
-                    env,
-                    jobId,
-                    currentStatus,
-                    error
-                );
+            await markFailed(
+                env,
+                jobId,
+                currentStatus,
+                error
+            );
         }
         catch (
             statusError
         ) {
             console.error(
-                "[OCR PROCESS] Could not persist failure state.",
+                "[OCR PROCESS] Failed to persist terminal failure status.",
                 {
                     jobId,
 
@@ -2220,39 +2275,27 @@ async function processJob(
 
                 jobId,
 
-                code:
-                    error?.code
-                    || "OCR_PROCESS_FAILED",
+                status:
+                    "failed",
 
-                message:
-                    currentStatus?.message
-                    || buildFailureMessage(
-                        error
+                code:
+                    String(
+                        error?.code
+                        || "OCR_PROCESS_FAILED"
                     ),
 
-                error: {
-                    code:
-                        error?.code
-                        || "OCR_PROCESS_FAILED",
-
-                    message:
-                        normalizeErrorMessage(
-                            error
-                        ),
-
-                    userMessage:
-                        buildFailureMessage(
-                            error
-                        )
-                },
+                message:
+                    buildFailureMessage(
+                        error
+                    ),
 
                 version:
                     PROCESS_JOB_VERSION
             },
             Number(
                 error?.httpStatus
+                || 500
             )
-            || 500
         );
     }
 }

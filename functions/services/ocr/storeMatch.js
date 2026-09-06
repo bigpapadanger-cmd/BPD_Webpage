@@ -2,25 +2,30 @@
 // BPD GAMING NETWORK
 // OCR MATCH - INTERNAL STORAGE SERVICE
 // ============================================================
+
 import {
     putMatchImage,
     putMatchReport
 } from "./storage.js";
 
 const STORE_MATCH_VERSION =
-    "ocr-store-match-2.0";
+    "ocr-store-match-2.1";
+
 const DEFAULT_BENCHMARK_PREFIX =
     "ocr-benchmarks";
 
 // ============================================================
 // JSON RESPONSE
 // ============================================================
+
 function jsonResponse(
     body,
     status = 200
 ) {
     return new Response(
-        JSON.stringify(body),
+        JSON.stringify(
+            body
+        ),
         {
             status,
             headers: {
@@ -36,6 +41,7 @@ function jsonResponse(
 // ============================================================
 // TIMING
 // ============================================================
+
 function nowMilliseconds() {
     return performance.now();
 }
@@ -50,13 +56,16 @@ function elapsedSeconds(
                 - startedAt
             )
             / 1000
-        ).toFixed(4)
+        ).toFixed(
+            4
+        )
     );
 }
 
 // ============================================================
 // AUTH
 // ============================================================
+
 function getBearerToken(
     request
 ) {
@@ -66,7 +75,9 @@ function getBearerToken(
                 "Authorization"
             )
             || ""
-        ).trim();
+        )
+            .trim();
+
     if (
         !authorization.startsWith(
             "Bearer "
@@ -74,8 +85,11 @@ function getBearerToken(
     ) {
         return "";
     }
+
     return authorization
-        .slice(7)
+        .slice(
+            7
+        )
         .trim();
 }
 
@@ -84,20 +98,33 @@ function constantTimeEqual(
     second
 ) {
     const a =
-        new TextEncoder().encode(
-            String(first || "")
-        );
+        new TextEncoder()
+            .encode(
+                String(
+                    first
+                    || ""
+                )
+            );
+
     const b =
-        new TextEncoder().encode(
-            String(second || "")
-        );
+        new TextEncoder()
+            .encode(
+                String(
+                    second
+                    || ""
+                )
+            );
+
     if (
-        a.length
-        !== b.length
+        a.length !==
+        b.length
     ) {
         return false;
     }
-    let result = 0;
+
+    let result =
+        0;
+
     for (
         let index = 0;
         index < a.length;
@@ -107,7 +134,9 @@ function constantTimeEqual(
             a[index]
             ^ b[index];
     }
-    return result === 0;
+
+    return result ===
+        0;
 }
 
 function validateInternalRequest(
@@ -118,17 +147,27 @@ function validateInternalRequest(
         String(
             env.OCR_STORAGE_TOKEN
             || ""
-        ).trim();
-    if (!expectedToken) {
+        )
+            .trim();
+
+    if (
+        !expectedToken
+    ) {
         return {
-            valid: false,
-            status: 503,
+            valid:
+                false,
+            status:
+                503,
             reason:
                 "OCR storage authentication is not configured."
         };
     }
+
     const receivedToken =
-        getBearerToken(request);
+        getBearerToken(
+            request
+        );
+
     if (
         !receivedToken
         || !constantTimeEqual(
@@ -137,25 +176,31 @@ function validateInternalRequest(
         )
     ) {
         return {
-            valid: false,
-            status: 401,
+            valid:
+                false,
+            status:
+                401,
             reason:
                 "Unauthorized."
         };
     }
+
     return {
-        valid: true
+        valid:
+            true
     };
 }
 
 // ============================================================
 // ID NORMALIZATION
 // ============================================================
+
 function normalizeId(
     value
 ) {
     return String(
-        value || ""
+        value
+        || ""
     )
         .trim()
         .toUpperCase();
@@ -172,52 +217,63 @@ function validId(
 // ============================================================
 // JSON PARSING
 // ============================================================
+
 function parseJsonObject(
     rawValue
 ) {
     if (
         rawValue === null
-        || typeof rawValue
-            === "undefined"
+        || typeof rawValue ===
+            "undefined"
     ) {
         return null;
     }
+
     if (
-        typeof rawValue
-            === "object"
-        && typeof rawValue.arrayBuffer
-            !== "function"
+        typeof rawValue ===
+            "object"
+        && typeof rawValue.arrayBuffer !==
+            "function"
     ) {
         return (
-            Array.isArray(rawValue)
-            ? null
-            : rawValue
+            Array.isArray(
+                rawValue
+            )
+                ? null
+                : rawValue
         );
     }
+
     try {
         const parsed =
             JSON.parse(
-                String(rawValue)
+                String(
+                    rawValue
+                )
             );
+
         if (
             parsed
-            && typeof parsed
-                === "object"
+            && typeof parsed ===
+                "object"
             && !Array.isArray(
                 parsed
             )
         ) {
             return parsed;
         }
-    } catch {
+    }
+    catch {
         return null;
     }
+
     return null;
 }
 
 // ============================================================
 // BENCHMARK PREFIX
 // ============================================================
+
 function normalizeBenchmarkPrefix(
     value
 ) {
@@ -231,30 +287,44 @@ function normalizeBenchmarkPrefix(
                 /^\/+|\/+$/g,
                 ""
             );
-    if (!raw) {
+
+    if (
+        !raw
+    ) {
         return DEFAULT_BENCHMARK_PREFIX;
     }
+
     const segments =
         raw
-            .split("/")
-            .filter(Boolean);
+            .split(
+                "/"
+            )
+            .filter(
+                Boolean
+            );
+
     const valid =
         segments.every(
-            segment =>
-                /^[a-zA-Z0-9_-]+$/.test(
+            function(
+                segment
+            ) {
+                return /^[a-zA-Z0-9_-]+$/.test(
                     segment
-                )
+                );
+            }
         );
-    return (
-        valid
-        ? segments.join("/")
-        : DEFAULT_BENCHMARK_PREFIX
-    );
+
+    return valid
+        ? segments.join(
+            "/"
+        )
+        : DEFAULT_BENCHMARK_PREFIX;
 }
 
 // ============================================================
 // BENCHMARK STORAGE
 // ============================================================
+
 async function putBenchmarkReport(
     bucket,
     {
@@ -265,6 +335,7 @@ async function putBenchmarkReport(
 ) {
     const objectKey =
         `${prefix}/${jobId}.json`;
+
     await bucket.put(
         objectKey,
         JSON.stringify(
@@ -297,8 +368,10 @@ async function putBenchmarkReport(
             }
         }
     );
+
     return {
-        success: true,
+        success:
+            true,
         objectKey
     };
 }
@@ -306,23 +379,27 @@ async function putBenchmarkReport(
 // ============================================================
 // MAIN STORE-MATCH HANDLER
 // ============================================================
+
 export async function handleStoreMatch(
     request,
     env
 ) {
     const handlerStartedAt =
         nowMilliseconds();
+
     try {
         // ====================================================
         // METHOD
         // ====================================================
+
         if (
-            request.method
-            !== "POST"
+            request.method !==
+                "POST"
         ) {
             return jsonResponse(
                 {
-                    success: false,
+                    success:
+                        false,
                     message:
                         "Method not allowed."
                 },
@@ -333,17 +410,20 @@ export async function handleStoreMatch(
         // ====================================================
         // AUTH
         // ====================================================
+
         const authentication =
             validateInternalRequest(
                 request,
                 env
             );
+
         if (
             !authentication.valid
         ) {
             return jsonResponse(
                 {
-                    success: false,
+                    success:
+                        false,
                     message:
                         authentication.reason
                 },
@@ -354,10 +434,14 @@ export async function handleStoreMatch(
         // ====================================================
         // R2
         // ====================================================
-        if (!env.OCR_STORAGE) {
+
+        if (
+            !env.OCR_STORAGE
+        ) {
             return jsonResponse(
                 {
-                    success: false,
+                    success:
+                        false,
                     message:
                         "OCR_STORAGE R2 binding is unavailable."
                 },
@@ -368,42 +452,51 @@ export async function handleStoreMatch(
         // ====================================================
         // MULTIPART
         // ====================================================
+
         const formStartedAt =
             nowMilliseconds();
+
         const formData =
             await request.formData();
+
         const formSeconds =
             elapsedSeconds(
                 formStartedAt
             );
+
         const image =
             formData.get(
                 "image"
             );
+
         const matchId =
             normalizeId(
                 formData.get(
                     "matchId"
                 )
             );
+
         const jobId =
             normalizeId(
                 formData.get(
                     "jobId"
                 )
             );
+
         const matchReport =
             parseJsonObject(
                 formData.get(
                     "matchReport"
                 )
             );
+
         const benchmarkReport =
             parseJsonObject(
                 formData.get(
                     "benchmarkReport"
                 )
             );
+
         const benchmarkPrefix =
             normalizeBenchmarkPrefix(
                 formData.get(
@@ -414,105 +507,134 @@ export async function handleStoreMatch(
         // ====================================================
         // VALIDATION
         // ====================================================
-        if (!validId(matchId)) {
+
+        if (
+            !validId(
+                matchId
+            )
+        ) {
             return jsonResponse(
                 {
-                    success: false,
+                    success:
+                        false,
                     message:
                         "matchId must be a 16-character alphanumeric ID."
                 },
                 400
             );
         }
+
         if (
-            jobId
-            && !validId(jobId)
+            !validId(
+                jobId
+            )
         ) {
             return jsonResponse(
                 {
-                    success: false,
+                    success:
+                        false,
                     message:
                         "jobId must be a 16-character alphanumeric ID."
                 },
                 400
             );
         }
+
         if (
             !image
-            || typeof image.arrayBuffer
-                !== "function"
+            || typeof image.arrayBuffer !==
+                "function"
         ) {
             return jsonResponse(
                 {
-                    success: false,
+                    success:
+                        false,
                     message:
                         "Match image is required."
                 },
                 400
             );
         }
-        if (!matchReport) {
+
+        if (
+            !matchReport
+        ) {
             return jsonResponse(
                 {
-                    success: false,
+                    success:
+                        false,
                     message:
                         "matchReport must contain valid JSON."
                 },
                 400
             );
         }
+
         if (
             matchReport.matchId
             && normalizeId(
                 matchReport.matchId
-            ) !== matchId
+            ) !==
+                matchId
         ) {
             return jsonResponse(
                 {
-                    success: false,
+                    success:
+                        false,
                     message:
                         "matchReport.matchId does not match matchId."
                 },
                 400
             );
         }
+
         if (
-            benchmarkReport
-            && !jobId
+            matchReport.jobId
+            && normalizeId(
+                matchReport.jobId
+            ) !==
+                jobId
         ) {
             return jsonResponse(
                 {
-                    success: false,
+                    success:
+                        false,
                     message:
-                        "jobId is required when benchmarkReport is provided."
+                        "matchReport.jobId does not match jobId."
                 },
                 400
             );
         }
+
         if (
             benchmarkReport?.jobId
             && normalizeId(
                 benchmarkReport.jobId
-            ) !== jobId
+            ) !==
+                jobId
         ) {
             return jsonResponse(
                 {
-                    success: false,
+                    success:
+                        false,
                     message:
                         "benchmarkReport.jobId does not match jobId."
                 },
                 400
             );
         }
+
         if (
             benchmarkReport?.matchId
             && normalizeId(
                 benchmarkReport.matchId
-            ) !== matchId
+            ) !==
+                matchId
         ) {
             return jsonResponse(
                 {
-                    success: false,
+                    success:
+                        false,
                     message:
                         "benchmarkReport.matchId does not match matchId."
                 },
@@ -523,28 +645,34 @@ export async function handleStoreMatch(
         // ====================================================
         // IMAGE BYTES
         // ====================================================
+
         const imageReadStartedAt =
             nowMilliseconds();
+
         const imageBytes =
             await image.arrayBuffer();
+
         const imageReadSeconds =
             elapsedSeconds(
                 imageReadStartedAt
             );
+
         if (
             !imageBytes
-            || imageBytes.byteLength
-                === 0
+            || imageBytes.byteLength ===
+                0
         ) {
             return jsonResponse(
                 {
-                    success: false,
+                    success:
+                        false,
                     message:
                         "Match image is empty."
                 },
                 400
             );
         }
+
         const contentType =
             String(
                 image.type
@@ -554,8 +682,10 @@ export async function handleStoreMatch(
         // ====================================================
         // STORE IMAGE
         // ====================================================
+
         const imageWriteStartedAt =
             nowMilliseconds();
+
         const imageResult =
             await putMatchImage(
                 env.OCR_STORAGE,
@@ -565,6 +695,7 @@ export async function handleStoreMatch(
                         imageBytes,
                     contentType,
                     metadata: {
+                        jobId,
                         submittedBy:
                             matchReport.submittedBy
                             || "",
@@ -580,6 +711,7 @@ export async function handleStoreMatch(
                     }
                 }
             );
+
         const imageWriteSeconds =
             elapsedSeconds(
                 imageWriteStartedAt
@@ -588,17 +720,23 @@ export async function handleStoreMatch(
         // ====================================================
         // STORE REPORT
         // ====================================================
+
         const reportWriteStartedAt =
             nowMilliseconds();
+
         const reportResult =
             await putMatchReport(
                 env.OCR_STORAGE,
                 {
                     matchId,
+                    jobId,
                     report:
-                        matchReport
+                        matchReport,
+                    preserveOriginal:
+                        true
                 }
             );
+
         const reportWriteSeconds =
             elapsedSeconds(
                 reportWriteStartedAt
@@ -607,14 +745,19 @@ export async function handleStoreMatch(
         // ====================================================
         // STORE BENCHMARK
         // ====================================================
-        let benchmarkResult = null;
-        let benchmarkWriteSeconds = 0;
+
+        let benchmarkResult =
+            null;
+
+        let benchmarkWriteSeconds =
+            0;
+
         if (
             benchmarkReport
-            && jobId
         ) {
             const benchmarkWriteStartedAt =
                 nowMilliseconds();
+
             const benchmark = {
                 ...benchmarkReport,
                 jobId,
@@ -632,12 +775,17 @@ export async function handleStoreMatch(
                         imageResult.objectKey,
                     reportKey:
                         reportResult.objectKey,
+                    currentReportKey:
+                        reportResult.currentKey,
+                    originalReportKey:
+                        reportResult.originalKey,
                     preBenchmarkWriteSeconds:
                         elapsedSeconds(
                             handlerStartedAt
                         )
                 }
             };
+
             benchmarkResult =
                 await putBenchmarkReport(
                     env.OCR_STORAGE,
@@ -648,6 +796,7 @@ export async function handleStoreMatch(
                             benchmarkPrefix
                     }
                 );
+
             benchmarkWriteSeconds =
                 elapsedSeconds(
                     benchmarkWriteStartedAt
@@ -657,20 +806,26 @@ export async function handleStoreMatch(
         // ====================================================
         // SUCCESS
         // ====================================================
+
         return jsonResponse(
             {
-                success: true,
-                stored: true,
+                success:
+                    true,
+                stored:
+                    true,
                 matchId,
-                jobId:
-                    jobId || null,
+                jobId,
                 imageKey:
                     imageResult.objectKey,
                 reportKey:
                     reportResult.objectKey,
+                currentReportKey:
+                    reportResult.currentKey,
+                originalReportKey:
+                    reportResult.originalKey,
                 benchmarkKey:
                     benchmarkResult
-                    ?.objectKey
+                        ?.objectKey
                     || null,
                 storagePerformance: {
                     formParseSeconds:
@@ -689,20 +844,23 @@ export async function handleStoreMatch(
             },
             200
         );
-    } catch (error) {
+    }
+    catch (
+        error
+    ) {
+        console.error(
+            "OCR STORE MATCH failed:",
+            error
+        );
+
         return jsonResponse(
             {
-                success: false,
+                success:
+                    false,
                 message:
-                    "Match storage failed.",
-                error:
                     String(
                         error?.message
-                        || error
-                    ),
-                runtimeSeconds:
-                    elapsedSeconds(
-                        handlerStartedAt
+                        || "Unable to store OCR match."
                     ),
                 version:
                     STORE_MATCH_VERSION

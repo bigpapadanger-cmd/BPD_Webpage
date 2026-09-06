@@ -15,7 +15,7 @@ import {
 } from "/scripts/apiConnection.js";
 
 const OCR_RESULTS_VERSION =
-    "ocr-results-3.1";
+    "ocr-results-3.2";
 
 const OCR_RESULT_DIALOG_ID =
     "ocrGlobalResultDialog";
@@ -139,6 +139,18 @@ function normalizeErrorCode(
 function normalizeInteger(
     value
 ) {
+    if (
+        value === null
+        || value === undefined
+        || String(
+            value
+        )
+            .trim() ===
+            ""
+    ) {
+        return null;
+    }
+
     const numeric =
         Number(
             value
@@ -1325,25 +1337,50 @@ function createOcrResultImage() {
    ========================================================= */
 
 function getScoreboardFields(
-    players
+    result
 ) {
-    return OCR_RESULT_FIELD_ORDER.filter(
-        function(
-            fieldName
-        ) {
-            return players.some(
-                function(
-                    player
-                ) {
-                    return getResultDisplayFields(
-                        player
-                    ).includes(
-                        fieldName
-                    );
-                }
-            );
-        }
-    );
+    const matchType =
+        String(
+            result?.matchType
+            || OCR_RESULTS_CURRENT_RESPONSE?.matchType
+            || ""
+        )
+            .trim()
+            .toLowerCase();
+
+    let middleStat =
+        String(
+            result?.middleStat
+            || OCR_RESULTS_CURRENT_RESPONSE?.middleStat
+            || ""
+        )
+            .trim()
+            .toLowerCase();
+
+    if (
+        ![
+            "assists",
+            "demos",
+            "damage"
+        ].includes(
+            middleStat
+        )
+    ) {
+        middleStat =
+            matchType ===
+                "1v1"
+                ? "demos"
+                : "assists";
+    }
+
+    return [
+        "score",
+        "goals",
+        middleStat,
+        "saves",
+        "shots",
+        "ping"
+    ];
 }
 
 function formatScoreboardHeader(
@@ -1412,8 +1449,22 @@ function createScoreboardValueCell(
     cell.className =
         "ocr-scoreboard-value";
 
+    const valueMissing = (
+        state.value === null
+        || state.value === undefined
+        || String(
+            state.value
+        )
+            .trim() ===
+            ""
+    );
+
     if (
         state.requiresVerification
+        || (
+            editable
+            && valueMissing
+        )
     ) {
         cell.classList.add(
             "ocr-scoreboard-value-review"
@@ -1445,7 +1496,8 @@ function createScoreboardValueCell(
 
     input.min =
         "0";
-
+    input.required =
+        true;
     input.inputMode =
         "numeric";
 
@@ -1561,25 +1613,6 @@ function createScoreboardPlayerRow(
         function(
             fieldName
         ) {
-            const playerFields =
-                getResultDisplayFields(
-                    player
-                );
-
-            if (
-                !playerFields.includes(
-                    fieldName
-                )
-            ) {
-                row.appendChild(
-                    createTextCell(
-                        "—"
-                    )
-                );
-
-                return;
-            }
-
             row.appendChild(
                 createScoreboardValueCell(
                     teamIndex,
@@ -1602,6 +1635,7 @@ function createScoreboardPlayerRow(
    ========================================================= */
 
 function createScoreboardTeamTable(
+    result,
     team,
     teamArrayIndex,
     {
@@ -1668,7 +1702,7 @@ function createScoreboardTeamTable(
 
     const fields =
         getScoreboardFields(
-            players
+            result
         );
 
     const wrapper =
@@ -1923,6 +1957,7 @@ function renderOcrResultTable(
 
             scoreboard.appendChild(
                 createScoreboardTeamTable(
+                    result,
                     team,
                     teamArrayIndex,
                     {
