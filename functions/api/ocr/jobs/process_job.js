@@ -2044,7 +2044,7 @@ async function processJob(
                         JOB_PROGRESS.OCR_ACCEPTED,
 
                     message:
-                        "Reading scoreboard..."
+                        "Validating image..."
                 }
             );
 

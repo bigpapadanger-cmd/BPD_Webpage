@@ -61,7 +61,9 @@ const OCR_PROGRESS_TIMELINE =
             progress:
                 21,
             stage:
-                "ocr"
+                "ocr",
+            message:
+                "Validating image..."
         },
         {
             fraction:
@@ -847,6 +849,9 @@ function calculateHybridProgress(
         simulatedProgress,
         simulatedStage:
             simulated.stage,
+        simulatedMessage:
+            simulated.message
+            || null,
         source
     };
 }
@@ -915,13 +920,27 @@ function calculateTimelineProgress(
                     * segmentFraction
                 );
 
+            const message =
+                normalizedFraction >=
+                    next.fraction
+                    ? (
+                        next.message
+                        || previous.message
+                        || null
+                    )
+                    : (
+                        previous.message
+                        || null
+                    );
+
             return {
                 progress:
                     Math.round(
                         progress
                     ),
                 stage:
-                    previous.stage
+                    previous.stage,
+                message
             };
         }
     }
@@ -1191,10 +1210,20 @@ function buildProgressResponse(
     else if (
         source ===
         "simulated"
-        && calculated.simulatedStage
     ) {
-        stage =
-            calculated.simulatedStage;
+        if (
+            calculated.simulatedStage
+        ) {
+            stage =
+                calculated.simulatedStage;
+        }
+
+        if (
+            calculated.simulatedMessage
+        ) {
+            message =
+                calculated.simulatedMessage;
+        }
     }
 
     return {

@@ -1318,17 +1318,75 @@ function createOcrResultImage() {
     return wrapper;
 }
 
+
+
 /* =========================================================
-   TABLE ROW
+   SCOREBOARD FIELDS V1
    ========================================================= */
 
-function createReviewRow(
+function getScoreboardFields(
+    players
+) {
+    return OCR_RESULT_FIELD_ORDER.filter(
+        function(
+            fieldName
+        ) {
+            return players.some(
+                function(
+                    player
+                ) {
+                    return getResultDisplayFields(
+                        player
+                    ).includes(
+                        fieldName
+                    );
+                }
+            );
+        }
+    );
+}
+
+function formatScoreboardHeader(
+    fieldName
+) {
+    const labels = {
+        score:
+            "Score",
+        goals:
+            "Goals",
+        assists:
+            "Assists",
+        demos:
+            "Demos",
+        saves:
+            "Saves",
+        shots:
+            "Shots",
+        damage:
+            "Damage",
+        ping:
+            "Ping"
+    };
+
+    return (
+        labels[
+            fieldName
+        ]
+        || fieldName
+    );
+}
+
+/* =========================================================
+   SCOREBOARD VALUE CELL
+   ========================================================= */
+
+function createScoreboardValueCell(
     teamIndex,
     player,
     fieldName,
     {
         editable = false,
-        useEffectiveValue = false
+        useEffectiveValue = true
     } = {}
 ) {
     const state =
@@ -1346,20 +1404,135 @@ function createReviewRow(
         )
         || "Unknown Player";
 
+    const cell =
+        document.createElement(
+            "td"
+        );
+
+    cell.className =
+        "ocr-scoreboard-value";
+
+    if (
+        state.requiresVerification
+    ) {
+        cell.classList.add(
+            "ocr-scoreboard-value-review"
+        );
+    }
+
+    if (
+        !editable
+    ) {
+        cell.textContent =
+            String(
+                state.value
+                ?? "—"
+            );
+
+        return cell;
+    }
+
+    const input =
+        document.createElement(
+            "input"
+        );
+
+    input.type =
+        "number";
+
+    input.step =
+        "1";
+
+    input.min =
+        "0";
+
+    input.inputMode =
+        "numeric";
+
+    /*
+     * Keep this class because collectEditableFields()
+     * already uses it.
+     */
+    input.className =
+        "ocr-review-value-input";
+
+    input.value =
+        state.value
+        ?? "";
+
+    input.dataset.team =
+        String(
+            teamIndex
+        );
+
+    input.dataset.player =
+        playerName;
+
+    input.dataset.field =
+        fieldName;
+
+    input.dataset.originalValue =
+        String(
+            state.value
+            ?? ""
+        );
+
+    input.dataset.requiresVerification =
+        String(
+            state.requiresVerification
+        );
+
+    input.addEventListener(
+        "input",
+        function() {
+            const changed =
+                input.value.trim() !==
+                String(
+                    input.dataset
+                        .originalValue
+                    ?? ""
+                );
+
+            cell.classList.toggle(
+                "ocr-scoreboard-value-disputed",
+                changed
+            );
+        }
+    );
+
+    cell.appendChild(
+        input
+    );
+
+    return cell;
+}
+
+/* =========================================================
+   SCOREBOARD PLAYER ROW
+   ========================================================= */
+
+function createScoreboardPlayerRow(
+    teamIndex,
+    player,
+    fields,
+    {
+        editable = false,
+        useEffectiveValue = true
+    } = {}
+) {
+    const playerName =
+        getOcrPlayerName(
+            player
+        )
+        || "Unknown Player";
+
     const row =
         document.createElement(
             "tr"
         );
 
     row.className =
-        (
-            "ocr-review-row "
-            + (
-                state.requiresVerification
-                    ? "ocr-review-row-needs-review"
-                    : "ocr-review-row-high-confidence"
-            )
-        );
+        "ocr-scoreboard-player-row";
 
     row.dataset.team =
         String(
@@ -1369,135 +1542,260 @@ function createReviewRow(
     row.dataset.player =
         playerName;
 
-    row.dataset.field =
-        fieldName;
-
-    row.dataset.originalValue =
-        String(
-            state.value
-            ?? ""
-        );
-
-    [
-        `Team ${teamIndex}`,
-        playerName,
-        fieldName,
-        state.ocrValue,
-        formatEngineValue(
-            state.template
-        ),
-        formatEngineValue(
-            state.tesseract
-        ),
-        formatEngineValue(
-            state.paddle
-        ),
-        formatConfidence(
-            state.confidence
-        )
-    ]
-        .forEach(
-            function(
-                value
-            ) {
-                row.appendChild(
-                    createTextCell(
-                        value
-                    )
-                );
-            }
-        );
-
-    const valueCell =
+    const playerCell =
         document.createElement(
             "td"
         );
 
-    if (
-        editable
-    ) {
-        const input =
-            document.createElement(
-                "input"
-            );
+    playerCell.className =
+        "ocr-scoreboard-player-name";
 
-        input.type =
-            "number";
-
-        input.step =
-            "1";
-
-        input.min =
-            "0";
-
-        input.inputMode =
-            "numeric";
-
-        input.className =
-            "ocr-review-value-input";
-
-        input.value =
-            state.value
-            ?? "";
-
-        input.dataset.team =
-            String(
-                teamIndex
-            );
-
-        input.dataset.player =
-            playerName;
-
-        input.dataset.field =
-            fieldName;
-
-        input.dataset.originalValue =
-            String(
-                state.value
-                ?? ""
-            );
-
-        input.dataset.requiresVerification =
-            String(
-                state.requiresVerification
-            );
-
-        input.addEventListener(
-            "input",
-            function() {
-                row.classList.toggle(
-                    "ocr-review-row-disputed",
-                    input.value.trim() !==
-                        String(
-                            input.dataset
-                                .originalValue
-                            ?? ""
-                        )
-                );
-            }
-        );
-
-        valueCell.appendChild(
-            input
-        );
-    }
-    else {
-        valueCell.textContent =
-            String(
-                state.value
-                ?? "—"
-            );
-    }
+    playerCell.textContent =
+        playerName;
 
     row.appendChild(
-        valueCell
+        playerCell
+    );
+
+    fields.forEach(
+        function(
+            fieldName
+        ) {
+            const playerFields =
+                getResultDisplayFields(
+                    player
+                );
+
+            if (
+                !playerFields.includes(
+                    fieldName
+                )
+            ) {
+                row.appendChild(
+                    createTextCell(
+                        "—"
+                    )
+                );
+
+                return;
+            }
+
+            row.appendChild(
+                createScoreboardValueCell(
+                    teamIndex,
+                    player,
+                    fieldName,
+                    {
+                        editable,
+                        useEffectiveValue
+                    }
+                )
+            );
+        }
     );
 
     return row;
 }
 
 /* =========================================================
-   RESULT TABLE
+   SCOREBOARD TEAM
+   ========================================================= */
+
+function createScoreboardTeamTable(
+    team,
+    teamArrayIndex,
+    {
+        editable = false,
+        mode = "result"
+    } = {}
+) {
+    const teamIndex =
+        Number(
+            team?.team
+            ?? team?.teamIndex
+            ?? (
+                teamArrayIndex
+                + 1
+            )
+        );
+
+    const players =
+        Array.isArray(
+            team?.players
+        )
+            ? team.players
+            : [];
+
+    const section =
+        document.createElement(
+            "section"
+        );
+
+    section.className =
+        (
+            "ocr-scoreboard-team "
+            + `ocr-scoreboard-team-${teamIndex}`
+        );
+
+    const teamHeader =
+        document.createElement(
+            "div"
+        );
+
+    teamHeader.className =
+        "ocr-scoreboard-team-header";
+
+    teamHeader.textContent =
+        `Team ${teamIndex}`;
+
+    section.appendChild(
+        teamHeader
+    );
+
+    if (
+        players.length === 0
+    ) {
+        section.appendChild(
+            createTextElement(
+                "div",
+                "ocr-result-empty",
+                "No players were returned for this team."
+            )
+        );
+
+        return section;
+    }
+
+    const fields =
+        getScoreboardFields(
+            players
+        );
+
+    const wrapper =
+        document.createElement(
+            "div"
+        );
+
+    /*
+     * Keep existing wrapper/table classes so your
+     * current CSS remains useful.
+     */
+    wrapper.className =
+        (
+            "ocr-review-table-wrap "
+            + "ocr-scoreboard-table-wrap"
+        );
+
+    const table =
+        document.createElement(
+            "table"
+        );
+
+    table.className =
+        (
+            "ocr-review-table "
+            + "ocr-scoreboard-table"
+        );
+
+    const head =
+        document.createElement(
+            "thead"
+        );
+
+    const headRow =
+        document.createElement(
+            "tr"
+        );
+
+    const playerHeader =
+        document.createElement(
+            "th"
+        );
+
+    playerHeader.textContent =
+        "Player";
+
+    headRow.appendChild(
+        playerHeader
+    );
+
+    fields.forEach(
+        function(
+            fieldName
+        ) {
+            const header =
+                document.createElement(
+                    "th"
+                );
+
+            header.textContent =
+                formatScoreboardHeader(
+                    fieldName
+                );
+
+            headRow.appendChild(
+                header
+            );
+        }
+    );
+
+    head.appendChild(
+        headRow
+    );
+
+    table.appendChild(
+        head
+    );
+
+    const body =
+        document.createElement(
+            "tbody"
+        );
+
+    players.forEach(
+        function(
+            player
+        ) {
+            body.appendChild(
+                createScoreboardPlayerRow(
+                    teamIndex,
+                    player,
+                    fields,
+                    {
+                        editable,
+                        /*
+                         * Review mode shows the OCR value
+                         * being reviewed.
+                         *
+                         * Result/adjustment modes use the
+                         * finalized/effective stored value.
+                         */
+                        useEffectiveValue:
+                            mode !==
+                            "review"
+                    }
+                )
+            );
+        }
+    );
+
+    table.appendChild(
+        body
+    );
+
+    wrapper.appendChild(
+        table
+    );
+
+    section.appendChild(
+        wrapper
+    );
+
+    return section;
+}
+
+/* =========================================================
+   RESULT SCOREBOARD
    ========================================================= */
 
 function renderOcrResultTable(
@@ -1555,105 +1853,57 @@ function renderOcrResultTable(
         );
 
     if (
-        mode === "review"
+        mode ===
+        "review"
     ) {
         help.textContent =
             policyState.locked
-                ? "This review window has closed. OCR evidence is shown read-only."
-                : "Verify every value before submitting. Highlighted values require special attention.";
+                ? (
+                    "This review window has closed. "
+                    + "The scoreboard is read-only."
+                )
+                : (
+                    "Verify the scoreboard below. "
+                    + "Highlighted values require special attention."
+                );
     }
     else if (
-        mode === "adjustment"
+        mode ===
+        "adjustment"
     ) {
         help.textContent =
-            "Change only incorrect values. Corrections are stored without replacing the original OCR evidence.";
+            (
+                "Correct only values that do not match "
+                + "the submitted scoreboard."
+            );
     }
     else {
         help.textContent =
             policyState.locked
-                ? "This scoreboard is read-only because its modification window has closed."
-                : "This scoreboard has been accepted. You may correct a value before the modification deadline.";
+                ? (
+                    "This scoreboard is read-only because "
+                    + "its modification window has closed."
+                )
+                : (
+                    "This scoreboard has been accepted. "
+                    + "You may correct a value before "
+                    + "the modification deadline."
+                );
     }
 
     content.appendChild(
         help
     );
 
-    const wrapper =
+    const scoreboard =
         document.createElement(
             "div"
         );
 
-    wrapper.className =
-        "ocr-review-table-wrap";
+    scoreboard.className =
+        "ocr-scoreboard";
 
-    const table =
-        document.createElement(
-            "table"
-        );
-
-    table.className =
-        "ocr-review-table";
-
-    const head =
-        document.createElement(
-            "thead"
-        );
-
-    const headRow =
-        document.createElement(
-            "tr"
-        );
-
-    [
-        "Team",
-        "Player",
-        "Stat",
-        "OCR Final",
-        "Template",
-        "Tesseract",
-        "Paddle",
-        "Confidence",
-        editable
-            ? (
-                mode === "adjustment"
-                    ? "New Value"
-                    : "User Value"
-            )
-            : "Final Value"
-    ]
-        .forEach(
-            function(
-                label
-            ) {
-                const th =
-                    document.createElement(
-                        "th"
-                    );
-
-                th.textContent =
-                    label;
-
-                headRow.appendChild(
-                    th
-                );
-            }
-        );
-
-    head.appendChild(
-        headRow
-    );
-
-    table.appendChild(
-        head
-    );
-
-    const body =
-        document.createElement(
-            "tbody"
-        );
-
-    let renderedRows =
+    let playerCount =
         0;
 
     teams.forEach(
@@ -1661,16 +1911,6 @@ function renderOcrResultTable(
             team,
             teamArrayIndex
         ) {
-            const teamIndex =
-                Number(
-                    team?.team
-                    ?? team?.teamIndex
-                    ?? (
-                        teamArrayIndex
-                        + 1
-                    )
-                );
-
             const players =
                 Array.isArray(
                     team?.players
@@ -1678,64 +1918,38 @@ function renderOcrResultTable(
                     ? team.players
                     : [];
 
-            players.forEach(
-                function(
-                    player
-                ) {
-                    getResultDisplayFields(
-                        player
-                    )
-                        .forEach(
-                            function(
-                                fieldName
-                            ) {
-                                body.appendChild(
-                                    createReviewRow(
-                                        teamIndex,
-                                        player,
-                                        fieldName,
-                                        {
-                                            editable,
-                                            useEffectiveValue:
-                                                mode !==
-                                                "review"
-                                        }
-                                    )
-                                );
+            playerCount +=
+                players.length;
 
-                                renderedRows +=
-                                    1;
-                            }
-                        );
-                }
+            scoreboard.appendChild(
+                createScoreboardTeamTable(
+                    team,
+                    teamArrayIndex,
+                    {
+                        editable,
+                        mode
+                    }
+                )
             );
         }
     );
 
     if (
-        renderedRows === 0
+        playerCount === 0
     ) {
         content.appendChild(
             createTextElement(
                 "div",
                 "ocr-result-empty",
-                "No scoreboard statistics are available."
+                "No scoreboard players are available."
             )
         );
 
         return false;
     }
 
-    table.appendChild(
-        body
-    );
-
-    wrapper.appendChild(
-        table
-    );
-
     content.appendChild(
-        wrapper
+        scoreboard
     );
 
     document.dispatchEvent(
@@ -1762,7 +1976,6 @@ function renderOcrResultTable(
 
     return true;
 }
-
 /* =========================================================
    FIELD COLLECTION
    ========================================================= */

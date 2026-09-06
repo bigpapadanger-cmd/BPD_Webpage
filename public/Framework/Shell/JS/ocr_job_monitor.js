@@ -26,18 +26,18 @@ const OCR_HANDLED_JOB_KEY =
     "rocketLeagueOcrAcknowledgedJobsV1";
 
 const OCR_INITIAL_CHECK_SCHEDULE_MS = [
-    2000,
     5000,
-    9000,
-    13000,
-    17000,
+    10000,
+    15000,
+    18000,
     21000,
     25000,
-    30000
+    30000,
+    35000
 ];
 
 const OCR_TAIL_POLL_MS =
-    10000;
+    15000;
 
 const OCR_QUEUE_STALE_MS =
     120000;
