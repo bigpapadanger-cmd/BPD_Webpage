@@ -8,15 +8,22 @@
 export async function initializeRouteModule(
     moduleFile
 ) {
+    const normalizedModuleFile =
+        String(
+            moduleFile
+            || ""
+        )
+            .trim();
+
     if (
-        !moduleFile
+        !normalizedModuleFile
     ) {
-        return;
+        return false;
     }
 
     const moduleUrl =
         new URL(
-            moduleFile,
+            normalizedModuleFile,
             window.location.origin
         );
 
@@ -25,17 +32,34 @@ export async function initializeRouteModule(
         "/Framework/Shell/JS/initialization.js"
     ) {
         throw new Error(
-            "initialization.js cannot be used as a route page module."
+            "initialization.js cannot initialize itself as a route module."
         );
     }
 
-    const pageModule =
-        await import(
-            moduleUrl.href
+    let pageModule;
+
+    try {
+        pageModule =
+            await import(
+                moduleUrl.href
+            );
+    }
+    catch (
+        error
+    ) {
+        throw new Error(
+            "Failed to load route module: "
+            + moduleUrl.pathname
+            + (
+                error?.message
+                    ? " — " + error.message
+                    : ""
+            )
         );
+    }
 
     if (
-        typeof pageModule.initializePage !==
+        typeof pageModule?.initializePage !==
         "function"
     ) {
         throw new Error(
@@ -45,4 +69,6 @@ export async function initializeRouteModule(
     }
 
     await pageModule.initializePage();
+
+    return true;
 }

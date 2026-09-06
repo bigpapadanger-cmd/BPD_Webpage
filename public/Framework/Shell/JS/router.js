@@ -5,13 +5,9 @@ import {
 } from "/routes.js";
 
 import {
-    initializeOcrNotifications,
-    checkActiveOcrSubmission
-} from "./ocr_notifications.js";
-
-import {
-    initializeOcrResults
-} from "./ocr_results.js";
+    initializeOcrRuntime,
+    resumeOcrRuntime
+} from "./ocr_runtime.js";
 
 import {
     loadSidebarHover,
@@ -54,8 +50,7 @@ const MASTER_CSS_LINK_ID =
 let navigationId =
     0;
 
-let globalOcrInitialized =
-    false;
+
 
 /* =========================================================
    INITIAL SHELL STATE
@@ -101,53 +96,38 @@ function applyInitialSidebarLayoutState() {
 }
 
 /* =========================================================
-   GLOBAL OCR
+   OCR RUNTIME
    ========================================================= */
 
 function initializeGlobalOcr() {
-    if (
-        globalOcrInitialized
-    ) {
-        return;
-    }
-
     try {
-        initializeOcrResults();
+        if (
+            !initializeOcrRuntime()
+        ) {
+            console.error(
+                "ROUTER: OCR runtime did not initialize."
+            );
+        }
     }
     catch (
         error
     ) {
         console.error(
-            "ROUTER: OCR result initialization failed.",
+            "ROUTER: OCR runtime initialization failed.",
             error
         );
     }
-
-    try {
-        initializeOcrNotifications();
-    }
-    catch (
-        error
-    ) {
-        console.error(
-            "ROUTER: OCR notification initialization failed.",
-            error
-        );
-    }
-
-    globalOcrInitialized =
-        true;
 }
 
-async function checkGlobalOcrSubmission() {
+function resumeGlobalOcr() {
     try {
-        await checkActiveOcrSubmission();
+        resumeOcrRuntime();
     }
     catch (
         error
     ) {
         console.error(
-            "ROUTER: OCR active submission check failed.",
+            "ROUTER: OCR runtime resume failed.",
             error
         );
     }
@@ -1721,19 +1701,10 @@ async function loadShell() {
         }
 
         /* -------------------------------------------------
-           OCR RESUME
-           ------------------------------------------------- */
+        OCR RESUME
+        ------------------------------------------------- */
 
-        await checkGlobalOcrSubmission();
-
-        if (
-            !isCurrentNavigation(
-                currentNavigationId
-            )
-        ) {
-            return;
-        }
-
+        resumeGlobalOcr();
         /* -------------------------------------------------
            FINISH NAVIGATION
            ------------------------------------------------- */

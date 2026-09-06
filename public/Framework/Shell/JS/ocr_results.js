@@ -15,7 +15,7 @@ import {
 } from "/scripts/apiConnection.js";
 
 const OCR_RESULTS_VERSION =
-    "ocr-results-3.0";
+    "ocr-results-3.1";
 
 const OCR_RESULT_DIALOG_ID =
     "ocrGlobalResultDialog";
@@ -30,6 +30,26 @@ const OCR_RESULT_FIELD_ORDER = [
     "damage",
     "ping"
 ];
+
+const OCR_CONFIRMATION_STATUSES =
+    new Set([
+        "pending_review",
+        "auto_accepted",
+        "confirmed",
+        "confirmed_with_disputes"
+    ]);
+
+const OCR_STRUCTURAL_REVIEW_FAILURE_CODES =
+    new Set([
+        "MATCH_ID_INVALID",
+        "MATCH_REPORT_NOT_FOUND",
+        "MATCH_REPORT_INVALID",
+        "MATCH_ID_MISMATCH",
+        "MATCH_OWNER_MISSING",
+        "EDIT_DEADLINE_MISSING",
+        "SCOREBOARD_EMPTY",
+        "OCR_RESULT_MISSING"
+    ]);
 
 let OCR_RESULTS_READY =
     false;
@@ -98,16 +118,22 @@ function normalizeConfirmationStatus(
             .trim()
             .toLowerCase();
 
-    return [
-        "pending_review",
-        "auto_accepted",
-        "confirmed",
-        "confirmed_with_disputes"
-    ].includes(
+    return OCR_CONFIRMATION_STATUSES.has(
         status
     )
         ? status
         : "";
+}
+
+function normalizeErrorCode(
+    value
+) {
+    return String(
+        value
+        || ""
+    )
+        .trim()
+        .toUpperCase();
 }
 
 function normalizeInteger(
@@ -130,6 +156,19 @@ function normalizeInteger(
     return numeric;
 }
 
+function isObject(
+    value
+) {
+    return Boolean(
+        value
+        && typeof value ===
+            "object"
+        && !Array.isArray(
+            value
+        )
+    );
+}
+
 /* =========================================================
    REVIEW POLICY
    ========================================================= */
@@ -150,38 +189,33 @@ function getOcrReviewPolicy() {
 }
 
 function getCurrentEditDeadlineAt() {
-    const responseDeadline =
-        String(
-            OCR_RESULTS_CURRENT_RESPONSE
-                ?.editDeadlineAt
-            || ""
-        )
-            .trim();
-
-    if (
-        responseDeadline
-    ) {
-        return responseDeadline;
-    }
-
-    const resultDeadline =
-        String(
-            OCR_RESULTS_CURRENT_RESULT
-                ?.editDeadlineAt
-            || ""
-        )
-            .trim();
-
-    if (
-        resultDeadline
-    ) {
-        return resultDeadline;
-    }
-
-    return (
+    const candidates = [
+        OCR_RESULTS_CURRENT_RESPONSE
+            ?.editDeadlineAt,
+        OCR_RESULTS_CURRENT_RESULT
+            ?.editDeadlineAt,
         OCR_RESULTS_CURRENT_EDIT_DEADLINE_AT
-        || null
-    );
+    ];
+
+    for (
+        const candidate
+        of candidates
+    ) {
+        const value =
+            String(
+                candidate
+                || ""
+            )
+                .trim();
+
+        if (
+            value
+        ) {
+            return value;
+        }
+    }
+
+    return null;
 }
 
 function getCurrentReviewPolicyState() {
@@ -209,9 +243,33 @@ function getCurrentReviewPolicyState() {
         };
     }
 
-    return policy.getState(
-        editDeadlineAt
-    );
+    try {
+        return policy.getState(
+            editDeadlineAt
+        );
+    }
+    catch (
+        error
+    ) {
+        console.error(
+            "[OCR RESULTS] Review policy failed.",
+            error
+        );
+
+        return {
+            locked:
+                true,
+            canModify:
+                false,
+            globallyLocked:
+                false,
+            deadlineExpired:
+                true,
+            editDeadlineAt,
+            editDeadlineDisplay:
+                ""
+        };
+    }
 }
 
 function getDeadlineMessage(
@@ -228,32 +286,24 @@ function getDeadlineMessage(
     if (
         state.locked
     ) {
-        if (
-            state.editDeadlineDisplay
-        ) {
-            return (
+        return state.editDeadlineDisplay
+            ? (
                 lockedPrefix
                 + " The modification deadline was "
                 + state.editDeadlineDisplay
                 + "."
-            );
-        }
-
-        return lockedPrefix;
+            )
+            : lockedPrefix;
     }
 
-    if (
-        state.editDeadlineDisplay
-    ) {
-        return (
+    return state.editDeadlineDisplay
+        ? (
             openPrefix
             + " "
             + state.editDeadlineDisplay
             + "."
-        );
-    }
-
-    return "";
+        )
+        : "";
 }
 
 function assertOcrResultEditable() {
@@ -278,7 +328,7 @@ function assertOcrResultEditable() {
 }
 
 /* =========================================================
-   JSON
+   RESPONSE HELPERS
    ========================================================= */
 
 async function readJsonResponse(
@@ -299,49 +349,66 @@ async function readJsonResponse(
         );
     }
     catch {
-        throw new Error(
-            "Server returned invalid JSON."
-        );
+        const error =
+            new Error(
+                "Server returned an invalid response."
+            );
+
+        error.code =
+            "INVALID_SERVER_RESPONSE";
+
+        error.status =
+            response.status;
+
+        throw error;
     }
 }
 
-/* =========================================================
-   RESULT UNWRAP
-   ========================================================= */
-
-function isObject(
-    value
+function createResponseError(
+    response,
+    data,
+    fallbackMessage
 ) {
-    return (
-        value
-        && typeof value ===
-            "object"
-        && !Array.isArray(
-            value
+    const error =
+        new Error(
+            data?.message
+            || fallbackMessage
+        );
+
+    error.status =
+        response?.status
+        || 0;
+
+    error.code =
+        normalizeErrorCode(
+            data?.code
         )
-    );
+        || null;
+
+    return error;
 }
+
+/* =========================================================
+   RESULT EXTRACTION
+   ========================================================= */
 
 function containsScoreboardTeams(
     value
 ) {
-    if (
-        !isObject(
+    return Boolean(
+        isObject(
             value
         )
-    ) {
-        return false;
-    }
-
-    return (
-        Array.isArray(
-            value.teams
-        )
-        || Array.isArray(
-            value.team1
-        )
-        || Array.isArray(
-            value.team2
+        && (
+            Array.isArray(
+                value.teams
+            )
+            || Array.isArray(
+                value.team1
+            )
+            || Array.isArray(
+                value.team2
+            )
         )
     );
 }
@@ -458,20 +525,11 @@ async function getOcrResult(
         || data?.success !==
             true
     ) {
-        const error =
-            new Error(
-                data?.message
-                || "Unable to load OCR result."
-            );
-
-        error.status =
-            response.status;
-
-        error.code =
-            data?.code
-            || null;
-
-        throw error;
+        throw createResponseError(
+            response,
+            data,
+            "Unable to load this scoreboard."
+        );
     }
 
     const result =
@@ -484,11 +542,14 @@ async function getOcrResult(
     ) {
         const error =
             new Error(
-                "OCR result was not returned."
+                "Stored OCR result is missing."
             );
 
         error.code =
             "OCR_RESULT_MISSING";
+
+        error.status =
+            409;
 
         throw error;
     }
@@ -563,18 +624,11 @@ function getOcrPlayerName(
 function getOcrReviewFields(
     player
 ) {
-    if (
+    return isObject(
         player?.reviewFields
-        && typeof player.reviewFields ===
-            "object"
-        && !Array.isArray(
-            player.reviewFields
-        )
-    ) {
-        return player.reviewFields;
-    }
-
-    return {};
+    )
+        ? player.reviewFields
+        : {};
 }
 
 function getResultDisplayFields(
@@ -585,32 +639,27 @@ function getResultDisplayFields(
             player
         );
 
-    return OCR_RESULT_FIELD_ORDER
-        .filter(
-            function(
-                fieldName
-            ) {
-                return (
-                    Object.prototype
-                        .hasOwnProperty
-                        .call(
-                            player,
-                            fieldName
-                        )
-                    || Object.prototype
-                        .hasOwnProperty
-                        .call(
-                            reviewFields,
-                            fieldName
-                        )
-                );
-            }
-        );
+    return OCR_RESULT_FIELD_ORDER.filter(
+        function(
+            fieldName
+        ) {
+            return (
+                Object.prototype
+                    .hasOwnProperty
+                    .call(
+                        player,
+                        fieldName
+                    )
+                || Object.prototype
+                    .hasOwnProperty
+                    .call(
+                        reviewFields,
+                        fieldName
+                    )
+            );
+        }
+    );
 }
-
-/* =========================================================
-   FIELD STATE
-   ========================================================= */
 
 function getOcrFieldReviewState(
     player,
@@ -624,19 +673,16 @@ function getOcrFieldReviewState(
             player
         );
 
-    const reviewField = (
-        reviewFields?.[
-            fieldName
-        ]
-        && typeof reviewFields[
-            fieldName
-        ] ===
-            "object"
-    )
-        ? reviewFields[
-            fieldName
-        ]
-        : {};
+    const reviewField =
+        isObject(
+            reviewFields?.[
+                fieldName
+            ]
+        )
+            ? reviewFields[
+                fieldName
+            ]
+            : {};
 
     const ocrValue =
         reviewField.value
@@ -660,23 +706,19 @@ function getOcrFieldReviewState(
         effectiveValue,
         requiresVerification:
             reviewField
-                .requiresVerification ===
+                ?.requiresVerification ===
                 true,
         confidence:
-            reviewField
-                .confidence
+            reviewField?.confidence
             ?? null,
         template:
-            reviewField
-                .template
+            reviewField?.template
             ?? null,
         tesseract:
-            reviewField
-                .tesseract
+            reviewField?.tesseract
             ?? null,
         paddle:
-            reviewField
-                .paddle
+            reviewField?.paddle
             ?? null
     };
 }
@@ -698,8 +740,9 @@ function formatEngineValue(
     }
 
     if (
-        typeof value ===
-            "object"
+        isObject(
+            value
+        )
     ) {
         const candidate =
             value?.value
@@ -707,17 +750,11 @@ function formatEngineValue(
             ?? value?.selectedValue
             ?? null;
 
-        if (
-            candidate !== null
-            && typeof candidate !==
-                "undefined"
-        ) {
-            return String(
+        return candidate === null
+            ? "—"
+            : String(
                 candidate
             );
-        }
-
-        return "—";
     }
 
     return String(
@@ -802,84 +839,7 @@ function createTextCell(
 }
 
 /* =========================================================
-   SCOREBOARD IMAGE
-   ========================================================= */
-
-function createOcrResultImage() {
-    const imageUrl =
-        String(
-            OCR_RESULTS_CURRENT_RESPONSE
-                ?.imageUrl
-            || ""
-        )
-            .trim();
-
-    if (
-        !imageUrl
-    ) {
-        return null;
-    }
-
-    const wrapper =
-        document.createElement(
-            "div"
-        );
-
-    wrapper.className =
-        "ocr-result-image-wrap";
-
-    const image =
-        document.createElement(
-            "img"
-        );
-
-    image.className =
-        "ocr-result-image";
-
-    image.alt =
-        "Submitted Rocket League scoreboard";
-
-    image.loading =
-        "eager";
-
-    image.decoding =
-        "async";
-
-    image.src =
-        imageUrl;
-
-    image.addEventListener(
-        "error",
-        function() {
-            console.warn(
-                "[OCR RESULTS] Stored scoreboard image could not be loaded.",
-                {
-                    jobId:
-                        OCR_RESULTS_CURRENT_JOB_ID
-                        || null,
-                    matchId:
-                        OCR_RESULTS_CURRENT_MATCH_ID
-                        || null
-                }
-            );
-
-            wrapper.remove();
-        },
-        {
-            once:
-                true
-        }
-    );
-
-    wrapper.appendChild(
-        image
-    );
-
-    return wrapper;
-}
-
-/* =========================================================
-   GLOBAL DIALOG
+   DIALOG
    ========================================================= */
 
 function ensureOcrResultDialog() {
@@ -1075,29 +1035,26 @@ function ensureOcrResultDialog() {
         dialog
     );
 
-    function closeResultDialog() {
-        if (
-            typeof dialog.close ===
-                "function"
-            && dialog.open
-        ) {
-            dialog.close();
-            return;
-        }
+    const close =
+        function() {
+            if (
+                OCR_RESULTS_CURRENT_MODE ===
+                "failure"
+            ) {
+                return;
+            }
 
-        dialog.removeAttribute(
-            "open"
-        );
-    }
+            closeDialog();
+        };
 
     closeButton.addEventListener(
         "click",
-        closeResultDialog
+        close
     );
 
     secondaryButton.addEventListener(
         "click",
-        closeResultDialog
+        close
     );
 
     dialog.addEventListener(
@@ -1107,11 +1064,9 @@ function ensureOcrResultDialog() {
         ) {
             if (
                 event.target ===
-                    dialog
-                && OCR_RESULTS_CURRENT_MODE !==
-                    "failure"
+                dialog
             ) {
-                closeResultDialog();
+                close();
             }
         }
     );
@@ -1119,46 +1074,113 @@ function ensureOcrResultDialog() {
     return dialog;
 }
 
-/* =========================================================
-   DIALOG STATE
-   ========================================================= */
+function openDialog() {
+    const dialog =
+        ensureOcrResultDialog();
+
+    if (
+        typeof dialog.showModal ===
+            "function"
+    ) {
+        if (
+            dialog.open
+        ) {
+            dialog.close();
+        }
+
+        dialog.showModal();
+
+        return;
+    }
+
+    dialog.setAttribute(
+        "open",
+        ""
+    );
+}
+
+function closeDialog() {
+    const dialog =
+        ensureOcrResultDialog();
+
+    if (
+        typeof dialog.close ===
+            "function"
+        && dialog.open
+    ) {
+        dialog.close();
+
+        return;
+    }
+
+    dialog.removeAttribute(
+        "open"
+    );
+}
+
+function getDialogElements() {
+    const dialog =
+        ensureOcrResultDialog();
+
+    return {
+        dialog,
+        title:
+            dialog.querySelector(
+                "#ocrGlobalResultTitle"
+            ),
+        subtitle:
+            dialog.querySelector(
+                "#ocrGlobalResultSubtitle"
+            ),
+        message:
+            dialog.querySelector(
+                "#ocrGlobalResultMessage"
+            ),
+        content:
+            dialog.querySelector(
+                "#ocrGlobalResultContent"
+            ),
+        error:
+            dialog.querySelector(
+                "#ocrGlobalResultError"
+            ),
+        primary:
+            dialog.querySelector(
+                "#ocrGlobalResultPrimary"
+            ),
+        secondary:
+            dialog.querySelector(
+                "#ocrGlobalResultSecondary"
+            )
+    };
+}
 
 function setDialogText(
     {
         title = "",
         subtitle = "",
         message = ""
-    }
+    } = {}
 ) {
-    const dialog =
-        ensureOcrResultDialog();
+    const elements =
+        getDialogElements();
 
-    dialog.querySelector(
-        "#ocrGlobalResultTitle"
-    ).textContent =
+    elements.title.textContent =
         title;
 
-    dialog.querySelector(
-        "#ocrGlobalResultSubtitle"
-    ).textContent =
+    elements.subtitle.textContent =
         subtitle;
 
-    dialog.querySelector(
-        "#ocrGlobalResultMessage"
-    ).textContent =
+    elements.message.textContent =
         message;
 }
 
 function setDialogError(
     message = ""
 ) {
-    const dialog =
-        ensureOcrResultDialog();
-
-    const errorElement =
-        dialog.querySelector(
-            "#ocrGlobalResultError"
-        );
+    const element =
+        getDialogElements()
+            .error;
 
     const normalized =
         String(
@@ -1167,10 +1189,10 @@ function setDialogError(
         )
             .trim();
 
-    errorElement.textContent =
+    element.textContent =
         normalized;
 
-    errorElement.hidden =
+    element.hidden =
         !normalized;
 }
 
@@ -1193,50 +1215,111 @@ function setDialogBusy(
         );
 }
 
-function openDialog() {
-    const dialog =
-        ensureOcrResultDialog();
+function resetDialogActions() {
+    const {
+        primary,
+        secondary
+    } =
+        getDialogElements();
 
-    if (
-        typeof dialog.showModal ===
-            "function"
-    ) {
-        if (
-            dialog.open
-        ) {
-            dialog.close();
-        }
+    primary.hidden =
+        true;
 
-        dialog.showModal();
-        return;
-    }
+    primary.disabled =
+        false;
 
-    dialog.setAttribute(
-        "open",
-        ""
-    );
-}
+    primary.onclick =
+        null;
 
-function closeDialog() {
-    const dialog =
-        ensureOcrResultDialog();
+    secondary.hidden =
+        false;
 
-    if (
-        typeof dialog.close ===
-            "function"
-        && dialog.open
-    ) {
-        dialog.close();
-        return;
-    }
+    secondary.disabled =
+        false;
 
-    dialog.removeAttribute(
-        "open"
-    );
+    secondary.textContent =
+        "Close";
 }
 
 /* =========================================================
-   REVIEW ROW
+   SCOREBOARD IMAGE
+   ========================================================= */
+
+function createOcrResultImage() {
+    const imageUrl =
+        String(
+            OCR_RESULTS_CURRENT_RESPONSE
+                ?.imageUrl
+            || ""
+        )
+            .trim();
+
+    if (
+        !imageUrl
+    ) {
+        return null;
+    }
+
+    const wrapper =
+        document.createElement(
+            "div"
+        );
+
+    wrapper.className =
+        "ocr-result-image-wrap";
+
+    const image =
+        document.createElement(
+            "img"
+        );
+
+    image.className =
+        "ocr-result-image";
+
+    image.alt =
+        "Submitted Rocket League scoreboard";
+
+    image.loading =
+        "eager";
+
+    image.decoding =
+        "async";
+
+    image.src =
+        imageUrl;
+
+    image.addEventListener(
+        "error",
+        function() {
+            console.warn(
+                "[OCR RESULTS] Scoreboard image unavailable.",
+                {
+                    jobId:
+                        OCR_RESULTS_CURRENT_JOB_ID
+                        || null,
+                    matchId:
+                        OCR_RESULTS_CURRENT_MATCH_ID
+                        || null
+                }
+            );
+
+            wrapper.remove();
+        },
+        {
+            once:
+                true
+        }
+    );
+
+    wrapper.appendChild(
+        image
+    );
+
+    return wrapper;
+}
+
+/* =========================================================
+   TABLE ROW
    ========================================================= */
 
 function createReviewRow(
@@ -1260,7 +1343,8 @@ function createReviewRow(
     const playerName =
         getOcrPlayerName(
             player
-        );
+        )
+        || "Unknown Player";
 
     const row =
         document.createElement(
@@ -1268,15 +1352,14 @@ function createReviewRow(
         );
 
     row.className =
-        state.requiresVerification
-            ? (
-                "ocr-review-row "
-                + "ocr-review-row-needs-review"
+        (
+            "ocr-review-row "
+            + (
+                state.requiresVerification
+                    ? "ocr-review-row-needs-review"
+                    : "ocr-review-row-high-confidence"
             )
-            : (
-                "ocr-review-row "
-                + "ocr-review-row-high-confidence"
-            );
+        );
 
     row.dataset.team =
         String(
@@ -1295,63 +1378,37 @@ function createReviewRow(
             ?? ""
         );
 
-    row.appendChild(
-        createTextCell(
-            `Team ${teamIndex}`
+    [
+        `Team ${teamIndex}`,
+        playerName,
+        fieldName,
+        state.ocrValue,
+        formatEngineValue(
+            state.template
+        ),
+        formatEngineValue(
+            state.tesseract
+        ),
+        formatEngineValue(
+            state.paddle
+        ),
+        formatConfidence(
+            state.confidence
         )
-    );
+    ]
+        .forEach(
+            function(
+                value
+            ) {
+                row.appendChild(
+                    createTextCell(
+                        value
+                    )
+                );
+            }
+        );
 
-    row.appendChild(
-        createTextCell(
-            playerName
-        )
-    );
-
-    row.appendChild(
-        createTextCell(
-            fieldName
-        )
-    );
-
-    row.appendChild(
-        createTextCell(
-            state.ocrValue
-        )
-    );
-
-    row.appendChild(
-        createTextCell(
-            formatEngineValue(
-                state.template
-            )
-        )
-    );
-
-    row.appendChild(
-        createTextCell(
-            formatEngineValue(
-                state.tesseract
-            )
-        )
-    );
-
-    row.appendChild(
-        createTextCell(
-            formatEngineValue(
-                state.paddle
-            )
-        )
-    );
-
-    row.appendChild(
-        createTextCell(
-            formatConfidence(
-                state.confidence
-            )
-        )
-    );
-
-    const inputCell =
+    const valueCell =
         document.createElement(
             "td"
         );
@@ -1408,27 +1465,24 @@ function createReviewRow(
         input.addEventListener(
             "input",
             function() {
-                const originalValue =
-                    String(
-                        input.dataset
-                            .originalValue
-                        ?? ""
-                    );
-
                 row.classList.toggle(
                     "ocr-review-row-disputed",
                     input.value.trim() !==
-                        originalValue
+                        String(
+                            input.dataset
+                                .originalValue
+                            ?? ""
+                        )
                 );
             }
         );
 
-        inputCell.appendChild(
+        valueCell.appendChild(
             input
         );
     }
     else {
-        inputCell.textContent =
+        valueCell.textContent =
             String(
                 state.value
                 ?? "—"
@@ -1436,7 +1490,7 @@ function createReviewRow(
     }
 
     row.appendChild(
-        inputCell
+        valueCell
     );
 
     return row;
@@ -1453,13 +1507,10 @@ function renderOcrResultTable(
         mode = "result"
     } = {}
 ) {
-    const dialog =
-        ensureOcrResultDialog();
-
-    const content =
-        dialog.querySelector(
-            "#ocrGlobalResultContent"
-        );
+    const {
+        content
+    } =
+        getDialogElements();
 
     content.replaceChildren();
 
@@ -1475,72 +1526,53 @@ function renderOcrResultTable(
             createTextElement(
                 "div",
                 "ocr-result-empty",
-                "No scoreboard teams were returned."
+                "No scoreboard values are available."
             )
         );
 
-        return;
+        return false;
     }
 
-    const scoreboardImage =
+    const image =
         createOcrResultImage();
 
     if (
-        scoreboardImage
+        image
     ) {
         content.appendChild(
-            scoreboardImage
+            image
         );
     }
-
-    const help =
-        document.createElement(
-            "div"
-        );
-
-    help.className =
-        "ocr-review-help";
 
     const policyState =
         getCurrentReviewPolicyState();
 
+    const help =
+        createTextElement(
+            "div",
+            "ocr-review-help",
+            ""
+        );
+
     if (
-        mode ===
-            "review"
+        mode === "review"
     ) {
         help.textContent =
             policyState.locked
-                ? (
-                    "This scoreboard required review, but the review window is now closed. "
-                    + "The displayed OCR evidence is read-only."
-                )
-                : (
-                    "Highlighted values require review. "
-                    + "Verify every displayed value before submitting. "
-                    + "Changed OCR values will be recorded as disputes."
-                );
+                ? "This review window has closed. OCR evidence is shown read-only."
+                : "Verify every value before submitting. Highlighted values require special attention.";
     }
     else if (
-        mode ===
-            "adjustment"
+        mode === "adjustment"
     ) {
         help.textContent =
-            (
-                "Edit only values that need correction. "
-                + "Your changes will be stored as an adjustment "
-                + "without replacing the original OCR evidence."
-            );
+            "Change only incorrect values. Corrections are stored without replacing the original OCR evidence.";
     }
     else {
         help.textContent =
             policyState.locked
-                ? (
-                    "This scoreboard is read-only because the modification window has closed."
-                )
-                : (
-                    "This scoreboard has already been accepted. "
-                    + "You can edit it if a value needs correction."
-                );
+                ? "This scoreboard is read-only because its modification window has closed."
+                : "This scoreboard has been accepted. You may correct a value before the modification deadline.";
     }
 
     content.appendChild(
@@ -1584,8 +1616,7 @@ function renderOcrResultTable(
         "Confidence",
         editable
             ? (
-                mode ===
-                    "adjustment"
+                mode === "adjustment"
                     ? "New Value"
                     : "User Value"
             )
@@ -1622,6 +1653,9 @@ function renderOcrResultTable(
             "tbody"
         );
 
+    let renderedRows =
+        0;
+
     teams.forEach(
         function(
             team,
@@ -1648,34 +1682,49 @@ function renderOcrResultTable(
                 function(
                     player
                 ) {
-                    const fields =
-                        getResultDisplayFields(
-                            player
-                        );
+                    getResultDisplayFields(
+                        player
+                    )
+                        .forEach(
+                            function(
+                                fieldName
+                            ) {
+                                body.appendChild(
+                                    createReviewRow(
+                                        teamIndex,
+                                        player,
+                                        fieldName,
+                                        {
+                                            editable,
+                                            useEffectiveValue:
+                                                mode !==
+                                                "review"
+                                        }
+                                    )
+                                );
 
-                    fields.forEach(
-                        function(
-                            fieldName
-                        ) {
-                            body.appendChild(
-                                createReviewRow(
-                                    teamIndex,
-                                    player,
-                                    fieldName,
-                                    {
-                                        editable,
-                                        useEffectiveValue:
-                                            mode !==
-                                            "review"
-                                    }
-                                )
-                            );
-                        }
-                    );
+                                renderedRows +=
+                                    1;
+                            }
+                        );
                 }
             );
         }
     );
+
+    if (
+        renderedRows === 0
+    ) {
+        content.appendChild(
+            createTextElement(
+                "div",
+                "ocr-result-empty",
+                "No scoreboard statistics are available."
+            )
+        );
+
+        return false;
+    }
 
     table.appendChild(
         body
@@ -1710,13 +1759,19 @@ function renderOcrResultTable(
             }
         )
     );
+
+    return true;
 }
 
 /* =========================================================
-   BUILD REVIEW FIELDS
+   FIELD COLLECTION
    ========================================================= */
 
-function buildReviewFields() {
+function collectEditableFields(
+    {
+        changedOnly = false
+    } = {}
+) {
     assertOcrResultEditable();
 
     const dialog =
@@ -1728,90 +1783,14 @@ function buildReviewFields() {
                 ".ocr-review-value-input"
             )
         );
-
-    const fields =
-        [];
-
-    for (
-        const input
-        of inputs
-    ) {
-        const team =
-            normalizeInteger(
-                input.dataset.team
-            );
-
-        const player =
-            String(
-                input.dataset.player
-                || ""
-            )
-                .trim();
-
-        const field =
-            String(
-                input.dataset.field
-                || ""
-            )
-                .trim();
-
-        const value =
-            normalizeInteger(
-                input.value
-            );
-
-        if (
-            (
-                team !== 1
-                && team !== 2
-            )
-            || !player
-            || !OCR_RESULT_FIELD_ORDER.includes(
-                field
-            )
-            || value === null
-        ) {
-            throw new Error(
-                "Every scoreboard field must contain a valid non-negative whole number."
-            );
-        }
-
-        fields.push({
-            team,
-            player,
-            field,
-            userValue:
-                value
-        });
-    }
 
     if (
-        fields.length === 0
+        inputs.length === 0
     ) {
         throw new Error(
-            "No review fields were available."
+            "No scoreboard fields are available."
         );
     }
-
-    return fields;
-}
-
-/* =========================================================
-   BUILD ADJUSTMENT FIELDS
-   ========================================================= */
-
-function buildAdjustmentFields() {
-    assertOcrResultEditable();
-
-    const dialog =
-        ensureOcrResultDialog();
-
-    const inputs =
-        Array.from(
-            dialog.querySelectorAll(
-                ".ocr-review-value-input"
-            )
-        );
 
     const fields =
         [];
@@ -1860,18 +1839,29 @@ function buildAdjustmentFields() {
                 field
             )
             || value === null
-            || originalValue === null
         ) {
             throw new Error(
-                "Every scoreboard field must contain a valid non-negative whole number."
+                "Every scoreboard value must be a non-negative whole number."
             );
         }
 
         if (
-            value ===
-                originalValue
+            changedOnly
         ) {
-            continue;
+            if (
+                originalValue === null
+            ) {
+                throw new Error(
+                    "An original scoreboard value is missing."
+                );
+            }
+
+            if (
+                value ===
+                originalValue
+            ) {
+                continue;
+            }
         }
 
         fields.push({
@@ -1887,7 +1877,9 @@ function buildAdjustmentFields() {
         fields.length === 0
     ) {
         throw new Error(
-            "No scoreboard values were changed."
+            changedOnly
+                ? "No scoreboard values were changed."
+                : "No review fields are available."
         );
     }
 
@@ -1904,6 +1896,15 @@ async function submitOcrFields(
 ) {
     assertOcrResultEditable();
 
+    if (
+        mode !== "review"
+        && mode !== "adjustment"
+    ) {
+        throw new Error(
+            "Invalid scoreboard update mode."
+        );
+    }
+
     const matchId =
         OCR_RESULTS_CURRENT_MATCH_ID;
 
@@ -1912,9 +1913,15 @@ async function submitOcrFields(
             matchId
         )
     ) {
-        throw new Error(
-            "A valid match ID is required."
-        );
+        const error =
+            new Error(
+                "A valid match ID is required."
+            );
+
+        error.code =
+            "MATCH_ID_INVALID";
+
+        throw error;
     }
 
     const response =
@@ -1952,37 +1959,113 @@ async function submitOcrFields(
         || data?.success !==
             true
     ) {
-        const error =
-            new Error(
-                data?.message
-                || (
-                    mode ===
-                        "adjustment"
-                        ? "Unable to save scoreboard adjustment."
-                        : "Unable to submit OCR review."
-                )
-            );
-
-        error.status =
-            response.status;
-
-        error.code =
-            data?.code
-            || null;
-
-        throw error;
+        throw createResponseError(
+            response,
+            data,
+            mode === "adjustment"
+                ? "Unable to save scoreboard corrections."
+                : "Unable to submit scoreboard review."
+        );
     }
 
     return data;
 }
 
 /* =========================================================
-   SUBMIT REVIEW
+   RELOAD
+   ========================================================= */
+
+async function reloadCurrentResult() {
+    if (
+        !validMatchId(
+            OCR_RESULTS_CURRENT_MATCH_ID
+        )
+    ) {
+        const error =
+            new Error(
+                "A valid match ID is required."
+            );
+
+        error.code =
+            "MATCH_ID_INVALID";
+
+        error.status =
+            400;
+
+        throw error;
+    }
+
+    const {
+        result,
+        responseData
+    } =
+        await getOcrResult(
+            OCR_RESULTS_CURRENT_MATCH_ID
+        );
+
+    OCR_RESULTS_CURRENT_RESULT =
+        result;
+
+    OCR_RESULTS_CURRENT_RESPONSE =
+        responseData;
+
+    const matchId =
+        normalizeId(
+            responseData?.matchId
+            || result?.matchId
+            || OCR_RESULTS_CURRENT_MATCH_ID
+        );
+
+    if (
+        validMatchId(
+            matchId
+        )
+    ) {
+        OCR_RESULTS_CURRENT_MATCH_ID =
+            matchId;
+    }
+
+    const jobId =
+        normalizeId(
+            responseData?.jobId
+            || OCR_RESULTS_CURRENT_JOB_ID
+        );
+
+    OCR_RESULTS_CURRENT_JOB_ID =
+        validJobId(
+            jobId
+        )
+            ? jobId
+            : "";
+
+    const editDeadlineAt =
+        String(
+            responseData?.editDeadlineAt
+            || result?.editDeadlineAt
+            || ""
+        )
+            .trim();
+
+    OCR_RESULTS_CURRENT_EDIT_DEADLINE_AT =
+        editDeadlineAt
+        || null;
+
+    return {
+        result,
+        responseData
+    };
+}
+
+/* =========================================================
+   REVIEW / ADJUSTMENT SUBMISSION
    ========================================================= */
 
 async function submitReview() {
     const fields =
-        buildReviewFields();
+        collectEditableFields({
+            changedOnly:
+                false
+        });
 
     const data =
         await submitOcrFields(
@@ -2004,13 +2087,12 @@ async function submitReview() {
                         false,
                     confirmationStatus:
                         normalizeConfirmationStatus(
-                            data
-                                ?.confirmationStatus
+                            data?.confirmationStatus
                         )
                         || "confirmed",
                     hasDisputes:
                         data?.hasDisputes ===
-                            true,
+                        true,
                     disputeCount:
                         Number(
                             data?.disputeCount
@@ -2030,13 +2112,12 @@ async function submitReview() {
     closeDialog();
 }
 
-/* =========================================================
-   SAVE ADJUSTMENT
-   ========================================================= */
-
 async function saveAdjustment() {
     const fields =
-        buildAdjustmentFields();
+        collectEditableFields({
+            changedOnly:
+                true
+        });
 
     const data =
         await submitOcrFields(
@@ -2059,14 +2140,12 @@ async function saveAdjustment() {
                         || null,
                     adjustmentCount:
                         Number(
-                            data
-                                ?.adjustmentCount
+                            data?.adjustmentCount
                             || 0
                         ),
                     changedFieldCount:
                         Number(
-                            data
-                                ?.changedFieldCount
+                            data?.changedFieldCount
                             || fields.length
                         ),
                     adjustedAt:
@@ -2124,88 +2203,41 @@ async function saveAdjustment() {
 }
 
 /* =========================================================
-   RELOAD CURRENT RESULT
+   ACTION ERROR RECOVERY
    ========================================================= */
 
-async function reloadCurrentResult() {
-    if (
-        !validMatchId(
-            OCR_RESULTS_CURRENT_MATCH_ID
-        )
-    ) {
-        const error =
-            new Error(
-                "A valid match ID is required."
-            );
+async function recoverFromClosedEditWindow(
+    mode
+) {
+    try {
+        await reloadCurrentResult();
 
-        error.code =
-            "MATCH_ID_INVALID";
+        renderOcrResultTable(
+            OCR_RESULTS_CURRENT_RESULT,
+            {
+                editable:
+                    false,
+                mode
+            }
+        );
 
-        error.status =
-            400;
-
-        throw error;
+        if (
+            mode === "review"
+        ) {
+            configureReviewActions();
+        }
+        else {
+            configureResultActions();
+        }
     }
-
-    const {
-        result,
-        responseData
-    } =
-        await getOcrResult(
-            OCR_RESULTS_CURRENT_MATCH_ID
-        );
-
-    OCR_RESULTS_CURRENT_RESULT =
-        result;
-
-    OCR_RESULTS_CURRENT_RESPONSE =
-        responseData;
-
-    const responseMatchId =
-        normalizeId(
-            responseData?.matchId
-            || result?.matchId
-            || OCR_RESULTS_CURRENT_MATCH_ID
-        );
-
-    if (
-        validMatchId(
-            responseMatchId
-        )
+    catch (
+        error
     ) {
-        OCR_RESULTS_CURRENT_MATCH_ID =
-            responseMatchId;
-    }
-
-    const responseJobId =
-        normalizeId(
-            responseData?.jobId
-            || OCR_RESULTS_CURRENT_JOB_ID
+        console.error(
+            "[OCR RESULTS] Could not refresh closed edit window.",
+            error
         );
-
-    OCR_RESULTS_CURRENT_JOB_ID =
-        validJobId(
-            responseJobId
-        )
-            ? responseJobId
-            : "";
-
-    const resolvedEditDeadlineAt =
-        String(
-            responseData?.editDeadlineAt
-            || result?.editDeadlineAt
-            || ""
-        )
-            .trim();
-
-    OCR_RESULTS_CURRENT_EDIT_DEADLINE_AT =
-        resolvedEditDeadlineAt
-        || null;
-
-    return {
-        result,
-        responseData
-    };
+    }
 }
 
 /* =========================================================
@@ -2213,52 +2245,46 @@ async function reloadCurrentResult() {
    ========================================================= */
 
 function configureResultActions() {
-    const dialog =
-        ensureOcrResultDialog();
-
-    const primaryButton =
-        dialog.querySelector(
-            "#ocrGlobalResultPrimary"
-        );
-
-    const secondaryButton =
-        dialog.querySelector(
-            "#ocrGlobalResultSecondary"
-        );
+    const {
+        primary,
+        secondary
+    } =
+        getDialogElements();
 
     const policyState =
         getCurrentReviewPolicyState();
 
-    secondaryButton.hidden =
+    secondary.hidden =
         false;
 
-    secondaryButton.disabled =
+    secondary.disabled =
         false;
 
-    secondaryButton.textContent =
+    secondary.textContent =
         "Close";
 
-    primaryButton.onclick =
+    primary.onclick =
         null;
 
-    primaryButton.disabled =
+    primary.disabled =
         false;
 
     if (
         policyState.locked
     ) {
-        primaryButton.hidden =
+        primary.hidden =
             true;
+
         return;
     }
 
-    primaryButton.hidden =
+    primary.hidden =
         false;
 
-    primaryButton.textContent =
+    primary.textContent =
         "Edit Result";
 
-    primaryButton.onclick =
+    primary.onclick =
         function() {
             try {
                 assertOcrResultEditable();
@@ -2272,6 +2298,7 @@ function configureResultActions() {
                 );
 
                 configureResultActions();
+
                 return;
             }
 
@@ -2287,7 +2314,7 @@ function configureResultActions() {
                     OCR_RESULTS_CURRENT_MATCH_ID,
                 message:
                     (
-                        "Correct any accepted scoreboard value that does not match the image. "
+                        "Correct only values that do not match the scoreboard image. "
                         + getDeadlineMessage({
                             openPrefix:
                                 "Changes may be submitted until"
@@ -2305,20 +2332,17 @@ function configureResultActions() {
                 }
             );
 
-            primaryButton.textContent =
+            primary.textContent =
                 "Save Changes";
 
-            primaryButton.onclick =
+            primary.onclick =
                 async function() {
                     setDialogError();
-
                     setDialogBusy(
                         true
                     );
 
                     try {
-                        assertOcrResultEditable();
-
                         await saveAdjustment();
                     }
                     catch (
@@ -2326,26 +2350,16 @@ function configureResultActions() {
                     ) {
                         setDialogError(
                             error?.message
-                            || "Unable to save scoreboard adjustment."
+                            || "Unable to save scoreboard corrections."
                         );
 
                         if (
                             error?.code ===
-                                "EDIT_WINDOW_CLOSED"
+                            "EDIT_WINDOW_CLOSED"
                         ) {
-                            await reloadCurrentResult();
-
-                            renderOcrResultTable(
-                                OCR_RESULTS_CURRENT_RESULT,
-                                {
-                                    editable:
-                                        false,
-                                    mode:
-                                        "result"
-                                }
+                            await recoverFromClosedEditWindow(
+                                "result"
                             );
-
-                            configureResultActions();
                         }
                     }
                     finally {
@@ -2362,62 +2376,53 @@ function configureResultActions() {
    ========================================================= */
 
 function configureReviewActions() {
-    const dialog =
-        ensureOcrResultDialog();
-
-    const primaryButton =
-        dialog.querySelector(
-            "#ocrGlobalResultPrimary"
-        );
-
-    const secondaryButton =
-        dialog.querySelector(
-            "#ocrGlobalResultSecondary"
-        );
+    const {
+        primary,
+        secondary
+    } =
+        getDialogElements();
 
     const policyState =
         getCurrentReviewPolicyState();
 
-    secondaryButton.hidden =
+    secondary.hidden =
         false;
 
-    secondaryButton.disabled =
+    secondary.disabled =
         false;
 
-    secondaryButton.textContent =
+    secondary.textContent =
         "Close";
 
-    primaryButton.onclick =
+    primary.onclick =
         null;
 
-    primaryButton.disabled =
+    primary.disabled =
         false;
 
     if (
         policyState.locked
     ) {
-        primaryButton.hidden =
+        primary.hidden =
             true;
+
         return;
     }
 
-    primaryButton.hidden =
+    primary.hidden =
         false;
 
-    primaryButton.textContent =
+    primary.textContent =
         "Submit Review";
 
-    primaryButton.onclick =
+    primary.onclick =
         async function() {
             setDialogError();
-
             setDialogBusy(
                 true
             );
 
             try {
-                assertOcrResultEditable();
-
                 await submitReview();
             }
             catch (
@@ -2425,26 +2430,16 @@ function configureReviewActions() {
             ) {
                 setDialogError(
                     error?.message
-                    || "Unable to submit OCR review."
+                    || "Unable to submit scoreboard review."
                 );
 
                 if (
                     error?.code ===
-                        "EDIT_WINDOW_CLOSED"
+                    "EDIT_WINDOW_CLOSED"
                 ) {
-                    await reloadCurrentResult();
-
-                    renderOcrResultTable(
-                        OCR_RESULTS_CURRENT_RESULT,
-                        {
-                            editable:
-                                false,
-                            mode:
-                                "review"
-                        }
+                    await recoverFromClosedEditWindow(
+                        "review"
                     );
-
-                    configureReviewActions();
                 }
             }
             finally {
@@ -2453,6 +2448,124 @@ function configureReviewActions() {
                 );
             }
         };
+}
+
+/* =========================================================
+   STRUCTURAL REVIEW FAILURES
+   ========================================================= */
+
+function isStructuralReviewFailure(
+    error
+) {
+    const code =
+        normalizeErrorCode(
+            error?.code
+        );
+
+    return Boolean(
+        code
+        && OCR_STRUCTURAL_REVIEW_FAILURE_CODES
+            .has(
+                code
+            )
+    );
+}
+
+function getStructuralReviewFailureMessage(
+    error
+) {
+    const code =
+        normalizeErrorCode(
+            error?.code
+        );
+
+    const messages = {
+        MATCH_ID_INVALID:
+            "This scoreboard cannot be reviewed because its match ID is invalid.",
+        MATCH_REPORT_NOT_FOUND:
+            "This scoreboard cannot be reviewed because its stored match report is missing.",
+        MATCH_REPORT_INVALID:
+            "This scoreboard cannot be reviewed because its stored match report is invalid.",
+        MATCH_ID_MISMATCH:
+            "This scoreboard cannot be reviewed because its stored match report does not match this match.",
+        MATCH_OWNER_MISSING:
+            "This scoreboard cannot be reviewed because required ownership information is missing.",
+        EDIT_DEADLINE_MISSING:
+            "This scoreboard cannot be reviewed because its review deadline is missing or invalid.",
+        SCOREBOARD_EMPTY:
+            "This scoreboard cannot be reviewed because the stored report contains no scoreboard values.",
+        OCR_RESULT_MISSING:
+            "This scoreboard cannot be reviewed because its stored OCR result is missing."
+    };
+
+    return messages[
+        code
+    ]
+    || String(
+        error?.message
+        || "This scoreboard cannot be reviewed because required stored data is missing or invalid."
+    )
+        .trim();
+}
+
+function dispatchInvalidReview(
+    error
+) {
+    const jobId =
+        validJobId(
+            OCR_RESULTS_CURRENT_JOB_ID
+        )
+            ? OCR_RESULTS_CURRENT_JOB_ID
+            : null;
+
+    const matchId =
+        validMatchId(
+            OCR_RESULTS_CURRENT_MATCH_ID
+        )
+            ? OCR_RESULTS_CURRENT_MATCH_ID
+            : null;
+
+    const errorCode =
+        normalizeErrorCode(
+            error?.code
+        )
+        || "OCR_REVIEW_INVALID";
+
+    const message =
+        getStructuralReviewFailureMessage(
+            error
+        );
+
+    console.error(
+        "[OCR RESULTS] Review is structurally invalid.",
+        {
+            jobId,
+            matchId,
+            errorCode,
+            message
+        }
+    );
+
+    document.dispatchEvent(
+        new CustomEvent(
+            "ocr:review-invalid",
+            {
+                detail: {
+                    jobId,
+                    matchId,
+                    errorCode,
+                    message
+                }
+            }
+        )
+    );
+
+    return {
+        jobId,
+        matchId,
+        errorCode,
+        message
+    };
 }
 
 /* =========================================================
@@ -2465,26 +2578,20 @@ function showUnavailableResult(
         message = ""
     } = {}
 ) {
-    const dialog =
-        ensureOcrResultDialog();
-
-    const content =
-        dialog.querySelector(
-            "#ocrGlobalResultContent"
-        );
-
-    const primaryButton =
-        dialog.querySelector(
-            "#ocrGlobalResultPrimary"
-        );
+    const {
+        content,
+        primary,
+        secondary
+    } =
+        getDialogElements();
 
     content.replaceChildren();
 
     setDialogText({
         title:
             review
-                ? "Review Scoreboard"
-                : "Scoreboard Result",
+                ? "Review Unavailable"
+                : "Scoreboard Unavailable",
         subtitle:
             OCR_RESULTS_CURRENT_MATCH_ID
             || OCR_RESULTS_CURRENT_JOB_ID,
@@ -2494,11 +2601,127 @@ function showUnavailableResult(
 
     setDialogError(
         message
-        || "This scoreboard result is no longer available."
+        || "This scoreboard is no longer available."
     );
 
-    primaryButton.hidden =
+    primary.hidden =
         true;
+
+    primary.onclick =
+        null;
+
+    secondary.hidden =
+        false;
+
+    secondary.disabled =
+        false;
+
+    secondary.textContent =
+        "Close";
+}
+
+/* =========================================================
+   FAILURE MODAL
+   ========================================================= */
+
+function openFailureModal(
+    detail
+) {
+    const requestedJobId =
+        normalizeId(
+            detail?.jobId
+        );
+
+    OCR_RESULTS_CURRENT_MODE =
+        "failure";
+
+    OCR_RESULTS_CURRENT_JOB_ID =
+        validJobId(
+            requestedJobId
+        )
+            ? requestedJobId
+            : "";
+
+    OCR_RESULTS_CURRENT_MATCH_ID =
+        "";
+
+    OCR_RESULTS_CURRENT_RESULT =
+        null;
+
+    OCR_RESULTS_CURRENT_RESPONSE =
+        null;
+
+    OCR_RESULTS_CURRENT_EDIT_DEADLINE_AT =
+        null;
+
+    const {
+        content,
+        primary,
+        secondary
+    } =
+        getDialogElements();
+
+    const errorCode =
+        normalizeErrorCode(
+            detail?.errorCode
+        )
+        || "OCR_FAILED";
+
+    const message =
+        String(
+            detail?.message
+            || "The scoreboard could not be processed."
+        )
+            .trim();
+
+    content.replaceChildren();
+
+    setDialogError();
+
+    setDialogText({
+        title:
+            "Scoreboard Processing Failed",
+        subtitle:
+            errorCode,
+        message
+    });
+
+    secondary.hidden =
+        true;
+
+    primary.hidden =
+        false;
+
+    primary.disabled =
+        false;
+
+    primary.textContent =
+        "Acknowledge";
+
+    primary.onclick =
+        function() {
+            if (
+                validJobId(
+                    OCR_RESULTS_CURRENT_JOB_ID
+                )
+            ) {
+                document.dispatchEvent(
+                    new CustomEvent(
+                        "ocr:failure-acknowledged",
+                        {
+                            detail: {
+                                jobId:
+                                    OCR_RESULTS_CURRENT_JOB_ID
+                            }
+                        }
+                    )
+                );
+            }
+
+            closeDialog();
+        };
+
+    openDialog();
 }
 
 /* =========================================================
@@ -2521,40 +2744,6 @@ async function openResultModal(
             detail?.matchId
         );
 
-    if (
-        !validMatchId(
-            requestedMatchId
-        )
-    ) {
-        const dialog =
-            ensureOcrResultDialog();
-
-        OCR_RESULTS_CURRENT_JOB_ID =
-            validJobId(
-                requestedJobId
-            )
-                ? requestedJobId
-                : "";
-
-        OCR_RESULTS_CURRENT_MATCH_ID =
-            "";
-
-        OCR_RESULTS_CURRENT_MODE =
-            review
-                ? "review"
-                : "result";
-
-        openDialog();
-
-        showUnavailableResult({
-            review,
-            message:
-                "This scoreboard result does not contain a valid match ID."
-        });
-
-        return;
-    }
-
     OCR_RESULTS_CURRENT_JOB_ID =
         validJobId(
             requestedJobId
@@ -2563,7 +2752,11 @@ async function openResultModal(
             : "";
 
     OCR_RESULTS_CURRENT_MATCH_ID =
-        requestedMatchId;
+        validMatchId(
+            requestedMatchId
+        )
+            ? requestedMatchId
+            : "";
 
     OCR_RESULTS_CURRENT_MODE =
         review
@@ -2579,41 +2772,50 @@ async function openResultModal(
     OCR_RESULTS_CURRENT_EDIT_DEADLINE_AT =
         null;
 
-    const dialog =
-        ensureOcrResultDialog();
+    resetDialogActions();
 
-    const content =
-        dialog.querySelector(
-            "#ocrGlobalResultContent"
-        );
+    if (
+        !OCR_RESULTS_CURRENT_MATCH_ID
+    ) {
+        if (
+            review
+        ) {
+            const error =
+                new Error(
+                    "This scoreboard does not contain a valid match ID."
+                );
 
-    const primaryButton =
-        dialog.querySelector(
-            "#ocrGlobalResultPrimary"
-        );
+            error.code =
+                "MATCH_ID_INVALID";
 
-    const secondaryButton =
-        dialog.querySelector(
-            "#ocrGlobalResultSecondary"
-        );
+            const failure =
+                dispatchInvalidReview(
+                    error
+                );
 
-    secondaryButton.hidden =
-        false;
+            openFailureModal(
+                failure
+            );
 
-    secondaryButton.disabled =
-        false;
+            return;
+        }
 
-    secondaryButton.textContent =
-        "Close";
+        openDialog();
 
-    primaryButton.hidden =
-        true;
+        showUnavailableResult({
+            review:
+                false,
+            message:
+                "This scoreboard does not contain a valid match ID."
+        });
 
-    primaryButton.disabled =
-        false;
+        return;
+    }
 
-    primaryButton.onclick =
-        null;
+    const {
+        content
+    } =
+        getDialogElements();
 
     content.replaceChildren(
         createTextElement(
@@ -2635,7 +2837,7 @@ async function openResultModal(
         message:
             review
                 ? "Loading scoreboard review..."
-                : "Loading OCR result..."
+                : "Loading scoreboard result..."
     });
 
     openDialog();
@@ -2683,15 +2885,14 @@ async function openResultModal(
                 message:
                     policyState.locked
                         ? (
-                            "This scoreboard required review, but the modification deadline has passed. "
+                            "This scoreboard required review, but its review window has closed. "
                             + getDeadlineMessage({
                                 lockedPrefix:
-                                    "Review is now closed."
+                                    "Review is now read-only."
                             })
                         )
                         : (
-                            "Verify each scoreboard value. "
-                            + "Highlighted values require special attention. "
+                            "Verify each scoreboard value before submitting. "
                             + getDeadlineMessage({
                                 openPrefix:
                                     "Submit your review by"
@@ -2710,6 +2911,7 @@ async function openResultModal(
             );
 
             configureReviewActions();
+
             return;
         }
 
@@ -2742,7 +2944,7 @@ async function openResultModal(
                             })
                             : getDeadlineMessage({
                                 openPrefix:
-                                    "You may make corrections until"
+                                    "Corrections may be submitted until"
                             })
                     )
                 )
@@ -2784,6 +2986,24 @@ async function openResultModal(
             }
         );
 
+        if (
+            review
+            && isStructuralReviewFailure(
+                error
+            )
+        ) {
+            const failure =
+                dispatchInvalidReview(
+                    error
+                );
+
+            openFailureModal(
+                failure
+            );
+
+            return;
+        }
+
         const unavailable = (
             error?.code ===
                 "MATCH_ID_INVALID"
@@ -2797,119 +3017,13 @@ async function openResultModal(
             review,
             message:
                 unavailable
-                    ? "This scoreboard result is no longer available."
+                    ? "This scoreboard is no longer available."
                     : (
                         error?.message
-                        || "Unable to load OCR result."
+                        || "Unable to load this scoreboard."
                     )
         });
     }
-}
-
-/* =========================================================
-   FAILURE MODAL
-   ========================================================= */
-
-function openFailureModal(
-    detail
-) {
-    OCR_RESULTS_CURRENT_MODE =
-        "failure";
-
-    OCR_RESULTS_CURRENT_JOB_ID =
-        normalizeId(
-            detail?.jobId
-        );
-
-    OCR_RESULTS_CURRENT_MATCH_ID =
-        "";
-
-    OCR_RESULTS_CURRENT_RESULT =
-        null;
-
-    OCR_RESULTS_CURRENT_RESPONSE =
-        null;
-
-    OCR_RESULTS_CURRENT_EDIT_DEADLINE_AT =
-        null;
-
-    const dialog =
-        ensureOcrResultDialog();
-
-    const content =
-        dialog.querySelector(
-            "#ocrGlobalResultContent"
-        );
-
-    const primaryButton =
-        dialog.querySelector(
-            "#ocrGlobalResultPrimary"
-        );
-
-    const secondaryButton =
-        dialog.querySelector(
-            "#ocrGlobalResultSecondary"
-        );
-
-    const message =
-        String(
-            detail?.message
-            || "The scoreboard could not be processed."
-        )
-            .trim();
-
-    const errorCode =
-        String(
-            detail?.errorCode
-            || "OCR_FAILED"
-        )
-            .trim();
-
-    setDialogText({
-        title:
-            "Scoreboard Processing Failed",
-        subtitle:
-            errorCode,
-        message
-    });
-
-    setDialogError();
-
-    content.replaceChildren();
-
-    primaryButton.hidden =
-        false;
-
-    primaryButton.disabled =
-        false;
-
-    primaryButton.textContent =
-        "Acknowledge";
-
-    secondaryButton.hidden =
-        true;
-
-    primaryButton.onclick =
-        function() {
-            document.dispatchEvent(
-                new CustomEvent(
-                    "ocr:failure-acknowledged",
-                    {
-                        detail: {
-                            jobId:
-                                OCR_RESULTS_CURRENT_JOB_ID
-                        }
-                    }
-                )
-            );
-
-            secondaryButton.hidden =
-                false;
-
-            closeDialog();
-        };
-
-    openDialog();
 }
 
 /* =========================================================
@@ -2952,7 +3066,7 @@ function handleFailureOpen(
 }
 
 /* =========================================================
-   PUBLIC OPEN
+   PUBLIC API
    ========================================================= */
 
 export function openOcrResult(
@@ -2996,6 +3110,7 @@ export function initializeOcrResults() {
         OCR_RESULTS_READY
     ) {
         ensureOcrResultDialog();
+
         return true;
     }
 

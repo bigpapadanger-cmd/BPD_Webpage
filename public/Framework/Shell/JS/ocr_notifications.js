@@ -2,25 +2,11 @@
 
 /* =========================================================
    BPD GAMING NETWORK
-   GLOBAL OCR NOTIFICATIONS
+   OCR NOTIFICATIONS
    ========================================================= */
 
-import {
-    OCR_JOB_STATUS_URL
-} from "/scripts/apiRoutes.js";
-
-import {
-    apiFetch
-} from "/scripts/apiConnection.js";
-
 const OCR_NOTIFICATION_VERSION =
-    "ocr-notifications-1.4";
-
-const OCR_ACTIVE_JOB_KEY =
-    "rocketLeagueOcrActiveJobV1";
-
-const OCR_ACTIVE_JOB_ROUTE_KEY =
-    "rocketLeagueOcrActiveJobRouteV1";
+    "ocr-notifications-1.7";
 
 const OCR_PENDING_REVIEW_KEY =
     "rocketLeagueOcrPendingReviewsV1";
@@ -28,74 +14,23 @@ const OCR_PENDING_REVIEW_KEY =
 const OCR_PENDING_FAILURE_KEY =
     "rocketLeagueOcrPendingFailuresV1";
 
+const OCR_ACKNOWLEDGED_JOB_KEY =
+    "rocketLeagueOcrAcknowledgedJobsV1";
+
 const OCR_ACCEPTED_RESULT_KEY =
     "rocketLeagueOcrAcceptedResultsV1";
+
+const OCR_ACKNOWLEDGED_JOB_LIMIT =
+    100;
 
 const OCR_NOTIFICATION_CONTAINER_ID =
     "ocrNotificationContainer";
 
 const OCR_NOTIFICATION_DURATION_MS =
-    15
-    * 1000;
-
-const OCR_NOTIFICATION_CHECK_SCHEDULE_MS = [
-    2000,
-    5000,
-    9000,
-    13000,
-    17000,
-    21000,
-    25000,
-    30000
-];
-
-const OCR_NOTIFICATION_QUEUE_STALE_MS =
-    2
-    * 60
-    * 1000;
-
-const OCR_NOTIFICATION_PROCESSING_STALE_MS =
-    120
-    * 1000;
-
-const OCR_NOTIFICATION_MAX_STALE_CHECKS =
-    3;
-
-const OCR_NOTIFICATION_TAIL_POLL_MS =
-    10
-    * 1000;
-
-const OCR_NOTIFICATION_MAX_ACTIVE_JOB_MS =
-    10
-    * 60
-    * 1000;
+    15000;
 
 let OCR_NOTIFICATIONS_READY =
     false;
-
-let OCR_NOTIFICATION_POLLING =
-    false;
-
-let OCR_NOTIFICATION_POLL_TIMER =
-    null;
-
-let OCR_NOTIFICATION_ACTIVE_JOB_ID =
-    "";
-
-let OCR_NOTIFICATION_CHECK_RUNNING =
-    false;
-
-let OCR_NOTIFICATION_CHECK_INDEX =
-    0;
-
-let OCR_NOTIFICATION_BURST_STARTED_AT =
-    0;
-
-let OCR_NOTIFICATION_STALE_CHECKS =
-    0;
-
-let OCR_NOTIFICATION_LAST_PROGRESS_SIGNATURE =
-    "";
 
 const OCR_NOTIFICATION_TIMERS =
     new Map();
@@ -135,33 +70,6 @@ function validMatchId(
     );
 }
 
-function normalizeClientProgress(
-    value
-) {
-    const numeric =
-        Number(
-            value
-        );
-
-    if (
-        !Number.isFinite(
-            numeric
-        )
-    ) {
-        return 0;
-    }
-
-    return Math.max(
-        0,
-        Math.min(
-            100,
-            Math.round(
-                numeric
-            )
-        )
-    );
-}
-
 function normalizeConfirmationStatus(
     value
 ) {
@@ -185,8 +93,21 @@ function normalizeConfirmationStatus(
         : "";
 }
 
+function normalizeErrorCode(
+    value,
+    fallback =
+        "OCR_FAILED"
+) {
+    return String(
+        value
+        || fallback
+    )
+        .trim()
+        .toUpperCase();
+}
+
 /* =========================================================
-   GENERIC LOCAL STORAGE
+   STORAGE
    ========================================================= */
 
 function readStoredArray(
@@ -210,8 +131,8 @@ function readStoredArray(
     catch (
         error
     ) {
-        console.error(
-            `[OCR NOTIFICATIONS] Could not read ${key}.`,
+        console.warn(
+            `[OCR NOTIFICATIONS] Invalid ${key} storage was ignored.`,
             error
         );
 
@@ -234,6 +155,8 @@ function writeStoredArray(
                     : []
             )
         );
+
+        return true;
     }
     catch (
         error
@@ -242,90 +165,126 @@ function writeStoredArray(
             `[OCR NOTIFICATIONS] Could not save ${key}.`,
             error
         );
+
+        return false;
     }
 }
 
 /* =========================================================
-   ACTIVE JOB STORAGE
+   HANDLED JOBS
    ========================================================= */
 
-function getStoredActiveJobId() {
-    try {
-        const jobId =
-            normalizeId(
-                localStorage.getItem(
-                    OCR_ACTIVE_JOB_KEY
+function readAcknowledgedJobs() {
+    return Array.from(
+        new Set(
+            readStoredArray(
+                OCR_ACKNOWLEDGED_JOB_KEY
+            )
+                .map(
+                    function(
+                        item
+                    ) {
+                        return normalizeId(
+                            typeof item ===
+                                "string"
+                                ? item
+                                : item?.jobId
+                        );
+                    }
                 )
+                .filter(
+                    validJobId
+                )
+        )
+    );
+}
+
+function writeAcknowledgedJobs(
+    jobIds
+) {
+    const normalized =
+        Array.from(
+            new Set(
+                (
+                    Array.isArray(
+                        jobIds
+                    )
+                        ? jobIds
+                        : []
+                )
+                    .map(
+                        normalizeId
+                    )
+                    .filter(
+                        validJobId
+                    )
+            )
+        )
+            .slice(
+                -OCR_ACKNOWLEDGED_JOB_LIMIT
             );
 
-        return validJobId(
+    return writeStoredArray(
+        OCR_ACKNOWLEDGED_JOB_KEY,
+        normalized
+    );
+}
+
+function isJobAcknowledged(
+    jobId
+) {
+    const normalizedJobId =
+        normalizeId(
             jobId
-        )
-            ? jobId
-            : "";
-    }
-    catch (
-        error
-    ) {
-        console.error(
-            "[OCR NOTIFICATIONS] Could not read active job.",
-            error
         );
 
-        return "";
-    }
-}
-
-function getStoredActiveJobRoute() {
-    try {
-        const route =
-            String(
-                localStorage.getItem(
-                    OCR_ACTIVE_JOB_ROUTE_KEY
-                )
-                || ""
+    return Boolean(
+        validJobId(
+            normalizedJobId
+        )
+        && readAcknowledgedJobs()
+            .includes(
+                normalizedJobId
             )
-                .trim();
-
-        return route.startsWith(
-            "/"
-        )
-            ? route
-            : "";
-    }
-    catch (
-        error
-    ) {
-        console.error(
-            "[OCR NOTIFICATIONS] Could not read active job route.",
-            error
-        );
-
-        return "";
-    }
+    );
 }
 
-function clearStoredActiveJob() {
-    OCR_NOTIFICATION_ACTIVE_JOB_ID =
-        "";
-
-    try {
-        localStorage.removeItem(
-            OCR_ACTIVE_JOB_KEY
+function rememberAcknowledgedJob(
+    jobId
+) {
+    const normalizedJobId =
+        normalizeId(
+            jobId
         );
 
-        localStorage.removeItem(
-            OCR_ACTIVE_JOB_ROUTE_KEY
-        );
-    }
-    catch (
-        error
+    if (
+        !validJobId(
+            normalizedJobId
+        )
     ) {
-        console.error(
-            "[OCR NOTIFICATIONS] Could not clear active job.",
-            error
-        );
+        return false;
     }
+
+    const jobs =
+        readAcknowledgedJobs()
+            .filter(
+                function(
+                    storedJobId
+                ) {
+                    return (
+                        storedJobId !==
+                        normalizedJobId
+                    );
+                }
+            );
+
+    jobs.push(
+        normalizedJobId
+    );
+
+    return writeAcknowledgedJobs(
+        jobs
+    );
 }
 
 /* =========================================================
@@ -341,34 +300,10 @@ export function readPendingReviews() {
 function writePendingReviews(
     reviews
 ) {
-    writeStoredArray(
+    return writeStoredArray(
         OCR_PENDING_REVIEW_KEY,
         reviews
     );
-}
-
-function getPendingReview(
-    matchId
-) {
-    const normalizedMatchId =
-        normalizeId(
-            matchId
-        );
-
-    return readPendingReviews()
-        .find(
-            function(
-                pending
-            ) {
-                return (
-                    normalizeId(
-                        pending?.matchId
-                    )
-                    === normalizedMatchId
-                );
-            }
-        )
-        || null;
 }
 
 function addPendingReview(
@@ -391,6 +326,9 @@ function addPendingReview(
         || !validMatchId(
             matchId
         )
+        || isJobAcknowledged(
+            jobId
+        )
     ) {
         return null;
     }
@@ -398,77 +336,23 @@ function addPendingReview(
     const pending = {
         jobId,
         matchId,
-
         confirmationStatus:
             "pending_review",
-
         reviewRequired:
             true,
-
         createdAt:
             String(
-                detail?.createdAt
+                detail?.completedAt
+                || detail?.createdAt
                 || new Date()
                     .toISOString()
             ),
-
         sourceRoute:
             String(
                 detail?.sourceRoute
-                || getStoredActiveJobRoute()
                 || ""
             )
     };
-
-    const reviews =
-        readPendingReviews();
-
-    const existingIndex =
-        reviews.findIndex(
-            function(
-                item
-            ) {
-                return (
-                    normalizeId(
-                        item?.matchId
-                    )
-                    === matchId
-                );
-            }
-        );
-
-    if (
-        existingIndex >= 0
-    ) {
-        reviews[
-            existingIndex
-        ] = {
-            ...reviews[
-                existingIndex
-            ],
-            ...pending
-        };
-    }
-    else {
-        reviews.push(
-            pending
-        );
-    }
-
-    writePendingReviews(
-        reviews
-    );
-
-    return pending;
-}
-
-export function removePendingReview(
-    matchId
-) {
-    const normalizedMatchId =
-        normalizeId(
-            matchId
-        );
 
     const reviews =
         readPendingReviews()
@@ -480,13 +364,72 @@ export function removePendingReview(
                         normalizeId(
                             item?.matchId
                         )
-                        !== normalizedMatchId
+                        !== matchId
                     );
                 }
             );
 
-    writePendingReviews(
+    reviews.push(
+        pending
+    );
+
+    return writePendingReviews(
         reviews
+    )
+        ? pending
+        : null;
+}
+
+export function removePendingReview(
+    matchId,
+    {
+        markHandled = true
+    } = {}
+) {
+    const normalizedMatchId =
+        normalizeId(
+            matchId
+        );
+
+    if (
+        !validMatchId(
+            normalizedMatchId
+        )
+    ) {
+        return null;
+    }
+
+    const reviews =
+        readPendingReviews();
+
+    const removed =
+        reviews.find(
+            function(
+                item
+            ) {
+                return (
+                    normalizeId(
+                        item?.matchId
+                    )
+                    === normalizedMatchId
+                );
+            }
+        )
+        || null;
+
+    writePendingReviews(
+        reviews.filter(
+            function(
+                item
+            ) {
+                return (
+                    normalizeId(
+                        item?.matchId
+                    )
+                    !== normalizedMatchId
+                );
+            }
+        )
     );
 
     clearNotificationTimer(
@@ -496,6 +439,19 @@ export function removePendingReview(
     removeNotificationElement(
         normalizedMatchId
     );
+
+    if (
+        markHandled
+        && validJobId(
+            removed?.jobId
+        )
+    ) {
+        rememberAcknowledgedJob(
+            removed.jobId
+        );
+    }
+
+    return removed;
 }
 
 /* =========================================================
@@ -511,7 +467,7 @@ export function readPendingFailures() {
 function writePendingFailures(
     failures
 ) {
-    writeStoredArray(
+    return writeStoredArray(
         OCR_PENDING_FAILURE_KEY,
         failures
     );
@@ -529,107 +485,82 @@ function addPendingFailure(
         !validJobId(
             jobId
         )
+        || isJobAcknowledged(
+            jobId
+        )
     ) {
         return null;
     }
 
-    const job =
-        detail?.job
-        && typeof detail.job ===
-            "object"
-            ? detail.job
-            : {};
+    const matchId =
+        normalizeId(
+            detail?.matchId
+        );
 
     const failure = {
         jobId,
-
+        matchId:
+            validMatchId(
+                matchId
+            )
+                ? matchId
+                : null,
         status:
             "failed",
-
         stage:
             String(
-                job?.stage
+                detail?.stage
                 || "failed"
             )
                 .trim()
                 .toLowerCase(),
-
+        errorCode:
+            normalizeErrorCode(
+                detail?.errorCode
+            ),
         message:
             String(
-                job?.error?.userMessage
-                || job?.message
-                || job?.error?.message
-                || detail?.message
+                detail?.message
                 || "The scoreboard could not be processed."
             )
                 .trim(),
-
-        errorCode:
-            String(
-                job?.error?.code
-                || detail?.reason
-                || "OCR_FAILED"
-            )
-                .trim()
-                .toUpperCase(),
-
         createdAt:
             String(
-                job?.completedAt
-                || job?.updatedAt
+                detail?.createdAt
                 || new Date()
                     .toISOString()
             ),
-
         sourceRoute:
             String(
                 detail?.sourceRoute
-                || detail?.reviewRoute
-                || getStoredActiveJobRoute()
                 || ""
             )
     };
 
     const failures =
-        readPendingFailures();
+        readPendingFailures()
+            .filter(
+                function(
+                    item
+                ) {
+                    return (
+                        normalizeId(
+                            item?.jobId
+                        )
+                        !== jobId
+                    );
+                }
+            );
 
-    const existingIndex =
-        failures.findIndex(
-            function(
-                item
-            ) {
-                return (
-                    normalizeId(
-                        item?.jobId
-                    )
-                    === jobId
-                );
-            }
-        );
-
-    if (
-        existingIndex >= 0
-    ) {
-        failures[
-            existingIndex
-        ] = {
-            ...failures[
-                existingIndex
-            ],
-            ...failure
-        };
-    }
-    else {
-        failures.push(
-            failure
-        );
-    }
-
-    writePendingFailures(
-        failures
+    failures.push(
+        failure
     );
 
-    return failure;
+    return writePendingFailures(
+        failures
+    )
+        ? failure
+        : null;
 }
 
 export function acknowledgeOcrFailure(
@@ -640,7 +571,23 @@ export function acknowledgeOcrFailure(
             jobId
         );
 
-    const failures =
+    if (
+        !validJobId(
+            normalizedJobId
+        )
+    ) {
+        return false;
+    }
+
+    if (
+        !rememberAcknowledgedJob(
+            normalizedJobId
+        )
+    ) {
+        return false;
+    }
+
+    writePendingFailures(
         readPendingFailures()
             .filter(
                 function(
@@ -653,10 +600,7 @@ export function acknowledgeOcrFailure(
                         !== normalizedJobId
                     );
                 }
-            );
-
-    writePendingFailures(
-        failures
+            )
     );
 
     clearNotificationTimer(
@@ -666,10 +610,20 @@ export function acknowledgeOcrFailure(
     removeNotificationElement(
         normalizedJobId
     );
+
+    console.log(
+        "[OCR NOTIFICATIONS] Failure acknowledged and removed.",
+        {
+            jobId:
+                normalizedJobId
+        }
+    );
+
+    return true;
 }
 
 /* =========================================================
-   ACCEPTED RESULTS
+   LEGACY ACCEPTED STORAGE
    ========================================================= */
 
 export function readAcceptedResults() {
@@ -678,101 +632,20 @@ export function readAcceptedResults() {
     );
 }
 
-function writeAcceptedResults(
-    results
-) {
-    writeStoredArray(
-        OCR_ACCEPTED_RESULT_KEY,
-        results
-    );
-}
-
-function addAcceptedResult(
-    detail
-) {
-    const jobId =
-        normalizeId(
-            detail?.jobId
-        );
-
-    const matchId =
-        normalizeId(
-            detail?.matchId
-        );
-
+function clearLegacyAcceptedResults() {
     if (
-        !validJobId(
-            jobId
-        )
-        || !validMatchId(
-            matchId
-        )
+        readAcceptedResults()
+            .length > 0
     ) {
-        return null;
-    }
-
-    const accepted = {
-        jobId,
-        matchId,
-
-        confirmationStatus:
-            normalizeConfirmationStatus(
-                detail?.confirmationStatus
-            )
-            || "auto_accepted",
-
-        createdAt:
-            String(
-                detail?.createdAt
-                || new Date()
-                    .toISOString()
-            )
-    };
-
-    const results =
-        readAcceptedResults();
-
-    const existingIndex =
-        results.findIndex(
-            function(
-                item
-            ) {
-                return (
-                    normalizeId(
-                        item?.matchId
-                    )
-                    === matchId
-                );
-            }
-        );
-
-    if (
-        existingIndex >= 0
-    ) {
-        results[
-            existingIndex
-        ] = {
-            ...results[
-                existingIndex
-            ],
-            ...accepted
-        };
-    }
-    else {
-        results.push(
-            accepted
+        writeStoredArray(
+            OCR_ACCEPTED_RESULT_KEY,
+            []
         );
     }
-
-    writeAcceptedResults(
-        results
-    );
-
-    return accepted;
 }
 
 /* =========================================================
-   NOTIFICATION CONTAINER
+   NOTIFICATION DOM
    ========================================================= */
 
 function ensureNotificationContainer() {
@@ -805,10 +678,6 @@ function ensureNotificationContainer() {
     return container;
 }
 
-/* =========================================================
-   NOTIFICATION HELPERS
-   ========================================================= */
-
 function getNotificationId(
     id
 ) {
@@ -820,27 +689,17 @@ function getNotificationId(
     );
 }
 
-function removeNotificationElement(
-    id
-) {
-    document.getElementById(
-        getNotificationId(
-            id
-        )
-    )?.remove();
-}
-
 function clearNotificationTimer(
     id
 ) {
-    const key =
+    const normalizedId =
         normalizeId(
             id
         );
 
     const timer =
         OCR_NOTIFICATION_TIMERS.get(
-            key
+            normalizedId
         );
 
     if (
@@ -854,13 +713,30 @@ function clearNotificationTimer(
     );
 
     OCR_NOTIFICATION_TIMERS.delete(
-        key
+        normalizedId
     );
 }
 
-/* =========================================================
-   NOTIFICATION UI
-   ========================================================= */
+function removeNotificationElement(
+    id
+) {
+    const normalizedId =
+        normalizeId(
+            id
+        );
+
+    if (
+        !normalizedId
+    ) {
+        return;
+    }
+
+    document.getElementById(
+        getNotificationId(
+            normalizedId
+        )
+    )?.remove();
+}
 
 function createNotification(
     {
@@ -882,21 +758,13 @@ function createNotification(
         return null;
     }
 
-    const notificationId =
-        getNotificationId(
-            normalizedId
-        );
-
-    removeNotificationElement(
-        normalizedId
-    );
-
     clearNotificationTimer(
         normalizedId
     );
 
-    const container =
-        ensureNotificationContainer();
+    removeNotificationElement(
+        normalizedId
+    );
 
     const notification =
         document.createElement(
@@ -907,23 +775,35 @@ function createNotification(
         "button";
 
     notification.id =
-        notificationId;
+        getNotificationId(
+            normalizedId
+        );
 
     notification.className =
         "ocr-notification";
 
     if (
-        type === "success"
+        type ===
+        "success"
     ) {
         notification.classList.add(
             "ocr-notification-success"
         );
     }
     else if (
-        type === "review"
+        type ===
+        "review"
     ) {
         notification.classList.add(
             "ocr-notification-review"
+        );
+    }
+    else if (
+        type ===
+        "info"
+    ) {
+        notification.classList.add(
+            "ocr-notification-info"
         );
     }
     else {
@@ -986,41 +866,40 @@ function createNotification(
         content
     );
 
-    notification.addEventListener(
-        "click",
-        async function() {
-            clearNotificationTimer(
-                normalizedId
-            );
-
-            removeNotificationElement(
-                normalizedId
-            );
-
-            if (
-                typeof onClick !==
-                    "function"
-            ) {
-                return;
-            }
-
-            try {
-                await onClick();
-            }
-            catch (
-                error
-            ) {
-                console.error(
-                    "[OCR NOTIFICATIONS] Notification action failed.",
-                    error
+    if (
+        typeof onClick ===
+        "function"
+    ) {
+        notification.addEventListener(
+            "click",
+            async function() {
+                clearNotificationTimer(
+                    normalizedId
                 );
-            }
-        }
-    );
 
-    container.appendChild(
-        notification
-    );
+                removeNotificationElement(
+                    normalizedId
+                );
+
+                try {
+                    await onClick();
+                }
+                catch (
+                    error
+                ) {
+                    console.error(
+                        "[OCR NOTIFICATIONS] Notification action failed.",
+                        error
+                    );
+                }
+            }
+        );
+    }
+
+    ensureNotificationContainer()
+        .appendChild(
+            notification
+        );
 
     const timer =
         setTimeout(
@@ -1045,189 +924,10 @@ function createNotification(
 }
 
 /* =========================================================
-   JSON
+   OPEN EVENTS
    ========================================================= */
 
-async function readJsonResponse(
-    response
-) {
-    const text =
-        await response.text();
-
-    if (
-        !text
-    ) {
-        return null;
-    }
-
-    try {
-        return JSON.parse(
-            text
-        );
-    }
-    catch {
-        throw new Error(
-            "Server returned invalid JSON."
-        );
-    }
-}
-
-/* =========================================================
-   GET JOB STATUS
-   ========================================================= */
-
-async function getOcrJob(
-    jobId
-) {
-    const response =
-        await apiFetch(
-            (
-                OCR_JOB_STATUS_URL
-                + "?jobId="
-                + encodeURIComponent(
-                    jobId
-                )
-            ),
-            {
-                method:
-                    "GET",
-
-                credentials:
-                    "same-origin",
-
-                cache:
-                    "no-store",
-
-                headers: {
-                    "Accept":
-                        "application/json"
-                }
-            }
-        );
-
-    const data =
-        await readJsonResponse(
-            response
-        );
-
-    if (
-        !response.ok
-        || data?.success !==
-            true
-    ) {
-        const error =
-            new Error(
-                data?.message
-                || "Unable to read OCR job."
-            );
-
-        error.status =
-            response.status;
-
-        throw error;
-    }
-
-    const storedJob =
-        (
-            data?.job
-            && typeof data.job ===
-                "object"
-            && !Array.isArray(
-                data.job
-            )
-        )
-            ? data.job
-            : {};
-
-    const status =
-        String(
-            storedJob?.status
-            || ""
-        )
-            .trim()
-            .toLowerCase();
-
-    if (
-        !status
-    ) {
-        const error =
-            new Error(
-                "OCR job status was not returned."
-            );
-
-        error.status =
-            response.status;
-
-        throw error;
-    }
-
-    return {
-        ...storedJob,
-
-        status,
-
-        stage:
-            String(
-                storedJob?.stage
-                || ""
-            )
-                .trim()
-                .toLowerCase(),
-
-        progress:
-            normalizeClientProgress(
-                storedJob?.progress
-            ),
-
-        confirmedProgress:
-            normalizeClientProgress(
-                storedJob?.confirmedProgress
-                ?? storedJob?.progress
-            ),
-
-        simulatedProgress:
-            normalizeClientProgress(
-                storedJob?.simulatedProgress
-                ?? 0
-            ),
-
-        progressSource:
-            String(
-                storedJob?.progressSource
-                || "stored"
-            )
-                .trim()
-                .toLowerCase(),
-
-        message:
-            String(
-                storedJob?.message
-                || ""
-            )
-                .trim(),
-
-        reviewRequired:
-            storedJob?.reviewRequired ===
-                true,
-
-        confirmationStatus:
-            normalizeConfirmationStatus(
-                storedJob?.confirmationStatus
-            ),
-
-        matchId:
-            normalizeId(
-                storedJob?.matchId
-            )
-            || null
-    };
-}
-
-/* =========================================================
-   OPEN GLOBAL RESULT / REVIEW
-   ========================================================= */
-
-function openOcrResult(
+function openResult(
     detail
 ) {
     document.dispatchEvent(
@@ -1240,124 +940,154 @@ function openOcrResult(
     );
 }
 
-function openPendingReview(
-    pending
+function openReview(
+    detail
 ) {
     document.dispatchEvent(
         new CustomEvent(
             "ocr:pending-review-open",
             {
-                detail:
-                    pending
+                detail
             }
         )
     );
 }
 
-function openPendingFailure(
-    failure
+function openFailure(
+    detail
 ) {
     document.dispatchEvent(
         new CustomEvent(
             "ocr:failure-open",
             {
-                detail:
-                    failure
+                detail
             }
         )
     );
 }
 
 /* =========================================================
-   REVIEW NOTIFICATION
+   DISPLAY TYPES
    ========================================================= */
 
 function showReviewNotification(
     pending
 ) {
-    createNotification({
+    if (
+        !validJobId(
+            pending?.jobId
+        )
+        || !validMatchId(
+            pending?.matchId
+        )
+        || isJobAcknowledged(
+            pending.jobId
+        )
+    ) {
+        return null;
+    }
+
+    return createNotification({
         id:
             pending.matchId,
-
         type:
             "review",
-
         title:
             "Scoreboard Needs Review",
-
         description:
-            "OCR completed. Tap to review the detected values.",
-
+            "OCR completed, but one or more scoreboard values need verification.",
         onClick:
-            async function() {
-                openPendingReview(
+            function() {
+                openReview(
                     pending
                 );
             }
     });
 }
 
-/* =========================================================
-   FAILURE NOTIFICATION
-   ========================================================= */
-
 function showFailureNotification(
     failure
 ) {
-    createNotification({
+    if (
+        !validJobId(
+            failure?.jobId
+        )
+        || isJobAcknowledged(
+            failure.jobId
+        )
+    ) {
+        return null;
+    }
+
+    return createNotification({
         id:
             failure.jobId,
-
         type:
             "failure",
-
         title:
             "Scoreboard Processing Failed",
-
         description:
-            "Tap to view failure details.",
-
+            failure.message
+            || "The scoreboard could not be processed.",
         onClick:
-            async function() {
-                openPendingFailure(
+            function() {
+                openFailure(
                     failure
                 );
             }
     });
 }
 
-/* =========================================================
-   ACCEPTED NOTIFICATION
-   ========================================================= */
-
 function showAcceptedNotification(
-    accepted
+    detail
 ) {
-    createNotification({
-        id:
-            accepted.matchId,
+    const jobId =
+        normalizeId(
+            detail?.jobId
+        );
 
+    const matchId =
+        normalizeId(
+            detail?.matchId
+        );
+
+    if (
+        !validJobId(
+            jobId
+        )
+        || !validMatchId(
+            matchId
+        )
+    ) {
+        return null;
+    }
+
+    /*
+     * Green requires no action and is considered resolved.
+     */
+    rememberAcknowledgedJob(
+        jobId
+    );
+
+    return createNotification({
+        id:
+            matchId,
         type:
             "success",
-
         title:
             "Scoreboard Accepted",
-
         description:
-            "OCR completed successfully. Tap to view the result.",
-
+            "OCR completed successfully. No review is required.",
         onClick:
-            async function() {
-                openOcrResult(
-                    accepted
-                );
+            function() {
+                openResult({
+                    ...detail,
+                    jobId,
+                    matchId
+                });
             }
     });
 }
-
-/* =========================================================
-   CONFIRMED NOTIFICATION
-   ========================================================= */
 
 function showConfirmedNotification(
     detail
@@ -1372,26 +1102,24 @@ function showConfirmedNotification(
             matchId
         )
     ) {
-        return;
+        return null;
     }
 
-    createNotification({
+    return createNotification({
         id:
-            "CONFIRMED"
-            + matchId,
-
+            (
+                "CONFIRMED"
+                + matchId
+            ),
         type:
             "success",
-
         title:
             "Scoreboard Confirmed",
-
         description:
-            "Review submitted. Tap to view the confirmed scoreboard.",
-
+            "Your scoreboard review was submitted successfully.",
         onClick:
-            async function() {
-                openOcrResult({
+            function() {
+                openResult({
                     ...detail,
                     matchId,
                     confirmationStatus:
@@ -1404,607 +1132,95 @@ function showConfirmedNotification(
     });
 }
 
-/* =========================================================
-   POLLING STATE
-   ========================================================= */
-
-function stopOcrNotificationPolling() {
-    OCR_NOTIFICATION_POLLING =
-        false;
-
-    OCR_NOTIFICATION_ACTIVE_JOB_ID =
-        "";
-
-    OCR_NOTIFICATION_CHECK_INDEX =
-        0;
-
-    OCR_NOTIFICATION_BURST_STARTED_AT =
-        0;
-
-    OCR_NOTIFICATION_STALE_CHECKS =
-        0;
-
-    OCR_NOTIFICATION_LAST_PROGRESS_SIGNATURE =
-        "";
-
-    if (
-        OCR_NOTIFICATION_POLL_TIMER
-    ) {
-        clearTimeout(
-            OCR_NOTIFICATION_POLL_TIMER
-        );
-
-        OCR_NOTIFICATION_POLL_TIMER =
-            null;
-    }
-}
-
-/* =========================================================
-   PROGRESS / STALE DETECTION
-   ========================================================= */
-
-function getOcrProgressSignature(
-    job
+function showMonitorPausedNotification(
+    detail
 ) {
-    return [
-        String(
-            job?.status
-            || ""
-        )
-            .trim()
-            .toLowerCase(),
-
-        String(
-            job?.stage
-            || ""
-        )
-            .trim()
-            .toLowerCase(),
-
-        String(
-            normalizeClientProgress(
-                job?.progress
-            )
-        ),
-
-        String(
-            job?.confirmedProgress
-            ?? ""
-        ),
-
-        String(
-            job?.simulatedProgress
-            ?? ""
-        ),
-
-        String(
-            job?.progressSource
-            || ""
-        )
-            .trim()
-            .toLowerCase(),
-
-        String(
-            job?.updatedAt
-            || ""
-        ),
-
-        String(
-            job?.heartbeatAt
-            || ""
-        )
-    ]
-        .join(
-            "|"
-        );
-}
-
-function hasOcrJobProgressed(
-    job
-) {
-    const signature =
-        getOcrProgressSignature(
-            job
-        );
-
-    if (
-        !OCR_NOTIFICATION_LAST_PROGRESS_SIGNATURE
-    ) {
-        OCR_NOTIFICATION_LAST_PROGRESS_SIGNATURE =
-            signature;
-
-        OCR_NOTIFICATION_STALE_CHECKS =
-            0;
-
-        return true;
-    }
-
-    if (
-        signature !==
-        OCR_NOTIFICATION_LAST_PROGRESS_SIGNATURE
-    ) {
-        OCR_NOTIFICATION_LAST_PROGRESS_SIGNATURE =
-            signature;
-
-        OCR_NOTIFICATION_STALE_CHECKS =
-            0;
-
-        return true;
-    }
-
-    OCR_NOTIFICATION_STALE_CHECKS +=
-        1;
-
-    return false;
-}
-
-function getOcrJobActivityTimestamp(
-    job
-) {
-    const candidates = [
-        job?.heartbeatAt,
-        job?.updatedAt,
-        job?.startedAt,
-        job?.createdAt
-    ];
-
-    for (
-        const candidate
-        of candidates
-    ) {
-        const parsed =
-            Date.parse(
-                String(
-                    candidate
-                    || ""
-                )
-            );
-
-        if (
-            Number.isFinite(
-                parsed
-            )
-        ) {
-            return parsed;
-        }
-    }
-
-    return null;
-}
-
-function getOcrJobCreatedTimestamp(
-    job
-) {
-    const createdAt =
-        Date.parse(
-            String(
-                job?.createdAt
-                || ""
-            )
-        );
-
-    return Number.isFinite(
-        createdAt
-    )
-        ? createdAt
-        : null;
-}
-
-function isOcrQueueStale(
-    job
-) {
-    const createdAt =
-        getOcrJobCreatedTimestamp(
-            job
-        );
-
-    if (
-        !Number.isFinite(
-            createdAt
-        )
-    ) {
-        return false;
-    }
-
-    return (
-        Date.now()
-        - createdAt
-        >= OCR_NOTIFICATION_QUEUE_STALE_MS
-    );
-}
-
-function isOcrProcessingStale(
-    job
-) {
-    if (
-        OCR_NOTIFICATION_STALE_CHECKS <
-        OCR_NOTIFICATION_MAX_STALE_CHECKS
-    ) {
-        return false;
-    }
-
-    const activityAt =
-        getOcrJobActivityTimestamp(
-            job
-        );
-
-    if (
-        !Number.isFinite(
-            activityAt
-        )
-    ) {
-        return false;
-    }
-
-    return (
-        Date.now()
-        - activityAt
-        >= OCR_NOTIFICATION_PROCESSING_STALE_MS
-    );
-}
-
-function isOcrJobPastClientLifetime(
-    job
-) {
-    const createdAt =
-        getOcrJobCreatedTimestamp(
-            job
-        );
-
-    if (
-        !Number.isFinite(
-            createdAt
-        )
-    ) {
-        return false;
-    }
-
-    return (
-        Date.now()
-        - createdAt
-        >= OCR_NOTIFICATION_MAX_ACTIVE_JOB_MS
-    );
-}
-
-/* =========================================================
-   FAILURE HANDLING
-   ========================================================= */
-
-function finalizeFailure(
-    jobId,
-    job,
-    extra = {}
-) {
-    const sourceRoute =
-        getStoredActiveJobRoute();
-
-    stopOcrNotificationPolling();
-    clearStoredActiveJob();
-
-    const failure =
-        addPendingFailure({
-            jobId,
-            job,
-            sourceRoute,
-            ...extra
-        });
-
-    if (
-        failure
-    ) {
-        showFailureNotification(
-            failure
-        );
-    }
-
-    document.dispatchEvent(
-        new CustomEvent(
-            "ocr:job-failed",
-            {
-                detail: {
-                    jobId,
-                    job,
-                    failure,
-                    ...extra
-                }
-            }
-        )
-    );
-}
-
-/* =========================================================
-   ABANDON JOB
-   ========================================================= */
-
-function abandonActiveOcrJob(
-    jobId,
-    job,
-    {
-        stage,
-        message,
-        reason
-    }
-) {
-    const abandonedJob = {
-        ...(
-            job
-            && typeof job ===
-                "object"
-                ? job
-                : {}
-        ),
-
-        jobId,
-
-        status:
-            "failed",
-
-        stage:
-            String(
-                stage
-                || "client_polling_stopped"
-            ),
-
-        message:
-            String(
-                message
-                || "OCR processing stopped responding."
-            ),
-
-        error: {
-            code:
-                String(
-                    reason
-                    || "CLIENT_POLLING_STOPPED"
-                ),
-
-            userMessage:
-                String(
-                    message
-                    || "OCR processing stopped responding."
-                ),
-
-            message:
-                String(
-                    message
-                    || "OCR processing stopped responding."
-                )
-        }
-    };
-
-    console.warn(
-        "[OCR NOTIFICATIONS] Releasing stalled OCR job.",
-        {
-            version:
-                OCR_NOTIFICATION_VERSION,
-
-            jobId,
-
-            reason:
-                abandonedJob
-                    .error
-                    .code,
-
-            status:
-                job?.status
-                || null,
-
-            stage:
-                job?.stage
-                || null,
-
-            progress:
-                job?.progress
-                ?? null
-        }
-    );
-
-    finalizeFailure(
-        jobId,
-        abandonedJob,
-        {
-            abandoned:
-                true,
-
-            reason:
-                abandonedJob
-                    .error
-                    .code
-        }
-    );
-}
-
-/* =========================================================
-   POLL SCHEDULING
-   ========================================================= */
-
-function scheduleActiveOcrCheck(
-    jobId
-) {
-    if (
-        !OCR_NOTIFICATION_POLLING
-        || OCR_NOTIFICATION_ACTIVE_JOB_ID !==
-            jobId
-    ) {
-        return;
-    }
-
-    if (
-        OCR_NOTIFICATION_POLL_TIMER
-    ) {
-        clearTimeout(
-            OCR_NOTIFICATION_POLL_TIMER
-        );
-
-        OCR_NOTIFICATION_POLL_TIMER =
-            null;
-    }
-
-    const usingInitialSchedule =
-        OCR_NOTIFICATION_CHECK_INDEX <
-        OCR_NOTIFICATION_CHECK_SCHEDULE_MS
-            .length;
-
-    const elapsed =
-        Math.max(
-            0,
-            Date.now()
-            - OCR_NOTIFICATION_BURST_STARTED_AT
-        );
-
-    const delay =
-        usingInitialSchedule
-            ? Math.max(
-                0,
-                OCR_NOTIFICATION_CHECK_SCHEDULE_MS[
-                    OCR_NOTIFICATION_CHECK_INDEX
-                ]
-                - elapsed
-            )
-            : OCR_NOTIFICATION_TAIL_POLL_MS;
-
-    OCR_NOTIFICATION_POLL_TIMER =
-        setTimeout(
-            function() {
-                OCR_NOTIFICATION_POLL_TIMER =
-                    null;
-
-                OCR_NOTIFICATION_CHECK_INDEX +=
-                    1;
-
-                void runActiveOcrCheck();
-            },
-            delay
-        );
-}
-
-function startOcrNotificationCheckBurst() {
     const jobId =
-        getStoredActiveJobId();
-
-    if (
-        !jobId
-    ) {
-        stopOcrNotificationPolling();
-
-        return;
-    }
-
-    if (
-        OCR_NOTIFICATION_CHECK_RUNNING
-    ) {
-        return;
-    }
-
-    if (
-        OCR_NOTIFICATION_POLLING
-        && OCR_NOTIFICATION_ACTIVE_JOB_ID ===
-            jobId
-    ) {
-        return;
-    }
-
-    if (
-        OCR_NOTIFICATION_POLL_TIMER
-    ) {
-        clearTimeout(
-            OCR_NOTIFICATION_POLL_TIMER
+        normalizeId(
+            detail?.jobId
         );
 
-        OCR_NOTIFICATION_POLL_TIMER =
-            null;
+    if (
+        !validJobId(
+            jobId
+        )
+    ) {
+        return null;
     }
 
-    OCR_NOTIFICATION_ACTIVE_JOB_ID =
-        jobId;
-
-    OCR_NOTIFICATION_POLLING =
-        true;
-
-    OCR_NOTIFICATION_CHECK_INDEX =
-        0;
-
-    OCR_NOTIFICATION_BURST_STARTED_AT =
-        Date.now();
-
-    OCR_NOTIFICATION_STALE_CHECKS =
-        0;
-
-    OCR_NOTIFICATION_LAST_PROGRESS_SIGNATURE =
-        "";
-
-    scheduleActiveOcrCheck(
-        jobId
-    );
+    return createNotification({
+        id:
+            (
+                "PAUSED"
+                + jobId
+            ),
+        type:
+            "info",
+        title:
+            "Scoreboard Status Paused",
+        description:
+            String(
+                detail?.message
+                || "Status checking is temporarily paused."
+            )
+    });
 }
 
 /* =========================================================
-   COMPLETED JOB
+   JOB COMPLETED
    ========================================================= */
 
-function handleCompletedJob(
-    jobId,
-    job
+function handleJobCompleted(
+    event
 ) {
+    const detail =
+        event?.detail
+        || {};
+
+    const jobId =
+        normalizeId(
+            detail?.jobId
+        );
+
     const matchId =
         normalizeId(
-            job?.matchId
+            detail?.matchId
         );
 
     if (
-        !validMatchId(
+        !validJobId(
+            jobId
+        )
+        || !validMatchId(
             matchId
         )
+        || isJobAcknowledged(
+            jobId
+        )
     ) {
-        abandonActiveOcrJob(
-            jobId,
-            job,
-            {
-                stage:
-                    "completed_without_match",
-
-                reason:
-                    "MATCH_ID_MISSING",
-
-                message:
-                    "OCR completed without returning a match ID."
-            }
-        );
-
         return;
     }
-
-    const sourceRoute =
-        getStoredActiveJobRoute();
 
     const confirmationStatus =
         normalizeConfirmationStatus(
-            job?.confirmationStatus
+            detail?.confirmationStatus
         );
 
-    const reviewRequired =
-        job?.reviewRequired ===
+    const reviewRequired = (
+        detail?.reviewRequired ===
             true
         || confirmationStatus ===
-            "pending_review";
-
-    stopOcrNotificationPolling();
-    clearStoredActiveJob();
-
-    let pending =
-        null;
-
-    let accepted =
-        null;
+            "pending_review"
+    );
 
     if (
         reviewRequired
     ) {
-        pending =
+        const pending =
             addPendingReview({
+                ...detail,
                 jobId,
-                matchId,
-                sourceRoute
+                matchId
             });
 
         if (
@@ -2014,415 +1230,61 @@ function handleCompletedJob(
                 pending
             );
         }
-    }
-    else {
-        accepted =
-            addAcceptedResult({
-                jobId,
-                matchId,
-                confirmationStatus:
-                    confirmationStatus
-                    || "auto_accepted"
-            });
 
-        if (
-            accepted
-        ) {
-            showAcceptedNotification(
-                accepted
-            );
-        }
+        return;
     }
 
-    document.dispatchEvent(
-        new CustomEvent(
-            "ocr:job-completed",
-            {
-                detail: {
-                    jobId,
-                    matchId,
-                    job,
-                    pending,
-                    accepted,
-                    confirmationStatus:
-                        confirmationStatus
-                        || (
-                            reviewRequired
-                                ? "pending_review"
-                                : "auto_accepted"
-                        )
-                }
-            }
-        )
-    );
-}
-
-/* =========================================================
-   FAILED JOB
-   ========================================================= */
-
-function handleFailedJob(
-    jobId,
-    job
-) {
-    finalizeFailure(
+    showAcceptedNotification({
+        ...detail,
         jobId,
-        job
-    );
+        matchId,
+        confirmationStatus:
+            confirmationStatus
+            || "auto_accepted"
+    });
 }
 
 /* =========================================================
-   ACTIVE JOB CHECK
+   JOB FAILED
    ========================================================= */
 
-async function runActiveOcrCheck() {
+function handleJobFailed(
+    event
+) {
+    const failure =
+        addPendingFailure(
+            event?.detail
+            || {}
+        );
+
     if (
-        OCR_NOTIFICATION_CHECK_RUNNING
+        failure
     ) {
-        return;
-    }
-
-    const jobId =
-        getStoredActiveJobId();
-
-    if (
-        !jobId
-        || OCR_NOTIFICATION_ACTIVE_JOB_ID !==
-            jobId
-    ) {
-        stopOcrNotificationPolling();
-
-        return;
-    }
-
-    OCR_NOTIFICATION_CHECK_RUNNING =
-        true;
-
-    try {
-        const job =
-            await getOcrJob(
-                jobId
-            );
-
-        const status =
-            String(
-                job?.status
-                || ""
-            )
-                .trim()
-                .toLowerCase();
-
-        if (
-            status !== "completed"
-            && status !== "failed"
-            && isOcrJobPastClientLifetime(
-                job
-            )
-        ) {
-            abandonActiveOcrJob(
-                jobId,
-                job,
-                {
-                    stage:
-                        "client_job_timeout",
-
-                    reason:
-                        "CLIENT_JOB_TIMEOUT",
-
-                    message:
-                        "The scoreboard job exceeded the allowed processing window. You can submit another image."
-                }
-            );
-
-            return;
-        }
-
-        document.dispatchEvent(
-            new CustomEvent(
-                "ocr:job-progress",
-                {
-                    detail: {
-                        jobId,
-
-                        job,
-
-                        status,
-
-                        stage:
-                            String(
-                                job?.stage
-                                || ""
-                            )
-                                .trim()
-                                .toLowerCase(),
-
-                        progress:
-                            normalizeClientProgress(
-                                job?.progress
-                            ),
-
-                        confirmedProgress:
-                            normalizeClientProgress(
-                                job?.confirmedProgress
-                                ?? job?.progress
-                            ),
-
-                        simulatedProgress:
-                            normalizeClientProgress(
-                                job?.simulatedProgress
-                                ?? 0
-                            ),
-
-                        progressSource:
-                            String(
-                                job?.progressSource
-                                || "stored"
-                            )
-                                .trim()
-                                .toLowerCase(),
-
-                        message:
-                            String(
-                                job?.message
-                                || ""
-                            )
-                                .trim(),
-
-                        startedAt:
-                            job?.startedAt
-                            || null,
-
-                        ocrStartedAt:
-                            job?.ocrStartedAt
-                            || null,
-
-                        updatedAt:
-                            job?.updatedAt
-                            || null,
-
-                        heartbeatAt:
-                            job?.heartbeatAt
-                            || null,
-
-                        reviewRequired:
-                            job?.reviewRequired ===
-                                true,
-
-                        confirmationStatus:
-                            normalizeConfirmationStatus(
-                                job?.confirmationStatus
-                            ),
-
-                        version:
-                            OCR_NOTIFICATION_VERSION
-                    }
-                }
-            )
+        showFailureNotification(
+            failure
         );
-
-        if (
-            status === "completed"
-        ) {
-            handleCompletedJob(
-                jobId,
-                job
-            );
-
-            return;
-        }
-
-        if (
-            status === "failed"
-        ) {
-            handleFailedJob(
-                jobId,
-                job
-            );
-
-            return;
-        }
-
-        if (
-            status === "queued"
-            && isOcrQueueStale(
-                job
-            )
-        ) {
-            abandonActiveOcrJob(
-                jobId,
-                job,
-                {
-                    stage:
-                        "queue_stalled",
-
-                    reason:
-                        "QUEUE_STALLED",
-
-                    message:
-                        "The scoreboard job remained queued for more than two minutes. Please try the upload again."
-                }
-            );
-
-            return;
-        }
-
-        hasOcrJobProgressed(
-            job
-        );
-
-        if (
-            status !== "queued"
-            && isOcrProcessingStale(
-                job
-            )
-        ) {
-            abandonActiveOcrJob(
-                jobId,
-                job,
-                {
-                    stage:
-                        "processing_stalled",
-
-                    reason:
-                        "PROCESSING_STALLED",
-
-                    message:
-                        "The scoreboard reader stopped reporting progress. You can try the upload again."
-                }
-            );
-
-            return;
-        }
-
-        scheduleActiveOcrCheck(
-            jobId
-        );
-    }
-    catch (
-        error
-    ) {
-        console.warn(
-            "[OCR NOTIFICATIONS] OCR status check failed.",
-            error
-        );
-
-        const status =
-            Number(
-                error?.status
-            );
-
-        if (
-            status === 404
-            || status === 409
-        ) {
-            abandonActiveOcrJob(
-                jobId,
-                null,
-                {
-                    stage:
-                        "job_unavailable",
-
-                    reason:
-                        status === 404
-                            ? "JOB_NOT_FOUND"
-                            : "JOB_INVALID",
-
-                    message:
-                        "The previous scoreboard job is no longer available. You can submit another image."
-                }
-            );
-
-            return;
-        }
-
-        if (
-            status === 401
-            || status === 403
-        ) {
-            abandonActiveOcrJob(
-                jobId,
-                null,
-                {
-                    stage:
-                        "job_access_lost",
-
-                    reason:
-                        status === 401
-                            ? "AUTHENTICATION_REQUIRED"
-                            : "JOB_ACCESS_DENIED",
-
-                    message:
-                        "The previous scoreboard job can no longer be accessed. You can submit another image."
-                }
-            );
-
-            return;
-        }
-
-        if (
-            !navigator.onLine
-        ) {
-            stopOcrNotificationPolling();
-
-            return;
-        }
-
-        scheduleActiveOcrCheck(
-            jobId
-        );
-    }
-    finally {
-        OCR_NOTIFICATION_CHECK_RUNNING =
-            false;
     }
 }
 
 /* =========================================================
-   PUBLIC ACTIVE CHECK
-   ========================================================= */
-
-export function checkActiveOcrSubmission() {
-    startOcrNotificationCheckBurst();
-}
-
-/* =========================================================
-   RESTORE PERSISTENT NOTIFICATIONS
-   ========================================================= */
-
-export function restorePendingNotifications() {
-    readPendingReviews()
-        .forEach(
-            function(
-                pending
-            ) {
-                showReviewNotification(
-                    pending
-                );
-            }
-        );
-
-    readPendingFailures()
-        .forEach(
-            function(
-                failure
-            ) {
-                showFailureNotification(
-                    failure
-                );
-            }
-        );
-}
-
-/* =========================================================
-   CONFIRMATION
+   REVIEW CONFIRMED
    ========================================================= */
 
 function handleResultsConfirmed(
     event
 ) {
+    const detail =
+        event?.detail
+        || {};
+
     const matchId =
         normalizeId(
-            event?.detail?.matchId
+            detail?.matchId
+        );
+
+    const jobId =
+        normalizeId(
+            detail?.jobId
         );
 
     if (
@@ -2433,41 +1295,147 @@ function handleResultsConfirmed(
         return;
     }
 
-    removePendingReview(
-        matchId
-    );
-
-    addAcceptedResult({
-        jobId:
-            normalizeId(
-                event?.detail?.jobId
-            ),
-
-        matchId,
-
-        confirmationStatus:
-            normalizeConfirmationStatus(
-                event?.detail?.confirmationStatus
-            )
-            || (
-                event?.detail?.hasDisputes ===
+    const removed =
+        removePendingReview(
+            matchId,
+            {
+                markHandled:
                     true
-                    ? "confirmed_with_disputes"
-                    : "confirmed"
-            )
-    });
+            }
+        );
 
     if (
-        event?.detail?.automatic ===
-            true
+        validJobId(
+            jobId
+        )
+    ) {
+        rememberAcknowledgedJob(
+            jobId
+        );
+    }
+    else if (
+        validJobId(
+            removed?.jobId
+        )
+    ) {
+        rememberAcknowledgedJob(
+            removed.jobId
+        );
+    }
+
+    if (
+        detail?.automatic ===
+        true
     ) {
         return;
     }
 
     showConfirmedNotification({
-        ...event.detail,
+        ...detail,
+        jobId:
+            validJobId(
+                jobId
+            )
+                ? jobId
+                : removed?.jobId
+                || "",
         matchId
     });
+}
+
+/* =========================================================
+   INVALID REVIEW
+   ORANGE → RED
+   ========================================================= */
+
+function handleInvalidReview(
+    event
+) {
+    const detail =
+        event?.detail
+        || {};
+
+    const jobId =
+        normalizeId(
+            detail?.jobId
+        );
+
+    const matchId =
+        normalizeId(
+            detail?.matchId
+        );
+
+    if (
+        !validJobId(
+            jobId
+        )
+    ) {
+        console.error(
+            "[OCR NOTIFICATIONS] Invalid review could not become a failure because Job ID is invalid.",
+            detail
+        );
+
+        return;
+    }
+
+    /*
+     * Do NOT tombstone this job yet.
+     * It is changing state from orange to red.
+     */
+    if (
+        validMatchId(
+            matchId
+        )
+    ) {
+        removePendingReview(
+            matchId,
+            {
+                markHandled:
+                    false
+            }
+        );
+    }
+
+    const failure =
+        addPendingFailure({
+            jobId,
+            matchId:
+                validMatchId(
+                    matchId
+                )
+                    ? matchId
+                    : null,
+            stage:
+                "review_invalid",
+            errorCode:
+                detail?.errorCode
+                || "OCR_REVIEW_INVALID",
+            message:
+                detail?.message
+                || "This scoreboard cannot be reviewed because required stored data is missing or invalid.",
+            createdAt:
+                new Date()
+                    .toISOString()
+        });
+
+    if (
+        failure
+    ) {
+        showFailureNotification(
+            failure
+        );
+
+        console.warn(
+            "[OCR NOTIFICATIONS] Review converted from orange to red.",
+            {
+                jobId,
+                matchId:
+                    failure.matchId,
+                errorCode:
+                    failure.errorCode
+            }
+        );
+    }
 }
 
 /* =========================================================
@@ -2483,20 +1451,199 @@ function handleFailureAcknowledged(
         );
 
     if (
-        !validJobId(
+        validJobId(
             jobId
         )
     ) {
-        return;
+        acknowledgeOcrFailure(
+            jobId
+        );
     }
+}
 
-    acknowledgeOcrFailure(
-        jobId
+/* =========================================================
+   MONITOR PAUSED
+   ========================================================= */
+
+function handleMonitorPaused(
+    event
+) {
+    showMonitorPausedNotification(
+        event?.detail
+        || {}
     );
 }
 
 /* =========================================================
-   VISIBILITY / ONLINE
+   STORAGE REPAIR
+   ========================================================= */
+
+function sanitizePendingReviews() {
+    const reviews =
+        readPendingReviews();
+
+    const sanitized =
+        reviews.filter(
+            function(
+                item
+            ) {
+                return (
+                    validJobId(
+                        item?.jobId
+                    )
+                    && validMatchId(
+                        item?.matchId
+                    )
+                    && !isJobAcknowledged(
+                        item.jobId
+                    )
+                );
+            }
+        );
+
+    if (
+        sanitized.length !==
+        reviews.length
+    ) {
+        writePendingReviews(
+            sanitized
+        );
+    }
+
+    return sanitized;
+}
+
+function sanitizePendingFailures() {
+    const failures =
+        readPendingFailures();
+
+    const sanitized =
+        failures.filter(
+            function(
+                item
+            ) {
+                return (
+                    validJobId(
+                        item?.jobId
+                    )
+                    && !isJobAcknowledged(
+                        item.jobId
+                    )
+                );
+            }
+        );
+
+    if (
+        sanitized.length !==
+        failures.length
+    ) {
+        writePendingFailures(
+            sanitized
+        );
+    }
+
+    return sanitized;
+}
+
+function removeHandledVisibleNotifications() {
+    const acknowledged =
+        new Set(
+            readAcknowledgedJobs()
+        );
+
+    readPendingReviews()
+        .forEach(
+            function(
+                pending
+            ) {
+                if (
+                    acknowledged.has(
+                        normalizeId(
+                            pending?.jobId
+                        )
+                    )
+                ) {
+                    clearNotificationTimer(
+                        pending?.matchId
+                    );
+
+                    removeNotificationElement(
+                        pending?.matchId
+                    );
+                }
+            }
+        );
+
+    readPendingFailures()
+        .forEach(
+            function(
+                failure
+            ) {
+                const jobId =
+                    normalizeId(
+                        failure?.jobId
+                    );
+
+                if (
+                    acknowledged.has(
+                        jobId
+                    )
+                ) {
+                    clearNotificationTimer(
+                        jobId
+                    );
+
+                    removeNotificationElement(
+                        jobId
+                    );
+                }
+            }
+        );
+}
+
+function repairNotificationStorage() {
+    writeAcknowledgedJobs(
+        readAcknowledgedJobs()
+    );
+
+    removeHandledVisibleNotifications();
+    sanitizePendingReviews();
+    sanitizePendingFailures();
+    clearLegacyAcceptedResults();
+}
+
+/* =========================================================
+   RESTORE
+   ========================================================= */
+
+export function restorePendingNotifications() {
+    repairNotificationStorage();
+
+    sanitizePendingReviews()
+        .forEach(
+            function(
+                pending
+            ) {
+                showReviewNotification(
+                    pending
+                );
+            }
+        );
+
+    sanitizePendingFailures()
+        .forEach(
+            function(
+                failure
+            ) {
+                showFailureNotification(
+                    failure
+                );
+            }
+        );
+}
+
+/* =========================================================
+   PAGE EVENTS
    ========================================================= */
 
 function handleVisibilityChange() {
@@ -2504,43 +1651,78 @@ function handleVisibilityChange() {
         document.visibilityState ===
         "visible"
     ) {
-        checkActiveOcrSubmission();
         restorePendingNotifications();
     }
 }
 
 function handleWindowFocus() {
-    checkActiveOcrSubmission();
-}
-
-function handleOnline() {
-    checkActiveOcrSubmission();
     restorePendingNotifications();
 }
-
-/* =========================================================
-   STORAGE
-   ========================================================= */
 
 function handleStorageChange(
     event
 ) {
     if (
         event.key ===
-        OCR_ACTIVE_JOB_KEY
-    ) {
-        checkActiveOcrSubmission();
-
-        return;
-    }
-
-    if (
-        event.key ===
-        OCR_PENDING_REVIEW_KEY
+            OCR_PENDING_REVIEW_KEY
         || event.key ===
             OCR_PENDING_FAILURE_KEY
+        || event.key ===
+            OCR_ACKNOWLEDGED_JOB_KEY
     ) {
         restorePendingNotifications();
+    }
+}
+
+/* =========================================================
+   DEBUG
+   ========================================================= */
+
+function getNotificationDebugState() {
+    return {
+        version:
+            OCR_NOTIFICATION_VERSION,
+        pendingReviews:
+            sanitizePendingReviews(),
+        pendingFailures:
+            sanitizePendingFailures(),
+        acknowledgedJobs:
+            readAcknowledgedJobs()
+    };
+}
+
+function installDebugHelper() {
+    try {
+        Object.defineProperty(
+            window,
+            "bpdOcrNotificationDebug",
+            {
+                configurable:
+                    true,
+                enumerable:
+                    false,
+                value:
+                    function() {
+                        const state =
+                            getNotificationDebugState();
+
+                        console.log(
+                            "[OCR NOTIFICATIONS] Debug state:",
+                            state
+                        );
+
+                        return state;
+                    }
+            }
+        );
+    }
+    catch (
+        error
+    ) {
+        console.warn(
+            "[OCR NOTIFICATIONS] Debug helper unavailable.",
+            error
+        );
     }
 }
 
@@ -2552,11 +1734,40 @@ export function initializeOcrNotifications() {
     if (
         OCR_NOTIFICATIONS_READY
     ) {
-        checkActiveOcrSubmission();
         restorePendingNotifications();
 
         return true;
     }
+
+    document.addEventListener(
+        "ocr:job-completed",
+        handleJobCompleted
+    );
+
+    document.addEventListener(
+        "ocr:job-failed",
+        handleJobFailed
+    );
+
+    document.addEventListener(
+        "ocr:job-monitor-paused",
+        handleMonitorPaused
+    );
+
+    document.addEventListener(
+        "ocr:results-confirmed",
+        handleResultsConfirmed
+    );
+
+    document.addEventListener(
+        "ocr:review-invalid",
+        handleInvalidReview
+    );
+
+    document.addEventListener(
+        "ocr:failure-acknowledged",
+        handleFailureAcknowledged
+    );
 
     document.addEventListener(
         "visibilitychange",
@@ -2569,29 +1780,14 @@ export function initializeOcrNotifications() {
     );
 
     window.addEventListener(
-        "online",
-        handleOnline
-    );
-
-    window.addEventListener(
         "storage",
         handleStorageChange
-    );
-
-    document.addEventListener(
-        "ocr:results-confirmed",
-        handleResultsConfirmed
-    );
-
-    document.addEventListener(
-        "ocr:failure-acknowledged",
-        handleFailureAcknowledged
     );
 
     OCR_NOTIFICATIONS_READY =
         true;
 
-    checkActiveOcrSubmission();
+    installDebugHelper();
     restorePendingNotifications();
 
     console.log(
