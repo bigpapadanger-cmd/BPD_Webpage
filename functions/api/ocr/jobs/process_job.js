@@ -1,10 +1,6 @@
 "use strict";
 
 import {
-    apiFetch
-} from "../../../public/scripts/apiConnection.js";
-
-import {
     putMatchReport
 } from "../../../services/ocr/storage.js";
 
@@ -980,7 +976,7 @@ async function fetchWithTimeout(
         );
 
     try {
-        return await apiFetch(
+        return await fetch(
             url,
             {
                 ...options,
