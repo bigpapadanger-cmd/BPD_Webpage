@@ -1099,17 +1099,6 @@ async function callOcrProvider(
         "scoreboard.png"
     );
 
-    if (
-        fields?.playersPerTeam !==
-            undefined
-    ) {
-        formData.set(
-            "playersPerTeam",
-            String(
-                fields.playersPerTeam
-            )
-        );
-    }
 
     if (
         fields?.expectedPlayerNames !==
@@ -1310,6 +1299,15 @@ function getProviderResult(
 function resultRequiresReview(
     result
 ) {
+    if (
+        result?.requiresPlayerReview ===
+            true
+        || result?.reviewRequired ===
+            true
+    ) {
+        return true;
+    }
+
     const teams =
         Array.isArray(
             result?.teams
