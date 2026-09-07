@@ -948,3 +948,22 @@ Handles:
             100%;
     }
 }
+.ocr-scoreboard-locked-notice {
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 10px;
+    padding: 12px 14px;
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.ocr-scoreboard-locked-title {
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+
+.ocr-scoreboard-locked-message {
+    opacity: 0.78;
+}
+
+.ocr-scoreboard-locked {
+    opacity: 0.92;
+}

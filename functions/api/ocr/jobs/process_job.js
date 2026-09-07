@@ -1935,7 +1935,16 @@ async function processJob(
     }
 
     if (
-        isLeaseActive(
+        normalizedStatus ===
+            "processing"
+        && String(
+            currentStatus?.stage
+            || ""
+        )
+            .trim()
+            .toLowerCase() !==
+            "starting"
+        && isLeaseActive(
             currentStatus
         )
     ) {

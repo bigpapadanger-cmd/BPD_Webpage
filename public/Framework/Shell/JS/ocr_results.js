@@ -338,7 +338,58 @@ function assertOcrResultEditable() {
 
     throw error;
 }
+/* =========================================================
+   LOCKED SCOREBOARD NOTICE
+   ========================================================= */
 
+function createLockedScoreboardNotice() {
+    const policyState =
+        getCurrentReviewPolicyState();
+
+    if (
+        !policyState.locked
+    ) {
+        return null;
+    }
+
+    const notice =
+        document.createElement(
+            "div"
+        );
+
+    notice.className =
+        "ocr-scoreboard-locked-notice";
+
+    const title =
+        createTextElement(
+            "div",
+            "ocr-scoreboard-locked-title",
+            "Scoreboard Locked"
+        );
+
+    const message =
+        createTextElement(
+            "div",
+            "ocr-scoreboard-locked-message",
+            policyState.editDeadlineDisplay
+                ? (
+                    "The modification deadline passed on "
+                    + policyState.editDeadlineDisplay
+                    + ". Saved values are now read-only."
+                )
+                : (
+                    "The modification deadline has passed. "
+                    + "Saved values are now read-only."
+                )
+        );
+
+    notice.append(
+        title,
+        message
+    );
+
+    return notice;
+}
 /* =========================================================
    RESPONSE HELPERS
    ========================================================= */
@@ -1878,7 +1929,16 @@ function renderOcrResultTable(
 
     const policyState =
         getCurrentReviewPolicyState();
+    const lockedNotice =
+        createLockedScoreboardNotice();
 
+    if (
+        lockedNotice
+    ) {
+        content.appendChild(
+            lockedNotice
+        );
+    }
     const help =
         createTextElement(
             "div",
@@ -1893,8 +1953,9 @@ function renderOcrResultTable(
         help.textContent =
             policyState.locked
                 ? (
-                    "This review window has closed. "
-                    + "The scoreboard is read-only."
+                    "This review is closed. "
+                    + "The displayed values are the final stored values "
+                    + "and can no longer be changed."
                 )
                 : (
                     "Verify the scoreboard below. "
@@ -1915,8 +1976,8 @@ function renderOcrResultTable(
         help.textContent =
             policyState.locked
                 ? (
-                    "This scoreboard is read-only because "
-                    + "its modification window has closed."
+                    "This scoreboard is finalized and read-only. "
+                    + "The modification deadline has passed."
                 )
                 : (
                     "This scoreboard has been accepted. "
@@ -1936,7 +1997,13 @@ function renderOcrResultTable(
 
     scoreboard.className =
         "ocr-scoreboard";
-
+    if (
+        policyState.locked
+    ) {
+        scoreboard.classList.add(
+            "ocr-scoreboard-locked"
+        );
+    }
     let playerCount =
         0;
 
@@ -3124,6 +3191,26 @@ async function openResultModal(
         ) {
             OCR_RESULTS_CURRENT_MODE =
                 "review";
+
+            if (
+                policyState.locked
+            ) {
+                document.dispatchEvent(
+                    new CustomEvent(
+                        "ocr:review-closed",
+                        {
+                            detail: {
+                                matchId:
+                                    OCR_RESULTS_CURRENT_MATCH_ID,
+
+                                jobId:
+                                    OCR_RESULTS_CURRENT_JOB_ID
+                                    || null
+                            }
+                        }
+                    )
+                );
+            }
 
             setDialogText({
                 title:

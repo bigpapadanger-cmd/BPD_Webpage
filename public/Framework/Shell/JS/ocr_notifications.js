@@ -1725,7 +1725,26 @@ function installDebugHelper() {
         );
     }
 }
+function handleReviewClosed(
+    event
+) {
+    const matchId =
+        normalizeId(
+            event?.detail?.matchId
+        );
 
+    if (
+        !validMatchId(
+            matchId
+        )
+    ) {
+        return;
+    }
+
+    removePendingReview(
+        matchId
+    );
+}
 /* =========================================================
    INITIALIZE
    ========================================================= */
@@ -1738,7 +1757,10 @@ export function initializeOcrNotifications() {
 
         return true;
     }
-
+    document.addEventListener(
+        "ocr:review-closed",
+        handleReviewClosed
+    );
     document.addEventListener(
         "ocr:job-completed",
         handleJobCompleted
