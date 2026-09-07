@@ -4,10 +4,6 @@ import {
     writeOcrDebugTrace
 } from "./debug.js";
 
-import {
-    getCurrentMatchReport,
-    updateCurrentMatchReport
-} from "./storage.js";
 
 const CLEANUP_VERSION =
     "ocr-cleanup-1.3";
@@ -697,6 +693,9 @@ async function synchronizeExpiredMatchReport(
         return;
     }
 
+    const currentReportKey =
+        `match-reports/${matchId}/current.json`;
+
     /*
      * Only the mutable canonical match report is synchronized.
      *
@@ -707,9 +706,8 @@ async function synchronizeExpiredMatchReport(
      * The original object is immutable OCR evidence.
      */
     const reportObject =
-        await getCurrentMatchReport(
-            env.OCR_STORAGE,
-            matchId
+        await env.OCR_STORAGE.get(
+            currentReportKey
         );
 
     if (
@@ -756,10 +754,19 @@ async function synchronizeExpiredMatchReport(
             || closedAt
     };
 
-    await updateCurrentMatchReport(
-        env.OCR_STORAGE,
-        matchId,
-        nextReport
+    await env.OCR_STORAGE.put(
+        currentReportKey,
+        JSON.stringify(
+            nextReport,
+            null,
+            2
+        ),
+        {
+            httpMetadata: {
+                contentType:
+                    "application/json"
+            }
+        }
     );
 }
 
