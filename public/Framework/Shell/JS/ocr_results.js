@@ -1390,48 +1390,48 @@ function createOcrResultImage() {
 function getScoreboardFields(
     result
 ) {
-    const matchType =
-        String(
-            result?.matchType
-            || OCR_RESULTS_CURRENT_RESPONSE?.matchType
-            || ""
+    const activeFields =
+        Array.isArray(
+            result?.activeFields
         )
-            .trim()
-            .toLowerCase();
+            ? result.activeFields
+            : [];
 
-    let middleStat =
-        String(
-            result?.middleStat
-            || OCR_RESULTS_CURRENT_RESPONSE?.middleStat
-            || ""
-        )
-            .trim()
-            .toLowerCase();
+    const normalizedFields =
+        new Set(
+            activeFields
+                .map(
+                    function(
+                        fieldName
+                    ) {
+                        return String(
+                            fieldName
+                            || ""
+                        )
+                            .trim()
+                            .toLowerCase();
+                    }
+                )
+                .filter(
+                    function(
+                        fieldName
+                    ) {
+                        return OCR_RESULT_FIELD_ORDER.includes(
+                            fieldName
+                        );
+                    }
+                )
+        );
 
-    if (
-        ![
-            "assists",
-            "demos",
-            "damage"
-        ].includes(
-            middleStat
-        )
-    ) {
-        middleStat =
-            matchType ===
-                "1v1"
-                ? "demos"
-                : "assists";
-    }
-
-    return [
-        "score",
-        "goals",
-        middleStat,
-        "saves",
-        "shots",
-        "ping"
-    ];
+    return OCR_RESULT_FIELD_ORDER.filter(
+        function(
+            fieldName
+        ) {
+            return normalizedFields.has(
+                fieldName
+            );
+        }
+    );
 }
 
 function formatScoreboardHeader(

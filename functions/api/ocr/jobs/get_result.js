@@ -505,7 +505,43 @@ function sanitizePublicScoreboard(
 
     const publicTeams =
         [];
+    const storedActiveFields =
+        Array.isArray(
+            matchReport?.activeFields
+        )
+            ? matchReport.activeFields
+            : [];
 
+    const activeFields =
+        storedActiveFields
+            .map(
+                function(
+                    field
+                ) {
+                    return String(
+                        field
+                        || ""
+                    )
+                        .trim()
+                        .toLowerCase();
+                }
+            )
+            .filter(
+                function(
+                    field
+                ) {
+                    return (
+                        ALLOWED_SCOREBOARD_FIELDS.has(
+                            field
+                        )
+                    );
+                }
+            );
+
+    const activeFieldSet =
+        new Set(
+            activeFields
+        );
     for (
         let teamArrayIndex = 0;
         teamArrayIndex < teams.length;
@@ -570,10 +606,9 @@ function sanitizePublicScoreboard(
 
             const publicReviewFields =
                 {};
-
             for (
                 const field
-                of ALLOWED_SCOREBOARD_FIELDS
+                of activeFieldSet
             ) {
                 const reviewField =
                     player
@@ -682,6 +717,7 @@ function sanitizePublicScoreboard(
             sanitizeMiddleStat(
                 matchReport?.middleStat
             ),
+        activeFields,
         editDeadlineAt,
         teams:
             publicTeams

@@ -612,6 +612,148 @@ Handles:
 }
 
 /* =========================================================
+   SCOREBOARD
+   ========================================================= */
+
+.ocr-scoreboard {
+    display:
+        flex;
+
+    flex-direction:
+        column;
+
+    gap:
+        16px;
+
+    width:
+        100%;
+}
+
+.ocr-scoreboard-team {
+    width:
+        100%;
+}
+
+.ocr-scoreboard-team-header {
+    padding:
+        9px 14px;
+
+    border:
+        1px solid
+        var(--ocr-popup-border);
+
+    border-bottom:
+        0;
+
+    border-radius:
+        8px 8px 0 0;
+
+    background:
+        rgba(255, 255, 255, 0.07);
+
+    color:
+        rgba(255, 255, 255, 0.9);
+
+    font-size:
+        0.8rem;
+
+    font-weight:
+        800;
+
+    letter-spacing:
+        0.06em;
+
+    text-transform:
+        uppercase;
+}
+
+.ocr-scoreboard-table-wrap {
+    border-radius:
+        0 0 8px 8px;
+}
+
+.ocr-scoreboard-table {
+    width:
+        100%;
+
+    min-width:
+        680px;
+
+    table-layout:
+        fixed;
+}
+
+.ocr-scoreboard-table th,
+.ocr-scoreboard-table td {
+    padding:
+        9px 10px;
+
+    text-align:
+        center;
+
+    white-space:
+        nowrap;
+}
+
+.ocr-scoreboard-table th:first-child,
+.ocr-scoreboard-table td:first-child {
+    width:
+        34%;
+
+    text-align:
+        left;
+}
+
+.ocr-scoreboard-table th:not(:first-child),
+.ocr-scoreboard-table td:not(:first-child) {
+    width:
+        11%;
+}
+
+.ocr-scoreboard-player-name {
+    overflow:
+        hidden;
+
+    text-overflow:
+        ellipsis;
+
+    font-weight:
+        700;
+}
+
+.ocr-scoreboard-value {
+    font-variant-numeric:
+        tabular-nums;
+}
+
+.ocr-scoreboard-player-row:hover {
+    background:
+        rgba(255, 255, 255, 0.04);
+}
+
+.ocr-scoreboard-value-review {
+    background:
+        rgba(245, 158, 11, 0.14);
+}
+
+.ocr-scoreboard-value-disputed {
+    background:
+        rgba(239, 75, 75, 0.14);
+}
+
+.ocr-scoreboard-value
+.ocr-review-value-input {
+    width:
+        58px;
+
+    max-width:
+        100%;
+
+    text-align:
+        center;
+}
+
+/* =========================================================
    REVIEW REQUIRED
    ========================================================= */
 
