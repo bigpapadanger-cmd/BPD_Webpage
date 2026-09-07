@@ -9,8 +9,12 @@ import {
     getStoredSession
 } from "../../../services/common_helpers/reload_sessions.js";
 
+import {
+    getCurrentMatchReport
+} from "../../../services/ocr/storage.js";
+
 const OCR_GET_RESULT_VERSION =
-    "ocr-get-result-3.0";
+    "ocr-get-result-3.1";
 
 const ALLOWED_SCOREBOARD_FIELDS =
     new Set([
@@ -56,7 +60,6 @@ export async function onRequestGet(
                 {
                     success:
                         false,
-
                     message:
                         "OCR storage is not configured."
                 },
@@ -71,7 +74,6 @@ export async function onRequestGet(
                 {
                     success:
                         false,
-
                     message:
                         "OCR owner hashing is not configured."
                 },
@@ -97,7 +99,6 @@ export async function onRequestGet(
                 {
                     success:
                         false,
-
                     message:
                         "Authentication required."
                 },
@@ -121,7 +122,6 @@ export async function onRequestGet(
                 {
                     success:
                         false,
-
                     message:
                         "Authenticated account is missing an EpicUniqueId."
                 },
@@ -158,10 +158,8 @@ export async function onRequestGet(
                 {
                     success:
                         false,
-
                     code:
                         "MATCH_ID_INVALID",
-
                     message:
                         "Missing or invalid matchId."
                 },
@@ -173,10 +171,29 @@ export async function onRequestGet(
         // LOAD MATCH REPORT
         // ====================================================
 
-        const reportObject =
-            await env.OCR_STORAGE.get(
-                `match-reports/${matchId}.json`
+        let reportObject =
+            await getCurrentMatchReport(
+                env.OCR_STORAGE,
+                matchId
             );
+
+        /*
+         * Temporary legacy fallback.
+         *
+         * New reports:
+         * match-reports/{matchId}/current.json
+         *
+         * Legacy reports:
+         * match-reports/{matchId}.json
+         */
+        if (
+            !reportObject
+        ) {
+            reportObject =
+                await env.OCR_STORAGE.get(
+                    `match-reports/${matchId}.json`
+                );
+        }
 
         if (
             !reportObject
@@ -185,10 +202,8 @@ export async function onRequestGet(
                 {
                     success:
                         false,
-
                     code:
                         "MATCH_REPORT_NOT_FOUND",
-
                     message:
                         "Stored match report was not found."
                 },
@@ -200,19 +215,36 @@ export async function onRequestGet(
 
         try {
             matchReport =
-                JSON.parse(
-                    await reportObject.text()
-                );
+                await reportObject.json();
         }
         catch {
             return jsonResponse(
                 {
                     success:
                         false,
-
                     code:
                         "MATCH_REPORT_INVALID",
+                    message:
+                        "Stored match report is invalid."
+                },
+                500
+            );
+        }
 
+        if (
+            !matchReport
+            || typeof matchReport !==
+                "object"
+            || Array.isArray(
+                matchReport
+            )
+        ) {
+            return jsonResponse(
+                {
+                    success:
+                        false,
+                    code:
+                        "MATCH_REPORT_INVALID",
                     message:
                         "Stored match report is invalid."
                 },
@@ -231,16 +263,14 @@ export async function onRequestGet(
 
         if (
             storedMatchId !==
-                matchId
+            matchId
         ) {
             return jsonResponse(
                 {
                     success:
                         false,
-
                     code:
                         "MATCH_ID_MISMATCH",
-
                     message:
                         "Stored match report does not match this match ID."
                 },
@@ -266,10 +296,8 @@ export async function onRequestGet(
                 {
                     success:
                         false,
-
                     code:
                         "MATCH_OWNER_MISSING",
-
                     message:
                         "Stored match report has no owner."
                 },
@@ -287,10 +315,8 @@ export async function onRequestGet(
                 {
                     success:
                         false,
-
                     code:
                         "MATCH_ACCESS_DENIED",
-
                     message:
                         "You are not authorized to access this OCR result."
                 },
@@ -345,10 +371,8 @@ export async function onRequestGet(
                 {
                     success:
                         false,
-
                     code:
                         "EDIT_DEADLINE_MISSING",
-
                     message:
                         "Stored match report does not contain a valid edit deadline."
                 },
@@ -372,23 +396,20 @@ export async function onRequestGet(
                 {
                     includeReviewEvidence:
                         requiresPlayerReview,
-
                     editDeadlineAt
                 }
             );
 
         if (
             result.teams.length ===
-                0
+            0
         ) {
             return jsonResponse(
                 {
                     success:
                         false,
-
                     code:
                         "SCOREBOARD_EMPTY",
-
                     message:
                         "Stored match report contains no scoreboard values."
                 },
@@ -404,53 +425,39 @@ export async function onRequestGet(
             {
                 success:
                     true,
-
                 version:
                     OCR_GET_RESULT_VERSION,
-
                 jobId,
-
                 matchId,
-
                 imageUrl:
                     `/api/ocr/jobs/image?matchId=${encodeURIComponent(
                         matchId
                     )}`,
-
                 confirmationStatus,
-
                 requiresPlayerReview,
-
                 reviewRequired:
                     requiresPlayerReview,
-
                 editDeadlineAt,
-
                 editWindowOpen,
-
                 hasDisputes:
                     matchReport
                         ?.hasDisputes ===
                         true,
-
                 disputeCount:
                     normalizeCount(
                         matchReport
                             ?.disputeCount
                     ),
-
                 adjustmentCount:
                     normalizeCount(
                         matchReport
                             ?.adjustmentCount
                     ),
-
                 lastAdjustedAt:
                     sanitizeTimestamp(
                         matchReport
                             ?.lastAdjustedAt
                     ),
-
                 result
             },
             200
@@ -468,10 +475,8 @@ export async function onRequestGet(
             {
                 success:
                     false,
-
                 code:
                     "OCR_RESULT_LOAD_FAILED",
-
                 message:
                     "Unable to load OCR result."
             },
@@ -582,12 +587,15 @@ function sanitizePublicScoreboard(
 
                 if (
                     (
-                        effectiveValue === null
+                        effectiveValue ===
+                            null
                         || typeof effectiveValue ===
                             "undefined"
                         || String(
                             effectiveValue
-                        ).trim() === ""
+                        )
+                            .trim() ===
+                            ""
                     )
                     && reviewField
                 ) {
@@ -601,15 +609,17 @@ function sanitizePublicScoreboard(
                         effectiveValue
                     );
 
-                if (
-                    numericEffectiveValue !==
-                        null
-                ) {
-                    publicPlayer[
-                        field
-                    ] =
-                        numericEffectiveValue;
-                }
+                /*
+                 * Always expose the scoreboard property.
+                 *
+                 * This is important because the client must
+                 * distinguish an unresolved OCR value from a
+                 * field that was stripped from the response.
+                 */
+                publicPlayer[
+                    field
+                ] =
+                    numericEffectiveValue;
 
                 if (
                     includeReviewEvidence
@@ -620,20 +630,13 @@ function sanitizePublicScoreboard(
                         reviewField
                     )
                 ) {
-                    const sanitizedReviewField =
+                    publicReviewFields[
+                        field
+                    ] =
                         sanitizeReviewField(
                             reviewField,
                             numericEffectiveValue
                         );
-
-                    if (
-                        sanitizedReviewField
-                    ) {
-                        publicReviewFields[
-                            field
-                        ] =
-                            sanitizedReviewField;
-                    }
                 }
             }
 
@@ -641,7 +644,8 @@ function sanitizePublicScoreboard(
                 includeReviewEvidence
                 && Object.keys(
                     publicReviewFields
-                ).length > 0
+                ).length >
+                    0
             ) {
                 publicPlayer.reviewFields =
                     publicReviewFields;
@@ -653,12 +657,12 @@ function sanitizePublicScoreboard(
         }
 
         if (
-            publicPlayers.length > 0
+            publicPlayers.length >
+            0
         ) {
             publicTeams.push({
                 team:
                     teamIndex,
-
                 players:
                     publicPlayers
             });
@@ -670,9 +674,15 @@ function sanitizePublicScoreboard(
             sanitizeMatchId(
                 matchReport?.matchId
             ),
-
+        matchType:
+            sanitizeText(
+                matchReport?.matchType
+            ),
+        middleStat:
+            sanitizeMiddleStat(
+                matchReport?.middleStat
+            ),
         editDeadlineAt,
-
         teams:
             publicTeams
     };
@@ -692,46 +702,40 @@ function sanitizeReviewField(
         );
 
     const sanitizedValue =
-        value !== null
+        value !==
+            null
             ? value
             : fallbackValue;
 
-    if (
-        sanitizedValue ===
-            null
-    ) {
-        return null;
-    }
-
+    /*
+     * Preserve the review field even if the OCR value is null.
+     *
+     * A null value means unresolved and must remain editable on
+     * the client. The evidence itself is still useful.
+     */
     return {
         value:
             sanitizedValue,
-
         requiresVerification:
             reviewField
                 ?.requiresVerification ===
                 true,
-
         engine:
             sanitizeText(
                 reviewField?.engine
             ),
-
         confidence:
             sanitizeConfidence(
                 reviewField?.confidence
             ),
-
         template:
             sanitizeEngineEvidence(
                 reviewField?.template
             ),
-
         tesseract:
             sanitizeEngineEvidence(
                 reviewField?.tesseract
             ),
-
         paddle:
             sanitizeEngineEvidence(
                 reviewField?.paddle
@@ -767,7 +771,8 @@ function sanitizeEngineEvidence(
             );
 
         return (
-            value !== null
+            value !==
+                null
                 ? value
                 : null
         );
@@ -783,7 +788,8 @@ function sanitizeEngineEvidence(
         );
 
     if (
-        value !== null
+        value !==
+        null
     ) {
         sanitized.value =
             value;
@@ -808,7 +814,7 @@ function sanitizeEngineEvidence(
 
     if (
         confidence !==
-            null
+        null
     ) {
         sanitized.confidence =
             confidence;
@@ -818,7 +824,7 @@ function sanitizeEngineEvidence(
         Object.keys(
             sanitized
         ).length ===
-            0
+        0
     ) {
         return null;
     }
@@ -839,7 +845,9 @@ function sanitizeScoreboardValue(
             "undefined"
         || String(
             value
-        ).trim() === ""
+        )
+            .trim() ===
+            ""
     ) {
         return null;
     }
@@ -859,6 +867,34 @@ function sanitizeScoreboardValue(
     }
 
     return numeric;
+}
+
+// ============================================================
+// MIDDLE STAT
+// ============================================================
+
+function sanitizeMiddleStat(
+    value
+) {
+    const middleStat =
+        String(
+            value
+            || ""
+        )
+            .trim()
+            .toLowerCase();
+
+    return (
+        [
+            "assists",
+            "demos",
+            "damage"
+        ].includes(
+            middleStat
+        )
+            ? middleStat
+            : null
+    );
 }
 
 // ============================================================
@@ -975,6 +1011,18 @@ function sanitizeText(
 function sanitizeConfidence(
     value
 ) {
+    if (
+        value === null
+        || value === undefined
+        || String(
+            value
+        )
+            .trim() ===
+            ""
+    ) {
+        return null;
+    }
+
     const numeric =
         Number(
             value
@@ -1014,7 +1062,6 @@ async function createOwnerHash(
             {
                 name:
                     "HMAC",
-
                 hash:
                     "SHA-256"
             },
@@ -1088,7 +1135,7 @@ function constantTimeEqual(
 
     if (
         firstBytes.length !==
-            secondBytes.length
+        secondBytes.length
     ) {
         return false;
     }
@@ -1180,11 +1227,9 @@ function jsonResponse(
         ),
         {
             status,
-
             headers: {
                 "Content-Type":
                     "application/json; charset=utf-8",
-
                 "Cache-Control":
                     "no-store"
             }

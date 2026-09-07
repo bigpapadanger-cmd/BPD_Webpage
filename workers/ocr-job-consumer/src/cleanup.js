@@ -4,8 +4,13 @@ import {
     writeOcrDebugTrace
 } from "./debug.js";
 
+import {
+    getCurrentMatchReport,
+    updateCurrentMatchReport
+} from "./storage.js";
+
 const CLEANUP_VERSION =
-    "ocr-cleanup-1.2";
+    "ocr-cleanup-1.3";
 
 const OCR_QUEUE_STALE_MS =
     2
@@ -90,9 +95,7 @@ async function cleanupDurableJobs(
             await env.OCR_STORAGE.list({
                 prefix:
                     "ocr-jobs/",
-
                 cursor,
-
                 limit:
                     1000
             });
@@ -127,7 +130,6 @@ async function cleanupDurableJobs(
                     {
                         key:
                             object.key,
-
                         message:
                             normalizeErrorMessage(
                                 error
@@ -181,16 +183,12 @@ async function cleanupOneOcrJob(
             {
                 component:
                     "cleanup",
-
                 event:
                     "invalid_status_skipped",
-
                 detail: {
                     version:
                         CLEANUP_VERSION,
-
                     statusKey,
-
                     message:
                         normalizeErrorMessage(
                             error
@@ -290,10 +288,8 @@ async function cleanupOneOcrJob(
             {
                 stage:
                     "queue_timeout",
-
                 code:
                     "QUEUE_TIMEOUT",
-
                 message:
                     "OCR job expired before processing started."
             },
@@ -306,21 +302,16 @@ async function cleanupOneOcrJob(
             env,
             {
                 jobId,
-
                 component:
                     "cleanup",
-
                 event:
                     "queue_timeout",
-
                 detail: {
                     version:
                         CLEANUP_VERSION,
-
                     createdAt:
                         status?.createdAt
                         || null,
-
                     previousStatus:
                         normalizedStatus
                 }
@@ -350,10 +341,8 @@ async function cleanupOneOcrJob(
             {
                 stage:
                     "processing_timeout",
-
                 code:
                     "PROCESSING_TIMEOUT",
-
                 message:
                     "OCR processing stopped reporting progress."
             },
@@ -366,29 +355,22 @@ async function cleanupOneOcrJob(
             env,
             {
                 jobId,
-
                 component:
                     "cleanup",
-
                 event:
                     "processing_timeout",
-
                 detail: {
                     version:
                         CLEANUP_VERSION,
-
                     heartbeatAt:
                         status?.heartbeatAt
                         || null,
-
                     updatedAt:
                         status?.updatedAt
                         || null,
-
                     previousStage:
                         status?.stage
                         || null,
-
                     previousProgress:
                         status?.progress
                         ?? null
@@ -438,17 +420,13 @@ async function cleanupOneOcrJob(
             env,
             {
                 jobId,
-
                 component:
                     "cleanup",
-
                 event:
                     "failed_job_deleted",
-
                 detail: {
                     version:
                         CLEANUP_VERSION,
-
                     completedAt:
                         status?.completedAt
                         || null
@@ -460,19 +438,15 @@ async function cleanupOneOcrJob(
             env.OCR_STORAGE.delete(
                 statusKey
             ),
-
             env.OCR_STORAGE.delete(
                 inputKey
             ),
-
             env.OCR_STORAGE.delete(
                 requestKey
             ),
-
             env.OCR_STORAGE.delete(
                 resultKey
             ),
-
             deleteProgressObject(
                 env,
                 progressKey
@@ -498,26 +472,24 @@ async function cleanupOneOcrJob(
             env,
             {
                 jobId,
-
                 component:
                     "cleanup",
-
                 event:
                     "completed_job_trimmed",
-
                 detail: {
                     version:
                         CLEANUP_VERSION,
-
                     completedAt:
                         status?.completedAt
                         || null,
-
                     editDeadlineAt:
                         status?.editDeadlineAt
                         || null,
-
                     resultPreserved:
+                        true,
+                    currentReportPreserved:
+                        true,
+                    originalReportPreserved:
                         true
                 }
             }
@@ -527,24 +499,31 @@ async function cleanupOneOcrJob(
          * Preserve:
          *
          * ocr-jobs/{jobId}/result.json
-         * match-reports/{matchId}.json
+         * match-reports/{matchId}/current.json
+         * match-reports/{matchId}/original/{jobId}.json
          *
-         * Those are the immutable evidence and durable
-         * effective match report.
+         * result.json preserves the durable job result.
+         *
+         * current.json preserves the effective scoreboard that
+         * may contain player confirmations or later adjustments.
+         *
+         * original/{jobId}.json preserves the immutable OCR
+         * match-report snapshot from the original OCR job.
+         *
+         * Normal completed-job cleanup must never modify or
+         * delete either match-report object.
          */
+
         await Promise.all([
             env.OCR_STORAGE.delete(
                 statusKey
             ),
-
             env.OCR_STORAGE.delete(
                 inputKey
             ),
-
             env.OCR_STORAGE.delete(
                 requestKey
             ),
-
             deleteProgressObject(
                 env,
                 progressKey
@@ -632,14 +611,11 @@ async function sealExpiredEditWindow(
 
     const nextStatus = {
         ...status,
-
         editWindowOpen:
             false,
-
         editWindowClosedAt:
             status?.editWindowClosedAt
             || closedAt,
-
         updatedAt:
             closedAt
     };
@@ -670,34 +646,26 @@ async function sealExpiredEditWindow(
         {
             jobId:
                 nextStatus.jobId,
-
             component:
                 "cleanup",
-
             event:
                 "edit_window_closed",
-
             detail: {
                 version:
                     CLEANUP_VERSION,
-
                 matchId:
                     nextStatus?.matchId
                     || null,
-
                 editDeadlineAt:
                     nextStatus
                         ?.editDeadlineAt
                     || null,
-
                 editWindowClosedAt:
                     closedAt,
-
                 confirmationStatus:
                     nextStatus
                         ?.confirmationStatus
                     || null,
-
                 requiresPlayerReview:
                     nextStatus
                         ?.requiresPlayerReview ===
@@ -729,12 +697,19 @@ async function synchronizeExpiredMatchReport(
         return;
     }
 
-    const reportKey =
-        `match-reports/${matchId}.json`;
-
+    /*
+     * Only the mutable canonical match report is synchronized.
+     *
+     * Never read from or write to:
+     *
+     * match-reports/{matchId}/original/{jobId}.json
+     *
+     * The original object is immutable OCR evidence.
+     */
     const reportObject =
-        await env.OCR_STORAGE.get(
-            reportKey
+        await getCurrentMatchReport(
+            env.OCR_STORAGE,
+            matchId
         );
 
     if (
@@ -774,28 +749,17 @@ async function synchronizeExpiredMatchReport(
 
     const nextReport = {
         ...report,
-
         editWindowOpen:
             false,
-
         editWindowClosedAt:
             report?.editWindowClosedAt
             || closedAt
     };
 
-    await env.OCR_STORAGE.put(
-        reportKey,
-        JSON.stringify(
-            nextReport,
-            null,
-            2
-        ),
-        {
-            httpMetadata: {
-                contentType:
-                    "application/json"
-            }
-        }
+    await updateCurrentMatchReport(
+        env.OCR_STORAGE,
+        matchId,
+        nextReport
     );
 }
 
@@ -823,53 +787,38 @@ async function failAndTrimOcrJob(
 
     const nextStatus = {
         ...status,
-
         status:
             "failed",
-
         stage:
             failure.stage,
-
         progress:
             Math.min(
                 FAILED_PROGRESS_MAX,
                 currentProgress
             ),
-
         progressSource:
             "worker",
-
         message:
             failure.message,
-
         requiresPlayerReview:
             false,
-
         reviewRequired:
             false,
-
         confirmationStatus:
             null,
-
         editDeadlineAt:
             null,
-
         editWindowOpen:
             false,
-
         updatedAt:
             now,
-
         completedAt:
             now,
-
         heartbeatAt:
             now,
-
         error: {
             code:
                 failure.code,
-
             message:
                 failure.message
         }
@@ -894,11 +843,9 @@ async function failAndTrimOcrJob(
         env.OCR_STORAGE.delete(
             inputKey
         ),
-
         env.OCR_STORAGE.delete(
             requestKey
         ),
-
         deleteProgressObject(
             env,
             progressKey
@@ -928,9 +875,7 @@ async function cleanupOrphanedProgress(
             await env.OCR_PROGRESS.list({
                 prefix:
                     `${OCR_PROGRESS_PREFIX}/`,
-
                 cursor,
-
                 limit:
                     1000
             });
@@ -955,7 +900,6 @@ async function cleanupOrphanedProgress(
                         key:
                             object?.key
                             || null,
-
                         message:
                             normalizeErrorMessage(
                                 error
@@ -1046,19 +990,14 @@ async function cleanupOneProgressObject(
         env,
         {
             jobId,
-
             component:
                 "cleanup",
-
             event:
                 "orphan_progress_deleted",
-
             detail: {
                 version:
                     CLEANUP_VERSION,
-
                 progressKey,
-
                 uploadedAt:
                     new Date(
                         uploadedAt
@@ -1096,7 +1035,6 @@ async function deleteProgressObject(
             "[OCR CLEANUP] Could not delete temporary progress.",
             {
                 progressKey,
-
                 message:
                     normalizeErrorMessage(
                         error
@@ -1281,11 +1219,9 @@ async function safeWriteOcrDebugTrace(
                 jobId:
                     trace?.jobId
                     || null,
-
                 event:
                     trace?.event
                     || null,
-
                 message:
                     normalizeErrorMessage(
                         error
