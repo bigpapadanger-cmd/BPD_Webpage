@@ -3,10 +3,6 @@
 
     "compatibility_date": "2026-09-01",
 
-    "compatibility_flags": [
-        "formdata_parser_supports_files"
-    ],
-
     "pages_build_output_dir": "./public",
 
     "kv_namespaces": [
