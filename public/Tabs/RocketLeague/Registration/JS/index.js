@@ -1,6 +1,6 @@
 "use strict";
 import {TIMEZONE_DISPLAY_ALIASES} from "./timezone.js"
-import { ROCKET_LEAGUE_PROFILE_URL, ROCKET_LEAGUE_PROFILE_UPDATE_URL } from "../../../../scripts/apiRoutes.js";
+import { ROCKET_LEAGUE_PROFILE_URL} from "../../../../scripts/apiRoutes.js";
 import { apiFetch } from "../../../../scripts/apiConnection.js";
 
 
@@ -2255,7 +2255,7 @@ async function submitRegistration(
     try {
         const response =
             await apiFetch(
-                ROCKET_LEAGUE_PROFILE_UPDATE_URL,
+                ROCKET_LEAGUE_PROFILE_URL,
                 {
                     method:
                         "POST",
