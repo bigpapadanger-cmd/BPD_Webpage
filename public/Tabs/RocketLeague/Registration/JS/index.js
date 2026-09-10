@@ -2316,15 +2316,6 @@ async function submitRegistration(
                 payload
             );
 
-            if (
-                result.registrationAccepted === true
-            ) {
-                localStorage.setItem(
-                    "bpdRocketLeagueRegistrationAccepted",
-                    "true"
-                );
-            }
-
             setBackendWarning(
                 true,
                 result.message ||

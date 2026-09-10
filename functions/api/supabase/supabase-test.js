@@ -3,7 +3,7 @@ export async function onRequestPost(context) {
 
     try {
         const response = await fetch(
-            `${env.SUBABASE_URL}connection_test`,
+            `${env.SUPABASE_URL}connection_test`,
             {
                 method: "POST",
                 headers: {
@@ -43,7 +43,7 @@ export async function onRequestPost(context) {
                     : String(error),
             hasUrl:
                 Boolean(
-                    env.SUBABASE_URL
+                    env.SUPABASE_URL
                 ),
             hasSecret:
                 Boolean(
