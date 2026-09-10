@@ -1,10 +1,9 @@
-//import {future} from "../../../api_vars";
 export async function handleRocketLeagueSignin(
     env,
     sessionData
 ) {
     try {
-        const profile =
+        const result =
             await callSupabaseSignin(
                 env,
                 {
@@ -20,19 +19,37 @@ export async function handleRocketLeagueSignin(
             );
 
         return {
-            success:
-                true,
+            success: true,
 
-            profileLoaded:
-                true,
+            profileLoaded: true,
+
+            userId:
+                result.user_id ||
+                null,
+
+            rlPlayerId:
+                result.rl_player_id ||
+                null,
+
+            role:
+                result.role ||
+                "user",
+
+            active:
+                result.active === true,
+
+            profileComplete:
+                result.profile_complete === true,
+
+            rocketLeagueAccess:
+                result.rocket_league_access === true,
 
             profile:
-                profile,
+                result,
 
             warning:
                 null
         };
-
     } catch (
         error
     ) {
@@ -42,10 +59,26 @@ export async function handleRocketLeagueSignin(
         );
 
         return {
-            success:
-                true,
+            success: true,
 
-            profileLoaded:
+            profileLoaded: false,
+
+            userId:
+                null,
+
+            rlPlayerId:
+                null,
+
+            role:
+                null,
+
+            active:
+                null,
+
+            profileComplete:
+                false,
+
+            rocketLeagueAccess:
                 false,
 
             profile:
@@ -56,8 +89,7 @@ export async function handleRocketLeagueSignin(
         };
     }
 }
-//.ENV variables are stored in SUPABASE, if any can be public
-//import them from /functions/api_vars.js
+
 export async function callSupabaseSignin(
     env,
     epicData
@@ -71,44 +103,113 @@ export async function callSupabaseSignin(
     }
 
     if (
-        !env.SUPA2CLOUDFLARE_AUTH
+        !env.SUPABASE_AUTH
     ) {
         throw new Error(
-            "SUPA2CLOUDFLARE_AUTH is not configured."
+            "SUPABASE_AUTH is not configured."
         );
     }
+
+    if (
+        !epicData?.EpicUniqueId
+    ) {
+        throw new Error(
+            "EpicUniqueId is required."
+        );
+    }
+
     const response =
-    
         await fetch(
             `${env.SUPABASE_URL}rpc/rocketleague_signin`,
             {
                 method:
                     "POST",
+
                 headers: {
                     "apikey":
-                        env.SUPA2CLOUDFLARE_AUTH,
-                    "Authorization":
-                        `Bearer ${env.SUPA2CLOUDFLARE_AUTH}`,
+                        env.SUPABASE_AUTH,
+
                     "Content-Type":
+                        "application/json",
+
+                    "Content-Profile":
+                        "api",
+
+                    "Accept":
                         "application/json"
                 },
+
                 body:
                     JSON.stringify({
                         epic_unique_id:
                             epicData.EpicUniqueId,
+
                         epic_display_name:
-                            epicData.EpicDisplayName,
+                            epicData.EpicDisplayName ||
+                            null,
+
                         epic_preferred_username:
-                            epicData.EpicPreferredUsername
+                            epicData.EpicPreferredUsername ||
+                            null
                     })
             }
         );
 
-    if (!response.ok) {
+    const responseText =
+        await response.text();
+
+    let responseData =
+        null;
+
+    if (
+        responseText
+    ) {
+        try {
+            responseData =
+                JSON.parse(
+                    responseText
+                );
+        } catch {
+            responseData =
+                responseText;
+        }
+    }
+
+    if (
+        !response.ok
+    ) {
+        console.error(
+            "[ROCKET LEAGUE PROFILE] Supabase RPC error:",
+            {
+                status:
+                    response.status,
+
+                statusText:
+                    response.statusText,
+
+                response:
+                    responseData
+            }
+        );
+
         throw new Error(
             `Supabase signin failed: ${response.status}`
         );
     }
 
-    return response.json();
+    if (
+        Array.isArray(
+            responseData
+        )
+    ) {
+        return (
+            responseData[0] ||
+            {}
+        );
+    }
+
+    return (
+        responseData ||
+        {}
+    );
 }

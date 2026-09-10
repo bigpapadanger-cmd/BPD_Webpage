@@ -10,6 +10,10 @@ import {
     getRocketLeagueProfileByEpicId
 } from "../supabase/rocketleague/rocketleague_profile.js";
 
+import {
+    saveRocketLeagueProfile
+} from "../supabase/rocketleague/save_profile.js";
+
 // ============================================================
 // CONSTANTS
 // ============================================================
@@ -209,45 +213,24 @@ function normalizeDatabaseProfile(
     databaseProfile,
     epicUser
 ) {
-    if (!databaseProfile) {
+    if (
+        !databaseProfile
+    ) {
         return null;
     }
 
-    const notificationsEnabled =
-        databaseProfile.notificationsEnabled ===
-        true ||
-        databaseProfile.notifications_enabled ===
-        true ||
-        databaseProfile.matchReminders ===
-        true ||
-        databaseProfile.match_reminders ===
-        true;
+    const displayName =
+        databaseProfile.displayName ||
+        databaseProfile.display_name ||
+        epicUser.EpicDisplayName ||
+        epicUser.EpicPreferredUsername ||
+        "";
 
-    const reminderMode =
-        databaseProfile.reminderMode ||
-        databaseProfile.reminder_mode ||
-        databaseProfile.reminderTiming ||
-        databaseProfile.reminder_timing ||
-        "24-hours";
-
-    const specificReminderTimes =
-        Array.isArray(
-            databaseProfile.specificReminderTimes
-        )
-            ? databaseProfile.specificReminderTimes
-            : Array.isArray(
-                databaseProfile.specific_reminder_times
-            )
-                ? databaseProfile.specific_reminder_times
-                : Array.isArray(
-                    databaseProfile.reminderSchedule
-                )
-                    ? databaseProfile.reminderSchedule
-                    : Array.isArray(
-                        databaseProfile.reminder_schedule
-                    )
-                        ? databaseProfile.reminder_schedule
-                        : [];
+    const ranked =
+        databaseProfile.ranked &&
+        typeof databaseProfile.ranked === "object"
+            ? databaseProfile.ranked
+            : {};
 
     return {
         EpicUniqueId:
@@ -259,18 +242,28 @@ function normalizeDatabaseProfile(
         EpicPreferredUsername:
             epicUser.EpicPreferredUsername,
 
+        userId:
+            databaseProfile.user_id ||
+            databaseProfile.userId ||
+            null,
+
+        rlPlayerId:
+            databaseProfile.rl_player_id ||
+            databaseProfile.rlPlayerId ||
+            null,
+
+        role:
+            databaseProfile.role ||
+            null,
+
+        active:
+            databaseProfile.active === true,
+
         username:
-            databaseProfile.displayName ||
-            epicUser.EpicDisplayName ||
-            epicUser.EpicPreferredUsername ||
+            displayName ||
             "Epic Player",
 
-        displayName:
-            databaseProfile.displayName ||
-            databaseProfile.display_name ||
-            epicUser.EpicDisplayName ||
-            epicUser.EpicPreferredUsername ||
-            "",
+        displayName,
 
         currentRank:
             databaseProfile.currentRank ||
@@ -301,6 +294,8 @@ function normalizeDatabaseProfile(
             "",
 
         timezone:
+            databaseProfile.displayTimezone ||
+            databaseProfile.display_timezone ||
             databaseProfile.timezone ||
             "",
 
@@ -312,37 +307,54 @@ function normalizeDatabaseProfile(
                 : [],
 
         showOnlineStatus:
-            databaseProfile.showOnlineStatus ===
-            true ||
-            databaseProfile.show_online_status ===
-            true,
+            databaseProfile.showOnlineStatus === true ||
+            databaseProfile.show_online_status === true,
 
-        notificationsEnabled,
+        notificationsEnabled:
+            databaseProfile.notificationsEnabled === true ||
+            databaseProfile.notifications_enabled === true ||
+            databaseProfile.matchReminders === true ||
+            databaseProfile.match_reminders === true,
 
-        reminderMode,
+        reminderMode:
+            databaseProfile.reminderMode ||
+            databaseProfile.reminder_mode ||
+            databaseProfile.reminderTiming ||
+            databaseProfile.reminder_timing ||
+            "24-hours",
 
-        specificReminderTimes,
+        specificReminderTimes:
+            Array.isArray(
+                databaseProfile.specificReminderTimes
+            )
+                ? databaseProfile.specificReminderTimes
+                : Array.isArray(
+                    databaseProfile.specific_reminder_times
+                )
+                    ? databaseProfile.specific_reminder_times
+                    : [],
 
         ageConsent:
-            databaseProfile.ageConsent ===
-            true ||
-            databaseProfile.age_consent ===
-            true,
+            databaseProfile.ageConsent === true ||
+            databaseProfile.age_consent === true,
+
+        registrationStatus:
+            databaseProfile.registrationStatus ||
+            databaseProfile.registration_status ||
+            null,
 
         profileComplete:
-            databaseProfile.profileComplete ===
-            true ||
-            databaseProfile.profile_complete ===
-            true,
+            databaseProfile.profileComplete === true ||
+            databaseProfile.profile_complete === true,
 
-        ranked:
-            databaseProfile.ranked ||
-            {},
+        rocketLeagueAccess:
+            databaseProfile.rocketLeagueAccess === true ||
+            databaseProfile.rocket_league_access === true,
+
+        ranked,
 
         stats: {
-            ranked:
-                databaseProfile.ranked ||
-                {}
+            ranked
         }
     };
 }
@@ -363,6 +375,18 @@ function buildFallbackProfile(
 
         EpicPreferredUsername:
             epicUser.EpicPreferredUsername,
+
+        userId:
+            null,
+
+        rlPlayerId:
+            null,
+
+        role:
+            null,
+
+        active:
+            false,
 
         username:
             epicUser.EpicDisplayName ||
@@ -413,7 +437,13 @@ function buildFallbackProfile(
         ageConsent:
             false,
 
+        registrationStatus:
+            "incomplete",
+
         profileComplete:
+            false,
+
+        rocketLeagueAccess:
             false,
 
         ranked:
@@ -427,7 +457,7 @@ function buildFallbackProfile(
 }
 
 // ============================================================
-// REGISTRATION PAYLOAD
+// AVAILABILITY
 // ============================================================
 
 function normalizeAvailability(
@@ -475,6 +505,10 @@ function normalizeAvailability(
             7
         );
 }
+
+// ============================================================
+// REGISTRATION PAYLOAD
+// ============================================================
 
 function normalizeRegistrationPayload(
     body
@@ -569,6 +603,10 @@ function normalizeRegistrationPayload(
                 : []
     };
 }
+
+// ============================================================
+// REGISTRATION VALIDATION
+// ============================================================
 
 function validateRegistrationPayload(
     profile
@@ -667,6 +705,8 @@ function validateRegistrationPayload(
     const invalidAvailability =
         profile.availability.some(
             (item) =>
+                !item.start ||
+                !item.end ||
                 item.start <
                     AVAILABILITY_START ||
                 item.start >
@@ -698,15 +738,19 @@ function validateRegistrationPayload(
         );
     }
 
+    /*
+     * Current Supabase alert storage uses lead_minutes.
+     * Literal specific clock-time reminders are not yet
+     * represented by the current database structure.
+     */
+
     if (
         profile.notificationsEnabled &&
         profile.reminderMode ===
-            "specific-times" &&
-        profile.specificReminderTimes.length ===
-            0
+            "specific-times"
     ) {
         return (
-            "Select at least one specific reminder time."
+            "Specific reminder times are not available yet. Select 24 hours, 1 hour, or both."
         );
     }
 
@@ -727,7 +771,9 @@ async function getAuthenticatedContext(
             env
         );
 
-    if (!storedSession) {
+    if (
+        !storedSession
+    ) {
         return {
             error:
                 json(
@@ -737,6 +783,9 @@ async function getAuthenticatedContext(
 
                         authenticated:
                             false,
+
+                        requiresEpicLogin:
+                            true,
 
                         message:
                             "Login is required to access Rocket League profile."
@@ -766,12 +815,15 @@ async function getAuthenticatedContext(
                             false,
 
                         authenticated:
+                            false,
+
+                        requiresEpicLogin:
                             true,
 
                         message:
                             "Epic account identity is missing from the session."
                     },
-                    400
+                    401
                 )
         };
     }
@@ -800,7 +852,7 @@ async function handleProfileGet(
         null;
 
     let profileLoaded =
-        true;
+        false;
 
     let warning =
         null;
@@ -812,12 +864,12 @@ async function handleProfileGet(
                 epicUser.EpicUniqueId
             );
 
+        profileLoaded =
+            databaseProfile !== null &&
+            databaseProfile !== undefined;
     } catch (
         error
     ) {
-        profileLoaded =
-            false;
-
         warning =
             (
                 "Your Epic account is signed in, "
@@ -838,11 +890,6 @@ async function handleProfileGet(
         );
     }
 
-    if (!databaseProfile) {
-        profileLoaded =
-            false;
-    }
-
     const profile =
         databaseProfile
             ? normalizeDatabaseProfile(
@@ -861,25 +908,52 @@ async function handleProfileGet(
             authenticated:
                 true,
 
+            requiresEpicLogin:
+                false,
+
             profileLoaded,
 
             profileSaved:
-                Boolean(
-                    databaseProfile
-                ),
+                profileLoaded,
 
             profileComplete:
                 profile.profileComplete ===
                 true,
 
+            rocketLeagueAccess:
+                profile.rocketLeagueAccess ===
+                true,
+
+            role:
+                profile.role,
+
+            active:
+                profile.active ===
+                true,
+
             warning,
 
             user: {
+                EpicUniqueId:
+                    epicUser.EpicUniqueId,
+
                 EpicDisplayName:
                     epicUser.EpicDisplayName,
 
                 EpicPreferredUsername:
-                    epicUser.EpicPreferredUsername
+                    epicUser.EpicPreferredUsername,
+
+                userId:
+                    profile.userId,
+
+                rlPlayerId:
+                    profile.rlPlayerId,
+
+                role:
+                    profile.role,
+
+                active:
+                    profile.active
             },
 
             location,
@@ -896,6 +970,7 @@ async function handleProfileGet(
 
 async function handleProfilePost(
     request,
+    env,
     epicUser
 ) {
     let body;
@@ -903,7 +978,6 @@ async function handleProfilePost(
     try {
         body =
             await request.json();
-
     } catch (
         error
     ) {
@@ -932,6 +1006,9 @@ async function handleProfilePost(
                     false,
 
                 profileComplete:
+                    false,
+
+                rocketLeagueAccess:
                     false,
 
                 message:
@@ -968,6 +1045,9 @@ async function handleProfilePost(
                 profileComplete:
                     false,
 
+                rocketLeagueAccess:
+                    false,
+
                 message:
                     validationError
             },
@@ -975,35 +1055,118 @@ async function handleProfilePost(
         );
     }
 
-    /*
-     * TEMPORARY:
-     *
-     * The submitted registration has been validated,
-     * but permanent Supabase profile persistence has
-     * not been enabled yet.
-     *
-     * Do not report profileSaved=true until the
-     * Supabase write succeeds.
-     */
+    let result;
+
+    try {
+        result =
+            await saveRocketLeagueProfile(
+                env,
+                epicUser.EpicUniqueId,
+                registration
+            );
+    } catch (
+        error
+    ) {
+        console.error(
+            "ROCKET LEAGUE PROFILE: Supabase profile save failed.",
+            {
+                name:
+                    error?.name ||
+                    "Error",
+
+                message:
+                    error?.message ||
+                    "Unknown error"
+            }
+        );
+
+        return json(
+            {
+                success:
+                    false,
+
+                authenticated:
+                    true,
+
+                profileSaved:
+                    false,
+
+                profileComplete:
+                    false,
+
+                rocketLeagueAccess:
+                    false,
+
+                message:
+                    "Your Rocket League registration could not be saved."
+            },
+            500
+        );
+    }
+
+    const profileSaved =
+        result?.profile_saved === true ||
+        result?.profileSaved === true;
+
+    const profileComplete =
+        result?.profile_complete === true ||
+        result?.profileComplete === true;
+
+    const rocketLeagueAccess =
+        result?.rocket_league_access === true ||
+        result?.rocketLeagueAccess === true;
 
     return json(
         {
-            success: true,
-            authenticated: true,
+            success:
+                true,
 
-            registrationAccepted: true,
+            authenticated:
+                true,
 
-            profileSaved: false,
-            profileComplete: false,
-            persistenceAvailable: false,
+            requiresEpicLogin:
+                false,
+
+            registrationAccepted:
+                true,
+
+            profileSaved,
+
+            profileComplete,
+
+            rocketLeagueAccess,
+
+            role:
+                result?.role ||
+                null,
+
+            active:
+                result?.active ===
+                true,
+
+            userId:
+                result?.user_id ||
+                result?.userId ||
+                null,
+
+            rlPlayerId:
+                result?.rl_player_id ||
+                result?.rlPlayerId ||
+                null,
 
             message:
-                "Your registration was received, but permanent profile saving is not available yet.",
+                profileSaved
+                    ? "Your Rocket League registration was saved."
+                    : "Your Rocket League registration could not be confirmed as saved.",
 
             redirectTo:
-                "/RocketLeague"
+                profileSaved
+                    ? "/RocketLeague"
+                    : null
         },
-        200
+        profileSaved
+            ? 200
+            : 500
     );
 }
 
@@ -1048,6 +1211,7 @@ export async function handleRocketLeagueProfile(
         ) {
             return handleProfilePost(
                 request,
+                env,
                 epicUser
             );
         }
@@ -1069,7 +1233,6 @@ export async function handleRocketLeagueProfile(
                     "GET, POST"
             }
         );
-
     } catch (
         error
     ) {
@@ -1094,10 +1257,16 @@ export async function handleRocketLeagueProfile(
                 authenticated:
                     false,
 
+                requiresEpicLogin:
+                    false,
+
                 profileSaved:
                     false,
 
                 profileComplete:
+                    false,
+
+                rocketLeagueAccess:
                     false,
 
                 message:
