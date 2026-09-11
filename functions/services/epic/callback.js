@@ -1,3 +1,45 @@
+"use strict";
+
+/* =========================================================
+BPD GAMING NETWORK
+EPIC OAUTH CALLBACK
+
+Purpose:
+    Completes the Epic Games OAuth login flow, creates the
+    authenticated BPD KV session, then synchronizes the Epic
+    identity with Supabase.
+
+Flow:
+    Epic redirects back with code + state
+        ↓
+    Validate OAuth state
+        ↓
+    Exchange authorization code for Epic access token
+        ↓
+    Fetch Epic account profile
+        ↓
+    Create BPD KV session
+        ↓
+    Create browser session cookie
+        ↓
+    Synchronize Epic identity with Supabase
+        ↓
+    Redirect to /RocketLeague
+
+Important:
+    - Epic/KV authentication remains authoritative for the
+      browser login session.
+    - Supabase synchronization is intentionally separate.
+    - A Supabase sync failure must NOT destroy an otherwise
+      valid Epic login.
+    - handleRocketLeagueSignin() catches normal Supabase
+      failures and returns profileLoaded:false rather than
+      necessarily throwing.
+    - Therefore this callback MUST inspect the returned
+      signin result instead of relying only on catch().
+    - Epic access tokens and secrets must never be logged.
+========================================================= */
+
 import {
     json,
     redirect
@@ -21,9 +63,16 @@ import {
     handleRocketLeagueSignin
 } from "../supabase/rocketleague/signin.js";
 
-function limitMessage(value) {
+/* =========================================================
+LOG MESSAGE LIMITER
+========================================================= */
+
+function limitMessage(
+    value
+) {
     return String(
-        value || ""
+        value ||
+        ""
     )
         .replace(
             /\s+/g,
@@ -34,6 +83,10 @@ function limitMessage(value) {
             300
         );
 }
+
+/* =========================================================
+MAIN EPIC CALLBACK
+========================================================= */
 
 export async function handleEpicCallback(
     request,
@@ -58,6 +111,10 @@ export async function handleEpicCallback(
         );
 
     try {
+        /* =================================================
+        VALIDATE CALLBACK PARAMETERS
+        ================================================= */
+
         if (
             !code ||
             !state
@@ -66,10 +123,17 @@ export async function handleEpicCallback(
                 "EPIC CALLBACK: OAuth parameters missing.",
                 {
                     debugId,
+
                     hasCode:
-                        Boolean(code),
+                        Boolean(
+                            code
+                        ),
+
                     hasState:
-                        Boolean(state),
+                        Boolean(
+                            state
+                        ),
+
                     hasOAuthError:
                         url.searchParams.has(
                             "error"
@@ -79,14 +143,21 @@ export async function handleEpicCallback(
 
             return json(
                 {
-                    success: false,
+                    success:
+                        false,
+
                     message:
                         "Missing OAuth parameters.",
+
                     debugId
                 },
                 400
             );
         }
+
+        /* =================================================
+        VALIDATE OAUTH STATE
+        ================================================= */
 
         const storedState =
             getCookie(
@@ -107,27 +178,37 @@ export async function handleEpicCallback(
 
             return json(
                 {
-                    success: false,
+                    success:
+                        false,
+
                     message:
                         "Invalid OAuth state.",
+
                     debugId
                 },
                 400
             );
         }
 
+        /* =================================================
+        VALIDATE EPIC CONFIGURATION
+        ================================================= */
+
         const clientId =
-            typeof env.EPIC_CLIENT_ID === "string"
+            typeof env.EPIC_CLIENT_ID ===
+                "string"
                 ? env.EPIC_CLIENT_ID.trim()
                 : "";
 
         const clientSecret =
-            typeof env.EPIC_CLIENT_SECRET === "string"
+            typeof env.EPIC_CLIENT_SECRET ===
+                "string"
                 ? env.EPIC_CLIENT_SECRET.trim()
                 : "";
 
         const redirectUri =
-            typeof env.EPIC_REDIRECT_URI === "string"
+            typeof env.EPIC_REDIRECT_URI ===
+                "string"
                 ? env.EPIC_REDIRECT_URI.trim()
                 : "";
 
@@ -140,25 +221,41 @@ export async function handleEpicCallback(
                 "EPIC CALLBACK: Configuration invalid.",
                 {
                     debugId,
+
                     hasClientId:
-                        Boolean(clientId),
+                        Boolean(
+                            clientId
+                        ),
+
                     hasClientSecret:
-                        Boolean(clientSecret),
+                        Boolean(
+                            clientSecret
+                        ),
+
                     hasRedirectUri:
-                        Boolean(redirectUri)
+                        Boolean(
+                            redirectUri
+                        )
                 }
             );
 
             return json(
                 {
-                    success: false,
+                    success:
+                        false,
+
                     message:
                         "Epic callback configuration invalid.",
+
                     debugId
                 },
                 500
             );
         }
+
+        /* =================================================
+        EXCHANGE AUTHORIZATION CODE
+        ================================================= */
 
         const tokenResponse =
             await fetch(
@@ -166,20 +263,25 @@ export async function handleEpicCallback(
                 {
                     method:
                         "POST",
+
                     headers: {
                         "Content-Type":
                             "application/x-www-form-urlencoded",
+
                         "Authorization":
                             "Basic " +
                             btoa(
                                 `${clientId}:${clientSecret}`
                             )
                     },
+
                     body:
                         new URLSearchParams({
                             grant_type:
                                 "authorization_code",
+
                             code,
+
                             redirect_uri:
                                 redirectUri
                         })
@@ -196,8 +298,10 @@ export async function handleEpicCallback(
                 "EPIC CALLBACK: Token exchange failed.",
                 {
                     debugId,
+
                     status:
                         tokenResponse.status,
+
                     response:
                         limitMessage(
                             tokenError
@@ -207,11 +311,15 @@ export async function handleEpicCallback(
 
             return json(
                 {
-                    success: false,
+                    success:
+                        false,
+
                     message:
                         "Token exchange failed.",
+
                     upstreamStatus:
                         tokenResponse.status,
+
                     debugId
                 },
                 502
@@ -222,12 +330,14 @@ export async function handleEpicCallback(
             await tokenResponse.json();
 
         const tokenAccountId =
-            typeof tokenData.account_id === "string"
+            typeof tokenData.account_id ===
+                "string"
                 ? tokenData.account_id.trim()
                 : "";
 
         const accessToken =
-            typeof tokenData.access_token === "string"
+            typeof tokenData.access_token ===
+                "string"
                 ? tokenData.access_token.trim()
                 : "";
 
@@ -254,14 +364,21 @@ export async function handleEpicCallback(
 
             return json(
                 {
-                    success: false,
+                    success:
+                        false,
+
                     message:
                         "Epic returned no access token.",
+
                     debugId
                 },
                 502
             );
         }
+
+        /* =================================================
+        LOAD EPIC PROFILE
+        ================================================= */
 
         const profileResponse =
             await fetch(
@@ -269,9 +386,11 @@ export async function handleEpicCallback(
                 {
                     method:
                         "GET",
+
                     headers: {
                         "Authorization":
                             `Bearer ${accessToken}`,
+
                         "Accept":
                             "application/json"
                     }
@@ -288,8 +407,10 @@ export async function handleEpicCallback(
                 "EPIC CALLBACK: Profile request failed.",
                 {
                     debugId,
+
                     status:
                         profileResponse.status,
+
                     response:
                         limitMessage(
                             profileError
@@ -299,11 +420,15 @@ export async function handleEpicCallback(
 
             return json(
                 {
-                    success: false,
+                    success:
+                        false,
+
                     message:
                         "Failed to fetch Epic profile.",
+
                     upstreamStatus:
                         profileResponse.status,
+
                     debugId
                 },
                 502
@@ -313,26 +438,39 @@ export async function handleEpicCallback(
         const profile =
             await profileResponse.json();
 
+        /* =================================================
+        NORMALIZE EPIC IDENTITY
+        ================================================= */
+
         const EpicUniqueId =
             (
-                typeof profile?.id === "string"
+                typeof profile?.id ===
+                    "string"
                     ? profile.id
-                    : typeof profile?.sub === "string"
+
+                    : typeof profile?.sub ===
+                        "string"
                         ? profile.sub
+
                         : tokenAccountId
             ).trim();
 
         const EpicDisplayName =
             (
-                typeof profile?.displayName === "string"
+                typeof profile?.displayName ===
+                    "string"
                     ? profile.displayName
-                    : typeof profile?.preferred_username === "string"
+
+                    : typeof profile?.preferred_username ===
+                        "string"
                         ? profile.preferred_username
+
                         : ""
             ).trim();
 
         const EpicPreferredUsername =
-            typeof profile?.preferred_username === "string"
+            typeof profile?.preferred_username ===
+                "string"
                 ? profile.preferred_username.trim()
                 : null;
 
@@ -348,14 +486,21 @@ export async function handleEpicCallback(
 
             return json(
                 {
-                    success: false,
+                    success:
+                        false,
+
                     message:
                         "Epic authentication returned no account identity.",
+
                     debugId
                 },
                 502
             );
         }
+
+        /* =================================================
+        VALIDATE KV SESSION STORAGE
+        ================================================= */
 
         if (
             !env.AUTH_SESSIONS
@@ -369,14 +514,21 @@ export async function handleEpicCallback(
 
             return json(
                 {
-                    success: false,
+                    success:
+                        false,
+
                     message:
                         "Session storage is unavailable.",
+
                     debugId
                 },
                 500
             );
         }
+
+        /* =================================================
+        REMOVE PREVIOUS SESSION
+        ================================================= */
 
         const existingSessionId =
             getCookie(
@@ -386,27 +538,30 @@ export async function handleEpicCallback(
 
         if (
             existingSessionId
-            && env.AUTH_SESSIONS
         ) {
             try {
                 await env.AUTH_SESSIONS.delete(
                     `session:${existingSessionId}`
                 );
-            }
-            catch (
+            } catch (
                 error
             ) {
                 console.warn(
                     "EPIC CALLBACK: Existing session cleanup failed.",
                     {
                         debugId,
+
                         message:
-                            error?.message
-                            || "Unknown error"
+                            error?.message ||
+                            "Unknown error"
                     }
                 );
             }
         }
+
+        /* =================================================
+        CREATE NEW KV SESSION
+        ================================================= */
 
         const sessionId =
             crypto.randomUUID();
@@ -459,6 +614,10 @@ export async function handleEpicCallback(
             }
         );
 
+        /* =================================================
+        CREATE SESSION COOKIE
+        ================================================= */
+
         const cookie =
             createCookie(
                 request,
@@ -483,46 +642,130 @@ export async function handleEpicCallback(
 
             return json(
                 {
-                    success: false,
+                    success:
+                        false,
+
                     message:
                         "Failed to create login session.",
+
                     debugId
                 },
                 500
             );
         }
 
+        /* =================================================
+        SYNC EPIC IDENTITY TO SUPABASE
+
+        IMPORTANT:
+            handleRocketLeagueSignin() intentionally catches
+            normal Supabase failures and returns
+            profileLoaded:false.
+
+            Therefore we must inspect the returned result.
+        ================================================= */
+
         try {
-            await handleRocketLeagueSignin(
-                env,
-                {
-                    EpicUniqueId:
-                        sessionData.EpicUniqueId,
+            const signinResult =
+                await handleRocketLeagueSignin(
+                    env,
+                    {
+                        EpicUniqueId:
+                            sessionData.EpicUniqueId,
 
-                    EpicDisplayName:
-                        sessionData.EpicDisplayName,
+                        EpicDisplayName:
+                            sessionData.EpicDisplayName,
 
-                    EpicPreferredUsername:
-                        sessionData.EpicPreferredUsername
-                }
-            );
+                        EpicPreferredUsername:
+                            sessionData.EpicPreferredUsername
+                    }
+                );
 
+            if (
+                signinResult?.profileLoaded ===
+                true
+            ) {
+                console.info(
+                    "EPIC CALLBACK: Supabase profile sync completed.",
+                    {
+                        debugId,
+
+                        hasUserId:
+                            Boolean(
+                                signinResult.userId
+                            ),
+
+                        hasRlPlayerId:
+                            Boolean(
+                                signinResult.rlPlayerId
+                            ),
+
+                        role:
+                            signinResult.role ||
+                            null,
+
+                        active:
+                            signinResult.active ===
+                            true,
+
+                        profileComplete:
+                            signinResult.profileComplete ===
+                            true,
+
+                        rocketLeagueAccess:
+                            signinResult.rocketLeagueAccess ===
+                            true
+                    }
+                );
+            } else {
+                console.warn(
+                    "EPIC CALLBACK: Epic login succeeded but Supabase profile sync did not complete.",
+                    {
+                        debugId,
+
+                        profileLoaded:
+                            false,
+
+                        warning:
+                            signinResult?.warning ||
+                            null
+                    }
+                );
+            }
         } catch (
             error
         ) {
+            /*
+             * An unexpected Supabase sync exception should
+             * be logged but must not invalidate the already
+             * successful Epic/KV login.
+             */
             console.error(
-                "EPIC CALLBACK: Supabase profile sync failed.",
+                "EPIC CALLBACK: Supabase profile sync failed unexpectedly.",
                 {
                     debugId,
+
                     name:
                         error?.name ||
                         "Error",
+
                     message:
                         error?.message ||
-                        "Unknown error"
+                        "Unknown error",
+
+                    stack:
+                        error?.stack ||
+                        null
                 }
             );
         }
+
+        /* =================================================
+        COMPLETE LOGIN
+
+        At this point Epic authentication + KV session are
+        valid even if Supabase synchronization failed.
+        ================================================= */
 
         return redirect(
             "/RocketLeague",
@@ -530,7 +773,6 @@ export async function handleEpicCallback(
                 cookie
             ]
         );
-
     } catch (
         error
     ) {
@@ -538,20 +780,29 @@ export async function handleEpicCallback(
             "EPIC CALLBACK: Unexpected failure.",
             {
                 debugId,
+
                 name:
                     error?.name ||
                     "Error",
+
                 message:
                     error?.message ||
-                    "Unknown error"
+                    "Unknown error",
+
+                stack:
+                    error?.stack ||
+                    null
             }
         );
 
         return json(
             {
-                success: false,
+                success:
+                    false,
+
                 message:
                     "Epic callback failed unexpectedly.",
+
                 debugId
             },
             500

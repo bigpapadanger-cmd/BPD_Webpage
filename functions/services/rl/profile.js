@@ -865,8 +865,17 @@ async function handleProfileGet(
             );
 
         profileLoaded =
-            databaseProfile !== null &&
-            databaseProfile !== undefined;
+            Boolean(
+                databaseProfile &&
+                (
+                    databaseProfile.userId ||
+                    databaseProfile.user_id
+                ) &&
+                (
+                    databaseProfile.rlPlayerId ||
+                    databaseProfile.rl_player_id
+                )
+            );
     } catch (
         error
     ) {
@@ -914,7 +923,7 @@ async function handleProfileGet(
             profileLoaded,
 
             profileSaved:
-                profileLoaded,
+                 null,
 
             profileComplete:
                 profile.profileComplete ===
@@ -1076,7 +1085,16 @@ async function handleProfilePost(
 
                 message:
                     error?.message ||
-                    "Unknown error"
+                    "Unknown error",
+
+                stack:
+                    error?.stack ||
+                    null,
+
+                epicAccountPresent:
+                    Boolean(
+                        epicUser?.EpicUniqueId
+                    )
             }
         );
 

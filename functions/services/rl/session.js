@@ -1,3 +1,36 @@
+"use strict";
+
+/* =========================================================
+BPD GAMING NETWORK
+ROCKET LEAGUE SESSION SERVICE
+
+Purpose:
+    Validates the current Epic/KV session and then loads the
+    linked Rocket League profile from Supabase.
+
+Flow:
+    Browser request
+        ↓
+    getStoredSession()
+        ↓
+    Valid Epic session?
+        ↓
+    getRocketLeagueProfileByEpicId()
+        ↓
+    Return combined authentication + profile state
+
+Important:
+    - KV remains authoritative for whether the Epic session
+      is authenticated.
+    - Supabase is authoritative for profile identity,
+      registration state, role, active status, and Rocket
+      League access.
+    - A Supabase failure must NOT automatically invalidate
+      the Epic login.
+    - profileLoaded is only true when Supabase returns both
+      a valid BPD user ID and Rocket League player ID.
+========================================================= */
+
 import {
     getStoredSession
 } from "../common_helpers/reload_sessions.js";
@@ -5,6 +38,10 @@ import {
 import {
     getRocketLeagueProfileByEpicId
 } from "../supabase/rocketleague/rocketleague_profile.js";
+
+/* =========================================================
+JSON RESPONSE
+========================================================= */
 
 function jsonResponse(
     data,
@@ -16,6 +53,7 @@ function jsonResponse(
         ),
         {
             status,
+
             headers: {
                 "Content-Type":
                     "application/json",
@@ -26,6 +64,52 @@ function jsonResponse(
         }
     );
 }
+
+/* =========================================================
+NORMALIZE PROFILE STATE
+========================================================= */
+
+function getProfileUserId(
+    profile
+) {
+    return (
+        profile?.userId ||
+        profile?.user_id ||
+        null
+    );
+}
+
+function getProfileRlPlayerId(
+    profile
+) {
+    return (
+        profile?.rlPlayerId ||
+        profile?.rl_player_id ||
+        null
+    );
+}
+
+function getProfileComplete(
+    profile
+) {
+    return (
+        profile?.profileComplete === true ||
+        profile?.profile_complete === true
+    );
+}
+
+function getRocketLeagueAccess(
+    profile
+) {
+    return (
+        profile?.rocketLeagueAccess === true ||
+        profile?.rocket_league_access === true
+    );
+}
+
+/* =========================================================
+MAIN SESSION HANDLER
+========================================================= */
 
 export async function handleRocketLeagueSession(
     request,
@@ -38,18 +122,35 @@ export async function handleRocketLeagueSession(
                 env
             );
 
-        if (
-            !session
-        ) {
+        /*
+         * No valid KV session means the user needs to
+         * authenticate with Epic again.
+         */
+        if (!session) {
             return jsonResponse({
-                success: true,
-                authenticated: false,
-                requiresEpicLogin: true,
-                user: null,
-                profileLoaded: false,
-                profileComplete: false,
-                rocketLeagueAccess: false,
-                profileError: null
+                success:
+                    true,
+
+                authenticated:
+                    false,
+
+                requiresEpicLogin:
+                    true,
+
+                user:
+                    null,
+
+                profileLoaded:
+                    false,
+
+                profileComplete:
+                    false,
+
+                rocketLeagueAccess:
+                    false,
+
+                profileError:
+                    null
             });
         }
 
@@ -71,18 +172,35 @@ export async function handleRocketLeagueSession(
                 null
         };
 
-        if (
-            !epicUser.EpicUniqueId
-        ) {
+        /*
+         * A stored session without the Epic account ID is
+         * incomplete and cannot be trusted for RL identity.
+         */
+        if (!epicUser.EpicUniqueId) {
             return jsonResponse({
-                success: true,
-                authenticated: false,
-                requiresEpicLogin: true,
-                user: null,
-                profileLoaded: false,
-                profileComplete: false,
-                rocketLeagueAccess: false,
-                profileError: null
+                success:
+                    true,
+
+                authenticated:
+                    false,
+
+                requiresEpicLogin:
+                    true,
+
+                user:
+                    null,
+
+                profileLoaded:
+                    false,
+
+                profileComplete:
+                    false,
+
+                rocketLeagueAccess:
+                    false,
+
+                profileError:
+                    null
             });
         }
 
@@ -95,6 +213,11 @@ export async function handleRocketLeagueSession(
         let profileError =
             null;
 
+        /*
+         * Load the persisted Supabase profile.
+         *
+         * Failure here does not invalidate the Epic session.
+         */
         try {
             profile =
                 await getRocketLeagueProfileByEpicId(
@@ -102,9 +225,26 @@ export async function handleRocketLeagueSession(
                     epicUser.EpicUniqueId
                 );
 
+            const userId =
+                getProfileUserId(
+                    profile
+                );
+
+            const rlPlayerId =
+                getProfileRlPlayerId(
+                    profile
+                );
+
+            /*
+             * Treat the profile as successfully loaded only
+             * when Supabase returned both identities.
+             */
             profileLoaded =
-                profile !== null &&
-                profile !== undefined;
+                Boolean(
+                    profile &&
+                    userId &&
+                    rlPlayerId
+                );
         } catch (
             error
         ) {
@@ -114,17 +254,27 @@ export async function handleRocketLeagueSession(
 
             console.error(
                 "ROCKET LEAGUE SESSION: Profile lookup failed.",
-                error
+                {
+                    name:
+                        error?.name ||
+                        "Error",
+
+                    message:
+                        error?.message ||
+                        "Unknown error"
+                }
             );
         }
 
         const userId =
-            profile?.user_id ||
-            null;
+            getProfileUserId(
+                profile
+            );
 
         const rlPlayerId =
-            profile?.rl_player_id ||
-            null;
+            getProfileRlPlayerId(
+                profile
+            );
 
         const role =
             profile?.role ||
@@ -134,10 +284,14 @@ export async function handleRocketLeagueSession(
             profile?.active === true;
 
         const profileComplete =
-            profile?.profileComplete === true;
+            getProfileComplete(
+                profile
+            );
 
         const rocketLeagueAccess =
-            profile?.rocketLeagueAccess === true;
+            getRocketLeagueAccess(
+                profile
+            );
 
         const user = {
             EpicUniqueId:
@@ -159,13 +313,23 @@ export async function handleRocketLeagueSession(
         };
 
         return jsonResponse({
-            success: true,
-            authenticated: true,
-            requiresEpicLogin: false,
+            success:
+                true,
+
+            authenticated:
+                true,
+
+            requiresEpicLogin:
+                false,
+
             user,
+
             profileLoaded,
+
             profileComplete,
+
             rocketLeagueAccess,
+
             profileError
         });
     } catch (
@@ -173,19 +337,43 @@ export async function handleRocketLeagueSession(
     ) {
         console.error(
             "ROCKET LEAGUE SESSION: Session lookup failed.",
-            error
+            {
+                name:
+                    error?.name ||
+                    "Error",
+
+                message:
+                    error?.message ||
+                    "Unknown error"
+            }
         );
 
         return jsonResponse(
             {
-                success: false,
-                authenticated: false,
-                requiresEpicLogin: false,
-                user: null,
-                profileLoaded: false,
-                profileComplete: false,
-                rocketLeagueAccess: false,
-                profileError: null,
+                success:
+                    false,
+
+                authenticated:
+                    false,
+
+                requiresEpicLogin:
+                    false,
+
+                user:
+                    null,
+
+                profileLoaded:
+                    false,
+
+                profileComplete:
+                    false,
+
+                rocketLeagueAccess:
+                    false,
+
+                profileError:
+                    null,
+
                 message:
                     "Authentication service is temporarily unavailable."
             },
