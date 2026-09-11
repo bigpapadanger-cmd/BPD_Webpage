@@ -1,3 +1,81 @@
+"use strict";
+
+/* =========================================================
+BPD GAMING NETWORK
+ROCKET LEAGUE SIGN-IN SYNC
+
+Purpose:
+    Synchronizes a successfully authenticated Epic Games
+    account with the BPD Gaming Network Supabase profile
+    system.
+
+Flow:
+    Epic OAuth callback succeeds
+        ↓
+    Cloudflare creates/updates the Epic KV session
+        ↓
+    handleRocketLeagueSignin()
+        ↓
+    callSupabaseSignin()
+        ↓
+    Supabase RPC:
+        api.rocketleague_signin
+        ↓
+    Supabase creates or updates:
+        - global BPD user identity
+        - Rocket League player identity
+        - Epic linked account
+        - current Epic alias
+        - registration state
+
+Important:
+    - Epic authentication is already complete before this
+      file runs.
+    - Supabase does NOT determine whether the Epic browser
+      session is valid.
+    - Failure to sync Supabase must NOT invalidate the Epic
+      login/session.
+    - EpicUniqueId comes from the trusted authenticated Epic
+      session data, not from browser-submitted JSON.
+    - The browser never receives the Supabase secret.
+    - This file does not save registration form data.
+    - Registration/profile updates are handled separately by
+      saveRocketLeagueProfile().
+    - Rocket League access returned here comes from Supabase
+      and should not be independently recalculated here.
+
+handleRocketLeagueSignin():
+    Wraps the Supabase sync so that an Epic login can still
+    succeed if Supabase is temporarily unavailable.
+
+callSupabaseSignin():
+    Performs the actual server-side call to:
+        api.rocketleague_signin
+
+Supabase RPC inputs:
+    epic_unique_id
+    epic_display_name
+    epic_preferred_username
+
+Supabase RPC returns:
+    user_id
+    rl_player_id
+    role
+    active
+    profile_complete
+    rocket_league_access
+    registration_status
+    epic_account_id
+    epic_display_name
+
+Failure behavior:
+    - Configuration or RPC errors throw inside
+      callSupabaseSignin().
+    - handleRocketLeagueSignin() catches those errors.
+    - Epic authentication remains successful.
+    - profileLoaded is returned as false so downstream code
+      knows BPD profile data could not be loaded.
+========================================================= */
 export async function handleRocketLeagueSignin(
     env,
     sessionData
@@ -179,7 +257,7 @@ export async function callSupabaseSignin(
         !response.ok
     ) {
         console.error(
-            "[ROCKET LEAGUE PROFILE] Supabase RPC error:",
+            "[ROCKET LEAGUE SIGNIN] Supabase signin failed:",
             {
                 status:
                     response.status,
@@ -193,6 +271,8 @@ export async function callSupabaseSignin(
         );
 
         throw new Error(
+            responseData?.message ||
+            responseData?.error ||
             `Supabase signin failed: ${response.status}`
         );
     }
