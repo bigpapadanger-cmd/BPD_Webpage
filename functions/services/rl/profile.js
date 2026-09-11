@@ -1295,11 +1295,21 @@ async function handleProfilePost(
 // ============================================================
 // MAIN PROFILE HANDLER
 // ============================================================
-
 export async function handleRocketLeagueProfile(
     request,
     env
 ) {
+    console.log(
+        "[RL PROFILE HANDLER HIT]",
+        {
+            method:
+                request.method,
+
+            url:
+                request.url
+        }
+    );
+
     try {
         const authenticated =
             await getAuthenticatedContext(
@@ -1310,16 +1320,50 @@ export async function handleRocketLeagueProfile(
         if (
             authenticated.error
         ) {
+            console.warn(
+                "[RL PROFILE AUTH FAILED]",
+                {
+                    method:
+                        request.method,
+
+                    url:
+                        request.url
+                }
+            );
+
             return authenticated.error;
         }
 
         const epicUser =
             authenticated.epicUser;
 
+        console.log(
+            "[RL PROFILE AUTH OK]",
+            {
+                method:
+                    request.method,
+
+                epicAccountPresent:
+                    Boolean(
+                        epicUser?.EpicUniqueId
+                    )
+            }
+        );
+
         if (
             request.method ===
             "GET"
         ) {
+            console.log(
+                "[RL PROFILE GET]",
+                {
+                    epicAccountPresent:
+                        Boolean(
+                            epicUser?.EpicUniqueId
+                        )
+                }
+            );
+
             return handleProfileGet(
                 request,
                 env,
@@ -1331,12 +1375,30 @@ export async function handleRocketLeagueProfile(
             request.method ===
             "POST"
         ) {
+            console.log(
+                "[RL PROFILE POST]",
+                {
+                    epicAccountPresent:
+                        Boolean(
+                            epicUser?.EpicUniqueId
+                        )
+                }
+            );
+
             return handleProfilePost(
                 request,
                 env,
                 epicUser
             );
         }
+
+        console.warn(
+            "[RL PROFILE METHOD NOT ALLOWED]",
+            {
+                method:
+                    request.method
+            }
+        );
 
         return json(
             {
@@ -1359,7 +1421,7 @@ export async function handleRocketLeagueProfile(
         error
     ) {
         console.error(
-            "ROCKET LEAGUE PROFILE: Unexpected failure.",
+            "[RL PROFILE UNEXPECTED FAILURE]",
             {
                 name:
                     error?.name ||
@@ -1367,7 +1429,17 @@ export async function handleRocketLeagueProfile(
 
                 message:
                     error?.message ||
-                    "Unknown error"
+                    "Unknown error",
+
+                stack:
+                    error?.stack ||
+                    null,
+
+                method:
+                    request.method,
+
+                url:
+                    request.url
             }
         );
 

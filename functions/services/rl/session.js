@@ -115,6 +115,17 @@ export async function handleRocketLeagueSession(
     request,
     env
 ) {
+    console.log(
+        "[RL SESSION HANDLER HIT]",
+        {
+            method:
+                request.method,
+
+            url:
+                request.url
+        }
+    );
+
     try {
         const session =
             await getStoredSession(
@@ -122,11 +133,11 @@ export async function handleRocketLeagueSession(
                 env
             );
 
-        /*
-         * No valid KV session means the user needs to
-         * authenticate with Epic again.
-         */
         if (!session) {
+            console.log(
+                "[RL SESSION NO KV SESSION]"
+            );
+
             return jsonResponse({
                 success:
                     true,
@@ -172,11 +183,11 @@ export async function handleRocketLeagueSession(
                 null
         };
 
-        /*
-         * A stored session without the Epic account ID is
-         * incomplete and cannot be trusted for RL identity.
-         */
         if (!epicUser.EpicUniqueId) {
+            console.warn(
+                "[RL SESSION INVALID KV IDENTITY]"
+            );
+
             return jsonResponse({
                 success:
                     true,
@@ -204,6 +215,14 @@ export async function handleRocketLeagueSession(
             });
         }
 
+        console.log(
+            "[RL SESSION KV AUTH OK]",
+            {
+                epicAccountPresent:
+                    true
+            }
+        );
+
         let profile =
             null;
 
@@ -213,12 +232,11 @@ export async function handleRocketLeagueSession(
         let profileError =
             null;
 
-        /*
-         * Load the persisted Supabase profile.
-         *
-         * Failure here does not invalidate the Epic session.
-         */
         try {
+            console.log(
+                "[RL SESSION SUPABASE PROFILE LOOKUP START]"
+            );
+
             profile =
                 await getRocketLeagueProfileByEpicId(
                     env,
@@ -235,16 +253,34 @@ export async function handleRocketLeagueSession(
                     profile
                 );
 
-            /*
-             * Treat the profile as successfully loaded only
-             * when Supabase returned both identities.
-             */
             profileLoaded =
                 Boolean(
                     profile &&
                     userId &&
                     rlPlayerId
                 );
+
+            console.log(
+                "[RL SESSION SUPABASE PROFILE LOOKUP COMPLETE]",
+                {
+                    profileReturned:
+                        Boolean(
+                            profile
+                        ),
+
+                    profileLoaded,
+
+                    hasUserId:
+                        Boolean(
+                            userId
+                        ),
+
+                    hasRlPlayerId:
+                        Boolean(
+                            rlPlayerId
+                        )
+                }
+            );
         } catch (
             error
         ) {
@@ -253,7 +289,7 @@ export async function handleRocketLeagueSession(
                 "Profile data is temporarily unavailable.";
 
             console.error(
-                "ROCKET LEAGUE SESSION: Profile lookup failed.",
+                "[RL SESSION SUPABASE PROFILE LOOKUP FAILED]",
                 {
                     name:
                         error?.name ||
@@ -261,7 +297,11 @@ export async function handleRocketLeagueSession(
 
                     message:
                         error?.message ||
-                        "Unknown error"
+                        "Unknown error",
+
+                    stack:
+                        error?.stack ||
+                        null
                 }
             );
         }
@@ -281,7 +321,8 @@ export async function handleRocketLeagueSession(
             null;
 
         const active =
-            profile?.active === true;
+            profile?.active ===
+            true;
 
         const profileComplete =
             getProfileComplete(
@@ -312,6 +353,30 @@ export async function handleRocketLeagueSession(
             active
         };
 
+        console.log(
+            "[RL SESSION RESPONSE]",
+            {
+                authenticated:
+                    true,
+
+                profileLoaded,
+
+                profileComplete,
+
+                rocketLeagueAccess,
+
+                hasUserId:
+                    Boolean(
+                        userId
+                    ),
+
+                hasRlPlayerId:
+                    Boolean(
+                        rlPlayerId
+                    )
+            }
+        );
+
         return jsonResponse({
             success:
                 true,
@@ -336,7 +401,7 @@ export async function handleRocketLeagueSession(
         error
     ) {
         console.error(
-            "ROCKET LEAGUE SESSION: Session lookup failed.",
+            "[RL SESSION UNEXPECTED FAILURE]",
             {
                 name:
                     error?.name ||
@@ -344,7 +409,17 @@ export async function handleRocketLeagueSession(
 
                 message:
                     error?.message ||
-                    "Unknown error"
+                    "Unknown error",
+
+                stack:
+                    error?.stack ||
+                    null,
+
+                method:
+                    request.method,
+
+                url:
+                    request.url
             }
         );
 
