@@ -1,0 +1,45 @@
+<!-- =========================================================
+BPD GAMING NETWORK
+ACCOUNT BANNER
+
+File:
+    Framework/Banner/HTML/account_banner.html
+
+Purpose:
+    Persistent global account/authentication banner.
+
+Description:
+    - Displays BPD authentication state.
+    - Provides Sign In, Account, and Logout actions.
+    - Remains outside the route-rendered site header.
+========================================================= -->
+
+<div
+    class="bpd-account-banner__inner"
+    data-account-banner-state="loading"
+>
+    <div class="bpd-account-banner__brand">
+        <span class="bpd-account-banner__network">
+            BPD Gaming Network
+        </span>
+    </div>
+
+    <div
+        class="bpd-account-banner__status"
+        id="accountBannerStatus"
+        aria-live="polite"
+    >
+        <span
+            class="bpd-account-banner__loading"
+            id="accountBannerLoading"
+        >
+            Checking account...
+        </span>
+    </div>
+
+    <div
+        class="bpd-account-banner__actions"
+        id="accountBannerActions"
+    >
+    </div>
+</div>

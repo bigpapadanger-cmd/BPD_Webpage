@@ -1,0 +1,117 @@
+/* =========================================================
+BPD GAMING NETWORK
+ACCOUNT BANNER STYLES
+
+File:
+    Framework/Banner/CSS/account_banner.css
+
+Purpose:
+    Styles the persistent global account/authentication banner.
+========================================================= */
+
+.account-banner {
+    width: 100%;
+    min-height: 34px;
+    background: rgba(12, 15, 20, 0.97);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    position: relative;
+    z-index: 1000;
+}
+
+.bpd-account-banner__inner {
+    min-height: 34px;
+    padding: 0 14px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.bpd-account-banner__brand {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+}
+
+.bpd-account-banner__network {
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+}
+
+.bpd-account-banner__status {
+    margin-left: auto;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.bpd-account-banner__loading,
+.bpd-account-banner__message,
+.bpd-account-banner__username {
+    font-size: 0.78rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.bpd-account-banner__provider {
+    font-size: 0.7rem;
+    opacity: 0.72;
+    white-space: nowrap;
+}
+
+.bpd-account-banner__actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.bpd-account-banner__button,
+.bpd-account-banner__link {
+    min-height: 26px;
+    padding: 4px 9px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 5px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-size: 0.75rem;
+    line-height: 1;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.bpd-account-banner__button:hover,
+.bpd-account-banner__link:hover {
+    background: rgba(255, 255, 255, 0.07);
+}
+
+.bpd-account-banner__button:focus-visible,
+.bpd-account-banner__link:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
+}
+
+@media (max-width: 640px) {
+    .bpd-account-banner__inner {
+        padding: 0 8px;
+        gap: 8px;
+    }
+
+    .bpd-account-banner__network {
+        display: none;
+    }
+
+    .bpd-account-banner__provider {
+        display: none;
+    }
+
+    .bpd-account-banner__status {
+        margin-left: 0;
+        flex: 1;
+        justify-content: flex-start;
+    }
+}

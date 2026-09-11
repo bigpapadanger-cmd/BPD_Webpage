@@ -2,36 +2,36 @@
 
 /* =========================================================
 BPD GAMING NETWORK
-EPIC OAUTH CALLBACK ROUTE
+GLOBAL LOGOUT ROUTE
 
 File:
-    functions/api/auth/epic/callback.js
+    functions/api/auth/logout.js
 
 Public Route:
-    GET /api/auth/epic/callback
+    GET /api/auth/logout
 
 Service:
-    functions/services/auth/providers/epic/callback.js
+    functions/services/auth/account/logout.js
 
 Purpose:
-    Thin Cloudflare Pages Functions route for the Epic OAuth
-    callback.
+    Ends the current global BPD browser session.
 
 Responsibilities:
-    - Receive the browser callback request.
-    - Log safe request metadata.
-    - Delegate all OAuth logic to the Epic auth service.
-    - Return the service response.
+    - Receive the browser logout request.
+    - Delegate session destruction to the account service.
+    - Return the logout service response.
 
 Important:
-    - OAuth logic does not belong in this route.
-    - Tokens, secrets, authorization codes, and OAuth state
-      values must never be logged.
+    - This is a GLOBAL logout.
+    - It destroys the centralized BPD browser session.
+    - It is not an Epic-only, Google-only, or
+      Rocket League-only logout.
+    - Provider unlinking is a separate operation.
 ========================================================= */
 
 import {
-    handleEpicCallback
-} from "../../../services/auth/providers/epic/callback.js";
+    handleLogout
+} from "../../services/auth/account/logout.js";
 
 /* =========================================================
 GET
@@ -49,48 +49,29 @@ export async function onRequestGet(
         );
 
     console.info(
-        "EPIC CALLBACK ROUTE: Request received.",
+        "LOGOUT ROUTE: Request received.",
         {
             debugId,
-
             method:
                 context.request.method,
-
             pathname:
-                requestUrl.pathname,
-
-            hasCode:
-                requestUrl.searchParams.has(
-                    "code"
-                ),
-
-            hasState:
-                requestUrl.searchParams.has(
-                    "state"
-                ),
-
-            hasError:
-                requestUrl.searchParams.has(
-                    "error"
-                )
+                requestUrl.pathname
         }
     );
 
     try {
         const response =
-            await handleEpicCallback(
+            await handleLogout(
                 context.request,
                 context.env
             );
 
         console.info(
-            "EPIC CALLBACK ROUTE: Request completed.",
+            "LOGOUT ROUTE: Request completed.",
             {
                 debugId,
-
                 status:
                     response.status,
-
                 hasRedirect:
                     Boolean(
                         response.headers.get(
@@ -106,18 +87,15 @@ export async function onRequestGet(
         error
     ) {
         console.error(
-            "EPIC CALLBACK ROUTE: Unexpected failure.",
+            "LOGOUT ROUTE: Unexpected failure.",
             {
                 debugId,
-
                 name:
                     error?.name
                     || "Error",
-
                 message:
                     error?.message
                     || "Unknown error",
-
                 stack:
                     error?.stack
                     || null
@@ -128,16 +106,13 @@ export async function onRequestGet(
             {
                 success:
                     false,
-
                 message:
-                    "Epic callback failed unexpectedly.",
-
+                    "Logout failed unexpectedly.",
                 debugId
             },
             {
                 status:
                     500,
-
                 headers: {
                     "Cache-Control":
                         "no-store"

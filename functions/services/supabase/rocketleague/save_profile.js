@@ -2,255 +2,310 @@
 
 /* =========================================================
 BPD GAMING NETWORK
-ROCKET LEAGUE PROFILE SAVE
+ROCKET LEAGUE PROFILE SAVE CLIENT
+
+File:
+    functions/services/supabase/rocketleague/save_profile.js
 
 Purpose:
-    Saves the authenticated Epic user's Rocket League
-    registration/profile data to Supabase.
+    Calls the Rocket League profile save RPC in Supabase.
 
-Flow:
-    Rocket League registration UI
-        ↓
-    /api/auth/rocketleague/profile
-        ↓
-    services/rl/profile.js
-        ↓
-    saveRocketLeagueProfile()
-        ↓
-    Supabase RPC:
-        api.save_rocketleague_profile
-        ↓
-    Supabase validates and persists the profile data
+Description:
+    - Saves Rocket League registration/profile data.
+    - Uses identity.accounts.id as the ownership key.
+    - Sends only normalized registration fields expected by
+      api.save_rocketleague_profile.
+    - Returns the authoritative RPC result.
+    - Never accepts Epic account ID as ownership proof.
+
+Database RPC:
+    api.save_rocketleague_profile
+
+Identity:
+    accountId
+        = identity.accounts.id
 
 Important:
-    - The browser never calls Supabase directly.
-    - The Supabase secret remains server-side in Cloudflare.
-    - EpicUniqueId must come from the validated Epic/KV
-      session, not from browser-submitted profile data.
-    - This function maps JavaScript camelCase fields into
-      the snake_case RPC arguments expected by Supabase.
-    - Supabase remains authoritative for whether the profile
-      is complete and whether Rocket League access is granted.
-    - This function should NOT independently calculate
-      profileComplete or rocketLeagueAccess.
+    - accountId must come from the authenticated BPD session.
+    - Browser-submitted account IDs must never be passed here.
+    - Epic account ID is not used to determine ownership.
+========================================================= */
 
-Supabase RPC receives:
-    epic_unique_id
-    age_consent
-    display_name
-    current_rank
-    show_online_status
-    contact_method
-    email_address
-    phone_number
-    preferred_mode
-    other_mode
-    display_timezone
-    availability
-    notifications_enabled
-    reminder_mode
+/* =========================================================
+NORMALIZATION
+========================================================= */
 
-Supabase RPC returns:
-    success
-    profile_saved
-    user_id
-    rl_player_id
-    role
-    active
-    profile_complete
-    rocket_league_access
-    registration_status
+function normalizeString(
+    value
+) {
+    if (
+        typeof value !== "string"
+    ) {
+        return "";
+    }
 
-Failure behavior:
-    - Missing Cloudflare Supabase configuration throws before
-      attempting a request.
-    - Missing EpicUniqueId throws before calling Supabase.
-    - Supabase HTTP failures are logged server-side with the
-      response body so database/RPC errors can be diagnosed.
-    - The caller decides what response is returned to the
-      browser after a save failure.
+    return value.trim();
+}
+
+function normalizeNullableString(
+    value
+) {
+    const normalized =
+        normalizeString(
+            value
+        );
+
+    return normalized
+        || null;
+}
+
+/* =========================================================
+SUPABASE CONFIGURATION
+========================================================= */
+
+function getSupabaseConfiguration(
+    env
+) {
+    const url =
+        normalizeString(
+            env.SUPABASE_URL
+        );
+
+    const apiKey =
+        normalizeString(
+            env.SUPABASE_AUTH
+        );
+
+    if (
+        !url
+        || !apiKey
+    ) {
+        return null;
+    }
+
+    return {
+        url:
+            url.endsWith(
+                "/"
+            )
+                ? url
+                : `${url}/`,
+
+        apiKey
+    };
+}
+
+/* =========================================================
+RPC ERROR
+========================================================= */
+
+async function createRpcError(
+    response
+) {
+    let data =
+        null;
+
+    try {
+        data =
+            await response.json();
+    }
+    catch {
+        // Ignore malformed upstream response.
+    }
+
+    const message =
+        normalizeString(
+            data?.message
+        )
+        || normalizeString(
+            data?.error
+        )
+        || `Rocket League profile save failed: ${response.status}`;
+
+    const error =
+        new Error(
+            message
+        );
+
+    error.upstreamStatus =
+        response.status;
+
+    error.upstreamCode =
+        normalizeNullableString(
+            data?.code
+        );
+
+    return error;
+}
+
+/* =========================================================
+SAVE PROFILE
 ========================================================= */
 
 export async function saveRocketLeagueProfile(
     env,
-    EpicUniqueId,
+    accountId,
     registration
 ) {
-    /*
-     * Validate server configuration before making an
-     * outbound request.
-     */
-    if (!env.SUPABASE_URL) {
+    const configuration =
+        getSupabaseConfiguration(
+            env
+        );
+
+    if (
+        !configuration
+    ) {
         throw new Error(
-            "SUPABASE_URL is not configured."
+            "Supabase configuration is unavailable."
         );
     }
 
-    if (!env.SUPABASE_AUTH) {
+    const normalizedAccountId =
+        normalizeString(
+            accountId
+        );
+
+    if (
+        !normalizedAccountId
+    ) {
         throw new Error(
-            "SUPABASE_AUTH is not configured."
+            "Rocket League profile save requires an account ID."
         );
     }
 
-    /*
-     * Epic identity must come from the authenticated
-     * server-side session.
-     */
-    if (!EpicUniqueId) {
+    if (
+        !registration
+        || typeof registration !== "object"
+        || Array.isArray(
+            registration
+        )
+    ) {
         throw new Error(
-            "EpicUniqueId is required."
+            "Rocket League registration data is invalid."
         );
     }
 
-    /*
-     * Convert the registration object's camelCase fields
-     * into the exact snake_case argument names expected by
-     * api.save_rocketleague_profile().
-     */
-    const payload = {
-    s_epic_unique_id:
-        EpicUniqueId,
-
-    s_age_consent:
-        registration.ageConsent,
-
-    s_display_name:
-        registration.displayName,
-
-    s_current_rank:
-        registration.currentRank,
-
-    s_show_online_status:
-        registration.showOnlineStatus,
-
-    s_contact_method:
-        registration.contactMethod,
-
-    s_email_address:
-        registration.email,
-
-    s_phone_number:
-        registration.phone,
-
-    s_preferred_mode:
-        registration.preferredMode,
-
-    s_other_mode:
-        registration.otherMode,
-
-    s_display_timezone:
-        registration.timezone,
-
-    s_availability:
-        registration.availability,
-
-    s_notifications_enabled:
-        registration.notificationsEnabled,
-
-    s_reminder_mode:
-        registration.reminderMode
-    };
-
-    /*
-     * Call the private Supabase API-schema RPC.
-     *
-     * Content-Profile tells PostgREST that the function
-     * belongs to the exposed "api" schema rather than
-     * the default public schema.
-     */
     const response =
         await fetch(
-            `${env.SUPABASE_URL}rpc/save_rocketleague_profile`,
+            `${configuration.url}rpc/save_rocketleague_profile`,
             {
                 method:
                     "POST",
 
                 headers: {
                     "apikey":
-                        env.SUPABASE_AUTH,
-
-                    "Content-Type":
-                        "application/json",
+                        configuration.apiKey,
 
                     "Content-Profile":
                         "api",
+
+                    "Content-Type":
+                        "application/json",
 
                     "Accept":
                         "application/json"
                 },
 
                 body:
-                    JSON.stringify(
-                        payload
-                    )
+                    JSON.stringify({
+                        s_account_id:
+                            normalizedAccountId,
+
+                        s_age_consent:
+                            registration.ageConsent === true,
+
+                        s_display_name:
+                            normalizeNullableString(
+                                registration.displayName
+                            ),
+
+                        s_current_rank:
+                            normalizeNullableString(
+                                registration.currentRank
+                            ),
+
+                        s_contact_method:
+                            normalizeNullableString(
+                                registration.contactMethod
+                            ),
+
+                        s_email_address:
+                            normalizeNullableString(
+                                registration.email
+                            ),
+
+                        s_phone_number:
+                            normalizeNullableString(
+                                registration.phone
+                            ),
+
+                        s_preferred_mode:
+                            normalizeNullableString(
+                                registration.preferredMode
+                            ),
+
+                        s_other_mode:
+                            normalizeNullableString(
+                                registration.otherMode
+                            ),
+
+                        s_display_timezone:
+                            normalizeNullableString(
+                                registration.timezone
+                            ),
+
+                        s_availability:
+                            Array.isArray(
+                                registration.availability
+                            )
+                                ? registration.availability
+                                : [],
+
+                        s_show_online_status:
+                            registration.showOnlineStatus === true,
+
+                        s_notifications_enabled:
+                            registration.notificationsEnabled === true,
+
+                        s_reminder_mode:
+                            normalizeNullableString(
+                                registration.reminderMode
+                            )
+                    })
             }
         );
 
-    /*
-     * Read the response as text first so that both JSON and
-     * non-JSON Supabase/PostgREST error responses can be
-     * logged without consuming the body twice.
-     */
-    const responseText =
-        await response.text();
-
-    let responseData =
-        null;
-
-    if (responseText) {
-        try {
-            responseData =
-                JSON.parse(
-                    responseText
-                );
-        } catch {
-            responseData =
-                responseText;
-        }
+    if (
+        !response.ok
+    ) {
+        throw await createRpcError(
+            response
+        );
     }
 
-    /*
-     * Log the real Supabase response server-side.
-     *
-     * This is especially important because the public API
-     * layer may intentionally return a generic error message
-     * to the browser.
-     */
-    if (!response.ok) {
-        console.error(
-            "[ROCKET LEAGUE PROFILE] Supabase save failed:",
-            {
-                status:
-                    response.status,
+    let result;
 
-                statusText:
-                    response.statusText,
-
-                response:
-                    responseData
-            }
-        );
-
+    try {
+        result =
+            await response.json();
+    }
+    catch {
         throw new Error(
-            responseData?.message ||
-            responseData?.error ||
-            `Supabase profile save failed: ${response.status}`
+            "Rocket League profile save returned an invalid response."
         );
     }
 
-    /*
-     * RPC functions normally return a single object, but
-     * tolerate an array response defensively.
-     */
-    if (Array.isArray(responseData)) {
-        return (
-            responseData[0] ||
-            {}
+    if (
+        !result
+        || typeof result !== "object"
+        || Array.isArray(
+            result
+        )
+    ) {
+        throw new Error(
+            "Rocket League profile save returned no result."
         );
     }
 
-    return (
-        responseData ||
-        {}
-    );
+    return result;
 }

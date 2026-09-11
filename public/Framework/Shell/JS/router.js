@@ -30,6 +30,10 @@ import {
     APP_ASSET_ID
 } from "/scripts/cacheHandler.js";
 
+import {
+    initializeAccountBanner
+} from "../../Banner/JS/account_banner.js";
+
 /* =========================================================
    BPD GAMING NETWORK
    SPA ROUTER
@@ -55,6 +59,7 @@ let navigationId =
 /* =========================================================
    INITIAL SHELL STATE
    ========================================================= */
+
 
 function applyInitialSidebarLayoutState() {
     const savedSidebar =
@@ -1871,6 +1876,15 @@ window.BPDRouter =
 applyInitialSidebarLayoutState();
 
 initializeGlobalOcr();
+
+/*
+ * Persistent account banner.
+ *
+ * This initializes once outside the route-rendering lifecycle
+ * so navigation can replace the header/content/sidebar/footer
+ * without replacing the account banner.
+ */
+void initializeAccountBanner();
 
 if (
     !window.location.pathname.startsWith(

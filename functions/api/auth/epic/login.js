@@ -2,36 +2,36 @@
 
 /* =========================================================
 BPD GAMING NETWORK
-EPIC OAUTH CALLBACK ROUTE
+EPIC OAUTH LOGIN ROUTE
 
 File:
-    functions/api/auth/epic/callback.js
+    functions/api/auth/epic/login.js
 
 Public Route:
-    GET /api/auth/epic/callback
+    GET /api/auth/epic/login
 
 Service:
-    functions/services/auth/providers/epic/callback.js
+    functions/services/auth/providers/epic/login.js
 
 Purpose:
-    Thin Cloudflare Pages Functions route for the Epic OAuth
-    callback.
+    Thin Cloudflare Pages Functions route that starts the
+    Epic OAuth authentication flow.
 
 Responsibilities:
-    - Receive the browser callback request.
+    - Receive the browser login request.
     - Log safe request metadata.
-    - Delegate all OAuth logic to the Epic auth service.
+    - Delegate OAuth initialization to the Epic auth service.
     - Return the service response.
 
 Important:
-    - OAuth logic does not belong in this route.
+    - OAuth implementation does not belong in this route.
     - Tokens, secrets, authorization codes, and OAuth state
       values must never be logged.
 ========================================================= */
 
 import {
-    handleEpicCallback
-} from "../../../services/auth/providers/epic/callback.js";
+    handleEpicLogin
+} from "../../../services/auth/providers/epic/login.js";
 
 /* =========================================================
 GET
@@ -49,7 +49,7 @@ export async function onRequestGet(
         );
 
     console.info(
-        "EPIC CALLBACK ROUTE: Request received.",
+        "EPIC LOGIN ROUTE: Request received.",
         {
             debugId,
 
@@ -57,42 +57,32 @@ export async function onRequestGet(
                 context.request.method,
 
             pathname:
-                requestUrl.pathname,
-
-            hasCode:
-                requestUrl.searchParams.has(
-                    "code"
-                ),
-
-            hasState:
-                requestUrl.searchParams.has(
-                    "state"
-                ),
-
-            hasError:
-                requestUrl.searchParams.has(
-                    "error"
-                )
+                requestUrl.pathname
         }
     );
 
     try {
         const response =
-            await handleEpicCallback(
+            await handleEpicLogin(
                 context.request,
                 context.env
             );
 
         console.info(
-            "EPIC CALLBACK ROUTE: Request completed.",
+            "EPIC LOGIN ROUTE: Request completed.",
             {
                 debugId,
 
                 status:
                     response.status,
 
-                hasRedirect:
-                    Boolean(
+                hasLocation:
+                    response.headers.has(
+                        "location"
+                    ),
+
+                locationOrigin:
+                    getLocationOrigin(
                         response.headers.get(
                             "location"
                         )
@@ -106,7 +96,7 @@ export async function onRequestGet(
         error
     ) {
         console.error(
-            "EPIC CALLBACK ROUTE: Unexpected failure.",
+            "EPIC LOGIN ROUTE: Unexpected failure.",
             {
                 debugId,
 
@@ -130,7 +120,7 @@ export async function onRequestGet(
                     false,
 
                 message:
-                    "Epic callback failed unexpectedly.",
+                    "Epic login failed unexpectedly.",
 
                 debugId
             },
@@ -144,5 +134,28 @@ export async function onRequestGet(
                 }
             }
         );
+    }
+}
+
+/* =========================================================
+SAFE REDIRECT ORIGIN
+========================================================= */
+
+function getLocationOrigin(
+    location
+) {
+    if (
+        !location
+    ) {
+        return null;
+    }
+
+    try {
+        return new URL(
+            location
+        ).origin;
+    }
+    catch {
+        return "invalid-location";
     }
 }

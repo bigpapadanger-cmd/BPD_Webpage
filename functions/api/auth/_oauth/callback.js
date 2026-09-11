@@ -2,36 +2,25 @@
 
 /* =========================================================
 BPD GAMING NETWORK
-EPIC OAUTH CALLBACK ROUTE
-
-File:
-    functions/api/auth/epic/callback.js
-
-Public Route:
-    GET /api/auth/epic/callback
-
-Service:
-    functions/services/auth/providers/epic/callback.js
+SUPABASE OAUTH CALLBACK ROUTE
 
 Purpose:
-    Thin Cloudflare Pages Functions route for the Epic OAuth
-    callback.
+    Public callback endpoint used by Supabase Auth.
 
 Responsibilities:
-    - Receive the browser callback request.
-    - Log safe request metadata.
-    - Delegate all OAuth logic to the Epic auth service.
+    - Receive the OAuth callback request.
+    - Delegate processing to the centralized OAuth service.
     - Return the service response.
 
 Important:
-    - OAuth logic does not belong in this route.
-    - Tokens, secrets, authorization codes, and OAuth state
-      values must never be logged.
+    - Provider-specific OAuth logic does not belong here.
+    - Tokens, authorization codes, PKCE verifiers, and
+      provider credentials must never be logged.
 ========================================================= */
 
 import {
-    handleEpicCallback
-} from "../../../services/auth/providers/epic/callback.js";
+    handleOAuthCallback
+} from "../../../services/auth/oauth/callback.js";
 
 /* =========================================================
 GET
@@ -43,13 +32,13 @@ export async function onRequestGet(
     const debugId =
         crypto.randomUUID();
 
-    const requestUrl =
+    const url =
         new URL(
             context.request.url
         );
 
     console.info(
-        "EPIC CALLBACK ROUTE: Request received.",
+        "OAUTH CALLBACK ROUTE: Request received.",
         {
             debugId,
 
@@ -57,20 +46,15 @@ export async function onRequestGet(
                 context.request.method,
 
             pathname:
-                requestUrl.pathname,
+                url.pathname,
 
             hasCode:
-                requestUrl.searchParams.has(
+                url.searchParams.has(
                     "code"
                 ),
 
-            hasState:
-                requestUrl.searchParams.has(
-                    "state"
-                ),
-
             hasError:
-                requestUrl.searchParams.has(
+                url.searchParams.has(
                     "error"
                 )
         }
@@ -78,13 +62,13 @@ export async function onRequestGet(
 
     try {
         const response =
-            await handleEpicCallback(
+            await handleOAuthCallback(
                 context.request,
                 context.env
             );
 
         console.info(
-            "EPIC CALLBACK ROUTE: Request completed.",
+            "OAUTH CALLBACK ROUTE: Request completed.",
             {
                 debugId,
 
@@ -106,7 +90,7 @@ export async function onRequestGet(
         error
     ) {
         console.error(
-            "EPIC CALLBACK ROUTE: Unexpected failure.",
+            "OAUTH CALLBACK ROUTE: Unexpected failure.",
             {
                 debugId,
 
@@ -130,7 +114,7 @@ export async function onRequestGet(
                     false,
 
                 message:
-                    "Epic callback failed unexpectedly.",
+                    "OAuth callback failed unexpectedly.",
 
                 debugId
             },
