@@ -108,50 +108,47 @@ export async function saveRocketLeagueProfile(
      * api.save_rocketleague_profile().
      */
     const payload = {
-        epic_unique_id:
-            EpicUniqueId,
+    s_epic_unique_id:
+        EpicUniqueId,
 
-        age_consent:
-            registration.ageConsent,
+    s_age_consent:
+        registration.ageConsent,
 
-        display_name:
-            registration.displayName,
+    s_display_name:
+        registration.displayName,
 
-        current_rank:
-            registration.currentRank,
+    s_current_rank:
+        registration.currentRank,
 
-        show_online_status:
-            registration.showOnlineStatus,
+    s_show_online_status:
+        registration.showOnlineStatus,
 
-        contact_method:
-            registration.contactMethod,
+    s_contact_method:
+        registration.contactMethod,
 
-        email_address:
-            registration.email ||
-            null,
+    s_email_address:
+        registration.email,
 
-        phone_number:
-            registration.phone ||
-            null,
+    s_phone_number:
+        registration.phone,
 
-        preferred_mode:
-            registration.preferredMode,
+    s_preferred_mode:
+        registration.preferredMode,
 
-        other_mode:
-            registration.otherMode ||
-            null,
+    s_other_mode:
+        registration.otherMode,
 
-        display_timezone:
-            registration.timezone,
+    s_display_timezone:
+        registration.timezone,
 
-        availability:
-            registration.availability,
+    s_availability:
+        registration.availability,
 
-        notifications_enabled:
-            registration.notificationsEnabled,
+    s_notifications_enabled:
+        registration.notificationsEnabled,
 
-        reminder_mode:
-            registration.reminderMode
+    s_reminder_mode:
+        registration.reminderMode
     };
 
     /*
