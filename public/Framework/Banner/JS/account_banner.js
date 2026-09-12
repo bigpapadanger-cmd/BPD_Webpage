@@ -30,8 +30,10 @@ Important:
 import {
     BPD_AUTH_SESSION_URL,
     BPD_AUTH_LOGOUT_URL
-} from "../../Shell/JS/api_urls.js";
-
+} from "../../../scripts/apiRoutes.js";
+import {
+    apiFetch
+} from "../../../scripts/apiConnection.js";
 /* =========================================================
 CONSTANTS
 ========================================================= */
@@ -494,7 +496,7 @@ SESSION LOAD
 
 async function loadAccountSession() {
     const response =
-        await fetch(
+        await apiFetch(
             BPD_AUTH_SESSION_URL,
             {
                 method:
@@ -587,7 +589,7 @@ LOGOUT
 async function handleLogout() {
     try {
         const response =
-            await fetch(
+            await apiFetch(
                 BPD_AUTH_LOGOUT_URL,
                 {
                     method:

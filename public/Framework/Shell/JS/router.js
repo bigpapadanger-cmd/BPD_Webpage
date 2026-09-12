@@ -1,3 +1,31 @@
+"use strict";
+
+/* =========================================================
+BPD GAMING NETWORK
+SPA ROUTER
+
+File:
+    Framework/Shell/JS/router.js
+
+Purpose:
+    Controls global SPA navigation, shell fragment loading,
+    route authentication, route CSS, route modules, sidebar
+    initialization, OCR runtime state, and persistent shell
+    components.
+
+Description:
+    - Resolves routes from /routes.js.
+    - Loads header, sidebar, page, and footer fragments.
+    - Applies route-specific master stylesheets.
+    - Uses apiFetch() for API connectivity/authentication.
+    - Distinguishes signed-out state from unavailable API state.
+    - Does not redirect protected routes merely because the
+      network or authentication API is unavailable.
+    - Initializes the persistent account banner outside the
+      route-rendering lifecycle.
+    - Protects asynchronous navigation from race conditions.
+========================================================= */
+
 import {
     ROUTES,
     HEADER_MAP,
@@ -23,7 +51,8 @@ import {
 } from "../../../scripts/apiRoutes.js";
 
 import {
-    apiFetch
+    apiFetch,
+    initializeApiConnectionMonitor
 } from "../../../scripts/apiConnection.js";
 
 import {
@@ -35,9 +64,8 @@ import {
 } from "../../Banner/JS/account_banner.js";
 
 /* =========================================================
-   BPD GAMING NETWORK
-   SPA ROUTER
-   ========================================================= */
+ROUTER CONFIGURATION
+========================================================= */
 
 const DEFAULT_ROUTE =
     "/";
@@ -51,15 +79,16 @@ const AUTH_FALLBACK_ROUTE =
 const MASTER_CSS_LINK_ID =
     "bpdMasterCss";
 
+/* =========================================================
+NAVIGATION STATE
+========================================================= */
+
 let navigationId =
     0;
 
-
-
 /* =========================================================
-   INITIAL SHELL STATE
-   ========================================================= */
-
+INITIAL SHELL STATE
+========================================================= */
 
 function applyInitialSidebarLayoutState() {
     const savedSidebar =
@@ -101,8 +130,8 @@ function applyInitialSidebarLayoutState() {
 }
 
 /* =========================================================
-   OCR RUNTIME
-   ========================================================= */
+OCR RUNTIME
+========================================================= */
 
 function initializeGlobalOcr() {
     try {
@@ -139,8 +168,8 @@ function resumeGlobalOcr() {
 }
 
 /* =========================================================
-   PATH NORMALIZATION
-   ========================================================= */
+PATH NORMALIZATION
+========================================================= */
 
 function normalizePath(
     path
@@ -198,10 +227,8 @@ function normalizePath(
         return "/";
     }
 
-    return (
-        pathname
-        || "/"
-    );
+    return pathname
+        || "/";
 }
 
 function normalizeDestination(
@@ -226,8 +253,8 @@ function normalizeDestination(
 }
 
 /* =========================================================
-   ROUTE RESOLUTION
-   ========================================================= */
+ROUTE RESOLUTION
+========================================================= */
 
 function routeExists(
     path
@@ -358,7 +385,7 @@ function findInheritedMapValue(
             );
 
     if (
-        matchingRoutes.length
+        matchingRoutes.length > 0
     ) {
         return map[
             matchingRoutes[
@@ -384,8 +411,8 @@ function findInheritedMapValue(
 }
 
 /* =========================================================
-   MASTER CSS
-   ========================================================= */
+MASTER CSS
+========================================================= */
 
 function normalizeCssPath(
     value
@@ -635,8 +662,8 @@ async function applyMasterCss(
 }
 
 /* =========================================================
-   ROUTING CONTROLS
-   ========================================================= */
+ROUTING CONTROLS
+========================================================= */
 
 function getRoutingControl(
     event
@@ -767,8 +794,8 @@ async function handleRoutingButtonPressed(
 }
 
 /* =========================================================
-   ROUTE TESTING
-   ========================================================= */
+ROUTE TESTING
+========================================================= */
 
 export function testRoute(
     path = "/"
@@ -857,8 +884,8 @@ export async function testRouteNavigation(
 }
 
 /* =========================================================
-   STATIC HTML
-   ========================================================= */
+STATIC HTML
+========================================================= */
 
 async function fetchHTML(
     file,
@@ -904,8 +931,8 @@ async function fetchHTML(
 }
 
 /* =========================================================
-   ROUTE CLASSIC SCRIPTS
-   ========================================================= */
+ROUTE CLASSIC SCRIPTS
+========================================================= */
 
 function isRouteScriptLoaded(
     src
@@ -1038,11 +1065,75 @@ async function activateRouteScripts(
 }
 
 /* =========================================================
-   AUTHENTICATION
-   ========================================================= */
+AUTH SESSION NORMALIZATION
+========================================================= */
+
+function createUnavailableAuthSession(
+    error = null
+) {
+    return {
+        available:
+            false,
+
+        authenticated:
+            false,
+
+        user:
+            null,
+
+        error
+    };
+}
+
+function createSignedOutAuthSession() {
+    return {
+        available:
+            true,
+
+        authenticated:
+            false,
+
+        user:
+            null
+    };
+}
+
+function normalizeRouterAuthSession(
+    result
+) {
+    const normalizedResult =
+        result
+        && typeof result ===
+            "object"
+            ? result
+            : {};
+
+    return {
+        ...normalizedResult,
+
+        available:
+            normalizedResult.available !==
+            false,
+
+        authenticated:
+            normalizedResult.authenticated ===
+            true,
+
+        user:
+            normalizedResult.user
+            || normalizedResult.sessionData
+            || null
+    };
+}
+
+/* =========================================================
+AUTHENTICATION
+========================================================= */
 
 async function loadRouterAuthSession() {
-    let result;
+    /* -----------------------------------------------------
+    GLOBAL AUTH CLIENT
+    ----------------------------------------------------- */
 
     if (
         window.BPDAuth
@@ -1050,12 +1141,37 @@ async function loadRouterAuthSession() {
             .getSession ===
             "function"
     ) {
-        result =
-            await window.BPDAuth
-                .getSession();
+        try {
+            const result =
+                await window.BPDAuth
+                    .getSession();
+
+            return normalizeRouterAuthSession(
+                result
+            );
+        }
+        catch (
+            error
+        ) {
+            console.warn(
+                "ROUTER: Global authentication client is unavailable.",
+                error
+            );
+
+            return createUnavailableAuthSession(
+                error
+            );
+        }
     }
-    else {
-        const response =
+
+    /* -----------------------------------------------------
+    DIRECT AUTH API
+    ----------------------------------------------------- */
+
+    let response;
+
+    try {
+        response =
             await apiFetch(
                 BPD_AUTH_SESSION_URL,
                 {
@@ -1074,42 +1190,78 @@ async function loadRouterAuthSession() {
                     }
                 }
             );
+    }
+    catch (
+        error
+    ) {
+        console.warn(
+            "ROUTER: Authentication API could not be reached.",
+            error
+        );
 
-        if (
-            !response.ok
-        ) {
-            return {
-                authenticated:
-                    false,
-
-                user:
-                    null
-            };
-        }
-
-        result =
-            await response
-                .json()
-                .catch(
-                    function() {
-                        return {};
-                    }
-                );
+        return createUnavailableAuthSession(
+            error
+        );
     }
 
-    return {
-        ...result,
+    /*
+     * A server or connectivity problem must not be interpreted
+     * as an explicit logout.
+     */
+    if (
+        !response.ok
+    ) {
+        if (
+            response.status ===
+                401
+            || response.status ===
+                403
+        ) {
+            return createSignedOutAuthSession();
+        }
 
-        authenticated:
-            result?.authenticated ===
-            true,
+        console.warn(
+            "ROUTER: Authentication API returned an unavailable response.",
+            {
+                status:
+                    response.status
+            }
+        );
 
-        user:
-            result?.user
-            || result?.sessionData
-            || null
-    };
+        return createUnavailableAuthSession(
+            new Error(
+                `Authentication API returned ${response.status}.`
+            )
+        );
+    }
+
+    let result;
+
+    try {
+        result =
+            await response.json();
+    }
+    catch (
+        error
+    ) {
+        console.warn(
+            "ROUTER: Authentication API returned invalid JSON.",
+            error
+        );
+
+        return createUnavailableAuthSession(
+            error
+        );
+    }
+
+    return normalizeRouterAuthSession(
+        result
+    );
 }
+
+/* =========================================================
+AUTHENTICATION ENFORCEMENT
+========================================================= */
 
 async function enforceRouteAuthentication(
     route
@@ -1121,35 +1273,66 @@ async function enforceRouteAuthentication(
     ) {
         return {
             route,
+
             authSession:
                 null,
+
             redirected:
+                false,
+
+            authUnavailable:
                 false
         };
     }
 
-    let authSession;
+    const authSession =
+        await loadRouterAuthSession();
 
-    try {
-        authSession =
-            await loadRouterAuthSession();
-    }
-    catch (
-        error
+    /* -----------------------------------------------------
+    AUTH SERVICE UNAVAILABLE
+
+    Keep the requested route rather than treating an
+    unavailable API as a logout.
+    ----------------------------------------------------- */
+
+    if (
+        authSession.available ===
+        false
     ) {
-        console.warn(
-            "ROUTER: Authentication check failed.",
-            error
+        document.body.dataset.authAvailable =
+            "false";
+
+        document.dispatchEvent(
+            new CustomEvent(
+                "bpd:auth-unavailable",
+                {
+                    detail: {
+                        requestedPath:
+                            route.requestedPath
+                    }
+                }
+            )
         );
 
-        authSession = {
-            authenticated:
+        return {
+            route,
+
+            authSession,
+
+            redirected:
                 false,
 
-            user:
-                null
+            authUnavailable:
+                true
         };
     }
+
+    document.body.dataset.authAvailable =
+        "true";
+
+    /* -----------------------------------------------------
+    AUTHENTICATED
+    ----------------------------------------------------- */
 
     if (
         authSession.authenticated ===
@@ -1157,11 +1340,25 @@ async function enforceRouteAuthentication(
     ) {
         return {
             route,
+
             authSession,
+
             redirected:
+                false,
+
+            authUnavailable:
                 false
         };
     }
+
+    /* -----------------------------------------------------
+    SIGNED OUT
+    ----------------------------------------------------- */
+
+    const fallbackRoute =
+        resolveRoute(
+            AUTH_FALLBACK_ROUTE
+        );
 
     const fallbackUrl =
         AUTH_FALLBACK_ROUTE
@@ -1193,16 +1390,21 @@ async function enforceRouteAuthentication(
 
     return {
         route:
-            resolveRoute(
-                AUTH_FALLBACK_ROUTE
-            ),
+            fallbackRoute,
 
         authSession,
 
         redirected:
-            true
+            true,
+
+        authUnavailable:
+            false
     };
 }
+
+/* =========================================================
+AUTH STATE EVENTS
+========================================================= */
 
 function dispatchAuthState(
     authSession
@@ -1218,6 +1420,10 @@ function dispatchAuthState(
             "bpd:auth-changed",
             {
                 detail: {
+                    available:
+                        authSession.available !==
+                        false,
+
                     authenticated:
                         authSession.authenticated ===
                         true,
@@ -1232,8 +1438,8 @@ function dispatchAuthState(
 }
 
 /* =========================================================
-   HEADER
-   ========================================================= */
+HEADER
+========================================================= */
 
 function setHeaderVisibility(
     showHeader
@@ -1271,8 +1477,8 @@ function setHeaderVisibility(
 }
 
 /* =========================================================
-   PAGE LOADING
-   ========================================================= */
+PAGE LOADING
+========================================================= */
 
 function setPageLoading(
     loading
@@ -1289,8 +1495,8 @@ function setPageLoading(
 }
 
 /* =========================================================
-   SIDEBAR
-   ========================================================= */
+SIDEBAR
+========================================================= */
 
 async function initializeLoadedSidebar(
     authSession
@@ -1315,8 +1521,8 @@ async function initializeLoadedSidebar(
 }
 
 /* =========================================================
-   ROUTE MODULE
-   ========================================================= */
+ROUTE MODULE
+========================================================= */
 
 async function initializeLoadedRouteModule(
     moduleFile
@@ -1379,21 +1585,19 @@ async function initializeLoadedRouteModule(
 }
 
 /* =========================================================
-   NAVIGATION VALIDITY
-   ========================================================= */
+NAVIGATION VALIDITY
+========================================================= */
 
 function isCurrentNavigation(
     currentNavigationId
 ) {
-    return (
-        currentNavigationId ===
-        navigationId
-    );
+    return currentNavigationId ===
+        navigationId;
 }
 
 /* =========================================================
-   ROUTE CONTENT
-   ========================================================= */
+SHELL ELEMENTS
+========================================================= */
 
 function getShellElements() {
     return {
@@ -1418,6 +1622,10 @@ function getShellElements() {
             )
     };
 }
+
+/* =========================================================
+ROUTE FRAGMENTS
+========================================================= */
 
 async function loadRouteFragments(
     routeConfig,
@@ -1476,11 +1684,19 @@ function injectRouteFragments(
             fragments.headerHTML;
     }
 
-    elements.sidebar.innerHTML =
-        fragments.sidebarHTML;
+    if (
+        elements.sidebar
+    ) {
+        elements.sidebar.innerHTML =
+            fragments.sidebarHTML;
+    }
 
-    elements.content.innerHTML =
-        fragments.pageHTML;
+    if (
+        elements.content
+    ) {
+        elements.content.innerHTML =
+            fragments.pageHTML;
+    }
 
     if (
         elements.footer
@@ -1491,8 +1707,8 @@ function injectRouteFragments(
 }
 
 /* =========================================================
-   ROUTE ERROR
-   ========================================================= */
+ROUTE ERROR
+========================================================= */
 
 function renderRouteLoadError() {
     const contentElement =
@@ -1524,8 +1740,8 @@ function renderRouteLoadError() {
 }
 
 /* =========================================================
-   SHELL LOAD
-   ========================================================= */
+SHELL LOAD
+========================================================= */
 
 async function loadShell() {
     const currentNavigationId =
@@ -1542,8 +1758,8 @@ async function loadShell() {
 
     try {
         /* -------------------------------------------------
-           AUTH
-           ------------------------------------------------- */
+        AUTHENTICATION
+        ------------------------------------------------- */
 
         const authCheck =
             await enforceRouteAuthentication(
@@ -1572,9 +1788,15 @@ async function loadShell() {
             );
         }
 
+        document.body.dataset.authUnavailable =
+            String(
+                authCheck.authUnavailable ===
+                true
+            );
+
         /* -------------------------------------------------
-           MASTER CSS
-           ------------------------------------------------- */
+        MASTER CSS
+        ------------------------------------------------- */
 
         await applyMasterCss(
             route.routePath,
@@ -1590,8 +1812,8 @@ async function loadShell() {
         }
 
         /* -------------------------------------------------
-           SHELL CONFIG
-           ------------------------------------------------- */
+        SHELL CONFIGURATION
+        ------------------------------------------------- */
 
         const showHeader =
             findInheritedMapValue(
@@ -1622,8 +1844,8 @@ async function loadShell() {
             || "BPD Gaming Network";
 
         /* -------------------------------------------------
-           LOAD FRAGMENTS
-           ------------------------------------------------- */
+        LOAD FRAGMENTS
+        ------------------------------------------------- */
 
         const fragments =
             await loadRouteFragments(
@@ -1640,8 +1862,8 @@ async function loadShell() {
         }
 
         /* -------------------------------------------------
-           INJECT FRAGMENTS
-           ------------------------------------------------- */
+        INJECT FRAGMENTS
+        ------------------------------------------------- */
 
         injectRouteFragments(
             elements,
@@ -1658,8 +1880,8 @@ async function loadShell() {
             );
 
         /* -------------------------------------------------
-           CLASSIC ROUTE SCRIPTS
-           ------------------------------------------------- */
+        CLASSIC ROUTE SCRIPTS
+        ------------------------------------------------- */
 
         await activateRouteScripts(
             elements.content
@@ -1674,8 +1896,8 @@ async function loadShell() {
         }
 
         /* -------------------------------------------------
-           SIDEBAR
-           ------------------------------------------------- */
+        SIDEBAR
+        ------------------------------------------------- */
 
         await initializeLoadedSidebar(
             authCheck.authSession
@@ -1690,8 +1912,8 @@ async function loadShell() {
         }
 
         /* -------------------------------------------------
-           ROUTE MODULE
-           ------------------------------------------------- */
+        ROUTE MODULE
+        ------------------------------------------------- */
 
         await initializeLoadedRouteModule(
             routeConfig.module
@@ -1710,9 +1932,10 @@ async function loadShell() {
         ------------------------------------------------- */
 
         resumeGlobalOcr();
+
         /* -------------------------------------------------
-           FINISH NAVIGATION
-           ------------------------------------------------- */
+        FINISH NAVIGATION
+        ------------------------------------------------- */
 
         elements.content.focus({
             preventScroll:
@@ -1746,6 +1969,9 @@ async function loadShell() {
 
                         redirected:
                             authCheck.redirected,
+
+                        authUnavailable:
+                            authCheck.authUnavailable,
 
                         masterCss:
                             getMasterCssForRoute(
@@ -1788,8 +2014,8 @@ async function loadShell() {
 }
 
 /* =========================================================
-   NAVIGATION
-   ========================================================= */
+NAVIGATION
+========================================================= */
 
 async function navigate(
     destination,
@@ -1840,8 +2066,8 @@ async function navigate(
 }
 
 /* =========================================================
-   ROUTER EVENTS
-   ========================================================= */
+ROUTER EVENTS
+========================================================= */
 
 document.addEventListener(
     "click",
@@ -1855,9 +2081,10 @@ window.addEventListener(
     }
 );
 
+
 /* =========================================================
-   PUBLIC ROUTER API
-   ========================================================= */
+PUBLIC ROUTER API
+========================================================= */
 
 window.BPDRouter =
     Object.freeze({
@@ -1870,19 +2097,19 @@ window.BPDRouter =
     });
 
 /* =========================================================
-   STARTUP
-   ========================================================= */
+STARTUP
+========================================================= */
 
 applyInitialSidebarLayoutState();
-
+void initializeApiConnectionMonitor();
 initializeGlobalOcr();
 
 /*
  * Persistent account banner.
  *
- * This initializes once outside the route-rendering lifecycle
- * so navigation can replace the header/content/sidebar/footer
- * without replacing the account banner.
+ * The banner initializes once outside the route-rendering
+ * lifecycle. Route navigation may replace the header,
+ * sidebar, content, and footer without replacing the banner.
  */
 void initializeAccountBanner();
 

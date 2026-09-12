@@ -1,19 +1,19 @@
-/* BPD GAMING NETWORK - RESPONSIVE FLOATING SIDEBAR */
+/* =========================================================
+BPD GAMING NETWORK
+RESPONSIVE ATTACHED SIDEBAR
+
+Purpose:
+    Provides the persistent floating sidebar with:
+    - shared body/sidebar vertical height
+    - attached toggle header
+    - animated expand/collapse width
+    - animated hamburger/X toggle icon
+========================================================= */
 
 :root {
-    /*
-    =========================================================
-    SIDEBAR SCALE
-
-    Expanded:
-        targets ~16% of viewport width
-        minimum keeps text usable on small screens
-        maximum prevents excessive width on large screens
-
-    Collapsed:
-        modestly scales with viewport
-    =========================================================
-    */
+    /* =====================================================
+    SIDEBAR WIDTHS
+    ===================================================== */
 
     --sidebar-width:
         clamp(
@@ -29,22 +29,16 @@
             80px
         );
 
+    /* =====================================================
+    SIDEBAR SPACING
+    ===================================================== */
+
     --sidebar-edge-gap:
         clamp(
             6px,
             1vw,
             16px
         );
-
-    --sidebar-vertical-gap:
-        clamp(
-            10px,
-            1.5vh,
-            20px
-        );
-
-    --sidebar-toggle-gap:
-        8px;
 
     --sidebar-content-gap:
         clamp(
@@ -53,65 +47,54 @@
             20px
         );
 
-    --sidebar-icon-width:
-        var(
-            --sidebar-collapsed-width
-        );
+    /* =====================================================
+    SIDEBAR ROWS
+    ===================================================== */
+
     --sidebar-row-height:
         clamp(
             46px,
             5vh,
             54px
         );
-}
 
+    --sidebar-icon-width:
+        var(
+            --sidebar-collapsed-width
+        );
 
-/* =========================================================
-   SIDEBAR NAVIGATION GROUPS
-   ========================================================= */
+    /* =====================================================
+    TOGGLE HEADER
+    ===================================================== */
 
-.sidebar-navigation-top,
-.sidebar-navigation-bottom {
-    display: flex;
-    flex: 0 0 auto;
-    flex-direction: column;
+    --sidebar-toggle-height:
+        var(
+            --sidebar-collapsed-width
+        );
 
-    width: 100%;
-    min-width: 0;
-
-    gap: 2px;
-}
-
-.sidebar-navigation-bottom {
-    margin-top: auto;
-    padding-top: 8px;
-
-    border-top:
-        1px solid
-        rgba(
-            255,
-            255,
-            255,
-            0.08
+    --sidebar-toggle-button-size:
+        clamp(
+            30px,
+            2.2vw,
+            36px
         );
 }
 
-
 /* =========================================================
-   SIDEBAR POSITIONING CONTAINER
-   ========================================================= */
+SIDEBAR CONTAINER
+========================================================= */
 
 .site-sidebar {
     position: fixed;
 
     top:
         var(
-            --sidebar-vertical-gap
+            --app-top-offset
         );
 
     bottom:
         var(
-            --sidebar-vertical-gap
+            --app-bottom-gap
         );
 
     left:
@@ -136,11 +119,8 @@
             --sidebar-width
         );
 
-    /*
-    Height now consumes all available viewport space between
-    the top and bottom gaps.
-    */
     height: auto;
+
     min-height: 0;
     max-height: none;
 
@@ -148,16 +128,8 @@
 
     border: 0;
 
-    background:
-        transparent;
-
-    box-shadow:
-        none;
-
-    /*
-    No translateY because positioning is now based on
-    top + bottom rather than a fixed height.
-    */
+    background: transparent;
+    box-shadow: none;
     transform: none;
 
     transition:
@@ -165,6 +137,10 @@
         min-width 0.33s ease,
         max-width 0.33s ease;
 }
+
+/* =========================================================
+COLLAPSED WIDTH
+========================================================= */
 
 body.sidebar-collapsed
 .site-sidebar {
@@ -190,15 +166,15 @@ body.sidebar-collapsed
     content: none;
 }
 
-
 /* =========================================================
-   TOGGLE BOX
-   ========================================================= */
+ATTACHED TOGGLE HEADER
+========================================================= */
 
 .sidebar-toggle-box {
     position: absolute;
 
     top: 0;
+    right: 0;
     left: 0;
 
     z-index: 110;
@@ -206,28 +182,48 @@ body.sidebar-collapsed
     display: flex;
 
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
 
-    width:
-        var(
-            --sidebar-collapsed-width
-        );
+    width: 100%;
 
     height:
         var(
-            --sidebar-collapsed-width
+            --sidebar-toggle-height
+        );
+
+    padding-left:
+        calc(
+            (
+                var(
+                    --sidebar-collapsed-width
+                )
+                -
+                var(
+                    --sidebar-toggle-button-size
+                )
+            )
+            / 2
         );
 
     border:
         2px solid
         #303541;
 
+    border-bottom: 0;
+
     border-radius:
         clamp(
-            11px,
-            1vw,
-            14px
-        );
+            14px,
+            1.3vw,
+            18px
+        )
+        clamp(
+            14px,
+            1.3vw,
+            18px
+        )
+        0
+        0;
 
     background:
         linear-gradient(
@@ -249,9 +245,54 @@ body.sidebar-collapsed
                 139,
                 92,
                 246,
-                0.1
+                0.12
+            );
+
+    overflow: hidden;
+
+    transition:
+        width 0.33s ease,
+        background 0.33s ease,
+        border-color 0.33s ease,
+        box-shadow 0.33s ease;
+}
+
+/* =========================================================
+TOGGLE HEADER EXPANDED VISUAL
+========================================================= */
+
+body:not(.sidebar-collapsed)
+.sidebar-toggle-box {
+    background:
+        linear-gradient(
+            180deg,
+            #11143d,
+            #00028f
+        );
+
+    border-color:
+        #3d4350;
+
+    box-shadow:
+        0 8px 24px
+            rgba(
+                0,
+                0,
+                0,
+                0.5
+            ),
+        0 0 18px
+            rgba(
+                139,
+                92,
+                246,
+                0.2
             );
 }
+
+/* =========================================================
+TOGGLE BUTTON
+========================================================= */
 
 .sidebar-toggle {
     position: relative;
@@ -263,20 +304,16 @@ body.sidebar-collapsed
     align-items: center;
     justify-content: center;
 
-    gap: 3px;
+    gap: 4px;
 
     width:
-        clamp(
-            28px,
-            2.1vw,
-            34px
+        var(
+            --sidebar-toggle-button-size
         );
 
     height:
-        clamp(
-            28px,
-            2.1vw,
-            34px
+        var(
+            --sidebar-toggle-button-size
         );
 
     padding: 0;
@@ -287,10 +324,14 @@ body.sidebar-collapsed
         2px solid
         #353b48;
 
-    border-radius: 8px;
+    border-radius: 9px;
 
     background:
-        #1b1e25;
+        linear-gradient(
+            180deg,
+            #20242d,
+            #12151b
+        );
 
     box-shadow:
         0 6px 18px
@@ -308,41 +349,160 @@ body.sidebar-collapsed
                 0.18
             );
 
+    transform:
+        rotate(0deg)
+        scale(1);
+
     transition:
-        transform 0.2s ease,
-        border-color 0.2s ease,
-        background 0.2s ease,
-        box-shadow 0.2s ease;
+        transform 0.32s ease,
+        border-color 0.25s ease,
+        background 0.25s ease,
+        box-shadow 0.25s ease;
 }
+
+/* =========================================================
+TOGGLE ICON BARS
+========================================================= */
 
 .sidebar-toggle span {
     display: block;
 
     width:
         clamp(
-            13px,
-            1vw,
-            16px
+            14px,
+            1.1vw,
+            17px
         );
 
     height: 2px;
 
-    border-radius: 2px;
+    flex: 0 0 auto;
+
+    border-radius: 999px;
 
     background:
         #ffffff;
+
+    transform-origin:
+        center;
+
+    transition:
+        transform 0.3s ease,
+        opacity 0.2s ease,
+        width 0.3s ease;
 }
 
-.sidebar-toggle:hover {
-    transform:
-        translateY(-2px)
-        scale(1.04);
+/* =========================================================
+COLLAPSED ICON
+Hamburger
+========================================================= */
 
+body.sidebar-collapsed
+.sidebar-toggle
+span:nth-child(1) {
+    transform:
+        translateY(0)
+        rotate(0deg);
+}
+
+body.sidebar-collapsed
+.sidebar-toggle
+span:nth-child(2) {
+    opacity: 1;
+
+    transform:
+        scaleX(1);
+}
+
+body.sidebar-collapsed
+.sidebar-toggle
+span:nth-child(3) {
+    transform:
+        translateY(0)
+        rotate(0deg);
+}
+
+/* =========================================================
+EXPANDED ICON
+Hamburger → X
+========================================================= */
+
+body:not(.sidebar-collapsed)
+.sidebar-toggle {
+    transform:
+        rotate(180deg);
+}
+
+body:not(.sidebar-collapsed)
+.sidebar-toggle
+span:nth-child(1) {
+    transform:
+        translateY(6px)
+        rotate(45deg);
+}
+
+body:not(.sidebar-collapsed)
+.sidebar-toggle
+span:nth-child(2) {
+    opacity: 0;
+
+    transform:
+        scaleX(0);
+}
+
+body:not(.sidebar-collapsed)
+.sidebar-toggle
+span:nth-child(3) {
+    transform:
+        translateY(-6px)
+        rotate(-45deg);
+}
+
+/* =========================================================
+TOGGLE BUTTON EXPANDED VISUAL
+========================================================= */
+
+body:not(.sidebar-collapsed)
+.sidebar-toggle {
     border-color:
         #8b5cf6;
 
     background:
-        #211936;
+        linear-gradient(
+            180deg,
+            #2b1c48,
+            #171026
+        );
+
+    box-shadow:
+        0 7px 20px
+            rgba(
+                0,
+                0,
+                0,
+                0.5
+            ),
+        0 0 16px
+            rgba(
+                139,
+                92,
+                246,
+                0.55
+            );
+}
+
+/* =========================================================
+TOGGLE HOVER
+========================================================= */
+
+body.sidebar-collapsed
+.sidebar-toggle:hover {
+    transform:
+        translateY(-2px)
+        scale(1.05);
+
+    border-color:
+        #8b5cf6;
 
     box-shadow:
         0 8px 22px
@@ -352,37 +512,56 @@ body.sidebar-collapsed
                 0,
                 0.5
             ),
-        0 0 14px
+        0 0 16px
             rgba(
                 139,
                 92,
                 246,
-                0.65
+                0.7
+            );
+}
+
+body:not(.sidebar-collapsed)
+.sidebar-toggle:hover {
+    transform:
+        rotate(180deg)
+        translateY(2px)
+        scale(1.05);
+
+    border-color:
+        #a78bfa;
+
+    box-shadow:
+        0 8px 22px
+            rgba(
+                0,
+                0,
+                0,
+                0.5
+            ),
+        0 0 18px
+            rgba(
+                139,
+                92,
+                246,
+                0.8
             );
 }
 
 .sidebar-toggle:active {
-    transform:
-        scale(0.98);
+    scale: 0.96;
 }
 
-
 /* =========================================================
-   NAVIGATION BODY
-   ========================================================= */
+NAVIGATION BODY
+========================================================= */
 
 .sidebar-navigation {
     position: absolute;
 
     top:
-        calc(
-            var(
-                --sidebar-collapsed-width
-            )
-            +
-            var(
-                --sidebar-toggle-gap
-            )
+        var(
+            --sidebar-toggle-height
         );
 
     right: 0;
@@ -424,7 +603,16 @@ body.sidebar-collapsed
         2px solid
         #303541;
 
+    border-top: 0;
+
     border-radius:
+        0
+        0
+        clamp(
+            14px,
+            1.3vw,
+            18px
+        )
         clamp(
             14px,
             1.3vw,
@@ -449,7 +637,31 @@ body.sidebar-collapsed
             0.45
         )
         transparent;
+
+    transition:
+        border-color 0.33s ease,
+        background 0.33s ease,
+        box-shadow 0.33s ease;
 }
+
+body:not(.sidebar-collapsed)
+.sidebar-navigation {
+    border-color:
+        #3d4350;
+
+    box-shadow:
+        0 10px 28px
+            rgba(
+                0,
+                0,
+                0,
+                0.32
+            );
+}
+
+/* =========================================================
+SCROLLBAR
+========================================================= */
 
 .sidebar-navigation::-webkit-scrollbar {
     width: 5px;
@@ -473,18 +685,58 @@ body.sidebar-collapsed
         );
 }
 
+/* =========================================================
+NAVIGATION GROUPS
+========================================================= */
+
+.sidebar-navigation-top,
+.sidebar-navigation-bottom {
+    display: flex;
+
+    flex:
+        0 0 auto;
+
+    flex-direction: column;
+
+    width: 100%;
+
+    min-width: 0;
+
+    gap: 2px;
+}
+
+.sidebar-navigation-bottom {
+    margin-top: auto;
+
+    padding-top: 8px;
+
+    border-top:
+        1px solid
+        rgba(
+            255,
+            255,
+            255,
+            0.08
+        );
+}
 
 /* =========================================================
-   NAVIGATION ITEMS
-   ========================================================= */
+NAVIGATION ITEM
+========================================================= */
 
 .site-sidebar .nav-item {
     display: flex;
-    flex: 0 0 var(--sidebar-row-height);
+
+    flex:
+        0 0
+        var(
+            --sidebar-row-height
+        );
 
     align-items: center;
 
     width: 100%;
+
     min-width: 0;
 
     height:
@@ -507,24 +759,37 @@ body.sidebar-collapsed
     overflow: hidden;
 
     border: 0;
+
     border-radius: 8px;
 
-    background: transparent;
+    background:
+        transparent;
 
-    color: #aeb5c3;
+    color:
+        #aeb5c3;
 
-    font: inherit;
-    text-align: left;
-    text-decoration: none;
+    font:
+        inherit;
 
-    appearance: none;
+    text-align:
+        left;
 
-    cursor: pointer;
-    white-space: nowrap;
+    text-decoration:
+        none;
+
+    appearance:
+        none;
+
+    cursor:
+        pointer;
+
+    white-space:
+        nowrap;
 
     transition:
         color 0.2s ease,
-        background 0.2s ease;
+        background 0.2s ease,
+        transform 0.2s ease;
 }
 
 .site-sidebar .nav-item:hover,
@@ -538,6 +803,11 @@ body.sidebar-collapsed
         #24202f;
 }
 
+.site-sidebar .nav-item:hover {
+    transform:
+        translateX(2px);
+}
+
 .site-sidebar .nav-item:focus-visible {
     outline:
         2px solid
@@ -547,10 +817,9 @@ body.sidebar-collapsed
         -2px;
 }
 
-
 /* =========================================================
-   NAVIGATION ICON
-   ========================================================= */
+NAVIGATION ICON
+========================================================= */
 
 .site-sidebar .nav-icon {
     display: grid;
@@ -578,51 +847,95 @@ body.sidebar-collapsed
         var(
             --sidebar-row-height
         );
+
+    transition:
+        transform 0.25s ease;
 }
 
+body:not(.sidebar-collapsed)
+.site-sidebar
+.nav-item:hover
+.nav-icon {
+    transform:
+        scale(1.08);
+}
 
 /* =========================================================
-   NAVIGATION LABEL
-   ========================================================= */
+NAVIGATION LABEL
+========================================================= */
 
 .site-sidebar .nav-label {
     display: flex;
-    flex: 1 1 auto;
+
+    flex:
+        1 1 auto;
 
     min-width: 0;
-    max-width: none;
 
-    padding-right: 10px;
+    max-width:
+        calc(
+            var(
+                --sidebar-width
+            )
+            -
+            var(
+                --sidebar-icon-width
+            )
+        );
 
-    overflow: hidden;
+    padding-right:
+        10px;
 
-    white-space: normal;
-    overflow-wrap: break-word;
+    overflow:
+        hidden;
 
-    line-height: 1.2;
+    white-space:
+        normal;
 
-    opacity: 1;
+    overflow-wrap:
+        break-word;
+
+    line-height:
+        1.2;
+
+    opacity:
+        1;
+
+    transform:
+        translateX(0);
 
     transition:
-        opacity 0.18s ease;
+        opacity 0.22s ease,
+        transform 0.28s ease,
+        max-width 0.33s ease;
 }
+
+/* =========================================================
+COLLAPSED LABEL
+========================================================= */
 
 body.sidebar-collapsed
 .site-sidebar
 .nav-label {
-    max-width: 0;
-    opacity: 0;
+    max-width:
+        0;
+
+    padding-right:
+        0;
+
+    opacity:
+        0;
+
+    transform:
+        translateX(-10px);
+
+    pointer-events:
+        none;
 }
 
-
 /* =========================================================
-   VERY SMALL VIEWPORTS
-
-   Expansion remains available.
-
-   An expanded sidebar is deliberately allowed to consume
-   substantial screen width on mobile.
-   ========================================================= */
+VERY SMALL VIEWPORTS
+========================================================= */
 
 @media (max-width: 700px) {
     :root {
@@ -643,24 +956,21 @@ body.sidebar-collapsed
         --sidebar-edge-gap:
             4px;
 
-        --sidebar-vertical-gap:
-            8px;
+        --sidebar-toggle-button-size:
+            clamp(
+                28px,
+                8vw,
+                34px
+            );
     }
 }
 
-
 /* =========================================================
-   SHORT VIEWPORTS
-
-   Keep full vertical usage and allow navigation body to
-   scroll internally.
-   ========================================================= */
+SHORT VIEWPORTS
+========================================================= */
 
 @media (max-height: 600px) {
     :root {
-        --sidebar-vertical-gap:
-            5px;
-
         --sidebar-collapsed-width:
             clamp(
                 56px,
@@ -675,15 +985,20 @@ body.sidebar-collapsed
     }
 }
 
-
 /* =========================================================
-   ACCESSIBILITY
-   ========================================================= */
+ACCESSIBILITY
+========================================================= */
 
 @media (prefers-reduced-motion: reduce) {
     .site-sidebar,
-    .site-sidebar .nav-label,
-    .sidebar-toggle {
-        transition: none;
+    .sidebar-toggle-box,
+    .sidebar-toggle,
+    .sidebar-toggle span,
+    .sidebar-navigation,
+    .site-sidebar .nav-item,
+    .site-sidebar .nav-icon,
+    .site-sidebar .nav-label {
+        transition:
+            none;
     }
 }

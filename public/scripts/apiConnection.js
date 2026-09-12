@@ -361,13 +361,21 @@ export async function apiFetch(
          * Do not lock for normal application-level 4xx
          * responses.
          */
-        if (
-            response.status === 502
-            || response.status === 503
-            || response.status === 504
-        ) {
-            lockApiConnection();
-        }
+    if (
+        [
+            502,
+            503,
+            504,
+            521,
+            522,
+            523,
+            524
+        ].includes(
+            response.status
+        )
+    ) {
+        lockApiConnection();
+    }
 
         return response;
     }

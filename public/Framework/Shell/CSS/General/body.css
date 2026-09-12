@@ -1,4 +1,30 @@
-/* BPD GAMING NETWORK - GLOBAL BODY */
+/* =========================================================
+BPD GAMING NETWORK
+GLOBAL BODY / CONTENT LAYOUT
+
+Purpose:
+    Controls the primary page content layout and reserves
+    space for the persistent account banner and sidebar.
+
+Layout Contract:
+    Account Banner
+        ↓
+    Shared top gap
+        ↓
+    Sidebar + Site Content
+        ↓
+    Shared bottom gap
+
+Important:
+    The sidebar should use the same:
+        --app-top-offset
+        --app-bottom-gap
+        --app-content-height
+========================================================= */
+
+/* =========================================================
+GLOBAL BOX MODEL
+========================================================= */
 
 *,
 *::before,
@@ -7,26 +33,106 @@
 }
 
 /* =========================================================
-   SITE CONTENT
-   ========================================================= */
+GLOBAL LAYOUT VARIABLES
+========================================================= */
+
+:root {
+    /* -----------------------------------------------------
+    ACCOUNT BANNER
+    ----------------------------------------------------- */
+
+    --account-banner-height:
+        clamp(
+            42px,
+            5vh,
+            56px
+        );
+
+    --account-banner-gap:
+        clamp(
+            6px,
+            1vh,
+            12px
+        );
+
+    /* -----------------------------------------------------
+    APPLICATION VERTICAL SPACING
+    ----------------------------------------------------- */
+
+    --app-bottom-gap:
+        clamp(
+            10px,
+            1.5vh,
+            20px
+        );
+
+    --app-top-offset:
+        calc(
+            var(
+                --account-banner-height
+            )
+            +
+            var(
+                --account-banner-gap
+            )
+        );
+
+    /*
+     * Remaining viewport height below the banner.
+     *
+     * Both site-content and site-sidebar should consume
+     * this same vertical area.
+     */
+    --app-content-height:
+        calc(
+            100dvh
+            -
+            var(
+                --app-top-offset
+            )
+            -
+            var(
+                --app-bottom-gap
+            )
+        );
+}
+
+/* =========================================================
+SITE CONTENT
+========================================================= */
 
 .site-content {
     display: block;
-    flex: 1 1 auto;
+
+    flex:
+        1 1 auto;
 
     width: 100%;
     max-width: 100%;
 
     min-width: 0;
-    min-height: 60vh;
+
+    /*
+     * Match the usable vertical space available to the
+     * sidebar.
+     */
+    min-height:
+        var(
+            --app-content-height
+        );
 
     padding:
         0
         0
         0
         calc(
-            var(--sidebar-width)
-            + var(--sidebar-content-gap)
+            var(
+                --sidebar-width
+            )
+            +
+            var(
+                --sidebar-content-gap
+            )
         );
 
     overflow-x: hidden;
@@ -38,24 +144,27 @@
         padding-left 0.25s ease;
 }
 
-
 /* =========================================================
-   COLLAPSED SIDEBAR
-   ========================================================= */
+COLLAPSED SIDEBAR
+========================================================= */
 
 body.sidebar-collapsed
 .site-content {
     padding-left:
         calc(
-            var(--sidebar-collapsed-width)
-            + var(--sidebar-content-gap)
+            var(
+                --sidebar-collapsed-width
+            )
+            +
+            var(
+                --sidebar-content-gap
+            )
         );
 }
 
-
 /* =========================================================
-   PAGE CONTENT
-   ========================================================= */
+PAGE CONTENT
+========================================================= */
 
 .site-content > section,
 .site-content > main,
@@ -66,25 +175,36 @@ body.sidebar-collapsed
     max-width: 100%;
 
     min-width: 0;
-    min-height: 60vh;
+
+    min-height:
+        var(
+            --app-content-height
+        );
 
     margin: 0;
 }
 
+/* =========================================================
+HEADER HIDDEN
+========================================================= */
+
+/*
+ * The content height already derives from the viewport and
+ * account-banner offset, so hiding the route header does not
+ * require an unrelated 60px subtraction.
+ */
 
 body[data-header="hidden"]
 .site-content {
     min-height:
-        calc(
-            100dvh
-            - 60px
+        var(
+            --app-content-height
         );
 }
 
-
 /* =========================================================
-   ROUTE LOAD ERROR
-   ========================================================= */
+ROUTE LOAD ERROR
+========================================================= */
 
 .route-load-error {
     display: flex;
@@ -97,7 +217,11 @@ body[data-header="hidden"]
     gap: 12px;
 
     width: 100%;
-    min-height: 60vh;
+
+    min-height:
+        var(
+            --app-content-height
+        );
 
     padding: 24px;
 
@@ -133,31 +257,48 @@ body[data-header="hidden"]
     text-decoration: none;
 }
 
-
 /* =========================================================
-   VERY SMALL VIEWPORTS
+VERY SMALL VIEWPORTS
 
-   Do NOT force collapsed content spacing here.
+Sidebar state remains controlled by:
+    body.sidebar-collapsed
 
-   Sidebar state remains controlled by:
-       body.sidebar-collapsed
-
-   If the user expands the sidebar on mobile,
-   site-content respects the expanded width.
-   ========================================================= */
+If the user expands the sidebar on mobile, site-content
+continues to respect the expanded width.
+========================================================= */
 
 @media (max-width: 700px) {
+    :root {
+        --account-banner-gap:
+            6px;
+
+        --app-bottom-gap:
+            8px;
+    }
+
     .site-content {
         transition:
-            padding-left
-            0.22s ease;
+            padding-left 0.22s ease;
     }
 }
 
+/* =========================================================
+SHORT VIEWPORTS
+========================================================= */
+
+@media (max-height: 600px) {
+    :root {
+        --account-banner-gap:
+            4px;
+
+        --app-bottom-gap:
+            5px;
+    }
+}
 
 /* =========================================================
-   REDUCED MOTION
-   ========================================================= */
+REDUCED MOTION
+========================================================= */
 
 @media (prefers-reduced-motion: reduce) {
     .site-content {
