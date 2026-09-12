@@ -1,43 +1,93 @@
-/* BPD GAMING NETWORK - GLOBAL FOOTER */
+/* =========================================================
+BPD GAMING NETWORK
+GLOBAL FOOTER
+
+Purpose:
+    Provides the persistent global footer layout and styling.
+
+Description:
+    - Respects expanded and collapsed sidebar widths.
+    - Centers footer content within the remaining page area.
+    - Uses bordered navigation buttons.
+    - Adds a purple glow effect on hover and keyboard focus.
+    - Preserves responsive behavior on smaller screens.
+========================================================= */
+
+/* =========================================================
+FOOTER SHELL
+========================================================= */
+
 .site-footer {
     position: relative;
+
     z-index: 1;
+
     flex: none;
+
     width: 100%;
     max-width: 100%;
     min-width: 0;
+
     padding:
         14px
         24px
         14px
         calc(
-            var(--sidebar-width)
-            + 18px
+            var(
+                --sidebar-width
+            )
+            +
+            var(
+                --sidebar-content-gap
+            )
         );
-    border-top: 1px solid #252934;
-    background: rgba(17, 19, 24, 0.96);
-    color: #9299a8;
+
+    border-top:
+        1px solid
+        #252934;
+
+    background:
+        rgba(
+            17,
+            19,
+            24,
+            0.96
+        );
+
+    color:
+        #9299a8;
+
     transition:
         padding-left 0.25s ease;
 }
 
-body.sidebar-collapsed .site-footer {
+/* =========================================================
+COLLAPSED SIDEBAR
+========================================================= */
+
+body.sidebar-collapsed
+.site-footer {
     padding-left:
         calc(
-            var(--sidebar-collapsed-width)
-            + 18px
+            var(
+                --sidebar-collapsed-width
+            )
+            +
+            var(
+                --sidebar-content-gap
+            )
         );
 }
-.footer-brand-name {
-    color: #d7dbe4;
-    font-weight: 700;
-}
-.footer-copyright {
-    color: #707787;
-}
+
+/* =========================================================
+FOOTER CONTENT
+========================================================= */
+
 .site-footer-content {
     display: flex;
+
     flex-direction: column;
+
     align-items: center;
 
     gap: 8px;
@@ -55,6 +105,10 @@ body.sidebar-collapsed .site-footer {
     text-align: center;
 }
 
+/* =========================================================
+PRIMARY ROW
+========================================================= */
+
 .footer-primary-row {
     display: flex;
 
@@ -69,6 +123,10 @@ body.sidebar-collapsed .site-footer {
     min-width: 0;
 }
 
+/* =========================================================
+BRAND
+========================================================= */
+
 .footer-brand {
     display: flex;
 
@@ -79,9 +137,29 @@ body.sidebar-collapsed .site-footer {
 
     margin: 0;
 
-    font-size: 0.78rem;
-    letter-spacing: 0.05em;
+    font-size:
+        0.78rem;
+
+    letter-spacing:
+        0.05em;
 }
+
+.footer-brand-name {
+    color:
+        #d7dbe4;
+
+    font-weight:
+        700;
+}
+
+.footer-copyright {
+    color:
+        #707787;
+}
+
+/* =========================================================
+FOOTER NAVIGATION
+========================================================= */
 
 .footer-navigation {
     display: flex;
@@ -94,55 +172,195 @@ body.sidebar-collapsed .site-footer {
     gap: 10px;
 }
 
+/* =========================================================
+FOOTER NAVIGATION BUTTONS
+========================================================= */
+
+.footer-navigation a {
+    position: relative;
+
+    display: inline-flex;
+
+    align-items: center;
+    justify-content: center;
+
+    min-height: 34px;
+
+    padding:
+        7px
+        12px;
+
+    border:
+        1px solid
+        rgba(
+            139,
+            92,
+            246,
+            0.28
+        );
+
+    border-radius:
+        8px;
+
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            0.02
+        );
+
+    color:
+        #aeb5c3;
+
+    font-size:
+        0.78rem;
+
+    font-weight:
+        600;
+
+    text-decoration:
+        none;
+
+    box-shadow:
+        inset 0 0 0 1px
+        rgba(
+            255,
+            255,
+            255,
+            0.02
+        );
+
+    transition:
+        color 0.2s ease,
+        border-color 0.2s ease,
+        background 0.2s ease,
+        box-shadow 0.25s ease,
+        transform 0.2s ease;
+}
+
+/* =========================================================
+BUTTON HOVER / FOCUS
+========================================================= */
+
+.footer-navigation a:hover,
+.footer-navigation a:focus-visible {
+    color:
+        #ffffff;
+
+    border-color:
+        #8b5cf6;
+
+    background:
+        rgba(
+            139,
+            92,
+            246,
+            0.10
+        );
+
+    box-shadow:
+        0 0 8px
+            rgba(
+                139,
+                92,
+                246,
+                0.45
+            ),
+        0 0 18px
+            rgba(
+                139,
+                92,
+                246,
+                0.22
+            ),
+        inset 0 0 8px
+            rgba(
+                139,
+                92,
+                246,
+                0.08
+            );
+
+    transform:
+        translateY(
+            -1px
+        );
+}
+
+/* =========================================================
+KEYBOARD FOCUS
+========================================================= */
+
+.footer-navigation a:focus-visible {
+    outline:
+        2px solid
+        rgba(
+            167,
+            139,
+            250,
+            0.85
+        );
+
+    outline-offset:
+        3px;
+}
+
+/* =========================================================
+ACTIVE PRESS
+========================================================= */
+
+.footer-navigation a:active {
+    transform:
+        translateY(
+            0
+        )
+        scale(
+            0.98
+        );
+}
+
+/* =========================================================
+DIVIDERS
+========================================================= */
+
+.footer-divider {
+    color:
+        #4e5563;
+
+    font-size:
+        0.8rem;
+
+    user-select:
+        none;
+}
+
+/* =========================================================
+DISCLAIMER
+========================================================= */
+
 .footer-disclaimer {
     width: 100%;
     max-width: 100%;
 
     margin: 0;
 
-    font-size: 0.7rem;
-    line-height: 1.4;
+    color:
+        #9299a8;
 
-    text-align: center;
-}
+    font-size:
+        0.7rem;
 
+    line-height:
+        1.4;
 
-.footer-navigation a:hover,
-.footer-navigation a:focus-visible {
-    color: #ffffff;
-    text-decoration-color: #8b5cf6;
-}
-
-.footer-divider {
-    color: #4e5563;
-    font-size: 0.8rem;
-    user-select: none;
-}
-.footer-navigation a::after {
-    position: relative;
-    right: 0;
-    bottom: 0;
-    left: 0;
-    height: 1px;
-    background: #8b5cf6;
-    content: "";
-    opacity: 0;
-    transform: scaleX(0);
-    transition: opacity 0.2s ease, transform 0.2s ease;
-}
-.footer-navigation a:focus-visible {
-    border-radius: 3px;
-    outline: 2px solid #8b5cf6;
-    outline-offset: 4px;
-}
-.footer-disclaimer {
-    width: 100%;
-    margin: 0;
-    font-size: 0.7rem;
-    line-height: 1.4;
-    text-align: center;
+    text-align:
+        center;
 }
 
+/* =========================================================
+VERY SMALL VIEWPORTS
+========================================================= */
 
 @media (max-width: 700px) {
     .site-footer {
@@ -151,8 +369,13 @@ body.sidebar-collapsed .site-footer {
             16px
             14px
             calc(
-                var(--sidebar-width)
-                + var(--sidebar-content-gap)
+                var(
+                    --sidebar-width
+                )
+                +
+                var(
+                    --sidebar-content-gap
+                )
             );
     }
 
@@ -160,21 +383,53 @@ body.sidebar-collapsed .site-footer {
     .site-footer {
         padding-left:
             calc(
-                var(--sidebar-collapsed-width)
-                + var(--sidebar-content-gap)
+                var(
+                    --sidebar-collapsed-width
+                )
+                +
+                var(
+                    --sidebar-content-gap
+                )
             );
     }
 
     .footer-primary-row {
         flex-direction: column;
+
         justify-content: center;
+
         gap: 10px;
+
         text-align: center;
     }
 
     .footer-navigation {
-        flex-wrap: wrap;
         justify-content: center;
-        gap: 14px;
+
+        flex-wrap: wrap;
+
+        gap: 10px;
+    }
+
+    .footer-navigation a {
+        min-height: 32px;
+
+        padding:
+            6px
+            10px;
+
+        font-size:
+            0.75rem;
+    }
+}
+
+/* =========================================================
+REDUCED MOTION
+========================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+    .site-footer,
+    .footer-navigation a {
+        transition: none;
     }
 }

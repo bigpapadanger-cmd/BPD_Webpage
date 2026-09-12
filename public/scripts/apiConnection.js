@@ -153,6 +153,21 @@ async function checkApiConnection() {
 
         unlockApiConnection();
 
+        document.dispatchEvent(
+            new CustomEvent(
+                "bpd:network-status",
+                {
+                    detail: {
+                        online:
+                            true,
+
+                        apiReady:
+                            true
+                    }
+                }
+            )
+        );
+
         return true;
     }
     finally {

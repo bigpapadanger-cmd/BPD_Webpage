@@ -11,8 +11,10 @@ Purpose:
     Starts an explicit provider-linking flow for an already
     authenticated global BPD account.
 
-Current supported provider:
+Supported Providers:
     - Google
+    - Discord
+    - Epic Games
 
 Flow:
     Authenticated BPD session
@@ -27,18 +29,29 @@ Flow:
         ↓
     Store temporary OAuth context in HttpOnly cookies
         ↓
-    Redirect to Supabase Auth / Google
+    Redirect into provider OAuth
         ↓
-    Supabase returns to /api/auth/_oauth/callback
+    Provider returns to /api/auth/_oauth/callback
         ↓
-    Callback uses api.link_google_identity instead of
-    api.resolve_google_identity
+    Callback links the authenticated provider identity to
+    the existing identity.accounts.id
 
 Important:
     - This service NEVER creates identity.accounts.
     - The current BPD session determines the target account.
+    - The browser never supplies identity.accounts.id.
     - Email is never used to determine account ownership.
     - OAuth verifier/state values must never be logged.
+    - Provider identity ownership is finalized only after
+      successful provider authentication in the callback.
+
+Compatibility:
+    - Google and Discord are intended to use Supabase Auth.
+    - Epic compatibility is enabled through the same provider
+      dispatch path for initial integration testing.
+    - If Epic requires the existing direct Epic OAuth flow,
+      only the Epic starter will need to be replaced later;
+      the account-linking contract can remain unchanged.
 ========================================================= */
 
 import {
@@ -81,10 +94,56 @@ const PKCE_COOKIE =
 const OAUTH_COOKIE_MAX_AGE_SECONDS =
     600;
 
+/* =========================================================
+SUPPORTED PROVIDERS
+========================================================= */
+
 const SUPPORTED_LINK_PROVIDERS =
     new Set([
-        "google"
+        "google",
+        "discord",
+        "epic"
     ]);
+
+/* =========================================================
+PROVIDER CONFIGURATION
+========================================================= */
+
+const PROVIDER_CONFIG =
+    Object.freeze({
+        google: {
+            provider:
+                "google",
+
+            label:
+                "Google",
+
+            authEngine:
+                "supabase"
+        },
+
+        discord: {
+            provider:
+                "discord",
+
+            label:
+                "Discord",
+
+            authEngine:
+                "supabase"
+        },
+
+        epic: {
+            provider:
+                "epic",
+
+            label:
+                "Epic Games",
+
+            authEngine:
+                "supabase"
+        }
+    });
 
 /* =========================================================
 NORMALIZATION
@@ -94,7 +153,8 @@ function normalizeString(
     value
 ) {
     if (
-        typeof value !== "string"
+        typeof value !==
+        "string"
     ) {
         return "";
     }
@@ -178,7 +238,7 @@ async function createPkceChallenge(
 }
 
 /* =========================================================
-CONFIGURATION
+OAUTH CONFIGURATION
 ========================================================= */
 
 function getOAuthConfiguration() {
@@ -219,7 +279,7 @@ function getOAuthConfiguration() {
 }
 
 /* =========================================================
-PROVIDER
+REQUESTED PROVIDER
 ========================================================= */
 
 function getProvider(
@@ -239,12 +299,99 @@ function getProvider(
 }
 
 /* =========================================================
-GOOGLE LINK FLOW
+PROVIDER CONFIG
 ========================================================= */
 
-async function startGoogleLink(
+function getProviderConfig(
+    provider
+) {
+    const normalizedProvider =
+        normalizeString(
+            provider
+        )
+            .toLowerCase();
+
+    if (
+        !normalizedProvider
+    ) {
+        return null;
+    }
+
+    return (
+        PROVIDER_CONFIG[
+            normalizedProvider
+        ]
+        || null
+    );
+}
+
+/* =========================================================
+CREATE OAUTH CONTEXT COOKIES
+========================================================= */
+
+function createOAuthContextCookies(
     request,
-    accountId
+    provider,
+    accountId,
+    verifier
+) {
+    const pkceCookie =
+        createCookie(
+            request,
+            PKCE_COOKIE,
+            verifier,
+            OAUTH_COOKIE_MAX_AGE_SECONDS
+        );
+
+    const providerCookie =
+        createCookie(
+            request,
+            OAUTH_PROVIDER_COOKIE,
+            provider,
+            OAUTH_COOKIE_MAX_AGE_SECONDS
+        );
+
+    const modeCookie =
+        createCookie(
+            request,
+            OAUTH_MODE_COOKIE,
+            OAUTH_MODE_LINK,
+            OAUTH_COOKIE_MAX_AGE_SECONDS
+        );
+
+    const accountCookie =
+        createCookie(
+            request,
+            OAUTH_ACCOUNT_COOKIE,
+            accountId,
+            OAUTH_COOKIE_MAX_AGE_SECONDS
+        );
+
+    if (
+        !pkceCookie
+        || !providerCookie
+        || !modeCookie
+        || !accountCookie
+    ) {
+        return null;
+    }
+
+    return [
+        pkceCookie,
+        providerCookie,
+        modeCookie,
+        accountCookie
+    ];
+}
+
+/* =========================================================
+SUPABASE PROVIDER LINK FLOW
+========================================================= */
+
+async function startSupabaseProviderLink(
+    request,
+    accountId,
+    provider
 ) {
     const configuration =
         getOAuthConfiguration();
@@ -254,6 +401,19 @@ async function startGoogleLink(
     ) {
         throw new Error(
             "OAuth configuration is invalid."
+        );
+    }
+
+    const providerConfig =
+        getProviderConfig(
+            provider
+        );
+
+    if (
+        !providerConfig
+    ) {
+        throw new Error(
+            "OAuth provider configuration was not found."
         );
     }
 
@@ -283,7 +443,7 @@ async function startGoogleLink(
 
     authorizeUrl.searchParams.set(
         "provider",
-        "google"
+        providerConfig.provider
     );
 
     authorizeUrl.searchParams.set(
@@ -301,43 +461,16 @@ async function startGoogleLink(
         "s256"
     );
 
-    const pkceCookie =
-        createCookie(
+    const cookies =
+        createOAuthContextCookies(
             request,
-            PKCE_COOKIE,
-            verifier,
-            OAUTH_COOKIE_MAX_AGE_SECONDS
-        );
-
-    const providerCookie =
-        createCookie(
-            request,
-            OAUTH_PROVIDER_COOKIE,
-            "google",
-            OAUTH_COOKIE_MAX_AGE_SECONDS
-        );
-
-    const modeCookie =
-        createCookie(
-            request,
-            OAUTH_MODE_COOKIE,
-            OAUTH_MODE_LINK,
-            OAUTH_COOKIE_MAX_AGE_SECONDS
-        );
-
-    const accountCookie =
-        createCookie(
-            request,
-            OAUTH_ACCOUNT_COOKIE,
+            providerConfig.provider,
             accountId,
-            OAUTH_COOKIE_MAX_AGE_SECONDS
+            verifier
         );
 
     if (
-        !pkceCookie
-        || !providerCookie
-        || !modeCookie
-        || !accountCookie
+        !cookies
     ) {
         throw new Error(
             "OAuth link cookies could not be created."
@@ -346,12 +479,45 @@ async function startGoogleLink(
 
     return redirect(
         authorizeUrl.toString(),
-        [
-            pkceCookie,
-            providerCookie,
-            modeCookie,
-            accountCookie
-        ]
+        cookies
+    );
+}
+
+/* =========================================================
+START PROVIDER LINK
+========================================================= */
+
+async function startProviderLink(
+    request,
+    accountId,
+    provider
+) {
+    const providerConfig =
+        getProviderConfig(
+            provider
+        );
+
+    if (
+        !providerConfig
+    ) {
+        throw new Error(
+            "Provider configuration was not found."
+        );
+    }
+
+    if (
+        providerConfig.authEngine ===
+        "supabase"
+    ) {
+        return startSupabaseProviderLink(
+            request,
+            accountId,
+            provider
+        );
+    }
+
+    throw new Error(
+        "Provider authentication engine is not supported."
     );
 }
 
@@ -367,6 +533,10 @@ export async function handleLinkProvider(
         crypto.randomUUID();
 
     try {
+        /* -------------------------------------------------
+        AUTHENTICATED BPD SESSION
+        ------------------------------------------------- */
+
         const session =
             await getSessionContext(
                 request,
@@ -374,7 +544,8 @@ export async function handleLinkProvider(
             );
 
         if (
-            session.authenticated !== true
+            session.authenticated !==
+            true
         ) {
             return json(
                 {
@@ -392,6 +563,10 @@ export async function handleLinkProvider(
                 401
             );
         }
+
+        /* -------------------------------------------------
+        CANONICAL ACCOUNT ID
+        ------------------------------------------------- */
 
         const accountId =
             normalizeString(
@@ -425,8 +600,13 @@ export async function handleLinkProvider(
             );
         }
 
+        /* -------------------------------------------------
+        ACCOUNT ACTIVE
+        ------------------------------------------------- */
+
         if (
-            session.active !== true
+            session.active !==
+            true
         ) {
             return json(
                 {
@@ -444,6 +624,10 @@ export async function handleLinkProvider(
                 403
             );
         }
+
+        /* -------------------------------------------------
+        PROVIDER
+        ------------------------------------------------- */
 
         const provider =
             getProvider(
@@ -473,6 +657,35 @@ export async function handleLinkProvider(
             );
         }
 
+        const providerConfig =
+            getProviderConfig(
+                provider
+            );
+
+        if (
+            !providerConfig
+        ) {
+            return json(
+                {
+                    success:
+                        false,
+
+                    code:
+                        "PROVIDER_CONFIG_MISSING",
+
+                    message:
+                        "The requested provider is not configured.",
+
+                    debugId
+                },
+                500
+            );
+        }
+
+        /* -------------------------------------------------
+        EXISTING PROVIDER LINK
+        ------------------------------------------------- */
+
         const existingProvider =
             session.providers
                 ?.[
@@ -481,7 +694,8 @@ export async function handleLinkProvider(
             || null;
 
         if (
-            existingProvider?.linked === true
+            existingProvider?.linked ===
+            true
         ) {
             return json(
                 {
@@ -492,13 +706,17 @@ export async function handleLinkProvider(
                         "PROVIDER_ALREADY_LINKED",
 
                     message:
-                        "This provider is already linked to your BPD account.",
+                        `${providerConfig.label} is already linked to your BPD account.`,
 
                     debugId
                 },
                 409
             );
         }
+
+        /* -------------------------------------------------
+        START LINK
+        ------------------------------------------------- */
 
         console.info(
             "LINK PROVIDER: Link flow started.",
@@ -507,34 +725,19 @@ export async function handleLinkProvider(
 
                 provider,
 
+                authEngine:
+                    providerConfig
+                        .authEngine,
+
                 hasAccountId:
                     true
             }
         );
 
-        if (
-            provider === "google"
-        ) {
-            return await startGoogleLink(
-                request,
-                accountId
-            );
-        }
-
-        return json(
-            {
-                success:
-                    false,
-
-                code:
-                    "UNSUPPORTED_PROVIDER",
-
-                message:
-                    "The requested account provider cannot be linked.",
-
-                debugId
-            },
-            400
+        return await startProviderLink(
+            request,
+            accountId,
+            provider
         );
     }
     catch (
@@ -563,6 +766,9 @@ export async function handleLinkProvider(
             {
                 success:
                     false,
+
+                code:
+                    "LINK_PROVIDER_FAILED",
 
                 message:
                     "Account provider linking could not be started.",

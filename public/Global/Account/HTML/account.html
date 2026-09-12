@@ -1,0 +1,446 @@
+<!-- =========================================================
+BPD GAMING NETWORK
+ACCOUNT PAGE
+
+File:
+    Account/HTML/account.html
+
+Purpose:
+    Provides the global BPD Gaming Network account interface.
+
+Description:
+    - Displays the user's BPD profile information.
+    - Allows the user to manage their BPD display name.
+    - Displays linked authentication providers.
+    - Provides connection-management controls for supported
+      authentication providers.
+    - Remains independent of game-specific profile data.
+========================================================= -->
+
+<section
+    class="account-page"
+    id="accountPage"
+>
+    <div class="account-page__container">
+
+        <!-- =================================================
+        PAGE HEADER
+        ================================================== -->
+
+        <header class="account-page__header">
+            <div class="account-page__header-content">
+                <p class="account-page__eyebrow">
+                    BPD Gaming Network
+                </p>
+
+                <h1 class="account-page__title">
+                    Account
+                </h1>
+
+                <p class="account-page__subtitle">
+                    Manage your profile and connected accounts.
+                </p>
+            </div>
+        </header>
+
+        <!-- =================================================
+        PAGE STATUS
+        ================================================== -->
+
+        <div
+            class="account-page__status"
+            id="accountPageStatus"
+            role="status"
+            aria-live="polite"
+            hidden
+        >
+        </div>
+
+        <!-- =================================================
+        PROFILE
+        ================================================== -->
+
+        <section
+            class="account-card"
+            aria-labelledby="accountProfileHeading"
+        >
+            <div class="account-card__header">
+                <div>
+                    <h2
+                        class="account-card__title"
+                        id="accountProfileHeading"
+                    >
+                        Profile
+                    </h2>
+
+                    <p class="account-card__description">
+                        This is your display identity across the
+                        BPD Gaming Network.
+                    </p>
+                </div>
+            </div>
+
+            <div class="account-card__body">
+                <form
+                    class="account-profile-form"
+                    id="accountProfileForm"
+                    autocomplete="off"
+                >
+                    <div class="account-field">
+                        <label
+                            class="account-field__label"
+                            for="accountDisplayName"
+                        >
+                            Display Name
+                        </label>
+
+                        <input
+                            class="account-field__input"
+                            id="accountDisplayName"
+                            name="displayName"
+                            type="text"
+                            minlength="3"
+                            maxlength="32"
+                            autocomplete="nickname"
+                            spellcheck="false"
+                            disabled
+                        >
+
+                        <p class="account-field__help">
+                            This name is shown throughout the
+                            BPD Gaming Network and is separate
+                            from your Epic, Google, Discord, or
+                            Steam username.
+                        </p>
+                    </div>
+
+                    <div class="account-profile-form__actions">
+                        <button
+                            class="account-button account-button--primary"
+                            id="accountSaveProfileButton"
+                            type="submit"
+                            disabled
+                        >
+                            Save Changes
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <!-- =================================================
+        CONNECTED ACCOUNTS
+        ================================================== -->
+
+        <section
+            class="account-card"
+            aria-labelledby="connectedAccountsHeading"
+        >
+            <div class="account-card__header">
+                <div>
+                    <h2
+                        class="account-card__title"
+                        id="connectedAccountsHeading"
+                    >
+                        Connected Accounts
+                    </h2>
+
+                    <p class="account-card__description">
+                        Providers connected to your BPD account
+                        can be used for authentication and
+                        provider-specific features.
+                    </p>
+                </div>
+            </div>
+
+            <div
+                class="account-providers"
+                id="accountProviders"
+            >
+
+                <!-- =========================================
+                GOOGLE
+                ========================================== -->
+
+                <article
+                    class="account-provider"
+                    data-provider="google"
+                >
+                    <div class="account-provider__identity">
+                        <div class="account-provider__icon-wrap">
+                            <img
+                                class="account-provider__icon"
+                                src="/Assets/images/framework_icons/google-symbol-white.png"
+                                alt=""
+                                data-provider-icon="google"
+                            >
+                        </div>
+
+                        <div class="account-provider__details">
+                            <h3 class="account-provider__name">
+                                Google
+                            </h3>
+
+                            <p
+                                class="account-provider__status"
+                                data-provider-status="google"
+                            >
+                                Checking connection...
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="account-provider__actions">
+                        <button
+                            class="account-button account-button--secondary"
+                            type="button"
+                            data-provider-action="google"
+                            disabled
+                        >
+                            Loading
+                        </button>
+                    </div>
+                </article>
+
+                <!-- =========================================
+                EPIC GAMES
+                ========================================== -->
+
+                <article
+                    class="account-provider"
+                    data-provider="epic"
+                >
+                    <div class="account-provider__identity">
+                        <div class="account-provider__icon-wrap">
+                            <img
+                                class="account-provider__icon"
+                                src="/Assets/images/framework_icons/epic-symbol-white.png"
+                                alt=""
+                                data-provider-icon="epic"
+                            >
+                        </div>
+
+                        <div class="account-provider__details">
+                            <h3 class="account-provider__name">
+                                Epic Games
+                            </h3>
+
+                            <p
+                                class="account-provider__status"
+                                data-provider-status="epic"
+                            >
+                                Checking connection...
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="account-provider__actions">
+                        <button
+                            class="account-button account-button--secondary"
+                            type="button"
+                            data-provider-action="epic"
+                            disabled
+                        >
+                            Loading
+                        </button>
+                    </div>
+                </article>
+
+                <!-- =========================================
+                DISCORD
+                ========================================== -->
+
+                <article
+                    class="account-provider"
+                    data-provider="discord"
+                >
+                    <div class="account-provider__identity">
+                        <div class="account-provider__icon-wrap">
+                            <img
+                                class="account-provider__icon"
+                                src="/Assets/images/framework_icons/discord-symbol-white.png"
+                                alt=""
+                                data-provider-icon="discord"
+                            >
+                        </div>
+
+                        <div class="account-provider__details">
+                            <h3 class="account-provider__name">
+                                Discord
+                            </h3>
+
+                            <p
+                                class="account-provider__status"
+                                data-provider-status="discord"
+                            >
+                                Checking connection...
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="account-provider__actions">
+                        <button
+                            class="account-button account-button--secondary"
+                            type="button"
+                            data-provider-action="discord"
+                            disabled
+                        >
+                            Loading
+                        </button>
+                    </div>
+                </article>
+
+                <!-- =========================================
+                STEAM
+                ========================================== -->
+
+                <article
+                    class="account-provider"
+                    data-provider="steam"
+                >
+                    <div class="account-provider__identity">
+                        <div class="account-provider__icon-wrap">
+                            <img
+                                class="account-provider__icon"
+                                src="/Assets/images/framework_icons/steam-symbol-white.png"
+                                alt=""
+                                data-provider-icon="steam"
+                            >
+                        </div>
+
+                        <div class="account-provider__details">
+                            <h3 class="account-provider__name">
+                                Steam
+                            </h3>
+
+                            <p
+                                class="account-provider__status"
+                                data-provider-status="steam"
+                            >
+                                Checking connection...
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="account-provider__actions">
+                        <button
+                            class="account-button account-button--secondary"
+                            type="button"
+                            data-provider-action="steam"
+                            disabled
+                        >
+                            Loading
+                        </button>
+                    </div>
+                </article>
+
+            </div>
+        </section>
+
+        <!-- =================================================
+        ACCOUNT INFORMATION
+        ================================================== -->
+
+        <section
+            class="account-card"
+            aria-labelledby="accountInformationHeading"
+        >
+            <div class="account-card__header">
+                <div>
+                    <h2
+                        class="account-card__title"
+                        id="accountInformationHeading"
+                    >
+                        Account Information
+                    </h2>
+
+                    <p class="account-card__description">
+                        General information about your BPD account.
+                    </p>
+                </div>
+            </div>
+
+            <div class="account-information">
+                <div class="account-information__row">
+                    <span class="account-information__label">
+                        Account Status
+                    </span>
+
+                    <span
+                        class="account-information__value"
+                        id="accountStatusValue"
+                    >
+                        Loading...
+                    </span>
+                </div>
+
+                <div class="account-information__row">
+                    <span class="account-information__label">
+                        Role
+                    </span>
+
+                    <span
+                        class="account-information__value"
+                        id="accountRoleValue"
+                    >
+                        Loading...
+                    </span>
+                </div>
+            </div>
+        </section>
+
+        <!-- =================================================
+        DANGER ZONE
+        ================================================== -->
+
+        <section
+            class="account-card account-card--danger"
+            aria-labelledby="accountDangerHeading"
+        >
+            <div class="account-card__header">
+                <div>
+                    <h2
+                        class="account-card__title account-card__title--danger"
+                        id="accountDangerHeading"
+                    >
+                        Danger Zone
+                    </h2>
+
+                    <p class="account-card__description">
+                        Permanently delete your BPD Gaming Network
+                        account and associated account data.
+                    </p>
+                </div>
+            </div>
+
+            <div class="account-danger">
+                <div class="account-danger__content">
+                    <div class="account-danger__details">
+                        <h3 class="account-danger__title">
+                            Delete Account
+                        </h3>
+
+                        <p class="account-danger__description">
+                            Deleting your account is permanent.
+                            Connected authentication providers will
+                            be unlinked and your BPD account will no
+                            longer be accessible.
+                        </p>
+                    </div>
+
+                    <div class="account-danger__actions">
+                        <button
+                            class="account-button account-button--danger"
+                            id="accountDeleteButton"
+                            type="button"
+                            disabled
+                        >
+                            Delete Account
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </div>
+</section>

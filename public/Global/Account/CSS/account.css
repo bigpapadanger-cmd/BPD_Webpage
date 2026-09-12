@@ -1,0 +1,1243 @@
+/* =========================================================
+BPD GAMING NETWORK
+ACCOUNT PAGE STYLES
+
+File:
+    Account/CSS/account.css
+
+Purpose:
+    Styles the global BPD Gaming Network account page.
+
+Description:
+    - Provides the account page shell and card layout.
+    - Styles the global BPD profile form.
+    - Styles linked provider rows and provider actions.
+    - Matches the dark BPD visual system.
+    - Uses purple hover/focus accents consistent with the
+      global account banner.
+    - Supports responsive layouts and reduced motion.
+========================================================= */
+
+/* =========================================================
+PAGE SHELL
+========================================================= */
+
+.account-page {
+    width: 100%;
+    min-width: 0;
+
+    padding:
+        24px
+        24px
+        40px;
+
+    color:
+        #ffffff;
+}
+
+.account-page__container {
+    width:
+        min(
+            100%,
+            1100px
+        );
+
+    min-width: 0;
+
+    margin-inline:
+        auto;
+}
+
+/* =========================================================
+PAGE HEADER
+========================================================= */
+
+.account-page__header {
+    display: flex;
+
+    align-items: flex-start;
+    justify-content: space-between;
+
+    gap: 20px;
+
+    margin-bottom:
+        24px;
+}
+
+.account-page__header-content {
+    min-width: 0;
+}
+
+.account-page__eyebrow {
+    margin:
+        0
+        0
+        6px;
+
+    color:
+        #9d8cff;
+
+    font-size:
+        0.75rem;
+
+    font-weight:
+        700;
+
+    letter-spacing:
+        0.08em;
+
+    text-transform:
+        uppercase;
+}
+
+.account-page__title {
+    margin:
+        0;
+
+    color:
+        #ffffff;
+
+    font-size:
+        clamp(
+            1.7rem,
+            3vw,
+            2.4rem
+        );
+
+    font-weight:
+        800;
+
+    line-height:
+        1.15;
+}
+
+.account-page__subtitle {
+    margin:
+        8px
+        0
+        0;
+
+    color:
+        #9ca4b3;
+
+    font-size:
+        0.95rem;
+
+    line-height:
+        1.5;
+}
+
+/* =========================================================
+PAGE STATUS
+========================================================= */
+
+.account-page__status {
+    margin-bottom:
+        18px;
+
+    padding:
+        12px
+        14px;
+
+    border:
+        1px solid
+        rgba(
+            139,
+            92,
+            246,
+            0.28
+        );
+
+    border-radius:
+        10px;
+
+    background:
+        rgba(
+            139,
+            92,
+            246,
+            0.08
+        );
+
+    color:
+        #e5deff;
+
+    font-size:
+        0.82rem;
+
+    line-height:
+        1.45;
+}
+
+.account-page__status[hidden] {
+    display:
+        none;
+}
+
+.account-page__status[data-status="success"] {
+    border-color:
+        rgba(
+            76,
+            209,
+            137,
+            0.35
+        );
+
+    background:
+        rgba(
+            76,
+            209,
+            137,
+            0.08
+        );
+
+    color:
+        #cbffe1;
+}
+
+.account-page__status[data-status="error"] {
+    border-color:
+        rgba(
+            255,
+            90,
+            110,
+            0.38
+        );
+
+    background:
+        rgba(
+            255,
+            90,
+            110,
+            0.08
+        );
+
+    color:
+        #ffd4da;
+}
+
+/* =========================================================
+ACCOUNT CARD
+========================================================= */
+
+.account-card {
+    width: 100%;
+    min-width: 0;
+
+    margin-bottom:
+        18px;
+
+    border:
+        1px solid
+        rgba(
+            255,
+            255,
+            255,
+            0.08
+        );
+
+    border-radius:
+        14px;
+
+    background:
+        rgba(
+            17,
+            19,
+            24,
+            0.96
+        );
+
+    box-shadow:
+        0 12px 30px
+        rgba(
+            0,
+            0,
+            0,
+            0.22
+        );
+
+    overflow:
+        hidden;
+}
+
+.account-card__header {
+    display: flex;
+
+    align-items: flex-start;
+    justify-content: space-between;
+
+    gap: 18px;
+
+    padding:
+        18px
+        20px;
+
+    border-bottom:
+        1px solid
+        rgba(
+            255,
+            255,
+            255,
+            0.065
+        );
+
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            0.015
+        );
+}
+
+.account-card__title {
+    margin:
+        0;
+
+    color:
+        #f4f5f8;
+
+    font-size:
+        1rem;
+
+    font-weight:
+        700;
+}
+
+.account-card__description {
+    margin:
+        6px
+        0
+        0;
+
+    color:
+        #8f97a6;
+
+    font-size:
+        0.8rem;
+
+    line-height:
+        1.45;
+}
+
+.account-card__body {
+    padding:
+        20px;
+}
+
+/* =========================================================
+PROFILE FORM
+========================================================= */
+
+.account-profile-form {
+    width: 100%;
+    min-width: 0;
+}
+
+.account-field {
+    width: 100%;
+    min-width: 0;
+}
+
+.account-field__label {
+    display: block;
+
+    margin-bottom:
+        7px;
+
+    color:
+        #dfe3eb;
+
+    font-size:
+        0.8rem;
+
+    font-weight:
+        650;
+}
+
+.account-field__input {
+    display: block;
+
+    width:
+        min(
+            100%,
+            520px
+        );
+
+    min-width: 0;
+    min-height: 40px;
+
+    padding:
+        9px
+        11px;
+
+    border:
+        1px solid
+        rgba(
+            255,
+            255,
+            255,
+            0.12
+        );
+
+    border-radius:
+        8px;
+
+    background:
+        rgba(
+            8,
+            10,
+            14,
+            0.75
+        );
+
+    color:
+        #ffffff;
+
+    font:
+        inherit;
+
+    font-size:
+        0.88rem;
+
+    outline:
+        none;
+
+    transition:
+        border-color 0.2s ease,
+        background 0.2s ease,
+        box-shadow 0.2s ease,
+        opacity 0.2s ease;
+}
+
+.account-field__input:hover:not(:disabled) {
+    border-color:
+        rgba(
+            139,
+            92,
+            246,
+            0.48
+        );
+}
+
+.account-field__input:focus {
+    border-color:
+        #8b5cf6;
+
+    background:
+        rgba(
+            11,
+            13,
+            18,
+            0.92
+        );
+
+    box-shadow:
+        0 0 0 3px
+        rgba(
+            139,
+            92,
+            246,
+            0.15
+        );
+}
+
+.account-field__input:disabled {
+    color:
+        #737b89;
+
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            0.02
+        );
+
+    cursor:
+        not-allowed;
+
+    opacity:
+        0.65;
+}
+
+.account-field__help {
+    width:
+        min(
+            100%,
+            680px
+        );
+
+    margin:
+        8px
+        0
+        0;
+
+    color:
+        #727b8a;
+
+    font-size:
+        0.74rem;
+
+    line-height:
+        1.45;
+}
+
+.account-profile-form__actions {
+    display: flex;
+
+    align-items: center;
+
+    gap: 8px;
+
+    margin-top:
+        16px;
+}
+
+/* =========================================================
+BUTTONS
+========================================================= */
+
+.account-button {
+    position: relative;
+
+    display: inline-flex;
+
+    align-items: center;
+    justify-content: center;
+
+    min-height:
+        36px;
+
+    padding:
+        8px
+        14px;
+
+    border:
+        1px solid
+        rgba(
+            255,
+            255,
+            255,
+            0.12
+        );
+
+    border-radius:
+        8px;
+
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            0.025
+        );
+
+    color:
+        #d5d9e1;
+
+    font:
+        inherit;
+
+    font-size:
+        0.8rem;
+
+    font-weight:
+        650;
+
+    line-height:
+        1;
+
+    text-decoration:
+        none;
+
+    white-space:
+        nowrap;
+
+    cursor:
+        pointer;
+
+    transition:
+        color 0.2s ease,
+        border-color 0.2s ease,
+        background 0.2s ease,
+        box-shadow 0.2s ease,
+        transform 0.2s ease,
+        opacity 0.2s ease;
+}
+
+.account-button:hover:not(:disabled) {
+    color:
+        #ffffff;
+
+    border-color:
+        rgba(
+            139,
+            92,
+            246,
+            0.72
+        );
+
+    background:
+        rgba(
+            139,
+            92,
+            246,
+            0.09
+        );
+
+    box-shadow:
+        0 0 8px
+        rgba(
+            139,
+            92,
+            246,
+            0.3
+        );
+
+    transform:
+        translateY(
+            -1px
+        );
+}
+
+.account-button:focus-visible {
+    outline:
+        2px solid
+        rgba(
+            167,
+            139,
+            250,
+            0.9
+        );
+
+    outline-offset:
+        2px;
+}
+
+.account-button:active:not(:disabled) {
+    transform:
+        translateY(
+            0
+        )
+        scale(
+            0.98
+        );
+}
+
+.account-button:disabled {
+    color:
+        #6e7480;
+
+    border-color:
+        rgba(
+            255,
+            255,
+            255,
+            0.065
+        );
+
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            0.015
+        );
+
+    box-shadow:
+        none;
+
+    cursor:
+        not-allowed;
+
+    opacity:
+        0.58;
+}
+
+/* =========================================================
+PRIMARY BUTTON
+========================================================= */
+
+.account-button--primary {
+    border-color:
+        rgba(
+            139,
+            92,
+            246,
+            0.55
+        );
+
+    background:
+        linear-gradient(
+            180deg,
+            rgba(
+                139,
+                92,
+                246,
+                0.2
+            ),
+            rgba(
+                139,
+                92,
+                246,
+                0.08
+            )
+        );
+
+    color:
+        #ece7ff;
+}
+
+.account-button--primary:hover:not(:disabled) {
+    border-color:
+        #a78bfa;
+
+    background:
+        linear-gradient(
+            180deg,
+            rgba(
+                139,
+                92,
+                246,
+                0.3
+            ),
+            rgba(
+                139,
+                92,
+                246,
+                0.13
+            )
+        );
+
+    box-shadow:
+        0 0 10px
+            rgba(
+                139,
+                92,
+                246,
+                0.42
+            ),
+        0 0 22px
+            rgba(
+                139,
+                92,
+                246,
+                0.18
+            );
+}
+
+/* =========================================================
+SECONDARY BUTTON
+========================================================= */
+
+.account-button--secondary {
+    min-width:
+        92px;
+}
+
+/* =========================================================
+CONNECTED PROVIDERS
+========================================================= */
+
+.account-providers {
+    width: 100%;
+    min-width: 0;
+}
+
+.account-provider {
+    display: flex;
+
+    align-items: center;
+    justify-content: space-between;
+
+    gap: 18px;
+
+    width: 100%;
+    min-width: 0;
+
+    padding:
+        15px
+        20px;
+
+    border-bottom:
+        1px solid
+        rgba(
+            255,
+            255,
+            255,
+            0.055
+        );
+
+    background:
+        transparent;
+
+    transition:
+        background 0.2s ease;
+}
+
+.account-provider:last-child {
+    border-bottom:
+        0;
+}
+
+.account-provider:hover {
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            0.015
+        );
+}
+
+/* =========================================================
+PROVIDER IDENTITY
+========================================================= */
+
+.account-provider__identity {
+    display: flex;
+
+    align-items: center;
+
+    gap: 12px;
+
+    min-width: 0;
+}
+
+.account-provider__icon-wrap {
+    display: inline-flex;
+
+    align-items: center;
+    justify-content: center;
+
+    flex:
+        0 0 auto;
+
+    width:
+        40px;
+
+    height:
+        40px;
+
+    border:
+        1px solid
+        rgba(
+            255,
+            255,
+            255,
+            0.1
+        );
+
+    border-radius:
+        9px;
+
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            0.03
+        );
+
+    box-shadow:
+        inset 0 0 0 1px
+        rgba(
+            255,
+            255,
+            255,
+            0.01
+        );
+
+    transition:
+        border-color 0.2s ease,
+        background 0.2s ease,
+        box-shadow 0.2s ease;
+}
+
+.account-provider:hover
+.account-provider__icon-wrap {
+    border-color:
+        rgba(
+            139,
+            92,
+            246,
+            0.38
+        );
+
+    background:
+        rgba(
+            139,
+            92,
+            246,
+            0.07
+        );
+
+    box-shadow:
+        0 0 8px
+        rgba(
+            139,
+            92,
+            246,
+            0.13
+        );
+}
+
+.account-provider__icon {
+    display:
+        block;
+
+    width:
+        22px;
+
+    height:
+        22px;
+
+    max-width:
+        100%;
+
+    max-height:
+        100%;
+
+    object-fit:
+        contain;
+
+    pointer-events:
+        none;
+
+    user-select:
+        none;
+}
+
+.account-provider__details {
+    min-width:
+        0;
+}
+
+.account-provider__name {
+    margin:
+        0;
+
+    color:
+        #e8ebf1;
+
+    font-size:
+        0.88rem;
+
+    font-weight:
+        700;
+}
+
+.account-provider__status {
+    margin:
+        4px
+        0
+        0;
+
+    color:
+        #7f8795;
+
+    font-size:
+        0.74rem;
+
+    line-height:
+        1.35;
+
+    overflow:
+        hidden;
+
+    text-overflow:
+        ellipsis;
+
+    white-space:
+        nowrap;
+}
+
+/* =========================================================
+PROVIDER STATUS STATES
+========================================================= */
+
+.account-provider[data-connected="true"]
+.account-provider__status {
+    color:
+        #8fd6ad;
+}
+
+.account-provider[data-connected="true"]
+.account-provider__icon-wrap {
+    border-color:
+        rgba(
+            76,
+            209,
+            137,
+            0.28
+        );
+}
+
+.account-provider[data-connected="false"]
+.account-provider__status {
+    color:
+        #7e8592;
+}
+
+/* =========================================================
+PROVIDER ACTIONS
+========================================================= */
+
+.account-provider__actions {
+    display: flex;
+
+    align-items: center;
+
+    justify-content: flex-end;
+
+    flex:
+        0 0 auto;
+
+    gap:
+        8px;
+}
+
+/* =========================================================
+ACCOUNT INFORMATION
+========================================================= */
+
+.account-information {
+    width: 100%;
+    min-width: 0;
+}
+
+.account-information__row {
+    display: flex;
+
+    align-items: center;
+    justify-content: space-between;
+
+    gap: 20px;
+
+    min-height:
+        48px;
+
+    padding:
+        0
+        20px;
+
+    border-bottom:
+        1px solid
+        rgba(
+            255,
+            255,
+            255,
+            0.055
+        );
+}
+
+.account-information__row:last-child {
+    border-bottom:
+        0;
+}
+
+.account-information__label {
+    color:
+        #8f97a6;
+
+    font-size:
+        0.78rem;
+
+    font-weight:
+        600;
+}
+
+.account-information__value {
+    min-width:
+        0;
+
+    color:
+        #dde1e8;
+
+    font-size:
+        0.8rem;
+
+    font-weight:
+        650;
+
+    text-align:
+        right;
+
+    overflow:
+        hidden;
+
+    text-overflow:
+        ellipsis;
+
+    white-space:
+        nowrap;
+}
+
+/* =========================================================
+LOADING STATE
+========================================================= */
+
+.account-page[data-account-state="loading"]
+.account-card {
+    opacity:
+        0.82;
+}
+
+/* =========================================================
+UNAVAILABLE STATE
+========================================================= */
+
+.account-page[data-account-state="unavailable"]
+.account-card {
+    opacity:
+        0.68;
+}
+
+/* =========================================================
+SMALL VIEWPORTS
+========================================================= */
+
+@media (max-width: 700px) {
+    .account-page {
+        padding:
+            16px
+            14px
+            28px;
+    }
+
+    .account-page__header {
+        margin-bottom:
+            18px;
+    }
+
+    .account-card {
+        border-radius:
+            11px;
+    }
+
+    .account-card__header {
+        padding:
+            15px
+            16px;
+    }
+
+    .account-card__body {
+        padding:
+            16px;
+    }
+
+    .account-provider {
+        align-items:
+            flex-start;
+
+        padding:
+            14px
+            16px;
+    }
+
+    .account-provider__icon-wrap {
+        width:
+            36px;
+
+        height:
+            36px;
+    }
+
+    .account-provider__icon {
+        width:
+            20px;
+
+        height:
+            20px;
+    }
+
+    .account-provider__actions {
+        align-self:
+            center;
+    }
+
+    .account-information__row {
+        padding:
+            0
+            16px;
+    }
+}
+
+/* =========================================================
+VERY SMALL VIEWPORTS
+========================================================= */
+
+@media (max-width: 480px) {
+    .account-provider {
+        flex-direction:
+            column;
+
+        align-items:
+            stretch;
+
+        gap:
+            12px;
+    }
+
+    .account-provider__actions {
+        width:
+            100%;
+    }
+
+    .account-provider__actions
+    .account-button {
+        width:
+            100%;
+    }
+
+    .account-profile-form__actions {
+        width:
+            100%;
+    }
+
+    .account-profile-form__actions
+    .account-button {
+        width:
+            100%;
+    }
+
+    .account-information__row {
+        align-items:
+            flex-start;
+
+        flex-direction:
+            column;
+
+        gap:
+            4px;
+
+        padding-top:
+            12px;
+
+        padding-bottom:
+            12px;
+    }
+
+    .account-information__value {
+        width:
+            100%;
+
+        text-align:
+            left;
+    }
+}
+
+/* =========================================================
+REDUCED MOTION
+========================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+    .account-field__input,
+    .account-button,
+    .account-provider,
+    .account-provider__icon-wrap {
+        transition:
+            none;
+    }
+}

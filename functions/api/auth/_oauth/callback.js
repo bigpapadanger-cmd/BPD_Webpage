@@ -4,13 +4,24 @@
 BPD GAMING NETWORK
 SUPABASE OAUTH CALLBACK ROUTE
 
-Purpose:
-    Public callback endpoint used by Supabase Auth.
+File:
+    functions/api/auth/_oauth/callback.js
 
-Responsibilities:
-    - Receive the OAuth callback request.
-    - Delegate processing to the centralized OAuth service.
-    - Return the service response.
+Public Route:
+    GET /api/auth/_oauth/callback
+
+Service:
+    functions/services/auth/oauth/callback.js
+
+Purpose:
+    Public callback endpoint used by authentication providers
+    routed through the centralized OAuth callback service.
+
+Description:
+    - Receives the OAuth callback request.
+    - Delegates processing to the centralized OAuth service.
+    - Returns the service response.
+    - Contains no provider-specific identity logic.
 
 Important:
     - Provider-specific OAuth logic does not belong here.

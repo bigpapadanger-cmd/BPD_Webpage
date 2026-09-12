@@ -101,7 +101,23 @@ export const ROUTES = {
         sitemap:
             true
     },
+    "/Account": {
+        title:
+            "Dashboard | BPD Gaming Network",
+        body:
+            "/Global/Index/HTML/home.html",
+        header:
+            "/Framework/Shell/HTML/Header/header.html",
+        sidebar:
+            "/Framework/Shell/HTML/Sidebar/dashboard.html",
+        footer:
+            "/Framework/Shell/HTML/Footer/footer.html",
+        module:
+            "/Global/Index/JS/index.js",
 
+        sitemap:
+            true
+    },
     // =====================================================
     // ROCKET LEAGUE
     // =====================================================

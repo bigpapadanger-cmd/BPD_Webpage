@@ -14,20 +14,24 @@ API Route:
     functions/api/auth/_oauth/callback.js
 
 Purpose:
-    Completes OAuth authentication flows managed through
-    Supabase Auth.
+    Completes OAuth authentication and provider-linking flows
+    managed through Supabase Auth.
 
-Current supported provider:
+Supported Providers:
     - Google
+    - Discord
+    - Epic Games
 
-Supported OAuth modes:
+Supported OAuth Modes:
     - login
     - link
 
 Login Flow:
-    Google authentication
+    Provider authentication
         ↓
-    api.resolve_google_identity
+    Resolve provider identity
+        ↓
+    Provider-specific identity RPC
         ↓
     Resolve or create identity.accounts
         ↓
@@ -36,23 +40,24 @@ Login Flow:
 Link Flow:
     Existing authenticated BPD session
         ↓
-    Google authentication
+    Provider authentication
         ↓
     Verify target identity.accounts.id
         ↓
-    api.link_google_identity
+    Provider-specific link RPC
         ↓
-    Attach Google identity to existing account
+    Attach provider identity to existing account
         ↓
     Update current BPD session provider state
 
 Important:
     - Supabase access tokens are NOT stored in BPD sessions.
     - Supabase refresh tokens are NOT stored in BPD sessions.
-    - Google access tokens are NOT stored in BPD sessions.
+    - Provider access tokens are NOT stored in BPD sessions.
     - Raw sessionData is never consumed here.
     - Email never determines account ownership.
     - Link mode NEVER creates identity.accounts.
+    - Provider ownership is based on provider subject.
 ========================================================= */
 
 import {
@@ -76,8 +81,6 @@ import {
 
 /* =========================================================
 OAUTH COOKIE NAMES
-
-These MUST match the login/link services.
 ========================================================= */
 
 const PKCE_COOKIE =
@@ -108,8 +111,50 @@ SUPPORTED PROVIDERS
 
 const SUPPORTED_PROVIDERS =
     new Set([
-        "google"
+        "google",
+        "discord",
+        "epic"
     ]);
+
+/* =========================================================
+PROVIDER CONFIGURATION
+========================================================= */
+
+const PROVIDER_CONFIG =
+    Object.freeze({
+        google: {
+            label:
+                "Google",
+
+            resolveRpc:
+                "resolve_google_identity",
+
+            linkRpc:
+                "link_google_identity"
+        },
+
+        discord: {
+            label:
+                "Discord",
+
+            resolveRpc:
+                "resolve_discord_identity",
+
+            linkRpc:
+                "link_discord_identity"
+        },
+
+        epic: {
+            label:
+                "Epic Games",
+
+            resolveRpc:
+                "resolve_epic_identity",
+
+            linkRpc:
+                "link_epic_identity"
+        }
+    });
 
 /* =========================================================
 NORMALIZATION
@@ -119,7 +164,8 @@ function normalizeString(
     value
 ) {
     if (
-        typeof value !== "string"
+        typeof value !==
+        "string"
     ) {
         return "";
     }
@@ -137,6 +183,41 @@ function normalizeNullableString(
 
     return normalized
         || null;
+}
+
+function normalizeProvider(
+    value
+) {
+    return normalizeString(
+        value
+    )
+        .toLowerCase();
+}
+
+/* =========================================================
+PROVIDER CONFIG
+========================================================= */
+
+function getProviderConfig(
+    provider
+) {
+    const normalizedProvider =
+        normalizeProvider(
+            provider
+        );
+
+    if (
+        !normalizedProvider
+    ) {
+        return null;
+    }
+
+    return (
+        PROVIDER_CONFIG[
+            normalizedProvider
+        ]
+        || null
+    );
 }
 
 /* =========================================================
@@ -158,12 +239,9 @@ function getSupabaseOrigin(
     }
 
     try {
-        const url =
-            new URL(
-                configuredUrl
-            );
-
-        return url.origin;
+        return new URL(
+            configuredUrl
+        ).origin;
     }
     catch {
         return null;
@@ -183,6 +261,31 @@ function getSupabaseApiKey(
 }
 
 /* =========================================================
+SUPABASE DATA API BASE URL
+========================================================= */
+
+function getSupabaseDataBaseUrl(
+    env
+) {
+    const supabaseUrl =
+        normalizeString(
+            env.SUPABASE_URL
+        );
+
+    if (
+        !supabaseUrl
+    ) {
+        return null;
+    }
+
+    return supabaseUrl.endsWith(
+        "/"
+    )
+        ? supabaseUrl
+        : `${supabaseUrl}/`;
+}
+
+/* =========================================================
 OAUTH MODE
 ========================================================= */
 
@@ -199,8 +302,8 @@ function getOAuthMode(
             .toLowerCase();
 
     /*
-     * Existing normal Google login flows may not yet set
-     * bpd_oauth_mode. Treat missing mode as normal login.
+     * Existing login flows may not yet set bpd_oauth_mode.
+     * Missing mode remains normal login for compatibility.
      */
     if (
         !mode
@@ -303,7 +406,8 @@ async function exchangeSupabaseCode(
 
     if (
         !data
-        || typeof data !== "object"
+        || typeof data !==
+            "object"
         || Array.isArray(
             data
         )
@@ -406,7 +510,8 @@ async function loadSupabaseAuthUser(
 
     if (
         !user
-        || typeof user !== "object"
+        || typeof user !==
+            "object"
         || Array.isArray(
             user
         )
@@ -423,7 +528,7 @@ async function loadSupabaseAuthUser(
 }
 
 /* =========================================================
-PROVIDER VALIDATION
+SUPABASE PROVIDERS
 ========================================================= */
 
 function getSupabaseProviders(
@@ -433,11 +538,10 @@ function getSupabaseProviders(
         new Set();
 
     const primaryProvider =
-        normalizeString(
+        normalizeProvider(
             user?.app_metadata
                 ?.provider
-        )
-            .toLowerCase();
+        );
 
     if (
         primaryProvider
@@ -461,10 +565,9 @@ function getSupabaseProviders(
             of metadataProviders
         ) {
             const normalized =
-                normalizeString(
+                normalizeProvider(
                     provider
-                )
-                    .toLowerCase();
+                );
 
             if (
                 normalized
@@ -486,10 +589,9 @@ function getSupabaseProviders(
             of user.identities
         ) {
             const normalized =
-                normalizeString(
+                normalizeProvider(
                     identity?.provider
-                )
-                    .toLowerCase();
+                );
 
             if (
                 normalized
@@ -506,15 +608,18 @@ function getSupabaseProviders(
     ];
 }
 
+/* =========================================================
+EXPECTED PROVIDER VALIDATION
+========================================================= */
+
 function validateExpectedProvider(
     provider,
     user
 ) {
     const expectedProvider =
-        normalizeString(
+        normalizeProvider(
             provider
-        )
-            .toLowerCase();
+        );
 
     if (
         !expectedProvider
@@ -534,12 +639,24 @@ function validateExpectedProvider(
 }
 
 /* =========================================================
-GOOGLE IDENTITY
+SUPABASE PROVIDER IDENTITY
 ========================================================= */
 
-function getGoogleIdentity(
-    user
+function getSupabaseIdentity(
+    user,
+    provider
 ) {
+    const normalizedProvider =
+        normalizeProvider(
+            provider
+        );
+
+    if (
+        !normalizedProvider
+    ) {
+        return null;
+    }
+
     const identities =
         Array.isArray(
             user?.identities
@@ -547,58 +664,109 @@ function getGoogleIdentity(
             ? user.identities
             : [];
 
-    const identity =
+    return (
         identities.find(
             (
                 entry
             ) =>
-                normalizeString(
+                normalizeProvider(
                     entry?.provider
                 )
-                    .toLowerCase()
-                === "google"
+                === normalizedProvider
         )
-        || null;
+        || null
+    );
+}
 
-    const identityData =
-        (
-            identity?.identity_data
-            && typeof identity.identity_data === "object"
-            && !Array.isArray(
-                identity.identity_data
-            )
+/* =========================================================
+IDENTITY DATA
+========================================================= */
+
+function getIdentityData(
+    identity
+) {
+    if (
+        identity?.identity_data
+        && typeof identity.identity_data ===
+            "object"
+        && !Array.isArray(
+            identity.identity_data
         )
-            ? identity.identity_data
-            : {};
+    ) {
+        return identity.identity_data;
+    }
 
-    const userMetadata =
-        (
-            user?.user_metadata
-            && typeof user.user_metadata === "object"
-            && !Array.isArray(
-                user.user_metadata
-            )
+    return {};
+}
+
+function getUserMetadata(
+    user
+) {
+    if (
+        user?.user_metadata
+        && typeof user.user_metadata ===
+            "object"
+        && !Array.isArray(
+            user.user_metadata
         )
-            ? user.user_metadata
-            : {};
+    ) {
+        return user.user_metadata;
+    }
 
-    const providerSubject =
+    return {};
+}
+
+/* =========================================================
+PROVIDER SUBJECT
+========================================================= */
+
+function getProviderSubject(
+    identity,
+    identityData
+) {
+    return (
         normalizeString(
             identityData.sub
         )
         || normalizeString(
+            identityData.provider_id
+        )
+        || normalizeString(
+            identityData.user_id
+        )
+        || normalizeString(
             identity?.id
-        );
+        )
+    );
+}
 
-    const email =
+/* =========================================================
+PROVIDER EMAIL
+========================================================= */
+
+function getProviderEmail(
+    user,
+    identityData
+) {
+    return (
         normalizeNullableString(
-            user.email
+            identityData.email
         )
         || normalizeNullableString(
-            identityData.email
-        );
+            user?.email
+        )
+    );
+}
 
-    const displayName =
+/* =========================================================
+GOOGLE DISPLAY NAME
+========================================================= */
+
+function getGoogleDisplayName(
+    identityData,
+    userMetadata
+) {
+    return (
         normalizeNullableString(
             identityData.full_name
         )
@@ -610,15 +778,233 @@ function getGoogleIdentity(
         )
         || normalizeNullableString(
             userMetadata.name
+        )
+    );
+}
+
+/* =========================================================
+DISCORD DISPLAY NAME
+========================================================= */
+
+function getDiscordDisplayName(
+    identityData,
+    userMetadata
+) {
+    return (
+        normalizeNullableString(
+            identityData.global_name
+        )
+        || normalizeNullableString(
+            identityData.full_name
+        )
+        || normalizeNullableString(
+            identityData.name
+        )
+        || normalizeNullableString(
+            identityData.username
+        )
+        || normalizeNullableString(
+            userMetadata.global_name
+        )
+        || normalizeNullableString(
+            userMetadata.full_name
+        )
+        || normalizeNullableString(
+            userMetadata.name
+        )
+        || normalizeNullableString(
+            userMetadata.user_name
+        )
+    );
+}
+
+/* =========================================================
+EPIC DISPLAY NAME
+========================================================= */
+
+function getEpicDisplayName(
+    identityData,
+    userMetadata
+) {
+    return (
+        normalizeNullableString(
+            identityData.preferred_username
+        )
+        || normalizeNullableString(
+            identityData.display_name
+        )
+        || normalizeNullableString(
+            identityData.name
+        )
+        || normalizeNullableString(
+            userMetadata.preferred_username
+        )
+        || normalizeNullableString(
+            userMetadata.display_name
+        )
+        || normalizeNullableString(
+            userMetadata.name
+        )
+    );
+}
+
+/* =========================================================
+PROVIDER DISPLAY NAME
+========================================================= */
+
+function getProviderDisplayName(
+    provider,
+    identityData,
+    userMetadata
+) {
+    if (
+        provider ===
+        "google"
+    ) {
+        return getGoogleDisplayName(
+            identityData,
+            userMetadata
+        );
+    }
+
+    if (
+        provider ===
+        "discord"
+    ) {
+        return getDiscordDisplayName(
+            identityData,
+            userMetadata
+        );
+    }
+
+    if (
+        provider ===
+        "epic"
+    ) {
+        return getEpicDisplayName(
+            identityData,
+            userMetadata
+        );
+    }
+
+    return null;
+}
+
+/* =========================================================
+PROVIDER PREFERRED USERNAME
+========================================================= */
+
+function getProviderPreferredUsername(
+    provider,
+    identityData,
+    userMetadata
+) {
+    if (
+        provider ===
+        "discord"
+    ) {
+        return (
+            normalizeNullableString(
+                identityData.username
+            )
+            || normalizeNullableString(
+                userMetadata.user_name
+            )
+            || normalizeNullableString(
+                userMetadata.username
+            )
+        );
+    }
+
+    if (
+        provider ===
+        "epic"
+    ) {
+        return (
+            normalizeNullableString(
+                identityData.preferred_username
+            )
+            || normalizeNullableString(
+                identityData.display_name
+            )
+            || normalizeNullableString(
+                userMetadata.preferred_username
+            )
+            || normalizeNullableString(
+                userMetadata.display_name
+            )
+        );
+    }
+
+    return null;
+}
+
+/* =========================================================
+PROVIDER EMAIL VERIFIED
+========================================================= */
+
+function getProviderEmailVerified(
+    identityData,
+    userMetadata
+) {
+    return (
+        identityData.email_verified ===
+        true
+        || userMetadata.email_verified ===
+            true
+    );
+}
+
+/* =========================================================
+RESOLVE PROVIDER IDENTITY
+========================================================= */
+
+function getProviderIdentity(
+    user,
+    provider
+) {
+    const normalizedProvider =
+        normalizeProvider(
+            provider
         );
 
-    const emailVerified =
-        identityData.email_verified === true
-        || userMetadata.email_verified === true;
+    const identity =
+        getSupabaseIdentity(
+            user,
+            normalizedProvider
+        );
+
+    if (
+        !identity
+    ) {
+        return null;
+    }
+
+    const identityData =
+        getIdentityData(
+            identity
+        );
+
+    const userMetadata =
+        getUserMetadata(
+            user
+        );
+
+    const providerSubject =
+        getProviderSubject(
+            identity,
+            identityData
+        );
+
+    if (
+        !providerSubject
+    ) {
+        return null;
+    }
 
     return {
         provider:
-            "google",
+            normalizedProvider,
 
         authUserId:
             normalizeString(
@@ -627,11 +1013,31 @@ function getGoogleIdentity(
 
         providerSubject,
 
-        email,
+        email:
+            getProviderEmail(
+                user,
+                identityData
+            ),
 
-        emailVerified,
+        emailVerified:
+            getProviderEmailVerified(
+                identityData,
+                userMetadata
+            ),
 
-        displayName
+        displayName:
+            getProviderDisplayName(
+                normalizedProvider,
+                identityData,
+                userMetadata
+            ),
+
+        preferredUsername:
+            getProviderPreferredUsername(
+                normalizedProvider,
+                identityData,
+                userMetadata
+            )
     };
 }
 
@@ -709,7 +1115,8 @@ async function readRpcRecord(
 
     if (
         !record
-        || typeof record !== "object"
+        || typeof record !==
+            "object"
         || Array.isArray(
             record
         )
@@ -723,19 +1130,18 @@ async function readRpcRecord(
 }
 
 /* =========================================================
-NORMAL LOGIN IDENTITY RESOLUTION
-
-RPC:
-    api.resolve_google_identity
+CALL PROVIDER RPC
 ========================================================= */
 
-async function resolveGoogleIdentity(
+async function callProviderRpc(
     env,
-    googleIdentity
+    rpcName,
+    body,
+    failureMessage
 ) {
-    const supabaseUrl =
-        normalizeString(
-            env.SUPABASE_URL
+    const baseUrl =
+        getSupabaseDataBaseUrl(
+            env
         );
 
     const apiKey =
@@ -744,7 +1150,7 @@ async function resolveGoogleIdentity(
         );
 
     if (
-        !supabaseUrl
+        !baseUrl
         || !apiKey
     ) {
         throw new Error(
@@ -752,16 +1158,9 @@ async function resolveGoogleIdentity(
         );
     }
 
-    const baseUrl =
-        supabaseUrl.endsWith(
-            "/"
-        )
-            ? supabaseUrl
-            : `${supabaseUrl}/`;
-
     const response =
         await fetch(
-            `${baseUrl}rpc/resolve_google_identity`,
+            `${baseUrl}rpc/${rpcName}`,
             {
                 method:
                     "POST",
@@ -781,29 +1180,62 @@ async function resolveGoogleIdentity(
                 },
 
                 body:
-                    JSON.stringify({
-                        p_auth_user_id:
-                            googleIdentity.authUserId,
-
-                        p_provider_subject:
-                            googleIdentity.providerSubject,
-
-                        p_email:
-                            googleIdentity.email,
-
-                        p_email_verified:
-                            googleIdentity.emailVerified === true,
-
-                        p_display_username:
-                            googleIdentity.displayName
-                    })
+                    JSON.stringify(
+                        body
+                    )
             }
         );
 
+    return readRpcRecord(
+        response,
+        failureMessage
+    );
+}
+
+/* =========================================================
+NORMAL LOGIN IDENTITY RESOLUTION
+========================================================= */
+
+async function resolveProviderIdentity(
+    env,
+    providerIdentity
+) {
+    const providerConfig =
+        getProviderConfig(
+            providerIdentity.provider
+        );
+
+    if (
+        !providerConfig
+    ) {
+        throw new Error(
+            "Provider configuration is unavailable."
+        );
+    }
+
     const record =
-        await readRpcRecord(
-            response,
-            "Google identity resolution failed."
+        await callProviderRpc(
+            env,
+            providerConfig.resolveRpc,
+            {
+                p_auth_user_id:
+                    providerIdentity.authUserId,
+
+                p_provider_subject:
+                    providerIdentity.providerSubject,
+
+                p_email:
+                    providerIdentity.email,
+
+                p_email_verified:
+                    providerIdentity.emailVerified ===
+                    true,
+
+                p_display_username:
+                    providerIdentity.displayName
+                    || providerIdentity.preferredUsername
+            },
+            `${providerConfig.label} identity resolution failed.`
         );
 
     const accountId =
@@ -816,7 +1248,7 @@ async function resolveGoogleIdentity(
         !accountId
     ) {
         throw new Error(
-            "Google identity resolution returned no account ID."
+            `${providerConfig.label} identity resolution returned no account ID.`
         );
     }
 
@@ -830,107 +1262,71 @@ async function resolveGoogleIdentity(
             || "user",
 
         active:
-            record.active !== false,
+            record.active !==
+            false,
 
         createdAccount:
-            record.created_account === true
-            || record.createdAccount === true,
+            record.created_account ===
+                true
+            || record.createdAccount ===
+                true,
 
         createdIdentity:
-            record.created_identity === true
-            || record.createdIdentity === true
+            record.created_identity ===
+                true
+            || record.createdIdentity ===
+                true
     };
 }
 
 /* =========================================================
-EXPLICIT GOOGLE LINK
-
-RPC:
-    api.link_google_identity
-
-Important:
-    This operation NEVER creates identity.accounts.
+EXPLICIT PROVIDER LINK
 ========================================================= */
 
-async function linkGoogleIdentity(
+async function linkProviderIdentity(
     env,
     accountId,
-    googleIdentity
+    providerIdentity
 ) {
-    const supabaseUrl =
-        normalizeString(
-            env.SUPABASE_URL
-        );
-
-    const apiKey =
-        getSupabaseApiKey(
-            env
+    const providerConfig =
+        getProviderConfig(
+            providerIdentity.provider
         );
 
     if (
-        !supabaseUrl
-        || !apiKey
+        !providerConfig
     ) {
         throw new Error(
-            "Supabase Data API configuration is unavailable."
+            "Provider configuration is unavailable."
         );
     }
 
-    const baseUrl =
-        supabaseUrl.endsWith(
-            "/"
-        )
-            ? supabaseUrl
-            : `${supabaseUrl}/`;
-
-    const response =
-        await fetch(
-            `${baseUrl}rpc/link_google_identity`,
-            {
-                method:
-                    "POST",
-
-                headers: {
-                    "apikey":
-                        apiKey,
-
-                    "Content-Profile":
-                        "api",
-
-                    "Content-Type":
-                        "application/json",
-
-                    "Accept":
-                        "application/json"
-                },
-
-                body:
-                    JSON.stringify({
-                        p_account_id:
-                            accountId,
-
-                        p_auth_user_id:
-                            googleIdentity.authUserId,
-
-                        p_provider_subject:
-                            googleIdentity.providerSubject,
-
-                        p_email:
-                            googleIdentity.email,
-
-                        p_email_verified:
-                            googleIdentity.emailVerified === true,
-
-                        p_display_username:
-                            googleIdentity.displayName
-                    })
-            }
-        );
-
     const record =
-        await readRpcRecord(
-            response,
-            "Google identity linking failed."
+        await callProviderRpc(
+            env,
+            providerConfig.linkRpc,
+            {
+                p_account_id:
+                    accountId,
+
+                p_auth_user_id:
+                    providerIdentity.authUserId,
+
+                p_provider_subject:
+                    providerIdentity.providerSubject,
+
+                p_email:
+                    providerIdentity.email,
+
+                p_email_verified:
+                    providerIdentity.emailVerified ===
+                    true,
+
+                p_display_username:
+                    providerIdentity.displayName
+                    || providerIdentity.preferredUsername
+            },
+            `${providerConfig.label} identity linking failed.`
         );
 
     const resolvedAccountId =
@@ -943,7 +1339,7 @@ async function linkGoogleIdentity(
         !resolvedAccountId
     ) {
         throw new Error(
-            "Google identity linking returned no account ID."
+            `${providerConfig.label} identity linking returned no account ID.`
         );
     }
 
@@ -958,11 +1354,14 @@ async function linkGoogleIdentity(
             || "user",
 
         active:
-            record.active !== false,
+            record.active !==
+            false,
 
         linkedIdentity:
-            record.linked_identity === true
-            || record.linkedIdentity === true
+            record.linked_identity ===
+                true
+            || record.linkedIdentity ===
+                true
     };
 }
 
@@ -970,8 +1369,8 @@ async function linkGoogleIdentity(
 PROVIDER SESSION DATA
 ========================================================= */
 
-function buildGoogleProviderData(
-    googleIdentity
+function buildProviderSessionData(
+    providerIdentity
 ) {
     const now =
         Date.now();
@@ -984,16 +1383,16 @@ function buildGoogleProviderData(
             true,
 
         AccountId:
-            googleIdentity.providerSubject,
+            providerIdentity.providerSubject,
 
         DisplayName:
-            googleIdentity.displayName,
+            providerIdentity.displayName,
 
         PreferredUsername:
-            null,
+            providerIdentity.preferredUsername,
 
         Email:
-            googleIdentity.email,
+            providerIdentity.email,
 
         AuthenticatedAt:
             now,
@@ -1004,7 +1403,7 @@ function buildGoogleProviderData(
 }
 
 /* =========================================================
-NORMAL LOGIN SESSION
+IDENTITY CONFLICT
 ========================================================= */
 
 function hasIdentityConflict(
@@ -1032,10 +1431,14 @@ function hasIdentityConflict(
         resolvedAccountId;
 }
 
+/* =========================================================
+NORMAL LOGIN SESSION
+========================================================= */
+
 async function establishLoginSession(
     request,
     env,
-    googleIdentity,
+    providerIdentity,
     resolvedAccount
 ) {
     const existingSession =
@@ -1044,8 +1447,12 @@ async function establishLoginSession(
             env
         );
 
+    const provider =
+        providerIdentity.provider;
+
     if (
-        existingSession.authenticated === true
+        existingSession.authenticated ===
+        true
     ) {
         if (
             hasIdentityConflict(
@@ -1068,9 +1475,9 @@ async function establishLoginSession(
         await attachProviderToSession(
             env,
             existingSession.sessionId,
-            "google",
-            buildGoogleProviderData(
-                googleIdentity
+            provider,
+            buildProviderSessionData(
+                providerIdentity
             )
         );
 
@@ -1115,9 +1522,9 @@ async function establishLoginSession(
                     resolvedAccount.active,
 
                 Providers: {
-                    google:
-                        buildGoogleProviderData(
-                            googleIdentity
+                    [provider]:
+                        buildProviderSessionData(
+                            providerIdentity
                         )
                 }
             }
@@ -1201,7 +1608,8 @@ async function getLinkContext(
         );
 
     if (
-        session.authenticated !== true
+        session.authenticated !==
+        true
     ) {
         return {
             valid:
@@ -1218,7 +1626,8 @@ async function getLinkContext(
     }
 
     if (
-        session.active !== true
+        session.active !==
+        true
     ) {
         return {
             valid:
@@ -1295,7 +1704,7 @@ UPDATE EXISTING SESSION AFTER LINK
 async function establishLinkedSession(
     env,
     linkContext,
-    googleIdentity,
+    providerIdentity,
     linkedAccount
 ) {
     if (
@@ -1312,9 +1721,9 @@ async function establishLinkedSession(
     await attachProviderToSession(
         env,
         linkContext.session.sessionId,
-        "google",
-        buildGoogleProviderData(
-            googleIdentity
+        providerIdentity.provider,
+        buildProviderSessionData(
+            providerIdentity
         )
     );
 
@@ -1403,13 +1812,12 @@ export async function handleOAuthCallback(
         );
 
     const provider =
-        normalizeString(
+        normalizeProvider(
             getCookie(
                 request,
                 OAUTH_PROVIDER_COOKIE
             )
-        )
-            .toLowerCase();
+        );
 
     const verifier =
         normalizeString(
@@ -1539,8 +1947,30 @@ export async function handleOAuthCallback(
             );
         }
 
+        const providerConfig =
+            getProviderConfig(
+                provider
+            );
+
+        if (
+            !providerConfig
+        ) {
+            return json(
+                {
+                    success:
+                        false,
+
+                    message:
+                        "OAuth provider configuration is unavailable.",
+
+                    debugId
+                },
+                500
+            );
+        }
+
         /* =================================================
-        VALIDATE LINK SESSION BEFORE IDENTITY MUTATION
+        VALIDATE LINK SESSION
         ================================================= */
 
         let linkContext =
@@ -1556,7 +1986,8 @@ export async function handleOAuthCallback(
                 );
 
             if (
-                linkContext.valid !== true
+                linkContext.valid !==
+                true
             ) {
                 console.warn(
                     "OAUTH CALLBACK: Link context validation failed.",
@@ -1715,17 +2146,11 @@ export async function handleOAuthCallback(
         RESOLVE PROVIDER IDENTITY
         ================================================= */
 
-        let providerIdentity =
-            null;
-
-        if (
-            provider === "google"
-        ) {
-            providerIdentity =
-                getGoogleIdentity(
-                    authUser
-                );
-        }
+        const providerIdentity =
+            getProviderIdentity(
+                authUser,
+                provider
+            );
 
         if (
             !providerIdentity
@@ -1757,7 +2182,7 @@ export async function handleOAuthCallback(
 
             try {
                 linkedAccount =
-                    await linkGoogleIdentity(
+                    await linkProviderIdentity(
                         env,
                         linkContext.accountId,
                         providerIdentity
@@ -1767,7 +2192,7 @@ export async function handleOAuthCallback(
                 error
             ) {
                 console.error(
-                    "OAUTH CALLBACK: Google identity link failed.",
+                    "OAUTH CALLBACK: Provider identity link failed.",
                     {
                         debugId,
 
@@ -1797,7 +2222,7 @@ export async function handleOAuthCallback(
                             || "ACCOUNT_LINK_FAILED",
 
                         message:
-                            "Google could not be linked to this BPD account.",
+                            `${providerConfig.label} could not be linked to this BPD account.`,
 
                         debugId
                     },
@@ -1823,12 +2248,13 @@ export async function handleOAuthCallback(
                         true,
 
                     linkedIdentity:
-                        linkedAccount.linkedIdentity === true
+                        linkedAccount.linkedIdentity ===
+                        true
                 }
             );
 
             return redirect(
-                "/",
+                "/Account",
                 getOAuthClearCookies(
                     request
                 )
@@ -1843,7 +2269,7 @@ export async function handleOAuthCallback(
 
         try {
             resolvedAccount =
-                await resolveGoogleIdentity(
+                await resolveProviderIdentity(
                     env,
                     providerIdentity
                 );
@@ -1895,7 +2321,8 @@ export async function handleOAuthCallback(
             );
 
         if (
-            sessionResult.conflict === true
+            sessionResult.conflict ===
+            true
         ) {
             return json(
                 {
@@ -1906,7 +2333,7 @@ export async function handleOAuthCallback(
                         "ACCOUNT_LINK_CONFLICT",
 
                     message:
-                        "This Google account is associated with a different BPD account.",
+                        `This ${providerConfig.label} account is associated with a different BPD account.`,
 
                     debugId
                 },
@@ -1942,10 +2369,12 @@ export async function handleOAuthCallback(
                     ),
 
                 createdAccount:
-                    resolvedAccount.createdAccount === true,
+                    resolvedAccount.createdAccount ===
+                    true,
 
                 createdIdentity:
-                    resolvedAccount.createdIdentity === true,
+                    resolvedAccount.createdIdentity ===
+                    true,
 
                 reusedSession:
                     !sessionResult.sessionCookie
