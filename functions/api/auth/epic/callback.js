@@ -7,31 +7,35 @@ EPIC OAUTH CALLBACK ROUTE
 File:
     functions/api/auth/epic/callback.js
 
+Purpose:
+    Thin Cloudflare Pages Functions route for the Epic OAuth
+    callback.
+
+Description:
+    - Receives the browser callback from Epic Games.
+    - Logs only safe callback metadata.
+    - Delegates OAuth processing to the Epic callback service.
+    - Rejects unsupported request methods.
+
 Public Route:
     GET /api/auth/epic/callback
 
 Service:
     functions/services/auth/providers/epic/callback.js
 
-Purpose:
-    Thin Cloudflare Pages Functions route for the Epic OAuth
-    callback.
-
-Responsibilities:
-    - Receive the browser callback request.
-    - Log safe request metadata.
-    - Delegate all OAuth logic to the Epic auth service.
-    - Return the service response.
-
 Important:
-    - OAuth logic does not belong in this route.
-    - Tokens, secrets, authorization codes, and OAuth state
+    - Turnstile verification does not occur on this route.
+    - OAuth secrets, tokens, authorization codes, and state
       values must never be logged.
 ========================================================= */
 
 import {
     handleEpicCallback
 } from "../../../services/auth/providers/epic/callback.js";
+
+import {
+    methodNotAllowedResponse
+} from "../../../services/http/responses.js";
 
 /* =========================================================
 GET
@@ -116,11 +120,7 @@ export async function onRequestGet(
 
                 message:
                     error?.message
-                    || "Unknown error",
-
-                stack:
-                    error?.stack
-                    || null
+                    || "Unknown error"
             }
         );
 
@@ -129,8 +129,8 @@ export async function onRequestGet(
                 success:
                     false,
 
-                message:
-                    "Epic callback failed unexpectedly.",
+                error:
+                    "EPIC_CALLBACK_FAILED",
 
                 debugId
             },
@@ -145,4 +145,40 @@ export async function onRequestGet(
             }
         );
     }
+}
+
+/* =========================================================
+UNSUPPORTED METHODS
+========================================================= */
+
+export async function onRequestPost() {
+    return methodNotAllowedResponse(
+        [
+            "GET"
+        ]
+    );
+}
+
+export async function onRequestPut() {
+    return methodNotAllowedResponse(
+        [
+            "GET"
+        ]
+    );
+}
+
+export async function onRequestPatch() {
+    return methodNotAllowedResponse(
+        [
+            "GET"
+        ]
+    );
+}
+
+export async function onRequestDelete() {
+    return methodNotAllowedResponse(
+        [
+            "GET"
+        ]
+    );
 }

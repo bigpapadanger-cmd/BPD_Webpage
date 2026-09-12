@@ -22,8 +22,11 @@ Description:
     - Uses the global BPD session for account ownership.
     - Uses identity.accounts.id as the canonical account ID.
     - Requires a linked Epic provider for Rocket League.
+    - Keeps GET profile operations read-only.
+    - Ensures the Rocket League player exists during POST.
     - Loads Rocket League data by core.rl_players.account_id.
     - Saves Rocket League data by account_id.
+    - Keeps BPD and Epic display names separate.
     - Returns only coarse Cloudflare request location.
     - Never accepts browser-submitted identity ownership.
 
@@ -37,16 +40,25 @@ Identity Model:
     providers.epic.accountId
         = Epic account ID
 
+Display Name Model:
+    bpdDisplayName
+        = identity.accounts.display_name
+
+    EpicDisplayName
+        = linked Epic provider display name
+
 Important:
     - Global BPD authentication is authoritative.
     - Epic is required for Rocket League functionality but
       is NOT the global ownership key.
     - Epic display names are never used for ownership.
+    - BPD display names belong to identity.accounts.
+    - There is no separate Rocket League display name.
     - Browser-submitted account IDs are ignored.
     - Browser-submitted Epic IDs are ignored.
-    - Supabase identity creation does not occur here.
-    - api.resolve_epic_identity handles Epic/global identity
-      establishment during Epic authentication.
+    - Browser-submitted display names are ignored.
+    - Browser-submitted location is ignored for authority.
+    - Supabase global identity creation does not occur here.
 ========================================================= */
 
 import {
@@ -57,6 +69,10 @@ import {
     getSessionContext,
     getProviderContext
 } from "../auth/sessions/session_context.js";
+
+import {
+    ensureRocketLeaguePlayer
+} from "../supabase/rocketleague/ensure_player.js";
 
 import {
     getRocketLeagueProfileByAccountId
@@ -87,8 +103,7 @@ const ALLOWED_MODES = [
 const ALLOWED_REMINDER_MODES = [
     "24-hours",
     "1-hour",
-    "both",
-    "specific-times"
+    "both"
 ];
 
 const ALLOWED_DAYS = [
@@ -269,12 +284,18 @@ function normalizeDatabaseProfile(
         || databaseProfile.rl_player_id
         || null;
 
-    const displayName =
-        databaseProfile.displayName
-        || databaseProfile.display_name
-        || epicUser.EpicDisplayName
-        || epicUser.EpicPreferredUsername
-        || "";
+    const bpdDisplayName =
+        normalizeNullableString(
+            databaseProfile.bpdDisplayName
+            || databaseProfile.bpd_display_name
+        );
+
+    const epicDisplayName =
+        normalizeNullableString(
+            databaseProfile.epicDisplayName
+            || databaseProfile.epic_display_name
+            || epicUser.EpicDisplayName
+        );
 
     const ranked =
         databaseProfile.ranked
@@ -299,11 +320,13 @@ function normalizeDatabaseProfile(
 
         rlPlayerId,
 
+        bpdDisplayName,
+
         EpicUniqueId:
             epicUser.EpicUniqueId,
 
         EpicDisplayName:
-            epicUser.EpicDisplayName,
+            epicDisplayName,
 
         EpicPreferredUsername:
             epicUser.EpicPreferredUsername,
@@ -315,12 +338,6 @@ function normalizeDatabaseProfile(
 
         active:
             databaseProfile.active === true,
-
-        username:
-            displayName
-            || "Epic Player",
-
-        displayName,
 
         currentRank:
             databaseProfile.currentRank
@@ -413,11 +430,6 @@ function buildFallbackProfile(
         sessionContext.userId
         || null;
 
-    const displayName =
-        epicUser.EpicDisplayName
-        || epicUser.EpicPreferredUsername
-        || "";
-
     return {
         accountId,
 
@@ -429,6 +441,11 @@ function buildFallbackProfile(
 
         rlPlayerId:
             null,
+
+        bpdDisplayName:
+            normalizeNullableString(
+                sessionContext.displayName
+            ),
 
         EpicUniqueId:
             epicUser.EpicUniqueId,
@@ -445,12 +462,6 @@ function buildFallbackProfile(
 
         active:
             sessionContext.active === true,
-
-        username:
-            displayName
-            || "Epic Player",
-
-        displayName,
 
         currentRank:
             "",
@@ -524,9 +535,7 @@ function normalizeAvailability(
 
     return availability
         .map(
-            (
-                item
-            ) => ({
+            item => ({
                 day:
                     normalizeString(
                         item?.day,
@@ -548,9 +557,7 @@ function normalizeAvailability(
             })
         )
         .filter(
-            (
-                item
-            ) =>
+            item =>
                 ALLOWED_DAYS.includes(
                     item.day
                 )
@@ -577,6 +584,7 @@ function normalizeRegistrationPayload(
      *     body.accountId is ignored.
      *     body.userId is ignored.
      *     body.EpicUniqueId is ignored.
+     *     body.displayName is ignored.
      *     body.role is ignored.
      *     body.active is ignored.
      *     body.location is ignored.
@@ -592,12 +600,6 @@ function normalizeRegistrationPayload(
         ageConsent:
             normalizeBoolean(
                 body?.ageConsent
-            ),
-
-        displayName:
-            normalizeString(
-                body?.displayName,
-                32
             ),
 
         currentRank:
@@ -684,14 +686,6 @@ function validateRegistrationPayload(
     }
 
     if (
-        !profile.displayName
-    ) {
-        return (
-            "Display name is required."
-        );
-    }
-
-    if (
         !profile.currentRank
     ) {
         return (
@@ -762,9 +756,7 @@ function validateRegistrationPayload(
 
     const invalidAvailability =
         profile.availability.some(
-            (
-                item
-            ) =>
+            item =>
                 !item.start
                 || !item.end
                 || item.start < AVAILABILITY_START
@@ -790,15 +782,6 @@ function validateRegistrationPayload(
     ) {
         return (
             "Select a valid reminder preference."
-        );
-    }
-
-    if (
-        profile.notificationsEnabled
-        && profile.reminderMode === "specific-times"
-    ) {
-        return (
-            "Specific reminder times are not available yet. Select 24 hours, 1 hour, or both."
         );
     }
 
@@ -834,6 +817,9 @@ async function getAuthenticatedContext(
 
                         requiresEpicLogin:
                             true,
+
+                        code:
+                            "AUTH_REQUIRED",
 
                         message:
                             "Login is required to access the Rocket League profile."
@@ -929,19 +915,20 @@ async function getAuthenticatedContext(
                         userId:
                             accountId,
 
+                        code:
+                            "EPIC_ACCOUNT_REQUIRED",
+
                         message:
                             "A linked Epic account is required to access Rocket League."
                     },
-                    401
+                    409
                 )
         };
     }
 
     return {
         sessionContext,
-
         accountId,
-
         epicUser
     };
 }
@@ -1089,6 +1076,9 @@ async function handleProfileGet(
                 rlPlayerId:
                     profile.rlPlayerId,
 
+                bpdDisplayName:
+                    profile.bpdDisplayName,
+
                 role:
                     profile.role,
 
@@ -1099,7 +1089,7 @@ async function handleProfileGet(
                     epicUser.EpicUniqueId,
 
                 EpicDisplayName:
-                    epicUser.EpicDisplayName,
+                    profile.EpicDisplayName,
 
                 EpicPreferredUsername:
                     epicUser.EpicPreferredUsername
@@ -1166,6 +1156,9 @@ async function handleProfilePost(
                 rocketLeagueAccess:
                     false,
 
+                code:
+                    "INVALID_REGISTRATION_DATA",
+
                 message:
                     "Registration data was invalid."
             },
@@ -1206,6 +1199,9 @@ async function handleProfilePost(
                 rocketLeagueAccess:
                     false,
 
+                code:
+                    "INVALID_REGISTRATION_DATA",
+
                 message:
                     validationError
             },
@@ -1213,15 +1209,154 @@ async function handleProfilePost(
         );
     }
 
+    /* =====================================================
+    ENSURE ROCKET LEAGUE PLAYER
+
+    This is deliberately a POST-side effect.
+
+    GET profile/session requests remain read-only and never
+    create core.rl_players records.
+    ===================================================== */
+
+    let ensuredPlayer;
+
+    try {
+        ensuredPlayer =
+            await ensureRocketLeaguePlayer(
+                env,
+                accountId
+            );
+    }
+    catch (
+        error
+    ) {
+        console.error(
+            "ROCKET LEAGUE PROFILE: Player initialization failed.",
+            {
+                name:
+                    error?.name
+                    || "Error",
+
+                code:
+                    error?.code
+                    || error?.upstreamCode
+                    || null,
+
+                upstreamStatus:
+                    error?.upstreamStatus
+                    || null,
+
+                message:
+                    error?.message
+                    || "Unknown error"
+            }
+        );
+
+        if (
+            error?.code === "EPIC_ACCOUNT_REQUIRED"
+            || error?.message === "EPIC_IDENTITY_NOT_LINKED"
+        ) {
+            return json(
+                {
+                    success:
+                        false,
+
+                    authenticated:
+                        true,
+
+                    requiresEpicLogin:
+                        true,
+
+                    profileSaved:
+                        false,
+
+                    profileComplete:
+                        false,
+
+                    rocketLeagueAccess:
+                        false,
+
+                    code:
+                        "EPIC_ACCOUNT_REQUIRED",
+
+                    message:
+                        "A linked Epic account is required to register for Rocket League."
+                },
+                409
+            );
+        }
+
+        return json(
+            {
+                success:
+                    false,
+
+                authenticated:
+                    true,
+
+                requiresEpicLogin:
+                    false,
+
+                profileSaved:
+                    false,
+
+                profileComplete:
+                    false,
+
+                rocketLeagueAccess:
+                    false,
+
+                code:
+                    error?.upstreamCode
+                    || "ROCKET_LEAGUE_PLAYER_INITIALIZATION_FAILED",
+
+                message:
+                    "Your Rocket League player profile could not be initialized."
+            },
+            500
+        );
+    }
+
+    if (
+        !ensuredPlayer?.rlPlayerId
+    ) {
+        return json(
+            {
+                success:
+                    false,
+
+                authenticated:
+                    true,
+
+                requiresEpicLogin:
+                    false,
+
+                profileSaved:
+                    false,
+
+                profileComplete:
+                    false,
+
+                rocketLeagueAccess:
+                    false,
+
+                code:
+                    "ROCKET_LEAGUE_PLAYER_INITIALIZATION_INVALID",
+
+                message:
+                    "Your Rocket League player profile could not be verified."
+            },
+            500
+        );
+    }
+
+    /* =====================================================
+    SAVE REGISTRATION
+    ===================================================== */
+
     let result;
 
     try {
-        /*
-         * accountId originates from session.userId.
-         *
-         * No browser-supplied account ID or Epic ID is used
-         * to determine ownership.
-         */
         result =
             await saveRocketLeagueProfile(
                 env,
@@ -1249,10 +1384,6 @@ async function handleProfilePost(
 
                 upstreamCode:
                     error?.upstreamCode
-                    || null,
-
-                stack:
-                    error?.stack
                     || null
             }
         );
@@ -1301,14 +1432,7 @@ async function handleProfilePost(
         && returnedAccountId !== accountId
     ) {
         console.error(
-            "ROCKET LEAGUE PROFILE: Save returned unexpected account.",
-            {
-                expectedAccount:
-                    true,
-
-                returnedAccount:
-                    true
-            }
+            "ROCKET LEAGUE PROFILE: Save returned unexpected account."
         );
 
         return json(
@@ -1356,6 +1480,7 @@ async function handleProfilePost(
     const rlPlayerId =
         result?.rl_player_id
         || result?.rlPlayerId
+        || ensuredPlayer.rlPlayerId
         || null;
 
     return json(
@@ -1387,6 +1512,12 @@ async function handleProfilePost(
                 accountId,
 
             rlPlayerId,
+
+            playerCreated:
+                ensuredPlayer.createdPlayer === true,
+
+            playerAdopted:
+                ensuredPlayer.adoptedPlayer === true,
 
             role:
                 result?.role
@@ -1534,10 +1665,6 @@ export async function handleRocketLeagueProfile(
                 message:
                     error?.message
                     || "Unknown error",
-
-                stack:
-                    error?.stack
-                    || null,
 
                 method:
                     request.method

@@ -14,13 +14,12 @@ API Route:
     functions/api/auth/_oauth/callback.js
 
 Purpose:
-    Completes OAuth authentication and provider-linking flows
-    managed through Supabase Auth.
+    Completes Supabase-managed OAuth authentication and
+    provider-linking flows.
 
 Supported Providers:
     - Google
     - Discord
-    - Epic Games
 
 Supported OAuth Modes:
     - login
@@ -29,6 +28,8 @@ Supported OAuth Modes:
 Login Flow:
     Provider authentication
         ↓
+    Supabase PKCE callback
+        ↓
     Resolve provider identity
         ↓
     Provider-specific identity RPC
@@ -36,6 +37,8 @@ Login Flow:
     Resolve or create identity.accounts
         ↓
     Establish centralized BPD session
+        ↓
+    Redirect to requested local destination
 
 Link Flow:
     Existing authenticated BPD session
@@ -51,14 +54,33 @@ Link Flow:
     Update current BPD session provider state
 
 Important:
-    - Supabase access tokens are NOT stored in BPD sessions.
-    - Supabase refresh tokens are NOT stored in BPD sessions.
-    - Provider access tokens are NOT stored in BPD sessions.
-    - Raw sessionData is never consumed here.
-    - Email never determines account ownership.
-    - Link mode NEVER creates identity.accounts.
+    - Epic direct OAuth is handled by its own callback service.
+    - Supabase access tokens are never stored in BPD sessions.
+    - Supabase refresh tokens are never stored in BPD sessions.
+    - Provider access tokens are never stored in BPD sessions.
+    - Email never determines BPD account ownership.
+    - Link mode never creates identity.accounts.
     - Provider ownership is based on provider subject.
 ========================================================= */
+
+import {
+    SUPPORTED_OAUTH_PROVIDERS,
+    getProviderConfig,
+    getProviderIdentity,
+    validateExpectedProvider,
+    normalizeString,
+    normalizeNullableString
+} from "./provider_helpers.js";
+
+import {
+    OAUTH_MODE_LINK,
+    getOAuthMode,
+    getOAuthProvider,
+    getOAuthPkceVerifier,
+    getOAuthAccountId,
+    getOAuthReturnTo,
+    getOAuthClearCookies
+} from "./state.js";
 
 import {
     json,
@@ -66,8 +88,6 @@ import {
 } from "../../common_helpers/responses.js";
 
 import {
-    getCookie,
-    clearCookie,
     createSession,
     createSessionCookie,
     attachProviderToSession,
@@ -80,145 +100,11 @@ import {
 } from "../sessions/session_context.js";
 
 /* =========================================================
-OAUTH COOKIE NAMES
+CONSTANTS
 ========================================================= */
 
-const PKCE_COOKIE =
-    "bpd_oauth_pkce";
-
-const OAUTH_PROVIDER_COOKIE =
-    "bpd_oauth_provider";
-
-const OAUTH_MODE_COOKIE =
-    "bpd_oauth_mode";
-
-const OAUTH_ACCOUNT_COOKIE =
-    "bpd_oauth_account";
-
-/* =========================================================
-OAUTH MODES
-========================================================= */
-
-const OAUTH_MODE_LOGIN =
-    "login";
-
-const OAUTH_MODE_LINK =
-    "link";
-
-/* =========================================================
-SUPPORTED PROVIDERS
-========================================================= */
-
-const SUPPORTED_PROVIDERS =
-    new Set([
-        "google",
-        "discord",
-        "epic"
-    ]);
-
-/* =========================================================
-PROVIDER CONFIGURATION
-========================================================= */
-
-const PROVIDER_CONFIG =
-    Object.freeze({
-        google: {
-            label:
-                "Google",
-
-            resolveRpc:
-                "resolve_google_identity",
-
-            linkRpc:
-                "link_google_identity"
-        },
-
-        discord: {
-            label:
-                "Discord",
-
-            resolveRpc:
-                "resolve_discord_identity",
-
-            linkRpc:
-                "link_discord_identity"
-        },
-
-        epic: {
-            label:
-                "Epic Games",
-
-            resolveRpc:
-                "resolve_epic_identity",
-
-            linkRpc:
-                "link_epic_identity"
-        }
-    });
-
-/* =========================================================
-NORMALIZATION
-========================================================= */
-
-function normalizeString(
-    value
-) {
-    if (
-        typeof value !==
-        "string"
-    ) {
-        return "";
-    }
-
-    return value.trim();
-}
-
-function normalizeNullableString(
-    value
-) {
-    const normalized =
-        normalizeString(
-            value
-        );
-
-    return normalized
-        || null;
-}
-
-function normalizeProvider(
-    value
-) {
-    return normalizeString(
-        value
-    )
-        .toLowerCase();
-}
-
-/* =========================================================
-PROVIDER CONFIG
-========================================================= */
-
-function getProviderConfig(
-    provider
-) {
-    const normalizedProvider =
-        normalizeProvider(
-            provider
-        );
-
-    if (
-        !normalizedProvider
-    ) {
-        return null;
-    }
-
-    return (
-        PROVIDER_CONFIG[
-            normalizedProvider
-        ]
-        || null
-    );
-}
+const NEW_ACCOUNT_RETURN_TO =
+    "/Account?setup=1";
 
 /* =========================================================
 SUPABASE PROJECT ORIGIN
@@ -229,7 +115,7 @@ function getSupabaseOrigin(
 ) {
     const configuredUrl =
         normalizeString(
-            env.SUPABASE_URL
+            env?.SUPABASE_URL
         );
 
     if (
@@ -256,7 +142,7 @@ function getSupabaseApiKey(
     env
 ) {
     return normalizeString(
-        env.SUPABASE_AUTH
+        env?.SUPABASE_AUTH
     );
 }
 
@@ -269,7 +155,7 @@ function getSupabaseDataBaseUrl(
 ) {
     const supabaseUrl =
         normalizeString(
-            env.SUPABASE_URL
+            env?.SUPABASE_URL
         );
 
     if (
@@ -283,42 +169,6 @@ function getSupabaseDataBaseUrl(
     )
         ? supabaseUrl
         : `${supabaseUrl}/`;
-}
-
-/* =========================================================
-OAUTH MODE
-========================================================= */
-
-function getOAuthMode(
-    request
-) {
-    const mode =
-        normalizeString(
-            getCookie(
-                request,
-                OAUTH_MODE_COOKIE
-            )
-        )
-            .toLowerCase();
-
-    /*
-     * Existing login flows may not yet set bpd_oauth_mode.
-     * Missing mode remains normal login for compatibility.
-     */
-    if (
-        !mode
-    ) {
-        return OAUTH_MODE_LOGIN;
-    }
-
-    if (
-        mode === OAUTH_MODE_LOGIN
-        || mode === OAUTH_MODE_LINK
-    ) {
-        return mode;
-    }
-
-    return null;
 }
 
 /* =========================================================
@@ -528,520 +378,6 @@ async function loadSupabaseAuthUser(
 }
 
 /* =========================================================
-SUPABASE PROVIDERS
-========================================================= */
-
-function getSupabaseProviders(
-    user
-) {
-    const providers =
-        new Set();
-
-    const primaryProvider =
-        normalizeProvider(
-            user?.app_metadata
-                ?.provider
-        );
-
-    if (
-        primaryProvider
-    ) {
-        providers.add(
-            primaryProvider
-        );
-    }
-
-    const metadataProviders =
-        user?.app_metadata
-            ?.providers;
-
-    if (
-        Array.isArray(
-            metadataProviders
-        )
-    ) {
-        for (
-            const provider
-            of metadataProviders
-        ) {
-            const normalized =
-                normalizeProvider(
-                    provider
-                );
-
-            if (
-                normalized
-            ) {
-                providers.add(
-                    normalized
-                );
-            }
-        }
-    }
-
-    if (
-        Array.isArray(
-            user?.identities
-        )
-    ) {
-        for (
-            const identity
-            of user.identities
-        ) {
-            const normalized =
-                normalizeProvider(
-                    identity?.provider
-                );
-
-            if (
-                normalized
-            ) {
-                providers.add(
-                    normalized
-                );
-            }
-        }
-    }
-
-    return [
-        ...providers
-    ];
-}
-
-/* =========================================================
-EXPECTED PROVIDER VALIDATION
-========================================================= */
-
-function validateExpectedProvider(
-    provider,
-    user
-) {
-    const expectedProvider =
-        normalizeProvider(
-            provider
-        );
-
-    if (
-        !expectedProvider
-        || !SUPPORTED_PROVIDERS.has(
-            expectedProvider
-        )
-    ) {
-        return false;
-    }
-
-    return getSupabaseProviders(
-        user
-    )
-        .includes(
-            expectedProvider
-        );
-}
-
-/* =========================================================
-SUPABASE PROVIDER IDENTITY
-========================================================= */
-
-function getSupabaseIdentity(
-    user,
-    provider
-) {
-    const normalizedProvider =
-        normalizeProvider(
-            provider
-        );
-
-    if (
-        !normalizedProvider
-    ) {
-        return null;
-    }
-
-    const identities =
-        Array.isArray(
-            user?.identities
-        )
-            ? user.identities
-            : [];
-
-    return (
-        identities.find(
-            (
-                entry
-            ) =>
-                normalizeProvider(
-                    entry?.provider
-                )
-                === normalizedProvider
-        )
-        || null
-    );
-}
-
-/* =========================================================
-IDENTITY DATA
-========================================================= */
-
-function getIdentityData(
-    identity
-) {
-    if (
-        identity?.identity_data
-        && typeof identity.identity_data ===
-            "object"
-        && !Array.isArray(
-            identity.identity_data
-        )
-    ) {
-        return identity.identity_data;
-    }
-
-    return {};
-}
-
-function getUserMetadata(
-    user
-) {
-    if (
-        user?.user_metadata
-        && typeof user.user_metadata ===
-            "object"
-        && !Array.isArray(
-            user.user_metadata
-        )
-    ) {
-        return user.user_metadata;
-    }
-
-    return {};
-}
-
-/* =========================================================
-PROVIDER SUBJECT
-========================================================= */
-
-function getProviderSubject(
-    identity,
-    identityData
-) {
-    return (
-        normalizeString(
-            identityData.sub
-        )
-        || normalizeString(
-            identityData.provider_id
-        )
-        || normalizeString(
-            identityData.user_id
-        )
-        || normalizeString(
-            identity?.id
-        )
-    );
-}
-
-/* =========================================================
-PROVIDER EMAIL
-========================================================= */
-
-function getProviderEmail(
-    user,
-    identityData
-) {
-    return (
-        normalizeNullableString(
-            identityData.email
-        )
-        || normalizeNullableString(
-            user?.email
-        )
-    );
-}
-
-/* =========================================================
-GOOGLE DISPLAY NAME
-========================================================= */
-
-function getGoogleDisplayName(
-    identityData,
-    userMetadata
-) {
-    return (
-        normalizeNullableString(
-            identityData.full_name
-        )
-        || normalizeNullableString(
-            identityData.name
-        )
-        || normalizeNullableString(
-            userMetadata.full_name
-        )
-        || normalizeNullableString(
-            userMetadata.name
-        )
-    );
-}
-
-/* =========================================================
-DISCORD DISPLAY NAME
-========================================================= */
-
-function getDiscordDisplayName(
-    identityData,
-    userMetadata
-) {
-    return (
-        normalizeNullableString(
-            identityData.global_name
-        )
-        || normalizeNullableString(
-            identityData.full_name
-        )
-        || normalizeNullableString(
-            identityData.name
-        )
-        || normalizeNullableString(
-            identityData.username
-        )
-        || normalizeNullableString(
-            userMetadata.global_name
-        )
-        || normalizeNullableString(
-            userMetadata.full_name
-        )
-        || normalizeNullableString(
-            userMetadata.name
-        )
-        || normalizeNullableString(
-            userMetadata.user_name
-        )
-    );
-}
-
-/* =========================================================
-EPIC DISPLAY NAME
-========================================================= */
-
-function getEpicDisplayName(
-    identityData,
-    userMetadata
-) {
-    return (
-        normalizeNullableString(
-            identityData.preferred_username
-        )
-        || normalizeNullableString(
-            identityData.display_name
-        )
-        || normalizeNullableString(
-            identityData.name
-        )
-        || normalizeNullableString(
-            userMetadata.preferred_username
-        )
-        || normalizeNullableString(
-            userMetadata.display_name
-        )
-        || normalizeNullableString(
-            userMetadata.name
-        )
-    );
-}
-
-/* =========================================================
-PROVIDER DISPLAY NAME
-========================================================= */
-
-function getProviderDisplayName(
-    provider,
-    identityData,
-    userMetadata
-) {
-    if (
-        provider ===
-        "google"
-    ) {
-        return getGoogleDisplayName(
-            identityData,
-            userMetadata
-        );
-    }
-
-    if (
-        provider ===
-        "discord"
-    ) {
-        return getDiscordDisplayName(
-            identityData,
-            userMetadata
-        );
-    }
-
-    if (
-        provider ===
-        "epic"
-    ) {
-        return getEpicDisplayName(
-            identityData,
-            userMetadata
-        );
-    }
-
-    return null;
-}
-
-/* =========================================================
-PROVIDER PREFERRED USERNAME
-========================================================= */
-
-function getProviderPreferredUsername(
-    provider,
-    identityData,
-    userMetadata
-) {
-    if (
-        provider ===
-        "discord"
-    ) {
-        return (
-            normalizeNullableString(
-                identityData.username
-            )
-            || normalizeNullableString(
-                userMetadata.user_name
-            )
-            || normalizeNullableString(
-                userMetadata.username
-            )
-        );
-    }
-
-    if (
-        provider ===
-        "epic"
-    ) {
-        return (
-            normalizeNullableString(
-                identityData.preferred_username
-            )
-            || normalizeNullableString(
-                identityData.display_name
-            )
-            || normalizeNullableString(
-                userMetadata.preferred_username
-            )
-            || normalizeNullableString(
-                userMetadata.display_name
-            )
-        );
-    }
-
-    return null;
-}
-
-/* =========================================================
-PROVIDER EMAIL VERIFIED
-========================================================= */
-
-function getProviderEmailVerified(
-    identityData,
-    userMetadata
-) {
-    return (
-        identityData.email_verified ===
-        true
-        || userMetadata.email_verified ===
-            true
-    );
-}
-
-/* =========================================================
-RESOLVE PROVIDER IDENTITY
-========================================================= */
-
-function getProviderIdentity(
-    user,
-    provider
-) {
-    const normalizedProvider =
-        normalizeProvider(
-            provider
-        );
-
-    const identity =
-        getSupabaseIdentity(
-            user,
-            normalizedProvider
-        );
-
-    if (
-        !identity
-    ) {
-        return null;
-    }
-
-    const identityData =
-        getIdentityData(
-            identity
-        );
-
-    const userMetadata =
-        getUserMetadata(
-            user
-        );
-
-    const providerSubject =
-        getProviderSubject(
-            identity,
-            identityData
-        );
-
-    if (
-        !providerSubject
-    ) {
-        return null;
-    }
-
-    return {
-        provider:
-            normalizedProvider,
-
-        authUserId:
-            normalizeString(
-                user.id
-            ),
-
-        providerSubject,
-
-        email:
-            getProviderEmail(
-                user,
-                identityData
-            ),
-
-        emailVerified:
-            getProviderEmailVerified(
-                identityData,
-                userMetadata
-            ),
-
-        displayName:
-            getProviderDisplayName(
-                normalizedProvider,
-                identityData,
-                userMetadata
-            ),
-
-        preferredUsername:
-            getProviderPreferredUsername(
-                normalizedProvider,
-                identityData,
-                userMetadata
-            )
-    };
-}
-
-/* =========================================================
 READ RPC RESULT
 ========================================================= */
 
@@ -1073,7 +409,7 @@ async function readRpcRecord(
                 );
         }
         catch {
-            // Ignore malformed upstream error body.
+            // Ignore malformed upstream error bodies.
         }
 
         const error =
@@ -1577,9 +913,8 @@ async function getLinkContext(
 ) {
     const targetAccountId =
         normalizeString(
-            getCookie(
-                request,
-                OAUTH_ACCOUNT_COOKIE
+            getOAuthAccountId(
+                request
             )
         );
 
@@ -1749,39 +1084,6 @@ async function establishLinkedSession(
 }
 
 /* =========================================================
-CLEAR TEMPORARY OAUTH COOKIES
-========================================================= */
-
-function getOAuthClearCookies(
-    request
-) {
-    return [
-        clearCookie(
-            request,
-            PKCE_COOKIE
-        ),
-
-        clearCookie(
-            request,
-            OAUTH_PROVIDER_COOKIE
-        ),
-
-        clearCookie(
-            request,
-            OAUTH_MODE_COOKIE
-        ),
-
-        clearCookie(
-            request,
-            OAUTH_ACCOUNT_COOKIE
-        )
-    ]
-        .filter(
-            Boolean
-        );
-}
-
-/* =========================================================
 MAIN CALLBACK
 ========================================================= */
 
@@ -1812,23 +1114,25 @@ export async function handleOAuthCallback(
         );
 
     const provider =
-        normalizeProvider(
-            getCookie(
-                request,
-                OAUTH_PROVIDER_COOKIE
-            )
+        getOAuthProvider(
+            request
         );
 
     const verifier =
-        normalizeString(
-            getCookie(
-                request,
-                PKCE_COOKIE
-            )
+        getOAuthPkceVerifier(
+            request
         );
 
     const mode =
         getOAuthMode(
+            request
+        );
+
+    /*
+     * Read this before clearing the one-time OAuth cookies.
+     */
+    const returnTo =
+        getOAuthReturnTo(
             request
         );
 
@@ -1863,6 +1167,9 @@ export async function handleOAuthCallback(
                     success:
                         false,
 
+                    code:
+                        "OAUTH_PROVIDER_REJECTED",
+
                     message:
                         "OAuth authentication was not completed.",
 
@@ -1884,6 +1191,9 @@ export async function handleOAuthCallback(
                     success:
                         false,
 
+                    code:
+                        "OAUTH_CODE_MISSING",
+
                     message:
                         "OAuth authorization code is missing.",
 
@@ -1895,7 +1205,7 @@ export async function handleOAuthCallback(
 
         if (
             !provider
-            || !SUPPORTED_PROVIDERS.has(
+            || !SUPPORTED_OAUTH_PROVIDERS.has(
                 provider
             )
         ) {
@@ -1903,6 +1213,9 @@ export async function handleOAuthCallback(
                 {
                     success:
                         false,
+
+                    code:
+                        "OAUTH_PROVIDER_INVALID",
 
                     message:
                         "OAuth provider context is invalid.",
@@ -1921,6 +1234,9 @@ export async function handleOAuthCallback(
                     success:
                         false,
 
+                    code:
+                        "OAUTH_MODE_INVALID",
+
                     message:
                         "OAuth operation mode is invalid.",
 
@@ -1937,6 +1253,9 @@ export async function handleOAuthCallback(
                 {
                     success:
                         false,
+
+                    code:
+                        "OAUTH_PKCE_MISSING",
 
                     message:
                         "OAuth verification data is missing. Please restart authentication.",
@@ -1959,6 +1278,9 @@ export async function handleOAuthCallback(
                 {
                     success:
                         false,
+
+                    code:
+                        "OAUTH_PROVIDER_CONFIGURATION_MISSING",
 
                     message:
                         "OAuth provider configuration is unavailable.",
@@ -1993,9 +1315,7 @@ export async function handleOAuthCallback(
                     "OAUTH CALLBACK: Link context validation failed.",
                     {
                         debugId,
-
                         provider,
-
                         code:
                             linkContext.code
                     }
@@ -2040,9 +1360,7 @@ export async function handleOAuthCallback(
                 "OAUTH CALLBACK: Supabase code exchange failed.",
                 {
                     debugId,
-
                     provider,
-
                     mode,
 
                     upstreamStatus:
@@ -2059,6 +1377,9 @@ export async function handleOAuthCallback(
                 {
                     success:
                         false,
+
+                    code:
+                        "OAUTH_CODE_EXCHANGE_FAILED",
 
                     message:
                         "OAuth authorization could not be verified.",
@@ -2089,9 +1410,7 @@ export async function handleOAuthCallback(
                 "OAUTH CALLBACK: Supabase Auth user validation failed.",
                 {
                     debugId,
-
                     provider,
-
                     mode,
 
                     upstreamStatus:
@@ -2108,6 +1427,9 @@ export async function handleOAuthCallback(
                 {
                     success:
                         false,
+
+                    code:
+                        "OAUTH_USER_VALIDATION_FAILED",
 
                     message:
                         "Authenticated user could not be validated.",
@@ -2132,6 +1454,9 @@ export async function handleOAuthCallback(
                 {
                     success:
                         false,
+
+                    code:
+                        "OAUTH_PROVIDER_MISMATCH",
 
                     message:
                         "Authenticated provider did not match the requested authentication flow.",
@@ -2161,6 +1486,9 @@ export async function handleOAuthCallback(
                 {
                     success:
                         false,
+
+                    code:
+                        "PROVIDER_IDENTITY_MISSING",
 
                     message:
                         "Provider identity could not be resolved.",
@@ -2195,7 +1523,6 @@ export async function handleOAuthCallback(
                     "OAUTH CALLBACK: Provider identity link failed.",
                     {
                         debugId,
-
                         provider,
 
                         upstreamStatus:
@@ -2241,11 +1568,7 @@ export async function handleOAuthCallback(
                 "OAUTH CALLBACK: Provider link completed.",
                 {
                     debugId,
-
                     provider,
-
-                    hasAccountId:
-                        true,
 
                     linkedIdentity:
                         linkedAccount.linkedIdentity ===
@@ -2281,7 +1604,6 @@ export async function handleOAuthCallback(
                 "OAUTH CALLBACK: Global identity resolution failed.",
                 {
                     debugId,
-
                     provider,
 
                     upstreamStatus:
@@ -2303,12 +1625,37 @@ export async function handleOAuthCallback(
                     success:
                         false,
 
+                    code:
+                        error?.upstreamCode
+                        || "ACCOUNT_RESOLUTION_FAILED",
+
                     message:
                         "BPD account synchronization failed.",
 
                     debugId
                 },
                 502
+            );
+        }
+
+        if (
+            resolvedAccount.active !==
+            true
+        ) {
+            return json(
+                {
+                    success:
+                        false,
+
+                    code:
+                        "ACCOUNT_INACTIVE",
+
+                    message:
+                        "This BPD account is not active.",
+
+                    debugId
+                },
+                403
             );
         }
 
@@ -2354,19 +1701,18 @@ export async function handleOAuthCallback(
             );
         }
 
+        const destination =
+            resolvedAccount.createdAccount ===
+                true
+                ? NEW_ACCOUNT_RETURN_TO
+                : returnTo;
+
         console.info(
             "OAUTH CALLBACK: Authentication completed.",
             {
                 debugId,
-
                 provider,
-
                 mode,
-
-                hasAccountId:
-                    Boolean(
-                        resolvedAccount.accountId
-                    ),
 
                 createdAccount:
                     resolvedAccount.createdAccount ===
@@ -2382,7 +1728,7 @@ export async function handleOAuthCallback(
         );
 
         return redirect(
-            "/",
+            destination,
             cookies
         );
     }
@@ -2408,11 +1754,7 @@ export async function handleOAuthCallback(
 
                 message:
                     error?.message
-                    || "Unknown error",
-
-                stack:
-                    error?.stack
-                    || null
+                    || "Unknown error"
             }
         );
 
@@ -2420,6 +1762,9 @@ export async function handleOAuthCallback(
             {
                 success:
                     false,
+
+                code:
+                    "OAUTH_CALLBACK_FAILED",
 
                 message:
                     "OAuth callback failed unexpectedly.",

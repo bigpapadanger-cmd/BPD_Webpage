@@ -72,6 +72,9 @@ import {
     OAUTH_RETURN_URL
 } from "../../config/api_vars.js";
 
+import { OAUTH_MODE_COOKIE, OAUTH_PROVIDER_COOKIE, OAUTH_ACCOUNT_COOKIE,
+        OAUTH_COOKIE_MAX_AGE_SECONDS, OAUTH_PKCE_COOKIE
+} from "../../config/api_vars.js";
 /* =========================================================
 CONSTANTS
 ========================================================= */
@@ -79,20 +82,8 @@ CONSTANTS
 const OAUTH_MODE_LINK =
     "link";
 
-const OAUTH_MODE_COOKIE =
-    "bpd_oauth_mode";
 
-const OAUTH_PROVIDER_COOKIE =
-    "bpd_oauth_provider";
 
-const OAUTH_ACCOUNT_COOKIE =
-    "bpd_oauth_account";
-
-const PKCE_COOKIE =
-    "bpd_oauth_pkce";
-
-const OAUTH_COOKIE_MAX_AGE_SECONDS =
-    600;
 
 /* =========================================================
 SUPPORTED PROVIDERS
@@ -338,7 +329,7 @@ function createOAuthContextCookies(
     const pkceCookie =
         createCookie(
             request,
-            PKCE_COOKIE,
+            OAUTH_PKCE_COOKIE,
             verifier,
             OAUTH_COOKIE_MAX_AGE_SECONDS
         );

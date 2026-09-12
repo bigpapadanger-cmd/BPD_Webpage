@@ -21,8 +21,9 @@ Description:
     - Resolves the Epic identity through identity.accounts.
     - Ensures the global account has a Rocket League player.
     - Creates or updates the centralized BPD browser session.
+    - Redirects new accounts to account setup.
+    - Redirects existing accounts to the requested local page.
     - Stores no Epic access token in the BPD session.
-    - Redirects the authenticated user to /RocketLeague.
 
 Identity Flow:
     Epic account ID
@@ -70,6 +71,17 @@ import {
     getSessionContext
 } from "../../sessions/session_context.js";
 
+import { OAUTH_RETURN_COOKIE } from "../../../config/api_vars.js";
+/* =========================================================
+CONSTANTS
+========================================================= */
+
+const DEFAULT_RETURN_TO =
+    "/Account";
+
+const NEW_ACCOUNT_RETURN_TO =
+    "/Account?setup=1";
+
 /* =========================================================
 NORMALIZATION
 ========================================================= */
@@ -78,7 +90,8 @@ function normalizeString(
     value
 ) {
     if (
-        typeof value !== "string"
+        typeof value !==
+        "string"
     ) {
         return "";
     }
@@ -96,6 +109,33 @@ function normalizeNullableString(
 
     return normalized
         || null;
+}
+
+/* =========================================================
+RETURN DESTINATION
+========================================================= */
+
+function normalizeReturnTo(
+    value
+) {
+    const returnTo =
+        normalizeString(
+            value
+        );
+
+    if (
+        !returnTo
+        || !returnTo.startsWith(
+            "/"
+        )
+        || returnTo.startsWith(
+            "//"
+        )
+    ) {
+        return DEFAULT_RETURN_TO;
+    }
+
+    return returnTo;
 }
 
 /* =========================================================
@@ -272,7 +312,8 @@ async function callApiRpc(
 
     if (
         !responseData
-        || typeof responseData !== "object"
+        || typeof responseData !==
+            "object"
         || Array.isArray(
             responseData
         )
@@ -343,88 +384,6 @@ async function resolveEpicIdentity(
     };
 }
 
-/* =========================================================
-ENSURE ROCKET LEAGUE PLAYER
-========================================================= */
-
-async function ensureRocketLeaguePlayer(
-    env,
-    accountId,
-    epicAccountId,
-    displayName
-) {
-    const result =
-        await callApiRpc(
-            env,
-            "ensure_rocketleague_player",
-            {
-                p_account_id:
-                    accountId,
-
-                p_epic_account_id:
-                    epicAccountId,
-
-                p_display_name:
-                    displayName
-            }
-        );
-
-    const returnedAccountId =
-        normalizeNullableString(
-            result.account_id
-            || result.user_id
-        );
-
-    if (
-        !returnedAccountId
-        || returnedAccountId !== accountId
-    ) {
-        throw new Error(
-            "Rocket League player initialization returned an unexpected account."
-        );
-    }
-
-    const rlPlayerId =
-        normalizeNullableString(
-            result.rl_player_id
-        );
-
-    if (
-        !rlPlayerId
-    ) {
-        throw new Error(
-            "Rocket League player initialization returned no player ID."
-        );
-    }
-
-    return {
-        accountId:
-            returnedAccountId,
-
-        rlPlayerId,
-
-        role:
-            normalizeString(
-                result.role
-            )
-            || null,
-
-        active:
-            result.active === true,
-
-        profileComplete:
-            result.profile_complete === true,
-
-        rocketLeagueAccess:
-            result.rocket_league_access === true,
-
-        createdPlayer:
-            result.created_player === true,
-
-        adoptedPlayer:
-            result.adopted_player === true
-    };
-}
 
 /* =========================================================
 EPIC TOKEN EXCHANGE
@@ -688,7 +647,8 @@ async function establishBpdSession(
     if (
         currentSession.authenticated === true
         && currentSession.userId
-        && currentSession.userId !== identity.accountId
+        && currentSession.userId !==
+            identity.accountId
     ) {
         const error =
             new Error(
@@ -948,6 +908,18 @@ export async function handleEpicCallback(
         }
 
         /* =================================================
+        RETURN DESTINATION
+        ================================================= */
+
+        const requestedReturnTo =
+            normalizeReturnTo(
+                getCookie(
+                    request,
+                    OAUTH_RETURN_COOKIE
+                )
+            );
+
+        /* =================================================
         EPIC TOKEN + PROFILE
         ================================================= */
 
@@ -1000,18 +972,7 @@ export async function handleEpicCallback(
             );
         }
 
-        /* =================================================
-        ROCKET LEAGUE DOMAIN INITIALIZATION
-        ================================================= */
 
-        const rocketLeague =
-            await ensureRocketLeaguePlayer(
-                env,
-                identity.accountId,
-                epicProfile.epicAccountId,
-                epicProfile.displayName
-                || epicProfile.preferredUsername
-            );
 
         /* =================================================
         CENTRALIZED BPD SESSION
@@ -1026,11 +987,10 @@ export async function handleEpicCallback(
                         identity.accountId,
 
                     role:
-                        rocketLeague.role
-                        || identity.role,
+                        identity.role,
 
                     active:
-                        rocketLeague.active === true
+                        identity.active
                 },
                 epicProfile
             );
@@ -1044,9 +1004,16 @@ export async function handleEpicCallback(
         }
 
         /* =================================================
-        SUCCESS
+        SUCCESS DESTINATION
+        ================================================= */
 
-        Clear the one-time Epic OAuth state cookie.
+        const successDestination =
+            identity.createdAccount === true
+                ? NEW_ACCOUNT_RETURN_TO
+                : requestedReturnTo;
+
+        /* =================================================
+        CLEAR ONE-TIME OAUTH COOKIES
         ================================================= */
 
         const stateCookie =
@@ -1055,11 +1022,18 @@ export async function handleEpicCallback(
                 AUTH_STATE_COOKIE
             );
 
+        const returnCookie =
+            clearCookie(
+                request,
+                OAUTH_RETURN_COOKIE
+            );
+
         return redirect(
-            "/RocketLeague",
+            successDestination,
             [
                 session.cookie,
-                stateCookie
+                stateCookie,
+                returnCookie
             ]
         );
     }

@@ -2,131 +2,80 @@
 
 /* =========================================================
 BPD GAMING NETWORK
-GOOGLE OAUTH LOGIN ROUTE
+GOOGLE LOGIN API ROUTE
 
 File:
     functions/api/auth/google/login.js
 
+Purpose:
+    Public API entry point for Google authentication.
+
+Description:
+    - Accepts POST login requests from the public login page.
+    - Delegates Turnstile verification and OAuth initialization.
+    - Returns a provider redirect URL as JSON.
+    - Rejects unsupported request methods.
+
 Public Route:
-    GET /api/auth/google/login
+    POST /api/auth/google/login
 
 Service:
     functions/services/auth/providers/google/login.js
-
-Purpose:
-    Thin Cloudflare Pages Functions route that starts the
-    Google OAuth authentication flow through Supabase Auth.
-
-Responsibilities:
-    - Receive the browser login request.
-    - Delegate OAuth initialization to the Google auth service.
-    - Return the service response.
-
-Important:
-    - OAuth implementation does not belong in this route.
-    - PKCE verifiers, authorization codes, tokens, and
-      provider credentials must never be logged.
 ========================================================= */
 
 import {
     handleGoogleLogin
 } from "../../../services/auth/providers/google/login.js";
 
+import {
+    methodNotAllowedResponse
+} from "../../../services/http/responses.js";
+
 /* =========================================================
-GET
+POST
 ========================================================= */
 
-export async function onRequestGet(
+export async function onRequestPost(
     context
 ) {
-    const debugId =
-        crypto.randomUUID();
-
-    const requestUrl =
-        new URL(
-            context.request.url
-        );
-
-    console.info(
-        "GOOGLE LOGIN ROUTE: Request received.",
-        {
-            debugId,
-
-            method:
-                context.request.method,
-
-            pathname:
-                requestUrl.pathname
-        }
+    return handleGoogleLogin(
+        context.request,
+        context.env
     );
+}
 
-    try {
-        const response =
-            await handleGoogleLogin(
-                context.request,
-                context.env
-            );
+/* =========================================================
+UNSUPPORTED METHODS
+========================================================= */
 
-        console.info(
-            "GOOGLE LOGIN ROUTE: Request completed.",
-            {
-                debugId,
+export async function onRequestGet() {
+    return methodNotAllowedResponse(
+        [
+            "POST"
+        ]
+    );
+}
 
-                status:
-                    response.status,
+export async function onRequestPut() {
+    return methodNotAllowedResponse(
+        [
+            "POST"
+        ]
+    );
+}
 
-                hasRedirect:
-                    Boolean(
-                        response.headers.get(
-                            "location"
-                        )
-                    )
-            }
-        );
+export async function onRequestPatch() {
+    return methodNotAllowedResponse(
+        [
+            "POST"
+        ]
+    );
+}
 
-        return response;
-    }
-    catch (
-        error
-    ) {
-        console.error(
-            "GOOGLE LOGIN ROUTE: Unexpected failure.",
-            {
-                debugId,
-
-                name:
-                    error?.name
-                    || "Error",
-
-                message:
-                    error?.message
-                    || "Unknown error",
-
-                stack:
-                    error?.stack
-                    || null
-            }
-        );
-
-        return Response.json(
-            {
-                success:
-                    false,
-
-                message:
-                    "Google login failed unexpectedly.",
-
-                debugId
-            },
-            {
-                status:
-                    500,
-
-                headers: {
-                    "Cache-Control":
-                        "no-store"
-                }
-            }
-        );
-    }
+export async function onRequestDelete() {
+    return methodNotAllowedResponse(
+        [
+            "POST"
+        ]
+    );
 }

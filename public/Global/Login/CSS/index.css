@@ -1,0 +1,664 @@
+/* =========================================================
+BPD GAMING NETWORK
+LOGIN PAGE
+
+File:
+    Global/Login/CSS/login.css
+
+Purpose:
+    Styles the public BPD Gaming Network authentication page.
+
+Description:
+    - Centers the authentication card.
+    - Displays login providers vertically.
+    - Provides consistent provider buttons and icon treatment.
+    - Supports loading, unavailable, and offline states.
+    - Supports responsive layouts and reduced motion.
+========================================================= */
+
+/* =========================================================
+PAGE
+========================================================= */
+
+.login-page {
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+
+    width: 100%;
+    min-height: 100%;
+
+    padding:
+        clamp(
+            24px,
+            5vh,
+            64px
+        )
+        clamp(
+            16px,
+            4vw,
+            32px
+        );
+
+    box-sizing: border-box;
+}
+
+/* =========================================================
+CARD
+========================================================= */
+
+.login-card {
+    width: 100%;
+    max-width: 460px;
+
+    padding:
+        clamp(
+            22px,
+            4vw,
+            34px
+        );
+
+    border:
+        1px solid
+        rgba(
+            139,
+            92,
+            246,
+            0.28
+        );
+
+    border-radius: 14px;
+
+    background:
+        linear-gradient(
+            180deg,
+            rgba(
+                24,
+                27,
+                36,
+                0.96
+            ),
+            rgba(
+                15,
+                17,
+                24,
+                0.97
+            )
+        );
+
+    box-shadow:
+        0 18px 45px
+            rgba(
+                0,
+                0,
+                0,
+                0.32
+            ),
+        0 0 22px
+            rgba(
+                139,
+                92,
+                246,
+                0.07
+            );
+
+    box-sizing: border-box;
+}
+
+/* =========================================================
+HEADER
+========================================================= */
+
+.login-card__header {
+    margin-bottom: 24px;
+
+    text-align: center;
+}
+
+.login-card__eyebrow {
+    margin:
+        0
+        0
+        8px;
+
+    color: #a78bfa;
+
+    font-size: 0.72rem;
+    font-weight: 700;
+
+    letter-spacing: 0.12em;
+
+    text-transform: uppercase;
+}
+
+.login-card__title {
+    margin:
+        0
+        0
+        10px;
+
+    color: #ffffff;
+
+    font-size:
+        clamp(
+            1.65rem,
+            4vw,
+            2.1rem
+        );
+
+    line-height: 1.1;
+}
+
+.login-card__description {
+    margin: 0;
+
+    color: #aeb4c0;
+
+    font-size: 0.9rem;
+
+    line-height: 1.5;
+}
+
+/* =========================================================
+STATUS
+========================================================= */
+
+.login-status {
+    margin-bottom: 18px;
+
+    padding:
+        10px
+        12px;
+
+    border:
+        1px solid
+        rgba(
+            255,
+            255,
+            255,
+            0.10
+        );
+
+    border-radius: 8px;
+
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            0.025
+        );
+
+    color: #cbd0da;
+
+    font-size: 0.8rem;
+
+    line-height: 1.4;
+
+    text-align: center;
+}
+
+.login-status[hidden] {
+    display: none;
+}
+
+.login-status[data-status="error"] {
+    border-color:
+        rgba(
+            248,
+            113,
+            113,
+            0.32
+        );
+
+    background:
+        rgba(
+            127,
+            29,
+            29,
+            0.12
+        );
+
+    color: #fca5a5;
+}
+
+.login-status[data-status="success"] {
+    border-color:
+        rgba(
+            74,
+            222,
+            128,
+            0.30
+        );
+
+    background:
+        rgba(
+            20,
+            83,
+            45,
+            0.10
+        );
+
+    color: #86efac;
+}
+
+/* =========================================================
+PROVIDER LIST
+
+Providers are intentionally vertical.
+========================================================= */
+
+.login-providers {
+    display: flex;
+    flex-direction: column;
+
+    width: 100%;
+
+    gap: 11px;
+}
+
+/* =========================================================
+PROVIDER BUTTON
+========================================================= */
+
+.login-provider {
+    position: relative;
+
+    display: grid;
+
+    grid-template-columns:
+        34px
+        1fr
+        34px;
+
+    align-items: center;
+
+    width: 100%;
+    min-height: 52px;
+
+    padding:
+        8px
+        12px;
+
+    border:
+        1px solid
+        rgba(
+            255,
+            255,
+            255,
+            0.13
+        );
+
+    border-radius: 9px;
+
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            0.025
+        );
+
+    color: #e1e5ec;
+
+    font: inherit;
+
+    cursor: pointer;
+
+    box-sizing: border-box;
+
+    transition:
+        border-color 0.2s ease,
+        background 0.2s ease,
+        box-shadow 0.25s ease,
+        transform 0.2s ease,
+        opacity 0.2s ease;
+}
+
+/*
+ * Empty third grid column keeps the text visually centered
+ * while the icon remains left-aligned.
+ */
+.login-provider::after {
+    content: "";
+
+    width: 34px;
+    height: 1px;
+}
+
+/* =========================================================
+PROVIDER HOVER
+========================================================= */
+
+.login-provider:hover:not(:disabled) {
+    border-color:
+        rgba(
+            139,
+            92,
+            246,
+            0.72
+        );
+
+    background:
+        rgba(
+            139,
+            92,
+            246,
+            0.075
+        );
+
+    box-shadow:
+        0 0 10px
+            rgba(
+                139,
+                92,
+                246,
+                0.25
+            ),
+        inset 0 0 8px
+            rgba(
+                139,
+                92,
+                246,
+                0.05
+            );
+
+    transform:
+        translateY(
+            -1px
+        );
+}
+
+/* =========================================================
+PROVIDER ACTIVE
+========================================================= */
+
+.login-provider:active:not(:disabled) {
+    transform:
+        translateY(
+            0
+        )
+        scale(
+            0.99
+        );
+}
+
+/* =========================================================
+PROVIDER FOCUS
+========================================================= */
+
+.login-provider:focus-visible {
+    outline:
+        2px solid
+        rgba(
+            167,
+            139,
+            250,
+            0.90
+        );
+
+    outline-offset: 2px;
+
+    border-color: #8b5cf6;
+}
+
+/* =========================================================
+PROVIDER DISABLED
+========================================================= */
+
+.login-provider:disabled {
+    opacity: 0.48;
+
+    cursor: not-allowed;
+
+    box-shadow: none;
+
+    transform: none;
+}
+
+/* =========================================================
+PROVIDER ICON
+========================================================= */
+
+.login-provider__icon-wrap {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    width: 30px;
+    height: 30px;
+
+    border:
+        1px solid
+        rgba(
+            255,
+            255,
+            255,
+            0.10
+        );
+
+    border-radius: 7px;
+
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            0.035
+        );
+}
+
+.login-provider__icon {
+    display: block;
+
+    width: 18px;
+    height: 18px;
+
+    object-fit: contain;
+
+    pointer-events: none;
+
+    user-select: none;
+}
+
+/* =========================================================
+PROVIDER LABEL
+========================================================= */
+
+.login-provider__label {
+    overflow: hidden;
+
+    padding:
+        0
+        10px;
+
+    font-size: 0.86rem;
+    font-weight: 600;
+
+    line-height: 1.2;
+
+    text-align: center;
+
+    text-overflow: ellipsis;
+
+    white-space: nowrap;
+}
+
+/* =========================================================
+HELP
+========================================================= */
+
+.login-card__help {
+    margin-top: 24px;
+
+    padding-top: 18px;
+
+    border-top:
+        1px solid
+        rgba(
+            255,
+            255,
+            255,
+            0.08
+        );
+
+    color: #858c99;
+
+    font-size: 0.75rem;
+
+    line-height: 1.5;
+
+    text-align: center;
+}
+
+.login-card__help p {
+    margin:
+        0
+        0
+        7px;
+}
+
+.login-card__help p:last-child {
+    margin-bottom: 0;
+}
+
+/* =========================================================
+FOOTER
+========================================================= */
+
+.login-card__footer {
+    display: flex;
+    justify-content: center;
+
+    margin-top: 20px;
+}
+
+.login-back-link {
+    color: #aaa2c7;
+
+    font-size: 0.76rem;
+
+    text-decoration: none;
+
+    transition:
+        color 0.2s ease,
+        text-shadow 0.2s ease;
+}
+
+.login-back-link:hover,
+.login-back-link:focus-visible {
+    color: #d9ceff;
+
+    text-shadow:
+        0 0 8px
+        rgba(
+            139,
+            92,
+            246,
+            0.45
+        );
+}
+
+/* =========================================================
+PAGE STATES
+========================================================= */
+
+.login-page[
+    data-login-state="loading"
+]
+.login-provider,
+.login-page[
+    data-login-state="offline"
+]
+.login-provider,
+.login-page[
+    data-login-state="unavailable"
+]
+.login-provider,
+.login-page[
+    data-login-state="redirecting"
+]
+.login-provider {
+    pointer-events: none;
+}
+
+/* =========================================================
+SMALL VIEWPORT
+========================================================= */
+
+@media (max-width: 540px) {
+    .login-page {
+        padding:
+            20px
+            12px;
+    }
+
+    .login-card {
+        padding:
+            20px
+            16px;
+
+        border-radius: 11px;
+    }
+
+    .login-provider {
+        min-height: 50px;
+
+        grid-template-columns:
+            32px
+            1fr
+            32px;
+
+        padding:
+            7px
+            10px;
+    }
+
+    .login-provider::after {
+        width: 32px;
+    }
+
+    .login-provider__icon-wrap {
+        width: 28px;
+        height: 28px;
+    }
+
+    .login-provider__icon {
+        width: 17px;
+        height: 17px;
+    }
+
+    .login-provider__label {
+        font-size: 0.82rem;
+    }
+}
+/* =========================================================
+TURNSTILE
+========================================================= */
+
+.login-turnstile {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    width: 100%;
+
+    margin:
+        0
+        0
+        18px;
+}
+
+.login-turnstile:empty {
+    min-height: 65px;
+}
+/* =========================================================
+REDUCED MOTION
+========================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+    .login-provider,
+    .login-back-link {
+        transition: none;
+    }
+}

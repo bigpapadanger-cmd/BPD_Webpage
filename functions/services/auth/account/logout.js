@@ -36,25 +36,12 @@ import {
     destroyRequestSession
 } from "../sessions/session.js";
 
-import {
-    AUTH_STATE_COOKIE
+import { OAUTH_MODE_COOKIE, OAUTH_PROVIDER_COOKIE, OAUTH_ACCOUNT_COOKIE,
+        OAUTH_PKCE_COOKIE, AUTH_STATE_COOKIE
 } from "../../config/api_vars.js";
 
-/* =========================================================
-TEMPORARY OAUTH COOKIES
-========================================================= */
 
-const PKCE_COOKIE =
-    "bpd_oauth_pkce";
 
-const OAUTH_PROVIDER_COOKIE =
-    "bpd_oauth_provider";
-
-const OAUTH_MODE_COOKIE =
-    "bpd_oauth_mode";
-
-const OAUTH_ACCOUNT_COOKIE =
-    "bpd_oauth_account";
 
 /* =========================================================
 MAIN
@@ -108,7 +95,7 @@ export async function handleLogout(
         const pkceCookie =
             clearCookie(
                 request,
-                PKCE_COOKIE
+                OAUTH_PKCE_COOKIE
             );
 
         const providerCookie =

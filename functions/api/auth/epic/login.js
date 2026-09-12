@@ -2,160 +2,80 @@
 
 /* =========================================================
 BPD GAMING NETWORK
-EPIC OAUTH LOGIN ROUTE
+EPIC LOGIN API ROUTE
 
 File:
     functions/api/auth/epic/login.js
 
+Purpose:
+    Public API entry point for Epic Games authentication.
+
+Description:
+    - Accepts POST login requests from the public login page.
+    - Delegates Turnstile verification and OAuth initialization.
+    - Returns an Epic authentication redirect URL as JSON.
+    - Rejects unsupported request methods.
+
 Public Route:
-    GET /api/auth/epic/login
+    POST /api/auth/epic/login
 
 Service:
     functions/services/auth/providers/epic/login.js
-
-Purpose:
-    Thin Cloudflare Pages Functions route that starts the
-    Epic OAuth authentication flow.
-
-Responsibilities:
-    - Receive the browser login request.
-    - Log safe request metadata.
-    - Delegate OAuth initialization to the Epic auth service.
-    - Return the service response.
-
-Important:
-    - OAuth implementation does not belong in this route.
-    - Tokens, secrets, authorization codes, and OAuth state
-      values must never be logged.
 ========================================================= */
 
 import {
     handleEpicLogin
 } from "../../../services/auth/providers/epic/login.js";
 
+import {
+    methodNotAllowedResponse
+} from "../../../services/http/responses.js";
+
 /* =========================================================
-GET
+POST
 ========================================================= */
 
-export async function onRequestGet(
+export async function onRequestPost(
     context
 ) {
-    const debugId =
-        crypto.randomUUID();
-
-    const requestUrl =
-        new URL(
-            context.request.url
-        );
-
-    console.info(
-        "EPIC LOGIN ROUTE: Request received.",
-        {
-            debugId,
-
-            method:
-                context.request.method,
-
-            pathname:
-                requestUrl.pathname
-        }
+    return handleEpicLogin(
+        context.request,
+        context.env
     );
-
-    try {
-        const response =
-            await handleEpicLogin(
-                context.request,
-                context.env
-            );
-
-        console.info(
-            "EPIC LOGIN ROUTE: Request completed.",
-            {
-                debugId,
-
-                status:
-                    response.status,
-
-                hasLocation:
-                    response.headers.has(
-                        "location"
-                    ),
-
-                locationOrigin:
-                    getLocationOrigin(
-                        response.headers.get(
-                            "location"
-                        )
-                    )
-            }
-        );
-
-        return response;
-    }
-    catch (
-        error
-    ) {
-        console.error(
-            "EPIC LOGIN ROUTE: Unexpected failure.",
-            {
-                debugId,
-
-                name:
-                    error?.name
-                    || "Error",
-
-                message:
-                    error?.message
-                    || "Unknown error",
-
-                stack:
-                    error?.stack
-                    || null
-            }
-        );
-
-        return Response.json(
-            {
-                success:
-                    false,
-
-                message:
-                    "Epic login failed unexpectedly.",
-
-                debugId
-            },
-            {
-                status:
-                    500,
-
-                headers: {
-                    "Cache-Control":
-                        "no-store"
-                }
-            }
-        );
-    }
 }
 
 /* =========================================================
-SAFE REDIRECT ORIGIN
+UNSUPPORTED METHODS
 ========================================================= */
 
-function getLocationOrigin(
-    location
-) {
-    if (
-        !location
-    ) {
-        return null;
-    }
+export async function onRequestGet() {
+    return methodNotAllowedResponse(
+        [
+            "POST"
+        ]
+    );
+}
 
-    try {
-        return new URL(
-            location
-        ).origin;
-    }
-    catch {
-        return "invalid-location";
-    }
+export async function onRequestPut() {
+    return methodNotAllowedResponse(
+        [
+            "POST"
+        ]
+    );
+}
+
+export async function onRequestPatch() {
+    return methodNotAllowedResponse(
+        [
+            "POST"
+        ]
+    );
+}
+
+export async function onRequestDelete() {
+    return methodNotAllowedResponse(
+        [
+            "POST"
+        ]
+    );
 }

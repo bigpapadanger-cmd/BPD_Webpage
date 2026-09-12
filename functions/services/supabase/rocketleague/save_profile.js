@@ -214,11 +214,6 @@ export async function saveRocketLeagueProfile(
                         s_age_consent:
                             registration.ageConsent === true,
 
-                        s_display_name:
-                            normalizeNullableString(
-                                registration.displayName
-                            ),
-
                         s_current_rank:
                             normalizeNullableString(
                                 registration.currentRank

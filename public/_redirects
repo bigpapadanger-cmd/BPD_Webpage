@@ -8,7 +8,7 @@
 /TOS                                /TOS 200
 /Error                              /index.html 200
 /Account                            /index.html 200
-
+/Login                              /Login 200
 
 /RocketLeague/*                     /RocketLeague 200
 /Minecraft/*                        /Minecraft 200

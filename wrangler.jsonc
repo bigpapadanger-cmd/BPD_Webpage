@@ -16,7 +16,11 @@
         "OCR_API_URL": "https://bpd-ocr-y5wgeempka-uc.a.run.app/api/ocr",
         "OCR_JOB_PROCESS_URL": "https://bpd-gaming-network.com/api/ocr/jobs/process_job",
         "OCR_JOB_PROGRESS_URL": "https://bpd-gaming-network.com/api/ocr/jobs/progress",
-        "SUPABASE_URL": "https://xslrwamnfqgoziaczgsn.supabase.co/rest/v1/"
+        "SUPABASE_URL": "https://xslrwamnfqgoziaczgsn.supabase.co/rest/v1/",
+        "DISCORD_ADMIN_ROLE_ID": "1548306582226468985",
+        "DISCORD_MOD_ROLE_ID": "1548306818491613235",
+        "DISCORD_LEAGUE_STAFF_ROLE_ID":"1548306980035235871",
+        "TURNSTILE_SITE_KEY": "0x4AAAAAAExY7tl-k005rJaK"
     },
 
     "r2_buckets": [

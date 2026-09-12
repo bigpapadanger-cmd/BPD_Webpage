@@ -1,3 +1,18 @@
+<!-- =========================================================
+BPD GAMING NETWORK
+ROCKET LEAGUE REGISTRATION
+
+Purpose:
+    Collects Rocket League-specific registration information
+    for an authenticated BPD account with a linked Epic account.
+
+Description:
+    - Epic identity information is read-only.
+    - Global BPD identity is not submitted by this form.
+    - No separate Rocket League display name is collected.
+    - Registration collects only Rocket League-specific data.
+========================================================= -->
+
 <section
     class="rl-registration"
     aria-labelledby="rlRegistrationTitle"
@@ -59,7 +74,7 @@
                 class="section-description"
                 data-copy="epicDescription"
             >
-                These fields come from your authenticated Epic Games session.
+                These fields come from your authenticated Epic Games account.
             </p>
 
             <div class="field-grid two-columns">
@@ -180,41 +195,6 @@
             </legend>
 
             <div class="field-grid two-columns">
-                <label
-                    class="form-field"
-                    for="displayName"
-                >
-                    <span>
-                        <span data-copy="displayNameLabel">
-                            Display name
-                        </span>
-
-                        <span
-                            class="required-mark"
-                            aria-hidden="true"
-                        >
-                            *
-                        </span>
-                    </span>
-
-                    <input
-                        id="displayName"
-                        name="displayName"
-                        type="text"
-                        maxlength="32"
-                        autocomplete="nickname"
-                        aria-describedby="displayNameHelp"
-                        required
-                    >
-
-                    <small
-                        id="displayNameHelp"
-                        data-copy="displayNameHelp"
-                    >
-                        This is the name other BPD players will see.
-                    </small>
-                </label>
-
                 <label
                     class="form-field"
                     for="currentRank"
@@ -768,39 +748,6 @@
                             Both
                         </span>
                     </label>
-
-                    <label class="choice-card">
-                        <input
-                            name="reminderMode"
-                            type="radio"
-                            value="specific-times"
-                        >
-
-                        <span data-copy="reminderSpecific">
-                            Specific times
-                        </span>
-                    </label>
-                </div>
-
-                <div
-                    id="specificReminderTimes"
-                    class="specific-reminder-times"
-                    hidden
-                >
-                    <div class="reminder-window-heading">
-                        <strong data-copy="specificTimesTitle">
-                            Specific reminder times
-                        </strong>
-
-                        <span data-copy="specificTimesBody">
-                            Select one or more times from the 24-hour clock. Times are available every 30 minutes.
-                        </span>
-                    </div>
-
-                    <div
-                        id="reminderTimeSlots"
-                        class="reminder-slot-grid reminder-slot-grid-24h"
-                    ></div>
                 </div>
 
                 <div class="reminder-note">

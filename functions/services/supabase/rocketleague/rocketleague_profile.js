@@ -14,6 +14,8 @@ Purpose:
 Description:
     - Uses identity.accounts.id as the lookup key.
     - Calls api.get_rocketleague_profile.
+    - Keeps the global BPD display name separate from the
+      linked Epic provider display name.
     - Normalizes Supabase snake_case fields into the
       camelCase structure used by Rocket League services.
     - Performs read-only profile retrieval.
@@ -38,12 +40,21 @@ Identity Model:
     core.rl_players.account_id
         = identity.accounts.id
 
+Display Name Model:
+    bpdDisplayName
+        = identity.accounts.display_name
+
+    epicDisplayName
+        = identity.account_identities.display_username
+          where provider = 'epic'
+
 Important:
     - The browser does NOT call Supabase directly.
     - The Supabase secret remains server-side.
     - accountId must come from the authenticated BPD session.
-    - Epic account ID is returned as provider/domain metadata,
-      but is not used as the ownership lookup key.
+    - Epic account ID is provider/domain metadata only.
+    - There is no separate user-selected Rocket League
+      display name.
     - This function does NOT create or update profiles.
     - Rocket League access is returned by Supabase and is not
       independently recalculated here.
@@ -54,7 +65,7 @@ Expected RPC Return Fields:
     rl_player_id
     epic_account_id
     epic_display_name
-    display_name
+    bpd_display_name
     email
     phone
     role
@@ -204,6 +215,9 @@ export async function getRocketLeagueProfileByAccountId(
                     "apikey":
                         apiKey,
 
+                    "Authorization":
+                        `Bearer ${apiKey}`,
+
                     "Content-Type":
                         "application/json",
 
@@ -319,7 +333,8 @@ export async function getRocketLeagueProfileByAccountId(
 
     if (
         returnedAccountId
-        && returnedAccountId !== normalizedAccountId
+        && returnedAccountId !==
+            normalizedAccountId
     ) {
         throw new Error(
             "Rocket League profile returned an unexpected account ID."
@@ -352,6 +367,23 @@ export async function getRocketLeagueProfileByAccountId(
                 responseData.rl_player_id
             ),
 
+        /* -------------------------------------------------
+        DISPLAY NAMES
+
+        bpdDisplayName:
+            Global BPD account name.
+
+        epicDisplayName:
+            Current Epic provider name.
+
+        There is intentionally no generic RL displayName.
+        ------------------------------------------------- */
+
+        bpdDisplayName:
+            normalizeNullableString(
+                responseData.bpd_display_name
+            ),
+
         epicAccountId:
             normalizeNullableString(
                 responseData.epic_account_id
@@ -359,14 +391,6 @@ export async function getRocketLeagueProfileByAccountId(
 
         epicDisplayName:
             normalizeNullableString(
-                responseData.epic_display_name
-            ),
-
-        displayName:
-            normalizeNullableString(
-                responseData.display_name
-            )
-            || normalizeNullableString(
                 responseData.epic_display_name
             ),
 

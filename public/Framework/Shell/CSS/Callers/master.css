@@ -41,6 +41,7 @@ Also used as the fallback for unknown routes.
 @import url("/Global/Index/CSS/index.css");
 @import url("/Global/404/CSS/404.css");
 
+
 /* =========================================================
    REQUIRED / INFORMATION
    ========================================================= */
@@ -49,3 +50,9 @@ Also used as the fallback for unknown routes.
 @import url("/Required/FAQ/CSS/index.css");
 @import url("/Required/PrivacyPolicy/CSS/index.css");
 @import url("/Required/TOS/CSS/index.css");
+
+/* =========================================================
+   Profile
+   ========================================================= */
+@import url("/Global/Account/CSS/index.css");
+@import url("/Global/Login/CSS/index.css");

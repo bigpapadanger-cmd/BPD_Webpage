@@ -1,0 +1,142 @@
+<!-- =========================================================
+BPD GAMING NETWORK
+LOGIN PAGE
+
+File:
+    Global/Login/HTML/login.html
+
+Purpose:
+    Public sign-in page for BPD Gaming Network.
+
+Description:
+    - Allows users to authenticate with supported providers.
+    - Supports Google, Discord, and Epic Games.
+    - Displays authentication availability.
+    - OAuth is started by the server-side provider routes.
+========================================================= -->
+
+<section
+    class="login-page"
+    id="loginPage"
+    data-login-state="loading"
+>
+    <div class="login-card">
+
+        <header class="login-card__header">
+            <p class="login-card__eyebrow">
+                BPD Gaming Network
+            </p>
+
+            <h1 class="login-card__title">
+                Sign In
+            </h1>
+
+            <p class="login-card__description">
+                Choose a provider to continue to your BPD account.
+            </p>
+        </header>
+
+        <div
+            class="login-status"
+            id="loginStatus"
+            role="status"
+            aria-live="polite"
+            hidden
+        >
+        </div>
+
+        <div
+            class="login-turnstile"
+            id="loginTurnstile"
+            data-site-key="0x4AAAAAAExY7tl-k005rJaK"
+            aria-label="Human verification"
+        >
+        </div>
+
+        <div class="login-providers">
+
+            <button
+                class="login-provider"
+                type="button"
+                data-login-provider="google"
+                disabled
+            >
+                <span class="login-provider__icon-wrap">
+                    <img
+                        class="login-provider__icon"
+                        data-login-provider-icon="google"
+                        alt=""
+                        aria-hidden="true"
+                    >
+                </span>
+
+                <span class="login-provider__label">
+                    Continue with Google
+                </span>
+            </button>
+
+            <button
+                class="login-provider"
+                type="button"
+                data-login-provider="discord"
+                disabled
+            >
+                <span class="login-provider__icon-wrap">
+                    <img
+                        class="login-provider__icon"
+                        data-login-provider-icon="discord"
+                        alt=""
+                        aria-hidden="true"
+                    >
+                </span>
+
+                <span class="login-provider__label">
+                    Continue with Discord
+                </span>
+            </button>
+
+            <button
+                class="login-provider"
+                type="button"
+                data-login-provider="epic"
+                disabled
+            >
+                <span class="login-provider__icon-wrap">
+                    <img
+                        class="login-provider__icon"
+                        data-login-provider-icon="epic"
+                        alt=""
+                        aria-hidden="true"
+                    >
+                </span>
+
+                <span class="login-provider__label">
+                    Continue with Epic Games
+                </span>
+            </button>
+
+        </div>
+
+        <div class="login-card__help">
+            <p>
+                Signing in creates or reconnects your global
+                BPD Gaming Network account.
+            </p>
+
+            <p>
+                Additional providers can be linked later from
+                your Account page.
+            </p>
+        </div>
+
+        <footer class="login-card__footer">
+            <a
+                class="login-back-link"
+                href="/"
+            >
+                Return to BPD Gaming Network
+            </a>
+        </footer>
+
+    </div>
+</section>

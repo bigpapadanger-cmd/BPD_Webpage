@@ -105,7 +105,7 @@ export const ROUTES = {
         title:
             "Dashboard | BPD Gaming Network",
         body:
-            "/Global/Index/HTML/home.html",
+            "/Global/Account/HTML/index.html",
         header:
             "/Framework/Shell/HTML/Header/header.html",
         sidebar:
@@ -113,10 +113,38 @@ export const ROUTES = {
         footer:
             "/Framework/Shell/HTML/Footer/footer.html",
         module:
-            "/Global/Index/JS/index.js",
+            "/Global/Account/JS/index.js",
 
         sitemap:
-            true
+            false,
+        requiresAuth:
+            true,
+    },
+
+    "/Login": {
+        title:
+            "Sign In | BPD Gaming Network",
+
+        body:
+            "/Global/Login/HTML/index.html",
+
+        header:
+            "/Framework/Shell/HTML/Header/header.html",
+
+        sidebar:
+            null,
+
+        footer:
+            "/Framework/Shell/HTML/Footer/footer.html",
+
+        module:
+            "/Global/Login/JS/index.js",
+
+        sitemap:
+            false,
+
+        requiresAuth:
+            false,
     },
     // =====================================================
     // ROCKET LEAGUE
@@ -193,7 +221,9 @@ export const ROUTES = {
             "/Tabs/RocketLeague/Index/JS/index.js",
 
         sitemap:
-            true
+            true,
+        requiresAuth:
+            true,
     },
 
     "/RocketLeague/Leaderboards": {
@@ -681,6 +711,9 @@ export const HEADER_MAP = {
         true,
 
     "/Error":
+        false,
+
+    "/Account":
         false
 };
 

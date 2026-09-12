@@ -31,7 +31,14 @@ const PROVIDER_LINK_URL =
 const PROVIDER_UNLINK_URL =
     "/api/auth/unlink";
 
+export const BPD_AUTH_GOOGLE_LOGIN_URL =
+    "/api/auth/google/login";
 
+export const BPD_AUTH_DISCORD_LOGIN_URL =
+    "/api/auth/discord/login";
+
+export const BPD_AUTH_EPIC_LOGIN_URL =
+    "/api/auth/epic/login";
 
 
 /* =========================================================

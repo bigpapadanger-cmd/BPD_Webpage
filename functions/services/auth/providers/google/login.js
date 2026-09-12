@@ -2,97 +2,51 @@
 
 /* =========================================================
 BPD GAMING NETWORK
-GOOGLE OAUTH LOGIN SERVICE
+GOOGLE LOGIN SERVICE
 
 File:
     functions/services/auth/providers/google/login.js
 
-Public Route:
-    GET /api/auth/google/login
+Purpose:
+    Starts Google authentication through Supabase Auth.
 
-API Route:
-    functions/api/auth/google/login.js
+Description:
+    - Accepts a Turnstile-protected login request.
+    - Uses the centralized Turnstile verification service.
+    - Validates the requested local return destination.
+    - Generates PKCE verifier and challenge values.
+    - Stores OAuth state in secure HttpOnly cookies.
+    - Builds the Supabase Google authorization URL.
+    - Returns the authorization URL to the browser.
+
+Public Route:
+    POST /api/auth/google/login
 
 Callback:
     GET /api/auth/_oauth/callback
-
-Callback Service:
-    functions/services/auth/oauth/callback.js
-
-Purpose:
-    Starts a NORMAL Google authentication flow through
-    Supabase Auth using PKCE.
-
-Flow:
-    Browser
-        ↓
-    Generate PKCE verifier + challenge
-        ↓
-    Mark OAuth operation as "login"
-        ↓
-    Clear any stale account-link target
-        ↓
-    Store temporary OAuth context in HttpOnly cookies
-        ↓
-    Redirect to Supabase Auth
-        ↓
-    Supabase redirects to Google
-        ↓
-    Google returns to Supabase
-        ↓
-    Supabase redirects to /api/auth/_oauth/callback
-        ↓
-    Callback calls api.resolve_google_identity
-
-Important:
-    - This is a NORMAL LOGIN flow, not provider linking.
-    - PKCE verifier is never exposed in the redirect URL.
-    - PKCE verifier is stored only in an HttpOnly cookie.
-    - This service does not create the BPD session.
-    - This service does not write identity.accounts.
-    - The centralized callback resolves the global account.
-    - Stale link-flow account context is explicitly cleared.
 ========================================================= */
 
 import {
-    json,
-    redirect
-} from "../../../common_helpers/responses.js";
-
-import {
-    createCookie,
-    clearCookie
-} from "../../sessions/session.js";
-
-import {
-    SUPABASE_OAUTH_AUTHORIZE_URL,
-    OAUTH_RETURN_URL
+    OAUTH_MODE_COOKIE,
+    OAUTH_PROVIDER_COOKIE,
+    OAUTH_PKCE_COOKIE,
+    OAUTH_RETURN_COOKIE,
+    OAUTH_COOKIE_MAX_AGE_SECONDS
 } from "../../../config/api_vars.js";
+
+import {
+    verifyTurnstile
+} from "../../../security/turnstile.js";
 
 /* =========================================================
 CONSTANTS
 ========================================================= */
 
-const GOOGLE_PROVIDER =
+const PROVIDER =
     "google";
 
-const OAUTH_MODE_LOGIN =
-    "login";
-
-const PKCE_COOKIE =
-    "bpd_oauth_pkce";
-
-const OAUTH_PROVIDER_COOKIE =
-    "bpd_oauth_provider";
-
-const OAUTH_MODE_COOKIE =
-    "bpd_oauth_mode";
-
-const OAUTH_ACCOUNT_COOKIE =
-    "bpd_oauth_account";
-
-const OAUTH_COOKIE_MAX_AGE_SECONDS =
-    600;
+const DEFAULT_RETURN_TO =
+    "/Account";
 
 /* =========================================================
 NORMALIZATION
@@ -101,22 +55,122 @@ NORMALIZATION
 function normalizeString(
     value
 ) {
-    if (
-        typeof value !== "string"
+    return typeof value === "string"
+        ? value.trim()
+        : "";
+}
+
+/* =========================================================
+JSON RESPONSE
+========================================================= */
+
+function jsonResponse(
+    body,
+    status = 200,
+    cookies = []
+) {
+    const headers =
+        new Headers();
+
+    headers.set(
+        "Content-Type",
+        "application/json; charset=utf-8"
+    );
+
+    headers.set(
+        "Cache-Control",
+        "no-store"
+    );
+
+    for (
+        const cookie
+        of cookies
     ) {
-        return "";
+        if (
+            cookie
+        ) {
+            headers.append(
+                "Set-Cookie",
+                cookie
+            );
+        }
     }
 
-    return value.trim();
+    return new Response(
+        JSON.stringify(
+            body
+        ),
+        {
+            status,
+            headers
+        }
+    );
+}
+
+/* =========================================================
+RETURN DESTINATION
+========================================================= */
+
+function normalizeReturnTo(
+    value
+) {
+    const returnTo =
+        normalizeString(
+            value
+        );
+
+    if (
+        !returnTo
+        || !returnTo.startsWith(
+            "/"
+        )
+        || returnTo.startsWith(
+            "//"
+        )
+    ) {
+        return DEFAULT_RETURN_TO;
+    }
+
+    return returnTo;
+}
+
+/* =========================================================
+COOKIE
+========================================================= */
+
+function createOAuthCookie(
+    name,
+    value,
+    maxAge =
+        OAUTH_COOKIE_MAX_AGE_SECONDS
+) {
+    return [
+        `${name}=${encodeURIComponent(value)}`,
+        "Path=/",
+        `Max-Age=${maxAge}`,
+        "HttpOnly",
+        "Secure",
+        "SameSite=Lax"
+    ]
+        .join(
+            "; "
+        );
 }
 
 /* =========================================================
 BASE64 URL
 ========================================================= */
 
-function toBase64Url(
-    bytes
+function arrayBufferToBase64Url(
+    value
 ) {
+    const bytes =
+        value instanceof Uint8Array
+            ? value
+            : new Uint8Array(
+                value
+            );
+
     let binary =
         "";
 
@@ -142,32 +196,34 @@ function toBase64Url(
             "_"
         )
         .replace(
-            /=+$/g,
+            /=+$/u,
             ""
         );
 }
 
 /* =========================================================
-PKCE VERIFIER
+RANDOM STRING
 ========================================================= */
 
-function createPkceVerifier() {
+function createRandomString(
+    byteLength = 48
+) {
     const bytes =
         new Uint8Array(
-            64
+            byteLength
         );
 
     crypto.getRandomValues(
         bytes
     );
 
-    return toBase64Url(
+    return arrayBufferToBase64Url(
         bytes
     );
 }
 
 /* =========================================================
-PKCE CHALLENGE
+PKCE
 ========================================================= */
 
 async function createPkceChallenge(
@@ -182,272 +238,341 @@ async function createPkceChallenge(
                 )
         );
 
-    return toBase64Url(
-        new Uint8Array(
-            digest
-        )
+    return arrayBufferToBase64Url(
+        digest
     );
 }
 
 /* =========================================================
-CONFIGURATION
+REQUEST BODY
 ========================================================= */
 
-function getOAuthConfiguration() {
-    const authorizeUrl =
+async function readRequestBody(
+    request
+) {
+    const contentType =
         normalizeString(
-            SUPABASE_OAUTH_AUTHORIZE_URL
-        );
-
-    const returnUrl =
-        normalizeString(
-            OAUTH_RETURN_URL
-        );
+            request.headers.get(
+                "content-type"
+            )
+        )
+            .toLowerCase();
 
     if (
-        !authorizeUrl
-        || !returnUrl
+        !contentType.includes(
+            "application/json"
+        )
     ) {
-        return null;
+        throw new Error(
+            "INVALID_CONTENT_TYPE"
+        );
     }
+
+    let body;
 
     try {
-        return {
-            authorizeUrl:
-                new URL(
-                    authorizeUrl
-                ),
-
-            returnUrl:
-                new URL(
-                    returnUrl
-                )
-                    .toString()
-        };
+        body =
+            await request.json();
     }
     catch {
-        return null;
+        throw new Error(
+            "INVALID_JSON"
+        );
     }
+
+    if (
+        !body
+        || typeof body !==
+            "object"
+        || Array.isArray(
+            body
+        )
+    ) {
+        throw new Error(
+            "INVALID_BODY"
+        );
+    }
+
+    return body;
 }
 
 /* =========================================================
-MAIN
+SUPABASE AUTHORIZE URL
+========================================================= */
+
+function buildGoogleAuthorizeUrl(
+    request,
+    env,
+    codeChallenge
+) {
+    const supabaseUrl =
+        normalizeString(
+            env?.SUPABASE_URL
+        )
+            .replace(
+                /\/+$/u,
+                ""
+            );
+
+    if (
+        !supabaseUrl
+    ) {
+        throw new Error(
+            "SUPABASE_URL_MISSING"
+        );
+    }
+
+    const callbackUrl =
+        new URL(
+            "/api/auth/_oauth/callback",
+            request.url
+        );
+
+    const authorizeUrl =
+        new URL(
+            `${supabaseUrl}/auth/v1/authorize`
+        );
+
+    authorizeUrl.searchParams.set(
+        "provider",
+        PROVIDER
+    );
+
+    authorizeUrl.searchParams.set(
+        "redirect_to",
+        callbackUrl.href
+    );
+
+    authorizeUrl.searchParams.set(
+        "code_challenge",
+        codeChallenge
+    );
+
+    authorizeUrl.searchParams.set(
+        "code_challenge_method",
+        "s256"
+    );
+
+    return authorizeUrl.href;
+}
+
+/* =========================================================
+TURNSTILE RESPONSE
+========================================================= */
+
+function getTurnstileFailureResponse(
+    verification
+) {
+    if (
+        verification.configurationError ===
+        true
+    ) {
+        return jsonResponse(
+            {
+                success:
+                    false,
+
+                error:
+                    verification.error
+                    || "CAPTCHA_NOT_CONFIGURED"
+            },
+            500
+        );
+    }
+
+    if (
+        verification.unavailable ===
+        true
+    ) {
+        return jsonResponse(
+            {
+                success:
+                    false,
+
+                error:
+                    verification.error
+                    || "CAPTCHA_SERVICE_UNAVAILABLE"
+            },
+            503
+        );
+    }
+
+    if (
+        verification.success !==
+        true
+    ) {
+        return jsonResponse(
+            {
+                success:
+                    false,
+
+                error:
+                    verification.error
+                    || "CAPTCHA_INVALID"
+            },
+            verification.error ===
+                "CAPTCHA_REQUIRED"
+                ? 400
+                : 403
+        );
+    }
+
+    return null;
+}
+
+/* =========================================================
+GOOGLE LOGIN
 ========================================================= */
 
 export async function handleGoogleLogin(
     request,
     env
 ) {
-    const debugId =
-        crypto.randomUUID();
+    if (
+        request.method !==
+        "POST"
+    ) {
+        return jsonResponse(
+            {
+                success:
+                    false,
+
+                error:
+                    "METHOD_NOT_ALLOWED"
+            },
+            405
+        );
+    }
+
+    let body;
 
     try {
-        const configuration =
-            getOAuthConfiguration();
-
-        if (
-            !configuration
-        ) {
-            console.error(
-                "GOOGLE LOGIN: OAuth configuration invalid.",
-                {
-                    debugId
-                }
+        body =
+            await readRequestBody(
+                request
             );
-
-            return json(
-                {
-                    success:
-                        false,
-
-                    message:
-                        "Google OAuth configuration is invalid.",
-
-                    debugId
-                },
-                500
-            );
-        }
-
-        const verifier =
-            createPkceVerifier();
-
-        const challenge =
-            await createPkceChallenge(
-                verifier
-            );
-
-        if (
-            !verifier
-            || !challenge
-        ) {
-            console.error(
-                "GOOGLE LOGIN: PKCE generation failed.",
-                {
-                    debugId
-                }
-            );
-
-            return json(
-                {
-                    success:
-                        false,
-
-                    message:
-                        "Unable to initialize Google login.",
-
-                    debugId
-                },
-                500
-            );
-        }
-
-        const authorizeUrl =
-            new URL(
-                configuration
-                    .authorizeUrl
-                    .toString()
-            );
-
-        authorizeUrl.searchParams.set(
-            "provider",
-            GOOGLE_PROVIDER
-        );
-
-        authorizeUrl.searchParams.set(
-            "redirect_to",
-            configuration.returnUrl
-        );
-
-        authorizeUrl.searchParams.set(
-            "code_challenge",
-            challenge
-        );
-
-        authorizeUrl.searchParams.set(
-            "code_challenge_method",
-            "s256"
-        );
-
-        /* =================================================
-        TEMPORARY OAUTH CONTEXT
-        ================================================= */
-
-        const verifierCookie =
-            createCookie(
-                request,
-                PKCE_COOKIE,
-                verifier,
-                OAUTH_COOKIE_MAX_AGE_SECONDS
-            );
-
-        const providerCookie =
-            createCookie(
-                request,
-                OAUTH_PROVIDER_COOKIE,
-                GOOGLE_PROVIDER,
-                OAUTH_COOKIE_MAX_AGE_SECONDS
-            );
-
-        const modeCookie =
-            createCookie(
-                request,
-                OAUTH_MODE_COOKIE,
-                OAUTH_MODE_LOGIN,
-                OAUTH_COOKIE_MAX_AGE_SECONDS
-            );
-
-        /*
-         * A normal login must never inherit a previous link
-         * flow's target identity.accounts ID.
-         */
-        const clearAccountCookie =
-            clearCookie(
-                request,
-                OAUTH_ACCOUNT_COOKIE
-            );
-
-        if (
-            !verifierCookie
-            || !providerCookie
-            || !modeCookie
-            || !clearAccountCookie
-        ) {
-            console.error(
-                "GOOGLE LOGIN: OAuth cookies could not be created.",
-                {
-                    debugId
-                }
-            );
-
-            return json(
-                {
-                    success:
-                        false,
-
-                    message:
-                        "Unable to initialize Google login.",
-
-                    debugId
-                },
-                500
-            );
-        }
-
-        console.info(
-            "GOOGLE LOGIN: Authorization started.",
+    }
+    catch (
+        error
+    ) {
+        return jsonResponse(
             {
-                debugId,
+                success:
+                    false,
 
-                provider:
-                    GOOGLE_PROVIDER,
+                error:
+                    error?.message
+                    || "INVALID_REQUEST"
+            },
+            400
+        );
+    }
 
-                mode:
-                    OAUTH_MODE_LOGIN
+    const verification =
+        await verifyTurnstile(
+            request,
+            env,
+            body.captchaToken
+        );
+
+    const verificationFailure =
+        getTurnstileFailureResponse(
+            verification
+        );
+
+    if (
+        verificationFailure
+    ) {
+        console.warn(
+            "GOOGLE LOGIN: Turnstile verification rejected.",
+            {
+                error:
+                    verification.error,
+
+                errorCodes:
+                    verification.errorCodes
             }
         );
 
-        return redirect(
-            authorizeUrl.toString(),
-            [
-                verifierCookie,
-                providerCookie,
-                modeCookie,
-                clearAccountCookie
-            ]
+        return verificationFailure;
+    }
+
+    const returnTo =
+        normalizeReturnTo(
+            body.returnTo
+        );
+
+    try {
+        const pkceVerifier =
+            createRandomString();
+
+        const pkceChallenge =
+            await createPkceChallenge(
+                pkceVerifier
+            );
+
+        const redirectUrl =
+            buildGoogleAuthorizeUrl(
+                request,
+                env,
+                pkceChallenge
+            );
+
+        const cookies = [
+            createOAuthCookie(
+                OAUTH_MODE_COOKIE,
+                "login"
+            ),
+
+            createOAuthCookie(
+                OAUTH_PROVIDER_COOKIE,
+                PROVIDER
+            ),
+
+            createOAuthCookie(
+                OAUTH_PKCE_COOKIE,
+                pkceVerifier
+            ),
+
+            createOAuthCookie(
+                OAUTH_RETURN_COOKIE,
+                returnTo
+            )
+        ];
+
+        return jsonResponse(
+            {
+                success:
+                    true,
+
+                provider:
+                    PROVIDER,
+
+                redirectUrl
+            },
+            200,
+            cookies
         );
     }
     catch (
         error
     ) {
         console.error(
-            "GOOGLE LOGIN: Unexpected failure.",
+            "GOOGLE LOGIN: Failed to create OAuth request.",
             {
-                debugId,
-
-                name:
-                    error?.name
-                    || "Error",
-
                 message:
                     error?.message
-                    || "Unknown error",
-
-                stack:
-                    error?.stack
-                    || null
+                    || "Unknown error"
             }
         );
 
-        return json(
+        return jsonResponse(
             {
                 success:
                     false,
 
-                message:
-                    "Google login initialization failed.",
-
-                debugId
+                error:
+                    "GOOGLE_LOGIN_START_FAILED"
             },
             500
         );

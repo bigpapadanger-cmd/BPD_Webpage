@@ -1,8 +1,37 @@
 "use strict";
-import {TIMEZONE_DISPLAY_ALIASES} from "./timezone.js"
-import { ROCKET_LEAGUE_PROFILE_URL} from "../../../../scripts/apiRoutes.js";
-import { apiFetch } from "../../../../scripts/apiConnection.js";
 
+/* =========================================================
+BPD GAMING NETWORK
+ROCKET LEAGUE REGISTRATION CLIENT
+
+Purpose:
+    Handles Rocket League registration UI, profile loading,
+    validation, draft persistence, and profile submission.
+
+Description:
+    - Loads authenticated Rocket League profile information.
+    - Displays Epic identity as read-only provider metadata.
+    - Does not submit global account ownership information.
+    - Does not maintain a separate Rocket League display name.
+    - Collects only Rocket League-specific registration data.
+    - Preserves unsaved registration data locally.
+========================================================= */
+
+import {
+    TIMEZONE_DISPLAY_ALIASES
+} from "./timezone.js";
+
+import {
+    ROCKET_LEAGUE_PROFILE_URL
+} from "../../../../scripts/apiRoutes.js";
+
+import {
+    apiFetch
+} from "../../../../scripts/apiConnection.js";
+
+/* =========================================================
+CONFIGURATION
+========================================================= */
 
 const REGISTRATION_DRAFT_KEY =
     "bpdRocketLeagueRegistrationDraft";
@@ -28,7 +57,7 @@ const REGISTRATION_CONFIG = {
             "Epic account",
 
         epicDescription:
-            "These fields come from your authenticated Epic Games session.",
+            "These fields come from your authenticated Epic Games account.",
 
         epicUserLabel:
             "Epic user",
@@ -53,12 +82,6 @@ const REGISTRATION_CONFIG = {
 
         playerProfileLegend:
             "Player profile",
-
-        displayNameLabel:
-            "Display name",
-
-        displayNameHelp:
-            "This is the name other BPD players will see.",
 
         rankLabel:
             "Current rank",
@@ -153,15 +176,6 @@ const REGISTRATION_CONFIG = {
         reminderBoth:
             "Both",
 
-        reminderSpecific:
-            "Specific times",
-
-        specificTimesTitle:
-            "Specific reminder times",
-
-        specificTimesBody:
-            "Select one or more times from the 24-hour clock. Times are available every 30 minutes.",
-
         reminderNoteTitle:
             "Scheduling note",
 
@@ -202,17 +216,6 @@ const REGISTRATION_CONFIG = {
 
         incrementMinutes:
             30
-    },
-
-    reminderTimes: {
-        start:
-            "00:00",
-
-        end:
-            "23:30",
-
-        incrementMinutes:
-            30
     }
 };
 
@@ -237,80 +240,90 @@ let currentLocation = {
 let notificationsOptOutConfirmed =
     false;
 
+/* =========================================================
+TIMEZONE DISPLAY
+========================================================= */
 
 function getTimezoneDisplayName(
     timezone
 ) {
     const value =
         String(
-            timezone ||
-            ""
+            timezone
+            || ""
         ).trim();
 
-    if (!value) {
+    if (
+        !value
+    ) {
         return "";
     }
 
     return (
         TIMEZONE_DISPLAY_ALIASES[
             value
-        ] ||
-        value
+        ]
+        || value
     );
 }
-// ============================================================
-// DYNAMIC COPY
-// ============================================================
+
+/* =========================================================
+DYNAMIC COPY
+========================================================= */
 
 function applyDynamicCopy() {
     document
         .querySelectorAll(
             "[data-copy]"
         )
-        .forEach((element) => {
-            const key =
-                element.dataset.copy;
+        .forEach(
+            element => {
+                const key =
+                    element.dataset.copy;
 
-            if (
-                key &&
-                Object.prototype.hasOwnProperty.call(
-                    REGISTRATION_CONFIG.copy,
+                if (
                     key
-                )
-            ) {
-                element.textContent =
-                    REGISTRATION_CONFIG.copy[
+                    && Object.prototype.hasOwnProperty.call(
+                        REGISTRATION_CONFIG.copy,
                         key
-                    ];
+                    )
+                ) {
+                    element.textContent =
+                        REGISTRATION_CONFIG.copy[
+                            key
+                        ];
+                }
             }
-        });
+        );
 
     document
         .querySelectorAll(
             "[data-copy-option]"
         )
-        .forEach((element) => {
-            const key =
-                element.dataset.copyOption;
+        .forEach(
+            element => {
+                const key =
+                    element.dataset.copyOption;
 
-            if (
-                key &&
-                Object.prototype.hasOwnProperty.call(
-                    REGISTRATION_CONFIG.copy,
+                if (
                     key
-                )
-            ) {
-                element.textContent =
-                    REGISTRATION_CONFIG.copy[
+                    && Object.prototype.hasOwnProperty.call(
+                        REGISTRATION_CONFIG.copy,
                         key
-                    ];
+                    )
+                ) {
+                    element.textContent =
+                        REGISTRATION_CONFIG.copy[
+                            key
+                        ];
+                }
             }
-        });
+        );
 }
 
-// ============================================================
-// TIME HELPERS
-// ============================================================
+/* =========================================================
+TIME HELPERS
+========================================================= */
 
 function timeToMinutes(
     value
@@ -454,45 +467,31 @@ function getAvailabilityTimeOptions() {
     );
 }
 
-function getReminderTimeOptions() {
-    return buildTimeOptions(
-        REGISTRATION_CONFIG
-            .reminderTimes
-            .start,
-
-        REGISTRATION_CONFIG
-            .reminderTimes
-            .end,
-
-        REGISTRATION_CONFIG
-            .reminderTimes
-            .incrementMinutes
-    );
-}
-
 function createTimeOptions(
     options,
     selectedValue
 ) {
     return options
-        .map(([value, label]) => `
-            <option
-                value="${value}"
-                ${
-                    value === selectedValue
-                        ? "selected"
-                        : ""
-                }
-            >
-                ${label}
-            </option>
-        `)
+        .map(
+            ([value, label]) => `
+                <option
+                    value="${value}"
+                    ${
+                        value === selectedValue
+                            ? "selected"
+                            : ""
+                    }
+                >
+                    ${label}
+                </option>
+            `
+        )
         .join("");
 }
 
-// ============================================================
-// AVAILABILITY
-// ============================================================
+/* =========================================================
+AVAILABILITY
+========================================================= */
 
 function renderAvailabilityRows() {
     const container =
@@ -500,7 +499,9 @@ function renderAvailabilityRows() {
             "availabilityRows"
         );
 
-    if (!container) {
+    if (
+        !container
+    ) {
         return;
     }
 
@@ -519,73 +520,77 @@ function renderAvailabilityRows() {
 
     container.innerHTML =
         DAYS
-            .map((day) => {
-                const key =
-                    day.toLowerCase();
+            .map(
+                day => {
+                    const key =
+                        day.toLowerCase();
 
-                return `
-                    <div
-                        class="availability-row"
-                        data-day="${key}"
-                    >
-                        <label class="availability-day">
-                            <input
-                                type="checkbox"
-                                name="availableDays"
-                                value="${key}"
+                    return `
+                        <div
+                            class="availability-row"
+                            data-day="${key}"
+                        >
+                            <label class="availability-day">
+                                <input
+                                    type="checkbox"
+                                    name="availableDays"
+                                    value="${key}"
+                                >
+
+                                <span>
+                                    ${day}
+                                </span>
+                            </label>
+
+                            <select
+                                class="availability-time"
+                                name="${key}Start"
+                                aria-label="${day} start time"
+                                disabled
                             >
+                                ${createTimeOptions(
+                                    timeOptions,
+                                    defaultStart
+                                )}
+                            </select>
 
-                            <span>
-                                ${day}
+                            <span class="availability-separator">
+                                to
                             </span>
-                        </label>
 
-                        <select
-                            class="availability-time"
-                            name="${key}Start"
-                            aria-label="${day} start time"
-                            disabled
-                        >
-                            ${createTimeOptions(
-                                timeOptions,
-                                defaultStart
-                            )}
-                        </select>
-
-                        <span class="availability-separator">
-                            to
-                        </span>
-
-                        <select
-                            class="availability-time"
-                            name="${key}End"
-                            aria-label="${day} end time"
-                            disabled
-                        >
-                            ${createTimeOptions(
-                                timeOptions,
-                                defaultEnd
-                            )}
-                        </select>
-                    </div>
-                `;
-            })
+                            <select
+                                class="availability-time"
+                                name="${key}End"
+                                aria-label="${day} end time"
+                                disabled
+                            >
+                                ${createTimeOptions(
+                                    timeOptions,
+                                    defaultEnd
+                                )}
+                            </select>
+                        </div>
+                    `;
+                }
+            )
             .join("");
 
     container
         .querySelectorAll(
             'input[name="availableDays"]'
         )
-        .forEach((checkbox) => {
-            checkbox.addEventListener(
-                "change",
-                () => {
-                    updateAvailabilityRow(
-                        checkbox
-                    );
-                }
-            );
-        });
+        .forEach(
+            checkbox => {
+                checkbox.addEventListener(
+                    "change",
+                    () => {
+                        updateAvailabilityRow(
+                            checkbox
+                        );
+                    }
+                );
+            }
+        );
 }
 
 function updateAvailabilityRow(
@@ -596,7 +601,9 @@ function updateAvailabilityRow(
             ".availability-row"
         );
 
-    if (!row) {
+    if (
+        !row
+    ) {
         return;
     }
 
@@ -609,10 +616,12 @@ function updateAvailabilityRow(
         .querySelectorAll(
             "select"
         )
-        .forEach((select) => {
-            select.disabled =
-                !checkbox.checked;
-        });
+        .forEach(
+            select => {
+                select.disabled =
+                    !checkbox.checked;
+            }
+        );
 }
 
 function getAvailability() {
@@ -620,20 +629,24 @@ function getAvailability() {
         ...document.querySelectorAll(
             ".availability-row.enabled"
         )
-    ].map((row) => ({
-        day:
-            row.dataset.day,
+    ].map(
+        row => ({
+            day:
+                row.dataset.day,
 
-        start:
-            row.querySelector(
-                'select[name$="Start"]'
-            )?.value || "",
+            start:
+                row.querySelector(
+                    'select[name$="Start"]'
+                )?.value
+                || "",
 
-        end:
-            row.querySelector(
-                'select[name$="End"]'
-            )?.value || ""
-    }));
+            end:
+                row.querySelector(
+                    'select[name$="End"]'
+                )?.value
+                || ""
+        })
+    );
 }
 
 function populateAvailability(
@@ -653,14 +666,16 @@ function populateAvailability(
         .querySelectorAll(
             'input[name="availableDays"]'
         )
-        .forEach((checkbox) => {
-            checkbox.checked =
-                false;
+        .forEach(
+            checkbox => {
+                checkbox.checked =
+                    false;
 
-            updateAvailabilityRow(
-                checkbox
-            );
-        });
+                updateAvailabilityRow(
+                    checkbox
+                );
+            }
+        );
 
     if (
         !Array.isArray(
@@ -671,16 +686,18 @@ function populateAvailability(
     }
 
     availability.forEach(
-        (item) => {
+        item => {
             const day =
                 String(
-                    item?.day ||
-                    ""
+                    item?.day
+                    || ""
                 )
                     .trim()
                     .toLowerCase();
 
-            if (!day) {
+            if (
+                !day
+            ) {
                 return;
             }
 
@@ -691,7 +708,9 @@ function populateAvailability(
                     )}"]`
                 );
 
-            if (!row) {
+            if (
+                !row
+            ) {
                 return;
             }
 
@@ -710,7 +729,9 @@ function populateAvailability(
                     'select[name$="End"]'
                 );
 
-            if (checkbox) {
+            if (
+                checkbox
+            ) {
                 checkbox.checked =
                     true;
 
@@ -721,28 +742,32 @@ function populateAvailability(
 
             const savedStart =
                 String(
-                    item?.start ||
-                    ""
+                    item?.start
+                    || ""
                 );
 
             const savedEnd =
                 String(
-                    item?.end ||
-                    ""
+                    item?.end
+                    || ""
                 );
 
-            if (start) {
+            if (
+                start
+            ) {
                 start.value =
-                    savedStart >= minimumTime &&
-                    savedStart <= maximumTime
+                    savedStart >= minimumTime
+                    && savedStart <= maximumTime
                         ? savedStart
                         : minimumTime;
             }
 
-            if (end) {
+            if (
+                end
+            ) {
                 end.value =
-                    savedEnd >= minimumTime &&
-                    savedEnd <= maximumTime
+                    savedEnd >= minimumTime
+                    && savedEnd <= maximumTime
                         ? savedEnd
                         : maximumTime;
             }
@@ -750,16 +775,16 @@ function populateAvailability(
     );
 }
 
-// ============================================================
-// CONTACT METHOD
-// ============================================================
+/* =========================================================
+CONTACT METHOD
+========================================================= */
 
 function updateContactFields() {
     const method =
         document.querySelector(
             'input[name="contactMethod"]:checked'
-        )?.value ||
-        "email";
+        )?.value
+        || "email";
 
     const email =
         document.getElementById(
@@ -782,29 +807,37 @@ function updateContactFields() {
         );
 
     const emailRequired =
-        method === "email" ||
-        method === "both";
+        method === "email"
+        || method === "both";
 
     const phoneRequired =
-        method === "phone" ||
-        method === "both";
+        method === "phone"
+        || method === "both";
 
-    if (email) {
+    if (
+        email
+    ) {
         email.required =
             emailRequired;
     }
 
-    if (phone) {
+    if (
+        phone
+    ) {
         phone.required =
             phoneRequired;
     }
 
-    if (emailMark) {
+    if (
+        emailMark
+    ) {
         emailMark.hidden =
             !emailRequired;
     }
 
-    if (phoneMark) {
+    if (
+        phoneMark
+    ) {
         phoneMark.hidden =
             !phoneRequired;
     }
@@ -813,11 +846,13 @@ function updateContactFields() {
         .querySelectorAll(
             ".contact-method-row .choice-card"
         )
-        .forEach((card) => {
-            card.classList.remove(
-                "related-selected"
-            );
-        });
+        .forEach(
+            card => {
+                card.classList.remove(
+                    "related-selected"
+                );
+            }
+        );
 
     if (
         method === "both"
@@ -826,17 +861,19 @@ function updateContactFields() {
             .querySelectorAll(
                 ".contact-method-row .choice-card"
             )
-            .forEach((card) => {
-                card.classList.add(
-                    "related-selected"
-                );
-            });
+            .forEach(
+                card => {
+                    card.classList.add(
+                        "related-selected"
+                    );
+                }
+            );
     }
 }
 
-// ============================================================
-// MODE
-// ============================================================
+/* =========================================================
+MODE
+========================================================= */
 
 function updateModeField() {
     const mode =
@@ -857,31 +894,38 @@ function updateModeField() {
     const isOther =
         mode === "other";
 
-    if (field) {
+    if (
+        field
+    ) {
         field.hidden =
             !isOther;
     }
 
-    if (input) {
+    if (
+        input
+    ) {
         input.required =
             isOther;
 
-        if (!isOther) {
+        if (
+            !isOther
+        ) {
             input.value =
                 "";
         }
     }
 }
 
-// ============================================================
-// NOTIFICATIONS
-// ============================================================
+/* =========================================================
+NOTIFICATIONS
+========================================================= */
 
 function getNotificationsEnabled() {
     return (
         document.querySelector(
             'input[name="notificationsEnabled"]:checked'
-        )?.value !== "false"
+        )?.value !==
+        "false"
     );
 }
 
@@ -891,7 +935,9 @@ function openNotificationOptOutModal() {
             "notificationOptOutModal"
         );
 
-    if (!modal) {
+    if (
+        !modal
+    ) {
         return;
     }
 
@@ -909,7 +955,9 @@ function closeNotificationOptOutModal() {
             "notificationOptOutModal"
         );
 
-    if (!modal) {
+    if (
+        !modal
+    ) {
         return;
     }
 
@@ -934,7 +982,9 @@ function setNotificationsEnabled(
             `input[name="notificationsEnabled"][value="${value}"]`
         );
 
-    if (input) {
+    if (
+        input
+    ) {
         input.checked =
             true;
     }
@@ -956,12 +1006,16 @@ function updateNotificationState() {
             "reminderOptions"
         );
 
-    if (warning) {
+    if (
+        warning
+    ) {
         warning.hidden =
             enabled;
     }
 
-    if (reminderOptions) {
+    if (
+        reminderOptions
+    ) {
         reminderOptions.classList.toggle(
             "notifications-disabled",
             !enabled
@@ -971,10 +1025,12 @@ function updateNotificationState() {
             .querySelectorAll(
                 "input"
             )
-            .forEach((input) => {
-                input.disabled =
-                    !enabled;
-            });
+            .forEach(
+                input => {
+                    input.disabled =
+                        !enabled;
+                }
+            );
     }
 }
 
@@ -985,9 +1041,9 @@ function handleNotificationChoiceChange(
         event.currentTarget;
 
     if (
-        input.value === "false" &&
-        input.checked &&
-        !notificationsOptOutConfirmed
+        input.value === "false"
+        && input.checked
+        && !notificationsOptOutConfirmed
     ) {
         setNotificationsEnabled(
             true
@@ -1001,88 +1057,9 @@ function handleNotificationChoiceChange(
     updateNotificationState();
 }
 
-// ============================================================
-// REMINDERS
-// ============================================================
-
-function renderReminderTimeSlots() {
-    const container =
-        document.getElementById(
-            "reminderTimeSlots"
-        );
-
-    if (!container) {
-        return;
-    }
-
-    container.innerHTML =
-        getReminderTimeOptions()
-            .map(([value, label]) => `
-                <label class="reminder-slot">
-                    <input
-                        type="checkbox"
-                        name="specificReminderTime"
-                        value="${value}"
-                    >
-
-                    <span>
-                        ${label}
-                    </span>
-                </label>
-            `)
-            .join("");
-}
-
-function updateReminderMode() {
-    const mode =
-        document.querySelector(
-            'input[name="reminderMode"]:checked'
-        )?.value ||
-        "24-hours";
-
-    const specificTimes =
-        document.getElementById(
-            "specificReminderTimes"
-        );
-
-    if (specificTimes) {
-        specificTimes.hidden =
-            mode !== "specific-times";
-    }
-}
-
-function getSpecificReminderTimes() {
-    return [
-        ...document.querySelectorAll(
-            'input[name="specificReminderTime"]:checked'
-        )
-    ].map(
-        (input) =>
-            input.value
-    );
-}
-
-function populateSpecificReminderTimes(
-    times
-) {
-    document
-        .querySelectorAll(
-            'input[name="specificReminderTime"]'
-        )
-        .forEach((input) => {
-            input.checked =
-                Array.isArray(
-                    times
-                ) &&
-                times.includes(
-                    input.value
-                );
-        });
-}
-
-// ============================================================
-// UI HELPERS
-// ============================================================
+/* =========================================================
+UI HELPERS
+========================================================= */
 
 function showMessage(
     message,
@@ -1093,7 +1070,9 @@ function showMessage(
             "registrationMessage"
         );
 
-    if (!element) {
+    if (
+        !element
+    ) {
         return;
     }
 
@@ -1121,7 +1100,9 @@ function hideMessage() {
             "registrationMessage"
         );
 
-    if (!element) {
+    if (
+        !element
+    ) {
         return;
     }
 
@@ -1144,7 +1125,9 @@ function setBackendWarning(
             "registrationBackendWarning"
         );
 
-    if (!element) {
+    if (
+        !element
+    ) {
         return;
     }
 
@@ -1152,15 +1135,17 @@ function setBackendWarning(
         !visible;
 
     if (
-        visible &&
-        message
+        visible
+        && message
     ) {
         const messageElement =
             element.querySelector(
                 "span"
             );
 
-        if (messageElement) {
+        if (
+            messageElement
+        ) {
             messageElement.textContent =
                 message;
         }
@@ -1176,10 +1161,12 @@ function setInputValue(
             id
         );
 
-    if (element) {
+    if (
+        element
+    ) {
         element.value =
-            value ??
-            "";
+            value
+            ?? "";
     }
 }
 
@@ -1193,10 +1180,10 @@ function setSelectValue(
         );
 
     if (
-        !element ||
-        value === null ||
-        value === undefined ||
-        value === ""
+        !element
+        || value === null
+        || value === undefined
+        || value === ""
     ) {
         return;
     }
@@ -1216,7 +1203,9 @@ function setCheckboxValue(
             id
         );
 
-    if (element) {
+    if (
+        element
+    ) {
         element.checked =
             value === true;
     }
@@ -1227,9 +1216,9 @@ function setRadioValue(
     value
 ) {
     if (
-        value === null ||
-        value === undefined ||
-        value === ""
+        value === null
+        || value === undefined
+        || value === ""
     ) {
         return;
     }
@@ -1243,54 +1232,56 @@ function setRadioValue(
             )}"]`
         );
 
-    if (input) {
+    if (
+        input
+    ) {
         input.checked =
             true;
     }
 }
 
-// ============================================================
-// LOCATION + PROFILE NORMALIZATION
-// ============================================================
+/* =========================================================
+LOCATION + PROFILE NORMALIZATION
+========================================================= */
 
 function normalizeLocation(
     result,
     profile
 ) {
     const source =
-        result?.location ||
-        result?.geo ||
-        profile?.location ||
-        {};
+        result?.location
+        || result?.geo
+        || profile?.location
+        || {};
 
     return {
         city:
-            source.city ||
-            result?.city ||
-            "",
+            source.city
+            || result?.city
+            || "",
 
         region:
-            source.region ||
-            source.regionName ||
-            result?.region ||
-            "",
+            source.region
+            || source.regionName
+            || result?.region
+            || "",
 
         country:
-            source.country ||
-            source.countryName ||
-            result?.country ||
-            "",
+            source.country
+            || source.countryName
+            || result?.country
+            || "",
 
         countryCode:
-            source.countryCode ||
-            source.country_code ||
-            result?.countryCode ||
-            "",
+            source.countryCode
+            || source.country_code
+            || result?.countryCode
+            || "",
 
         timezone:
-            source.timezone ||
-            result?.timezone ||
-            ""
+            source.timezone
+            || result?.timezone
+            || ""
     };
 }
 
@@ -1299,16 +1290,16 @@ function normalizeProfile(
     authUser = null
 ) {
     const profile =
-        result?.profile &&
-        typeof result.profile ===
+        result?.profile
+        && typeof result.profile ===
             "object"
             ? result.profile
             : {};
 
     const user =
-        result?.user ||
-        authUser ||
-        {};
+        result?.user
+        || authUser
+        || {};
 
     const location =
         normalizeLocation(
@@ -1317,70 +1308,68 @@ function normalizeProfile(
         );
 
     return {
+        bpdDisplayName:
+            profile.bpdDisplayName
+            || profile.bpd_display_name
+            || null,
+
         EpicUniqueId:
-            profile.EpicUniqueId ||
-            profile.epicUniqueId ||
-            user.EpicUniqueId ||
-            user.epicUniqueId ||
-            null,
+            profile.EpicUniqueId
+            || profile.epicUniqueId
+            || profile.epicAccountId
+            || user.EpicUniqueId
+            || user.epicUniqueId
+            || null,
 
         EpicDisplayName:
-            profile.EpicDisplayName ||
-            profile.epicDisplayName ||
-            user.EpicDisplayName ||
-            user.epicDisplayName ||
-            user.displayName ||
-            "",
+            profile.EpicDisplayName
+            || profile.epicDisplayName
+            || user.EpicDisplayName
+            || user.epicDisplayName
+            || "",
 
         EpicPreferredUsername:
-            profile.EpicPreferredUsername ||
-            profile.epicPreferredUsername ||
-            user.EpicPreferredUsername ||
-            user.epicPreferredUsername ||
-            null,
-
-        displayName:
-            profile.displayName ||
-            profile.username ||
-            profile.EpicDisplayName ||
-            profile.epicDisplayName ||
-            user.EpicDisplayName ||
-            user.displayName ||
-            "",
+            profile.EpicPreferredUsername
+            || profile.epicPreferredUsername
+            || user.EpicPreferredUsername
+            || user.epicPreferredUsername
+            || null,
 
         currentRank:
-            profile.currentRank ||
-            profile.current_rank ||
-            profile.rank ||
-            "",
+            profile.currentRank
+            || profile.current_rank
+            || profile.rank
+            || "",
 
         contactMethod:
-            profile.contactMethod ||
-            profile.contact_method ||
-            "email",
+            profile.contactMethod
+            || profile.contact_method
+            || "email",
 
         email:
-            profile.email ||
-            "",
+            profile.email
+            || "",
 
         phone:
-            profile.phone ||
-            "",
+            profile.phone
+            || "",
 
         preferredMode:
-            profile.preferredMode ||
-            profile.preferred_mode ||
-            "",
+            profile.preferredMode
+            || profile.preferred_mode
+            || "",
 
         otherMode:
-            profile.otherMode ||
-            profile.other_mode ||
-            "",
+            profile.otherMode
+            || profile.other_mode
+            || "",
 
         timezone:
-            profile.timezone ||
-            location.timezone ||
-            "",
+            profile.timezone
+            || profile.displayTimezone
+            || profile.display_timezone
+            || location.timezone
+            || "",
 
         location,
 
@@ -1393,47 +1382,36 @@ function normalizeProfile(
 
         showOnlineStatus:
             profile.showOnlineStatus ===
-            true ||
-            profile.show_online_status ===
-            true,
+                true
+            || profile.show_online_status ===
+                true,
 
         notificationsEnabled:
             profile.notificationsEnabled !==
-            false &&
-            profile.notifications_enabled !==
-            false,
+                false
+            && profile.notifications_enabled !==
+                false,
 
         reminderMode:
-            profile.reminderMode ||
-            profile.reminder_mode ||
-            profile.reminderTiming ||
-            profile.reminder_timing ||
-            "24-hours",
-
-        specificReminderTimes:
-            Array.isArray(
-                profile.specificReminderTimes
-            )
-                ? profile.specificReminderTimes
-                : Array.isArray(
-                    profile.specific_reminder_times
-                )
-                    ? profile.specific_reminder_times
-                    : [],
+            profile.reminderMode
+            || profile.reminder_mode
+            || profile.reminderTiming
+            || profile.reminder_timing
+            || "24-hours",
 
         ageConsent:
             profile.ageConsent ===
-            true ||
-            profile.age_consent ===
-            true,
+                true
+            || profile.age_consent ===
+                true,
 
         profileComplete:
             result?.profileComplete ===
-            true ||
-            profile.profileComplete ===
-            true ||
-            profile.profile_complete ===
-            true
+                true
+            || profile.profileComplete ===
+                true
+            || profile.profile_complete ===
+                true
     };
 }
 
@@ -1443,13 +1421,15 @@ function formatLocation(
     const values =
         [
             location?.region,
-            location?.country ||
-            location?.countryCode
+
+            location?.country
+            || location?.countryCode
         ]
             .map(
-                (value) =>
+                value =>
                     String(
-                        value || ""
+                        value
+                        || ""
                     ).trim()
             )
             .filter(
@@ -1468,24 +1448,24 @@ function applyLocation(
 ) {
     currentLocation = {
         city:
-            location?.city ||
-            "",
+            location?.city
+            || "",
 
         region:
-            location?.region ||
-            "",
+            location?.region
+            || "",
 
         country:
-            location?.country ||
-            "",
+            location?.country
+            || "",
 
         countryCode:
-            location?.countryCode ||
-            "",
+            location?.countryCode
+            || "",
 
         timezone:
-            location?.timezone ||
-            ""
+            location?.timezone
+            || ""
     };
 
     setInputValue(
@@ -1503,13 +1483,13 @@ function applyTimezone(
         Intl
             .DateTimeFormat()
             .resolvedOptions()
-            .timeZone ||
-        "UTC";
+            .timeZone
+        || "UTC";
 
     const resolvedTimezone =
-        timezone ||
-        currentLocation.timezone ||
-        browserTimezone;
+        timezone
+        || currentLocation.timezone
+        || browserTimezone;
 
     setInputValue(
         "timezone",
@@ -1529,22 +1509,14 @@ function populateProfileForm(
 ) {
     setInputValue(
         "epicDisplayName",
-        profile.EpicDisplayName ||
-        profile.EpicPreferredUsername ||
-        "Epic Player"
+        profile.EpicDisplayName
+        || profile.EpicPreferredUsername
+        || "Epic Player"
     );
 
     setInputValue(
         "epicPlatform",
         "Epic Games"
-    );
-
-    setInputValue(
-        "displayName",
-        profile.displayName ||
-        profile.EpicDisplayName ||
-        profile.EpicPreferredUsername ||
-        ""
     );
 
     setSelectValue(
@@ -1619,43 +1591,43 @@ function populateProfileForm(
         profile.availability
     );
 
-    populateSpecificReminderTimes(
-        profile.specificReminderTimes
-    );
-
     updateContactFields();
     updateModeField();
     updateNotificationState();
-    updateReminderMode();
 }
 
-// ============================================================
-// AUTH + PROFILE LOAD
-// ============================================================
+/* =========================================================
+AUTH + PROFILE LOAD
+========================================================= */
 
 async function getAuthenticatedEpicUser() {
     try {
         if (
-            window.BPDAuth &&
-            typeof window.BPDAuth.getSession ===
+            window.BPDAuth
+            && typeof window.BPDAuth.getSession ===
                 "function"
         ) {
             const session =
                 await window.BPDAuth.getSession();
 
             return (
-                session?.sessionData ||
-                session?.user ||
-                session ||
-                null
+                session?.sessionData
+                || session?.user
+                || session
+                || null
             );
         }
-    } catch (
+    }
+    catch (
         error
     ) {
         console.error(
             "ROCKET LEAGUE REGISTRATION: Could not read Epic session.",
-            error
+            {
+                message:
+                    error?.message
+                    || "Unknown error"
+            }
         );
     }
 
@@ -1666,7 +1638,9 @@ async function loadRocketLeagueProfile() {
     const authUser =
         await getAuthenticatedEpicUser();
 
-    if (authUser) {
+    if (
+        authUser
+    ) {
         const authProfile =
             normalizeProfile(
                 {
@@ -1678,27 +1652,10 @@ async function loadRocketLeagueProfile() {
 
         setInputValue(
             "epicDisplayName",
-            authProfile.EpicDisplayName ||
-            authProfile.EpicPreferredUsername ||
-            "Epic Player"
+            authProfile.EpicDisplayName
+            || authProfile.EpicPreferredUsername
+            || "Epic Player"
         );
-
-        const displayNameElement =
-            document.getElementById(
-                "displayName"
-            );
-
-        if (
-            displayNameElement &&
-            !displayNameElement.value
-        ) {
-            setInputValue(
-                "displayName",
-                authProfile.EpicDisplayName ||
-                authProfile.EpicPreferredUsername ||
-                ""
-            );
-        }
     }
 
     let response;
@@ -1723,16 +1680,16 @@ async function loadRocketLeagueProfile() {
                     }
                 }
             );
-
-    } catch (
+    }
+    catch (
         error
     ) {
         console.error(
             "ROCKET LEAGUE REGISTRATION: Profile request failed.",
             {
                 message:
-                    error?.message ||
-                    "Unknown error"
+                    error?.message
+                    || "Unknown error"
             }
         );
 
@@ -1764,8 +1721,9 @@ async function loadRocketLeagueProfile() {
             );
 
     if (
-        response.status ===
-        401
+        response.status === 401
+        || result.requiresEpicLogin ===
+            true
     ) {
         window.location.replace(
             "/RocketLeague"
@@ -1781,8 +1739,8 @@ async function loadRocketLeagueProfile() {
         );
 
     if (
-        !response.ok ||
-        result.success !==
+        !response.ok
+        || result.success !==
             true
     ) {
         return {
@@ -1793,8 +1751,8 @@ async function loadRocketLeagueProfile() {
                 false,
 
             warning:
-                result.message ||
-                REGISTRATION_CONFIG
+                result.message
+                || REGISTRATION_CONFIG
                     .copy
                     .backendWarningBody
         };
@@ -1809,14 +1767,14 @@ async function loadRocketLeagueProfile() {
             false,
 
         warning:
-            result.warning ||
-            null
+            result.warning
+            || null
     };
 }
 
-// ============================================================
-// LOCAL DRAFT
-// ============================================================
+/* =========================================================
+LOCAL DRAFT
+========================================================= */
 
 function readRegistrationDraft() {
     try {
@@ -1825,7 +1783,9 @@ function readRegistrationDraft() {
                 REGISTRATION_DRAFT_KEY
             );
 
-        if (!raw) {
+        if (
+            !raw
+        ) {
             return null;
         }
 
@@ -1835,22 +1795,22 @@ function readRegistrationDraft() {
             );
 
         return (
-            parsed &&
-            typeof parsed ===
+            parsed
+            && typeof parsed ===
                 "object"
         )
             ? parsed
             : null;
-
-    } catch (
+    }
+    catch (
         error
     ) {
         console.error(
             "ROCKET LEAGUE REGISTRATION: Draft read failed.",
             {
                 message:
-                    error?.message ||
-                    "Unknown error"
+                    error?.message
+                    || "Unknown error"
             }
         );
 
@@ -1868,16 +1828,16 @@ function saveRegistrationDraft(
                 payload
             )
         );
-
-    } catch (
+    }
+    catch (
         error
     ) {
         console.error(
             "ROCKET LEAGUE REGISTRATION: Draft save failed.",
             {
                 message:
-                    error?.message ||
-                    "Unknown error"
+                    error?.message
+                    || "Unknown error"
             }
         );
     }
@@ -1888,16 +1848,16 @@ function clearRegistrationDraft() {
         localStorage.removeItem(
             REGISTRATION_DRAFT_KEY
         );
-
-    } catch (
+    }
+    catch (
         error
     ) {
         console.error(
             "ROCKET LEAGUE REGISTRATION: Draft clear failed.",
             {
                 message:
-                    error?.message ||
-                    "Unknown error"
+                    error?.message
+                    || "Unknown error"
             }
         );
     }
@@ -1907,17 +1867,12 @@ function populateDraft(
     draft
 ) {
     if (
-        !draft ||
-        typeof draft !==
+        !draft
+        || typeof draft !==
             "object"
     ) {
         return;
     }
-
-    setInputValue(
-        "displayName",
-        draft.displayName
-    );
 
     setSelectValue(
         "currentRank",
@@ -1976,8 +1931,8 @@ function populateDraft(
     );
 
     if (
-        draft.location &&
-        typeof draft.location ===
+        draft.location
+        && typeof draft.location ===
             "object"
     ) {
         applyLocation(
@@ -1997,19 +1952,14 @@ function populateDraft(
         draft.availability
     );
 
-    populateSpecificReminderTimes(
-        draft.specificReminderTimes
-    );
-
     updateContactFields();
     updateModeField();
     updateNotificationState();
-    updateReminderMode();
 }
 
-// ============================================================
-// PAYLOAD
-// ============================================================
+/* =========================================================
+PAYLOAD
+========================================================= */
 
 function buildRegistrationPayload(
     form
@@ -2029,20 +1979,12 @@ function buildRegistrationPayload(
             ) ===
             "on",
 
-        displayName:
-            String(
-                data.get(
-                    "displayName"
-                ) ||
-                ""
-            ).trim(),
-
         currentRank:
             String(
                 data.get(
                     "currentRank"
-                ) ||
-                ""
+                )
+                || ""
             ).trim(),
 
         showOnlineStatus:
@@ -2060,16 +2002,16 @@ function buildRegistrationPayload(
             String(
                 data.get(
                     "email"
-                ) ||
-                ""
+                )
+                || ""
             ).trim(),
 
         phone:
             String(
                 data.get(
                     "phone"
-                ) ||
-                ""
+                )
+                || ""
             ).trim(),
 
         preferredMode:
@@ -2081,16 +2023,16 @@ function buildRegistrationPayload(
             String(
                 data.get(
                     "otherMode"
-                ) ||
-                ""
+                )
+                || ""
             ).trim(),
 
         timezone:
             String(
                 data.get(
                     "timezone"
-                ) ||
-                ""
+                )
+                || ""
             ).trim(),
 
         location: {
@@ -2107,17 +2049,16 @@ function buildRegistrationPayload(
                 ? (
                     data.get(
                         "reminderMode"
-                    ) ||
-                    "24-hours"
+                    )
+                    || "24-hours"
                 )
-                : null,
-
-        specificReminderTimes:
-            notificationsEnabled
-                ? getSpecificReminderTimes()
-                : []
+                : null
     };
 }
+
+/* =========================================================
+VALIDATION
+========================================================= */
 
 function validateRegistrationPayload(
     payload
@@ -2125,8 +2066,8 @@ function validateRegistrationPayload(
     if (
         !Array.isArray(
             payload.availability
-        ) ||
-        payload.availability.length ===
+        )
+        || payload.availability.length ===
             0
     ) {
         return (
@@ -2147,10 +2088,10 @@ function validateRegistrationPayload(
     if (
         payload.availability.some(
             ({ start, end }) =>
-                start < minimumTime ||
-                start > maximumTime ||
-                end < minimumTime ||
-                end > maximumTime
+                start < minimumTime
+                || start > maximumTime
+                || end < minimumTime
+                || end > maximumTime
         )
     ) {
         return (
@@ -2169,29 +2110,12 @@ function validateRegistrationPayload(
         );
     }
 
-    if (
-        payload.notificationsEnabled &&
-        payload.reminderMode ===
-            "specific-times" &&
-        (
-            !Array.isArray(
-                payload.specificReminderTimes
-            ) ||
-            payload.specificReminderTimes.length ===
-                0
-        )
-    ) {
-        return (
-            "Select at least one specific reminder time."
-        );
-    }
-
     return null;
 }
 
-// ============================================================
-// SUBMIT
-// ============================================================
+/* =========================================================
+SUBMIT
+========================================================= */
 
 async function submitRegistration(
     event
@@ -2210,7 +2134,6 @@ async function submitRegistration(
     updateContactFields();
     updateModeField();
     updateNotificationState();
-    updateReminderMode();
 
     if (
         !form.reportValidity()
@@ -2244,7 +2167,9 @@ async function submitRegistration(
             "registrationSubmit"
         );
 
-    if (submitButton) {
+    if (
+        submitButton
+    ) {
         submitButton.disabled =
             true;
 
@@ -2289,8 +2214,9 @@ async function submitRegistration(
                 );
 
         if (
-            response.status ===
-            401
+            response.status === 401
+            || result.requiresEpicLogin ===
+                true
         ) {
             window.location.replace(
                 "/RocketLeague"
@@ -2298,19 +2224,21 @@ async function submitRegistration(
 
             return;
         }
+
         if (
-            !response.ok ||
-            result.success !==
+            !response.ok
+            || result.success !==
                 true
         ) {
             throw new Error(
-                result.message ||
-                "Profile could not be processed."
+                result.message
+                || "Profile could not be processed."
             );
         }
 
         if (
-            result.profileSaved !== true
+            result.profileSaved !==
+            true
         ) {
             saveRegistrationDraft(
                 payload
@@ -2318,8 +2246,8 @@ async function submitRegistration(
 
             setBackendWarning(
                 true,
-                result.message ||
-                "Your registration was received, but permanent profile saving is not available yet."
+                result.message
+                || "Your registration was received, but permanent profile saving is not available yet."
             );
 
             showMessage(
@@ -2327,12 +2255,15 @@ async function submitRegistration(
                 "warning"
             );
 
-            setTimeout(() => {
-                window.location.replace(
-                    result.redirectTo ||
-                    "/RocketLeague"
-                );
-            }, 1800);
+            setTimeout(
+                () => {
+                    window.location.replace(
+                        result.redirectTo
+                        || "/RocketLeague"
+                    );
+                },
+                1800
+            );
 
             return;
         }
@@ -2349,13 +2280,11 @@ async function submitRegistration(
         );
 
         window.location.replace(
-            result.redirectTo ||
-            "/RocketLeague"
+            result.redirectTo
+            || "/RocketLeague"
         );
-
-        return;
-
-    } catch (
+    }
+    catch (
         error
     ) {
         saveRegistrationDraft(
@@ -2371,15 +2300,17 @@ async function submitRegistration(
 
         showMessage(
             (
-                error?.message ||
-                "Profile could not be saved."
-            ) +
-            " Your form has been preserved locally.",
+                error?.message
+                || "Profile could not be saved."
+            )
+            + " Your form has been preserved locally.",
             "warning"
         );
-
-    } finally {
-        if (submitButton) {
+    }
+    finally {
+        if (
+            submitButton
+        ) {
             submitButton.disabled =
                 false;
 
@@ -2391,9 +2322,9 @@ async function submitRegistration(
     }
 }
 
-// ============================================================
-// INITIALIZE
-// ============================================================
+/* =========================================================
+INITIALIZE
+========================================================= */
 
 export async function initializePage() {
     const form =
@@ -2401,7 +2332,9 @@ export async function initializePage() {
             "rlRegistrationForm"
         );
 
-    if (!form) {
+    if (
+        !form
+    ) {
         console.error(
             "ROCKET LEAGUE REGISTRATION: Form was not found."
         );
@@ -2421,7 +2354,6 @@ export async function initializePage() {
 
     applyDynamicCopy();
     renderAvailabilityRows();
-    renderReminderTimeSlots();
 
     setInputValue(
         "epicDisplayName",
@@ -2446,65 +2378,62 @@ export async function initializePage() {
         .querySelectorAll(
             'input[name="contactMethod"]'
         )
-        .forEach((input) => {
-            input.addEventListener(
-                "change",
-                updateContactFields
-            );
-        });
+        .forEach(
+            input => {
+                input.addEventListener(
+                    "change",
+                    updateContactFields
+                );
+            }
+        );
 
     document
         .querySelectorAll(
             'input[name="preferredMode"]'
         )
-        .forEach((input) => {
-            input.addEventListener(
-                "change",
-                updateModeField
-            );
-        });
+        .forEach(
+            input => {
+                input.addEventListener(
+                    "change",
+                    updateModeField
+                );
+            }
+        );
 
     document
         .querySelectorAll(
             'input[name="notificationsEnabled"]'
         )
-        .forEach((input) => {
-            input.addEventListener(
-                "change",
-                handleNotificationChoiceChange
-            );
-        });
-
-    document
-        .querySelectorAll(
-            'input[name="reminderMode"]'
-        )
-        .forEach((input) => {
-            input.addEventListener(
-                "change",
-                updateReminderMode
-            );
-        });
+        .forEach(
+            input => {
+                input.addEventListener(
+                    "change",
+                    handleNotificationChoiceChange
+                );
+            }
+        );
 
     document
         .querySelectorAll(
             "[data-modal-close]"
         )
-        .forEach((element) => {
-            element.addEventListener(
-                "click",
-                () => {
-                    notificationsOptOutConfirmed =
-                        false;
+        .forEach(
+            element => {
+                element.addEventListener(
+                    "click",
+                    () => {
+                        notificationsOptOutConfirmed =
+                            false;
 
-                    setNotificationsEnabled(
-                        true
-                    );
+                        setNotificationsEnabled(
+                            true
+                        );
 
-                    closeNotificationOptOutModal();
-                }
-            );
-        });
+                        closeNotificationOptOutModal();
+                    }
+                );
+            }
+        );
 
     document
         .getElementById(
@@ -2550,12 +2479,13 @@ export async function initializePage() {
     updateContactFields();
     updateModeField();
     updateNotificationState();
-    updateReminderMode();
 
     const profileResult =
         await loadRocketLeagueProfile();
 
-    if (!profileResult) {
+    if (
+        !profileResult
+    ) {
         return;
     }
 
@@ -2575,7 +2505,9 @@ export async function initializePage() {
         const draft =
             readRegistrationDraft();
 
-        if (draft) {
+        if (
+            draft
+        ) {
             populateDraft(
                 draft
             );
@@ -2585,8 +2517,8 @@ export async function initializePage() {
                 "warning"
             );
         }
-
-    } else {
+    }
+    else {
         setBackendWarning(
             false
         );
