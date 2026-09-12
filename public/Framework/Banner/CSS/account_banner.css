@@ -15,7 +15,219 @@ Description:
     - Adds hover, focus, active, and disabled states.
     - Supports fallback provider images.
 ========================================================= */
+/* =========================================================
+BPD GAMING NETWORK
+ACCOUNT BANNER BASE
+========================================================= */
 
+.account-banner {
+    position: relative;
+    z-index: 1000;
+
+    display: block;
+
+    width: 100%;
+    min-width: 0;
+
+    background:
+        rgba(
+            10,
+            12,
+            18,
+            0.98
+        );
+
+    border-bottom:
+        1px solid
+        rgba(
+            139,
+            92,
+            246,
+            0.24
+        );
+
+    box-shadow:
+        0 2px 12px
+        rgba(
+            0,
+            0,
+            0,
+            0.28
+        );
+
+    color:
+        #ffffff;
+}
+
+.bpd-account-banner__inner {
+    display: flex;
+    align-items: center;
+
+    width: 100%;
+    min-width: 0;
+
+    min-height:
+        var(
+            --account-banner-height,
+            48px
+        );
+
+    padding:
+        7px
+        clamp(
+            12px,
+            2vw,
+            24px
+        );
+
+    gap:
+        16px;
+
+    box-sizing:
+        border-box;
+}
+
+.bpd-account-banner__brand {
+    display: flex;
+    align-items: center;
+
+    flex:
+        0 0 auto;
+
+    min-width:
+        0;
+}
+
+.bpd-account-banner__network {
+    color:
+        #ffffff;
+
+    font-size:
+        0.82rem;
+
+    font-weight:
+        700;
+
+    line-height:
+        1;
+
+    letter-spacing:
+        0.025em;
+
+    white-space:
+        nowrap;
+}
+
+.bpd-account-banner__status {
+    display: flex;
+    align-items: center;
+
+    flex:
+        1 1 auto;
+
+    min-width:
+        0;
+
+    gap:
+        8px;
+
+    color:
+        #b9bfca;
+}
+
+.bpd-account-banner__message {
+    overflow:
+        hidden;
+
+    color:
+        #9299a6;
+
+    font-size:
+        0.75rem;
+
+    line-height:
+        1.2;
+
+    text-overflow:
+        ellipsis;
+
+    white-space:
+        nowrap;
+}
+
+.bpd-account-banner__username {
+    overflow:
+        hidden;
+
+    color:
+        #e8e2ff;
+
+    font-size:
+        0.78rem;
+
+    font-weight:
+        600;
+
+    text-overflow:
+        ellipsis;
+
+    white-space:
+        nowrap;
+}
+
+/* =========================================================
+BANNER STATES
+========================================================= */
+
+.bpd-account-banner__inner[
+    data-account-banner-state="offline"
+]
+.bpd-account-banner__message {
+    color:
+        #9ca3af;
+}
+
+.bpd-account-banner__inner[
+    data-account-banner-state="unavailable"
+]
+.bpd-account-banner__message {
+    color:
+        #c4a7a7;
+}
+
+/* =========================================================
+SMALL VIEWPORT BASE
+========================================================= */
+
+@media (max-width: 640px) {
+    .bpd-account-banner__inner {
+        min-height:
+            44px;
+
+        padding:
+            6px
+            10px;
+
+        gap:
+            8px;
+    }
+
+    .bpd-account-banner__network {
+        font-size:
+            0.74rem;
+    }
+
+    .bpd-account-banner__status {
+        gap:
+            5px;
+    }
+
+    .bpd-account-banner__message,
+    .bpd-account-banner__username {
+        font-size:
+            0.7rem;
+    }
+}
 /* =========================================================
 LINKED PROVIDERS
 ========================================================= */

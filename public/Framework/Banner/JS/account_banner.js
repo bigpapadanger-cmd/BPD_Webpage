@@ -1123,11 +1123,16 @@ INITIALIZATION
 ========================================================= */
 
 export async function initializeAccountBanner() {
+    /*
+     * Banner construction is completely local.
+     * It must succeed independently of network/API state.
+     */
     ensureBannerMarkup();
 
     if (
         initialized
     ) {
+        void refreshAccountBanner();
         return;
     }
 
@@ -1145,7 +1150,24 @@ export async function initializeAccountBanner() {
     }
 
     renderWaitingForConnection();
+
+    /*
+     * Do not depend exclusively on receiving a
+     * bpd:network-status event.
+     *
+     * The API monitor may have completed before this
+     * controller registered its event listener.
+     *
+     * apiFetch() will verify the API connection itself when
+     * necessary.
+     */
+    void refreshAccountBanner();
 }
+
+/* =========================================================
+WAITING FOR CONNECTION
+========================================================= */
+
 function renderWaitingForConnection() {
     const {
         status,
