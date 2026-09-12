@@ -17,6 +17,8 @@ Description:
     - Generates PKCE verifier and challenge values.
     - Stores OAuth state in secure HttpOnly cookies.
     - Builds the Supabase Discord authorization URL.
+    - Includes the public Supabase publishable key required
+      by the Supabase Auth authorize endpoint.
     - Returns the authorization URL to the browser.
 
 Public Route:
@@ -25,10 +27,15 @@ Public Route:
 Callback:
     GET /api/auth/_oauth/callback
 
+Supabase Public Key:
+    env.SB_PUB_KEY
+
 Important:
     - Discord authentication does not require guild membership.
     - Guild membership and role authorization are evaluated
       separately after authentication.
+    - SB_PUB_KEY is the public Supabase publishable key.
+    - SUPABASE_AUTH must never be exposed in this URL.
 ========================================================= */
 
 import {
@@ -302,13 +309,11 @@ async function readRequestBody(
 }
 
 /* =========================================================
-SUPABASE AUTHORIZE URL
+SUPABASE CONFIGURATION
 ========================================================= */
 
-function buildDiscordAuthorizeUrl(
-    request,
-    env,
-    codeChallenge
+function getSupabaseConfiguration(
+    env
 ) {
     const supabaseUrl =
         normalizeString(
@@ -319,6 +324,11 @@ function buildDiscordAuthorizeUrl(
                 ""
             );
 
+    const publishableKey =
+        normalizeString(
+            env?.SB_PUB_KEY
+        );
+
     if (
         !supabaseUrl
     ) {
@@ -326,6 +336,37 @@ function buildDiscordAuthorizeUrl(
             "SUPABASE_URL_MISSING"
         );
     }
+
+    if (
+        !publishableKey
+    ) {
+        throw new Error(
+            "SB_PUB_KEY_MISSING"
+        );
+    }
+
+    return {
+        supabaseUrl,
+        publishableKey
+    };
+}
+
+/* =========================================================
+SUPABASE AUTHORIZE URL
+========================================================= */
+
+function buildDiscordAuthorizeUrl(
+    request,
+    env,
+    codeChallenge
+) {
+    const {
+        supabaseUrl,
+        publishableKey
+    } =
+        getSupabaseConfiguration(
+            env
+        );
 
     const callbackUrl =
         new URL(
@@ -356,6 +397,19 @@ function buildDiscordAuthorizeUrl(
     authorizeUrl.searchParams.set(
         "code_challenge_method",
         "s256"
+    );
+
+    /*
+     * Supabase Auth requires an API key for this request.
+     *
+     * SB_PUB_KEY is intentionally public and may appear
+     * in the browser-visible authorization URL.
+     *
+     * Never use SUPABASE_AUTH here.
+     */
+    authorizeUrl.searchParams.set(
+        "apikey",
+        publishableKey
     );
 
     return authorizeUrl.href;
@@ -577,7 +631,10 @@ export async function handleDiscordLogin(
                     false,
 
                 error:
-                    "DISCORD_LOGIN_START_FAILED"
+                    error?.message ===
+                        "SB_PUB_KEY_MISSING"
+                        ? "SB_PUB_KEY_MISSING"
+                        : "DISCORD_LOGIN_START_FAILED"
             },
             500
         );

@@ -17,6 +17,7 @@ Description:
     - Generates PKCE verifier and challenge values.
     - Stores OAuth state in secure HttpOnly cookies.
     - Builds the Supabase Google authorization URL.
+    - Supplies the public Supabase API key required by Auth.
     - Returns the authorization URL to the browser.
 
 Public Route:
@@ -24,6 +25,10 @@ Public Route:
 
 Callback:
     GET /api/auth/_oauth/callback
+
+Important:
+    - SUPABASE_PUBLISHABLE_KEY is safe for OAuth initiation.
+    - Never expose the Supabase service-role/secret key here.
 ========================================================= */
 
 import {
@@ -297,15 +302,13 @@ async function readRequestBody(
 }
 
 /* =========================================================
-SUPABASE AUTHORIZE URL
+SUPABASE CONFIGURATION
 ========================================================= */
 
-function buildGoogleAuthorizeUrl(
-    request,
-    env,
-    codeChallenge
+function getSupabaseConfiguration(
+    env
 ) {
-    const supabaseUrl =
+    const url =
         normalizeString(
             env?.SUPABASE_URL
         )
@@ -314,13 +317,49 @@ function buildGoogleAuthorizeUrl(
                 ""
             );
 
+    const publishableKey =
+        normalizeString(
+            env?.SB_PUB_KEY
+        );
+
     if (
-        !supabaseUrl
+        !url
     ) {
         throw new Error(
             "SUPABASE_URL_MISSING"
         );
     }
+
+    if (
+        !publishableKey
+    ) {
+        throw new Error(
+            "SUPABASE_PUBLISHABLE_KEY_MISSING"
+        );
+    }
+
+    return {
+        url,
+        publishableKey
+    };
+}
+
+/* =========================================================
+SUPABASE AUTHORIZE URL
+========================================================= */
+
+function buildGoogleAuthorizeUrl(
+    request,
+    env,
+    codeChallenge
+) {
+    const {
+        url,
+        publishableKey
+    } =
+        getSupabaseConfiguration(
+            env
+        );
 
     const callbackUrl =
         new URL(
@@ -330,7 +369,7 @@ function buildGoogleAuthorizeUrl(
 
     const authorizeUrl =
         new URL(
-            `${supabaseUrl}/auth/v1/authorize`
+            `${url}/auth/v1/authorize`
         );
 
     authorizeUrl.searchParams.set(
@@ -351,6 +390,20 @@ function buildGoogleAuthorizeUrl(
     authorizeUrl.searchParams.set(
         "code_challenge_method",
         "s256"
+    );
+
+    /*
+     * Supabase Auth requires an API key for the authorize
+     * request.
+     *
+     * This must be the PUBLIC publishable/anon key.
+     *
+     * Never use a service-role/secret key here because this
+     * URL is returned to the browser.
+     */
+    authorizeUrl.searchParams.set(
+        "apikey",
+        publishableKey
     );
 
     return authorizeUrl.href;
@@ -572,7 +625,10 @@ export async function handleGoogleLogin(
                     false,
 
                 error:
-                    "GOOGLE_LOGIN_START_FAILED"
+                    error?.message ===
+                        "SUPABASE_PUBLISHABLE_KEY_MISSING"
+                        ? "SUPABASE_PUBLISHABLE_KEY_MISSING"
+                        : "GOOGLE_LOGIN_START_FAILED"
             },
             500
         );
