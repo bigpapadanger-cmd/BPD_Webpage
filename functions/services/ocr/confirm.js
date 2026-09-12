@@ -1,9 +1,37 @@
 "use strict";
 
 /* =========================================================
-   BPD GAMING NETWORK
-   OCR RESULT CONFIRMATION / ADJUSTMENT
-   ========================================================= */
+BPD GAMING NETWORK
+OCR RESULT CONFIRMATION / ADJUSTMENT
+
+File:
+    functions/services/ocr/confirm.js
+
+Service:
+    OCR result confirmation and adjustment
+
+Purpose:
+    Validates and stores user-confirmed or adjusted OCR results.
+
+Description:
+    - Requires a valid global BPD session.
+    - New OCR results are owned by identity.accounts.id.
+    - Existing Epic-owned OCR results remain accessible.
+    - Uses originating OCR job metadata when the match report
+      does not contain ownerType / ownerVersion metadata.
+    - Validates ownership before modifying stored match data.
+    - Enforces edit deadlines and review requirements.
+
+Ownership Model:
+    Version 2:
+        ownerType = "account"
+        ownerVersion = 2
+        ownerId/submittedBy = HMAC(identity.accounts.id)
+
+    Legacy:
+        owner metadata absent
+        submittedBy = HMAC(Epic provider subject)
+========================================================= */
 
 import {
     getCurrentMatchReport,
@@ -11,19 +39,26 @@ import {
 } from "./storage.js";
 
 import {
-    getStoredSession
-} from "../common_helpers/reload_sessions.js";
+    getSessionContext,
+    getProviderContext
+} from "../auth/sessions/session_context.js";
 
 /* =========================================================
-   VERSION
-   ========================================================= */
+VERSION
+========================================================= */
 
 const OCR_CONFIRM_VERSION =
-    "ocr-confirm-2.1";
+    "ocr-confirm-3.0";
+
+const OWNER_TYPE_ACCOUNT =
+    "account";
+
+const OWNER_VERSION_ACCOUNT =
+    2;
 
 /* =========================================================
-   MODES
-   ========================================================= */
+MODES
+========================================================= */
 
 const CONFIRM_MODE_REVIEW =
     "review";
@@ -32,23 +67,24 @@ const CONFIRM_MODE_ADJUSTMENT =
     "adjustment";
 
 /* =========================================================
-   ALLOWED REVIEW FIELDS
-   ========================================================= */
+ALLOWED REVIEW FIELDS
+========================================================= */
 
-const ALLOWED_REVIEW_FIELDS = new Set([
-    "score",
-    "goals",
-    "assists",
-    "demos",
-    "saves",
-    "shots",
-    "damage",
-    "ping"
-]);
+const ALLOWED_REVIEW_FIELDS =
+    new Set([
+        "score",
+        "goals",
+        "assists",
+        "demos",
+        "saves",
+        "shots",
+        "damage",
+        "ping"
+    ]);
 
 /* =========================================================
-   ADJUSTMENT ID
-   ========================================================= */
+ADJUSTMENT ID
+========================================================= */
 
 const ADJUSTMENT_ID_LENGTH =
     16;
@@ -57,8 +93,8 @@ const ADJUSTMENT_ID_ALPHABET =
     "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
 
 /* =========================================================
-   RESPONSE
-   ========================================================= */
+RESPONSE
+========================================================= */
 
 function jsonResponse(
     body,
@@ -69,11 +105,11 @@ function jsonResponse(
             body
         ),
         {
-            status:
-                status,
+            status,
             headers: {
                 "Content-Type":
-                    "application/json",
+                    "application/json; charset=utf-8",
+
                 "Cache-Control":
                     "no-store"
             }
@@ -82,11 +118,11 @@ function jsonResponse(
 }
 
 /* =========================================================
-   OWNER HASH
-   ========================================================= */
+OWNER HASH
+========================================================= */
 
 async function createOwnerHash(
-    epicUniqueId,
+    ownerIdentity,
     secret
 ) {
     const encoder =
@@ -103,6 +139,7 @@ async function createOwnerHash(
             {
                 name:
                     "HMAC",
+
                 hash:
                     "SHA-256"
             },
@@ -118,7 +155,7 @@ async function createOwnerHash(
             key,
             encoder.encode(
                 String(
-                    epicUniqueId
+                    ownerIdentity
                 )
             )
         );
@@ -148,8 +185,65 @@ async function createOwnerHash(
 }
 
 /* =========================================================
-   HELPERS
-   ========================================================= */
+CONSTANT-TIME COMPARE
+========================================================= */
+
+function constantTimeEqual(
+    first,
+    second
+) {
+    const encoder =
+        new TextEncoder();
+
+    const firstBytes =
+        encoder.encode(
+            String(
+                first
+                || ""
+            )
+        );
+
+    const secondBytes =
+        encoder.encode(
+            String(
+                second
+                || ""
+            )
+        );
+
+    const maxLength =
+        Math.max(
+            firstBytes.length,
+            secondBytes.length
+        );
+
+    let difference =
+        firstBytes.length
+        ^ secondBytes.length;
+
+    for (
+        let index = 0;
+        index < maxLength;
+        index += 1
+    ) {
+        difference |=
+            (
+                firstBytes[index]
+                || 0
+            )
+            ^ (
+                secondBytes[index]
+                || 0
+            );
+    }
+
+    return difference ===
+        0;
+}
+
+/* =========================================================
+HELPERS
+========================================================= */
 
 function normalizeString(
     value
@@ -161,10 +255,40 @@ function normalizeString(
         )
             .trim();
 
-    return (
-        normalized
-        || null
-    );
+    return normalized
+        || null;
+}
+
+function normalizePositiveInteger(
+    value
+) {
+    if (
+        value === null
+        || value === undefined
+        || String(
+            value
+        )
+            .trim() ===
+            ""
+    ) {
+        return null;
+    }
+
+    const numeric =
+        Number(
+            value
+        );
+
+    if (
+        !Number.isInteger(
+            numeric
+        )
+        || numeric <= 0
+    ) {
+        return null;
+    }
+
+    return numeric;
 }
 
 function normalizeInteger(
@@ -218,6 +342,24 @@ function validMatchId(
     );
 }
 
+function sanitizeJobId(
+    value
+) {
+    const jobId =
+        String(
+            value
+            || ""
+        )
+            .trim()
+            .toUpperCase();
+
+    return /^[A-Z0-9]{16}$/.test(
+        jobId
+    )
+        ? jobId
+        : null;
+}
+
 function normalizePlayerName(
     value
 ) {
@@ -262,8 +404,373 @@ function normalizeMode(
 }
 
 /* =========================================================
-   RANDOM ADJUSTMENT ID
-   ========================================================= */
+STORED JSON
+========================================================= */
+
+async function readStoredJson(
+    object
+) {
+    try {
+        const data =
+            JSON.parse(
+                await object.text()
+            );
+
+        if (
+            !data
+            || typeof data !==
+                "object"
+            || Array.isArray(
+                data
+            )
+        ) {
+            return null;
+        }
+
+        return data;
+    }
+    catch {
+        return null;
+    }
+}
+
+/* =========================================================
+OWNERSHIP RESOLUTION
+========================================================= */
+
+async function resolveMatchOwnership(
+    env,
+    matchReport
+) {
+    const reportOwnerId =
+        normalizeString(
+            matchReport?.ownerId
+            || matchReport?.submittedBy
+        );
+
+    const reportOwnerType =
+        String(
+            matchReport?.ownerType
+            || ""
+        )
+            .trim()
+            .toLowerCase();
+
+    const reportOwnerVersion =
+        normalizePositiveInteger(
+            matchReport?.ownerVersion
+        );
+
+    if (
+        reportOwnerId
+        && reportOwnerType ===
+            OWNER_TYPE_ACCOUNT
+        && reportOwnerVersion ===
+            OWNER_VERSION_ACCOUNT
+    ) {
+        return {
+            ownerId:
+                reportOwnerId,
+
+            ownerType:
+                OWNER_TYPE_ACCOUNT,
+
+            ownerVersion:
+                OWNER_VERSION_ACCOUNT,
+
+            isLegacy:
+                false
+        };
+    }
+
+    const jobId =
+        sanitizeJobId(
+            matchReport?.jobId
+        );
+
+    if (
+        jobId
+    ) {
+        const jobOwnership =
+            await resolveJobOwnership(
+                env,
+                jobId
+            );
+
+        if (
+            jobOwnership
+        ) {
+            if (
+                reportOwnerId
+                && !constantTimeEqual(
+                    reportOwnerId,
+                    jobOwnership.ownerId
+                )
+            ) {
+                return null;
+            }
+
+            return jobOwnership;
+        }
+    }
+
+    /*
+     * Historical reports contain only submittedBy and that
+     * value was derived from the Epic account identifier.
+     */
+    if (
+        reportOwnerId
+        && !reportOwnerType
+        && reportOwnerVersion ===
+            null
+    ) {
+        return {
+            ownerId:
+                reportOwnerId,
+
+            ownerType:
+                "epic",
+
+            ownerVersion:
+                1,
+
+            isLegacy:
+                true
+        };
+    }
+
+    return null;
+}
+
+/* =========================================================
+JOB OWNERSHIP
+========================================================= */
+
+async function resolveJobOwnership(
+    env,
+    jobId
+) {
+    const baseKey =
+        `ocr-jobs/${jobId}`;
+
+    const statusObject =
+        await env.OCR_STORAGE.get(
+            `${baseKey}/status.json`
+        );
+
+    if (
+        statusObject
+    ) {
+        const statusData =
+            await readStoredJson(
+                statusObject
+            );
+
+        if (
+            statusData
+            && sanitizeJobId(
+                statusData?.jobId
+            ) ===
+                jobId
+        ) {
+            const ownership =
+                normalizeStoredOwnership(
+                    statusData?.ownerId,
+                    statusData?.ownerType,
+                    statusData?.ownerVersion
+                );
+
+            if (
+                ownership
+            ) {
+                return ownership;
+            }
+        }
+    }
+
+    const requestObject =
+        await env.OCR_STORAGE.get(
+            `${baseKey}/request.json`
+        );
+
+    if (
+        !requestObject
+    ) {
+        return null;
+    }
+
+    const requestData =
+        await readStoredJson(
+            requestObject
+        );
+
+    if (
+        !requestData
+        || sanitizeJobId(
+            requestData?.jobId
+        ) !==
+            jobId
+    ) {
+        return null;
+    }
+
+    return normalizeStoredOwnership(
+        requestData?.ownerId
+            || requestData
+                ?.fields
+                ?.submittedBy,
+
+        requestData?.ownerType
+            || requestData
+                ?.fields
+                ?.ownerType,
+
+        requestData?.ownerVersion
+            ?? requestData
+                ?.fields
+                ?.ownerVersion
+    );
+}
+
+function normalizeStoredOwnership(
+    ownerId,
+    ownerType,
+    ownerVersion
+) {
+    const normalizedOwnerId =
+        normalizeString(
+            ownerId
+        );
+
+    const normalizedOwnerType =
+        String(
+            ownerType
+            || ""
+        )
+            .trim()
+            .toLowerCase();
+
+    const normalizedOwnerVersion =
+        normalizePositiveInteger(
+            ownerVersion
+        );
+
+    if (
+        !normalizedOwnerId
+    ) {
+        return null;
+    }
+
+    if (
+        normalizedOwnerType ===
+            OWNER_TYPE_ACCOUNT
+        && normalizedOwnerVersion ===
+            OWNER_VERSION_ACCOUNT
+    ) {
+        return {
+            ownerId:
+                normalizedOwnerId,
+
+            ownerType:
+                OWNER_TYPE_ACCOUNT,
+
+            ownerVersion:
+                OWNER_VERSION_ACCOUNT,
+
+            isLegacy:
+                false
+        };
+    }
+
+    if (
+        !normalizedOwnerType
+        && normalizedOwnerVersion ===
+            null
+    ) {
+        return {
+            ownerId:
+                normalizedOwnerId,
+
+            ownerType:
+                "epic",
+
+            ownerVersion:
+                1,
+
+            isLegacy:
+                true
+        };
+    }
+
+    return null;
+}
+
+/* =========================================================
+AUTHENTICATED OWNER
+========================================================= */
+
+async function resolveAuthenticatedOwnerHash(
+    session,
+    ownership,
+    secret
+) {
+    if (
+        ownership.ownerType ===
+            OWNER_TYPE_ACCOUNT
+        && ownership.ownerVersion ===
+            OWNER_VERSION_ACCOUNT
+    ) {
+        const accountId =
+            normalizeString(
+                session.userId
+            );
+
+        if (
+            !accountId
+        ) {
+            return null;
+        }
+
+        return createOwnerHash(
+            accountId,
+            secret
+        );
+    }
+
+    if (
+        ownership.isLegacy ===
+            true
+    ) {
+        const epic =
+            getProviderContext(
+                session,
+                "epic"
+            );
+
+        const epicAccountId =
+            normalizeString(
+                epic?.accountId
+            );
+
+        if (
+            epic?.linked !== true
+            || !epicAccountId
+        ) {
+            return null;
+        }
+
+        return createOwnerHash(
+            epicAccountId,
+            secret
+        );
+    }
+
+    return null;
+}
+
+/* =========================================================
+RANDOM ADJUSTMENT ID
+========================================================= */
 
 function randomAdjustmentCharacter() {
     const values =
@@ -298,8 +805,8 @@ function generateAdjustmentId() {
 }
 
 /* =========================================================
-   VALIDATE FIELD ENTRY
-   ========================================================= */
+VALIDATE FIELD ENTRY
+========================================================= */
 
 function normalizeFieldEntry(
     entry
@@ -379,20 +886,16 @@ function normalizeFieldEntry(
     }
 
     return {
-        team:
-            team,
-        player:
-            player,
-        field:
-            field,
-        userValue:
-            userValue
+        team,
+        player,
+        field,
+        userValue
     };
 }
 
 /* =========================================================
-   FIELD KEY
-   ========================================================= */
+FIELD KEY
+========================================================= */
 
 function buildFieldKey(
     team,
@@ -418,8 +921,8 @@ function buildFieldKey(
 }
 
 /* =========================================================
-   FIND TEAM
-   ========================================================= */
+FIND TEAM
+========================================================= */
 
 function findStoredTeam(
     teams,
@@ -445,8 +948,8 @@ function findStoredTeam(
 }
 
 /* =========================================================
-   FIND PLAYER
-   ========================================================= */
+FIND PLAYER
+========================================================= */
 
 function findStoredPlayer(
     team,
@@ -479,10 +982,8 @@ function findStoredPlayer(
                         || ""
                     );
 
-                return (
-                    storedName ===
-                    normalizedRequestedPlayer
-                );
+                return storedName ===
+                    normalizedRequestedPlayer;
             }
         )
         || null
@@ -490,8 +991,8 @@ function findStoredPlayer(
 }
 
 /* =========================================================
-   CURRENT EFFECTIVE VALUE
-   ========================================================= */
+CURRENT EFFECTIVE VALUE
+========================================================= */
 
 function getCurrentPlayerValue(
     player,
@@ -512,12 +1013,10 @@ function getCurrentPlayerValue(
             .trim() ===
             ""
     ) {
-        return (
-            field ===
-                "ping"
-                ? 0
-                : null
-        );
+        return field ===
+            "ping"
+            ? 0
+            : null;
     }
 
     return normalizeInteger(
@@ -526,8 +1025,8 @@ function getCurrentPlayerValue(
 }
 
 /* =========================================================
-   REVIEW FIELD
-   ========================================================= */
+REVIEW FIELD
+========================================================= */
 
 function getStoredReviewField(
     player,
@@ -536,9 +1035,7 @@ function getStoredReviewField(
     const reviewField =
         player
             ?.reviewFields
-            ?.[
-                field
-            ];
+            ?.[field];
 
     if (
         !reviewField
@@ -555,8 +1052,8 @@ function getStoredReviewField(
 }
 
 /* =========================================================
-   ORIGINAL OCR VALUE
-   ========================================================= */
+ORIGINAL OCR VALUE
+========================================================= */
 
 function getConfirmationOcrValue(
     report,
@@ -564,15 +1061,14 @@ function getConfirmationOcrValue(
     player,
     field
 ) {
-    const fields = (
+    const fields =
         Array.isArray(
             report
                 ?.confirmation
                 ?.fields
         )
             ? report.confirmation.fields
-            : []
-    );
+            : [];
 
     const requestedKey =
         buildFieldKey(
@@ -591,7 +1087,8 @@ function getConfirmationOcrValue(
                 entry?.player,
                 entry?.field
             )
-            !== requestedKey
+            !==
+            requestedKey
         ) {
             continue;
         }
@@ -617,13 +1114,12 @@ function getAdjustmentOcrValue(
     player,
     field
 ) {
-    const adjustments = (
+    const adjustments =
         Array.isArray(
             report?.adjustments
         )
             ? report.adjustments
-            : []
-    );
+            : [];
 
     const requestedKey =
         buildFieldKey(
@@ -636,13 +1132,12 @@ function getAdjustmentOcrValue(
         const adjustment
         of adjustments
     ) {
-        const fields = (
+        const fields =
             Array.isArray(
                 adjustment?.fields
             )
                 ? adjustment.fields
-                : []
-        );
+                : [];
 
         for (
             const entry
@@ -654,7 +1149,8 @@ function getAdjustmentOcrValue(
                     entry?.player,
                     entry?.field
                 )
-                !== requestedKey
+                !==
+                requestedKey
             ) {
                 continue;
             }
@@ -753,8 +1249,8 @@ function getOriginalOcrValue(
 }
 
 /* =========================================================
-   OCR EVIDENCE
-   ========================================================= */
+OCR EVIDENCE
+========================================================= */
 
 function buildOcrEvidence(
     reviewField,
@@ -800,9 +1296,10 @@ function buildOcrEvidence(
             ?? null
     };
 }
+
 /* =========================================================
-   EXPECTED REVIEW FIELD SET
-   ========================================================= */
+EXPECTED REVIEW FIELD SET
+========================================================= */
 
 function buildExpectedReviewFieldKeys(
     teams
@@ -830,13 +1327,12 @@ function buildExpectedReviewFieldKeys(
                 )
             );
 
-        const players = (
+        const players =
             Array.isArray(
                 team?.players
             )
                 ? team.players
-                : []
-        );
+                : [];
 
         for (
             const player
@@ -856,7 +1352,7 @@ function buildExpectedReviewFieldKeys(
                 continue;
             }
 
-            const reviewFields = (
+            const reviewFields =
                 player?.reviewFields
                 && typeof player.reviewFields ===
                     "object"
@@ -864,8 +1360,7 @@ function buildExpectedReviewFieldKeys(
                     player.reviewFields
                 )
                     ? player.reviewFields
-                    : {}
-            );
+                    : {};
 
             for (
                 const fieldName
@@ -896,8 +1391,8 @@ function buildExpectedReviewFieldKeys(
 }
 
 /* =========================================================
-   REVIEW MODE
-   ========================================================= */
+REVIEW MODE
+========================================================= */
 
 function processReviewConfirmation(
     existingReport,
@@ -920,6 +1415,7 @@ function processReviewConfirmation(
             error: {
                 status:
                     409,
+
                 message:
                     "This scoreboard is no longer awaiting review."
             }
@@ -939,6 +1435,7 @@ function processReviewConfirmation(
             error: {
                 status:
                     409,
+
                 message:
                     "Stored match report contains no reviewable fields."
             }
@@ -953,6 +1450,7 @@ function processReviewConfirmation(
             error: {
                 status:
                     400,
+
                 message:
                     "All scoreboard fields must be reviewed before confirmation."
             }
@@ -972,6 +1470,7 @@ function processReviewConfirmation(
                 error: {
                     status:
                         400,
+
                     message:
                         "All scoreboard fields must be reviewed before confirmation."
                 }
@@ -999,11 +1498,10 @@ function processReviewConfirmation(
                 error: {
                     status:
                         409,
+
                     message:
-                        (
-                            "Stored team could not be matched "
-                            + `for team ${entry.team}.`
-                        )
+                        "Stored team could not be matched "
+                        + `for team ${entry.team}.`
                 }
             };
         }
@@ -1021,11 +1519,10 @@ function processReviewConfirmation(
                 error: {
                     status:
                         409,
+
                     message:
-                        (
-                            "Stored player could not be matched: "
-                            + entry.player
-                        )
+                        "Stored player could not be matched: "
+                        + entry.player
                 }
             };
         }
@@ -1043,11 +1540,10 @@ function processReviewConfirmation(
                 error: {
                     status:
                         409,
+
                     message:
-                        (
-                            "Stored OCR review evidence is missing "
-                            + `for ${entry.player} / ${entry.field}.`
-                        )
+                        "Stored OCR review evidence is missing "
+                        + `for ${entry.player} / ${entry.field}.`
                 }
             };
         }
@@ -1062,49 +1558,52 @@ function processReviewConfirmation(
             );
 
         if (
-            ocrValue ===
-                null
+            ocrValue === null
         ) {
             return {
                 error: {
                     status:
                         409,
+
                     message:
-                        (
-                            "Stored OCR value is invalid "
-                            + `for ${entry.player} / ${entry.field}.`
-                        )
+                        "Stored OCR value is invalid "
+                        + `for ${entry.player} / ${entry.field}.`
                 }
             };
         }
 
-        const disputed = (
+        const disputed =
             entry.userValue !==
-            ocrValue
-        );
+            ocrValue;
 
         authoritativeFields.push({
             team:
                 entry.team,
+
             player:
                 String(
                     player?.player
                     || entry.player
                 ),
+
             field:
                 entry.field,
-            ocrValue:
-                ocrValue,
+
+            ocrValue,
+
             userValue:
                 entry.userValue,
+
             finalValue:
                 entry.userValue,
-            disputed:
-                disputed,
+
+            disputed,
+
             requiresVerification:
                 reviewField
                     .requiresVerification ===
                 true,
+
             ocrEvidence:
                 buildOcrEvidence(
                     reviewField,
@@ -1123,18 +1622,15 @@ function processReviewConfirmation(
             function(
                 entry
             ) {
-                return (
-                    entry.disputed ===
-                    true
-                );
+                return entry.disputed ===
+                    true;
             }
         );
 
-    const confirmationStatus = (
+    const confirmationStatus =
         disputes.length > 0
             ? "confirmed_with_disputes"
-            : "confirmed"
-    );
+            : "confirmed";
 
     const confirmedAt =
         new Date()
@@ -1158,37 +1654,43 @@ function processReviewConfirmation(
     existingReport.confirmation = {
         status:
             confirmationStatus,
-        confirmedAt:
-            confirmedAt,
+
+        confirmedAt,
+
         hasDisputes:
             disputes.length > 0,
+
         disputeCount:
             disputes.length,
+
         fields:
             authoritativeFields,
-        disputes:
-            disputes
+
+        disputes
     };
 
     return {
         success:
             true,
+
         mode:
             CONFIRM_MODE_REVIEW,
-        confirmationStatus:
-            confirmationStatus,
-        confirmedAt:
-            confirmedAt,
+
+        confirmationStatus,
+
+        confirmedAt,
+
         hasDisputes:
             disputes.length > 0,
+
         disputeCount:
             disputes.length
     };
 }
 
 /* =========================================================
-   ADJUSTMENT MODE
-   ========================================================= */
+ADJUSTMENT MODE
+========================================================= */
 
 function processAdjustment(
     existingReport,
@@ -1209,6 +1711,7 @@ function processAdjustment(
             error: {
                 status:
                     409,
+
                 message:
                     "This scoreboard must complete review before adjustments can be made."
             }
@@ -1229,6 +1732,7 @@ function processAdjustment(
             error: {
                 status:
                     409,
+
                 message:
                     "This scoreboard is not in a state that can be adjusted."
             }
@@ -1255,11 +1759,10 @@ function processAdjustment(
                 error: {
                     status:
                         409,
+
                     message:
-                        (
-                            "Stored team could not be matched "
-                            + `for team ${entry.team}.`
-                        )
+                        "Stored team could not be matched "
+                        + `for team ${entry.team}.`
                 }
             };
         }
@@ -1277,11 +1780,10 @@ function processAdjustment(
                 error: {
                     status:
                         409,
+
                     message:
-                        (
-                            "Stored player could not be matched: "
-                            + entry.player
-                        )
+                        "Stored player could not be matched: "
+                        + entry.player
                 }
             };
         }
@@ -1294,17 +1796,16 @@ function processAdjustment(
 
         if (
             previousValue ===
-                null
+            null
         ) {
             return {
                 error: {
                     status:
                         409,
+
                     message:
-                        (
-                            "Stored scoreboard value is invalid "
-                            + `for ${entry.player} / ${entry.field}.`
-                        )
+                        "Stored scoreboard value is invalid "
+                        + `for ${entry.player} / ${entry.field}.`
                 }
             };
         }
@@ -1333,17 +1834,16 @@ function processAdjustment(
 
         if (
             ocrValue ===
-                null
+            null
         ) {
             return {
                 error: {
                     status:
                         409,
+
                     message:
-                        (
-                            "Original OCR value could not be established "
-                            + `for ${entry.player} / ${entry.field}.`
-                        )
+                        "Original OCR value could not be established "
+                        + `for ${entry.player} / ${entry.field}.`
                 }
             };
         }
@@ -1351,22 +1851,27 @@ function processAdjustment(
         adjustmentFields.push({
             team:
                 entry.team,
+
             player:
                 String(
                     player?.player
                     || entry.player
                 ),
+
             field:
                 entry.field,
-            ocrValue:
-                ocrValue,
-            previousValue:
-                previousValue,
+
+            ocrValue,
+
+            previousValue,
+
             newValue:
                 entry.userValue,
+
             differsFromOcr:
                 entry.userValue !==
                 ocrValue,
+
             ocrEvidence:
                 buildOcrEvidence(
                     reviewField,
@@ -1382,12 +1887,13 @@ function processAdjustment(
 
     if (
         adjustmentFields.length ===
-            0
+        0
     ) {
         return {
             error: {
                 status:
                     400,
+
                 message:
                     "No scoreboard values were changed."
             }
@@ -1401,22 +1907,22 @@ function processAdjustment(
         new Date()
             .toISOString();
 
-    const adjustments = (
+    const adjustments =
         Array.isArray(
             existingReport
                 ?.adjustments
         )
             ? existingReport.adjustments
-            : []
-    );
+            : [];
 
     adjustments.push({
-        adjustmentId:
-            adjustmentId,
-        adjustedAt:
-            adjustedAt,
+        adjustmentId,
+
+        adjustedAt,
+
         previousConfirmationStatus:
             currentStatus,
+
         fields:
             adjustmentFields
     });
@@ -1430,38 +1936,31 @@ function processAdjustment(
     existingReport.adjustmentCount =
         adjustments.length;
 
-    /*
-     * Keep confirmationStatus as the acceptance lineage.
-     *
-     * auto_accepted remains auto_accepted.
-     * confirmed remains confirmed.
-     * confirmed_with_disputes remains confirmed_with_disputes.
-     *
-     * The presence of adjustments[] tells us the effective
-     * scoreboard has been edited after acceptance.
-     */
-
     return {
         success:
             true,
+
         mode:
             CONFIRM_MODE_ADJUSTMENT,
+
         confirmationStatus:
             currentStatus,
-        adjustedAt:
-            adjustedAt,
-        adjustmentId:
-            adjustmentId,
+
+        adjustedAt,
+
+        adjustmentId,
+
         adjustmentCount:
             adjustments.length,
+
         changedFieldCount:
             adjustmentFields.length
     };
 }
 
 /* =========================================================
-   MAIN
-   ========================================================= */
+MAIN
+========================================================= */
 
 export async function handleOcrConfirmation(
     {
@@ -1471,8 +1970,8 @@ export async function handleOcrConfirmation(
 ) {
     try {
         /* =================================================
-           METHOD
-           ================================================= */
+        METHOD
+        ================================================= */
 
         if (
             request.method !==
@@ -1482,6 +1981,7 @@ export async function handleOcrConfirmation(
                 {
                     success:
                         false,
+
                     message:
                         "Method not allowed."
                 },
@@ -1490,8 +1990,8 @@ export async function handleOcrConfirmation(
         }
 
         /* =================================================
-           STORAGE
-           ================================================= */
+        CONFIGURATION
+        ================================================= */
 
         if (
             !env.OCR_STORAGE
@@ -1500,64 +2000,13 @@ export async function handleOcrConfirmation(
                 {
                     success:
                         false,
+
                     message:
                         "OCR storage binding is not configured."
                 },
                 503
             );
         }
-
-        /* =================================================
-           AUTHENTICATED SESSION
-           ================================================= */
-
-        const session =
-            await getStoredSession(
-                request,
-                env
-            );
-
-        if (
-            !session
-            || !session.sessionData
-        ) {
-            return jsonResponse(
-                {
-                    success:
-                        false,
-                    message:
-                        "Authentication required."
-                },
-                401
-            );
-        }
-
-        const epicUniqueId =
-            String(
-                session
-                    .sessionData
-                    .EpicUniqueId
-                || ""
-            )
-                .trim();
-
-        if (
-            !epicUniqueId
-        ) {
-            return jsonResponse(
-                {
-                    success:
-                        false,
-                    message:
-                        "Authenticated account is missing an EpicUniqueId."
-                },
-                401
-            );
-        }
-
-        /* =================================================
-           OWNER HASH
-           ================================================= */
 
         const ownerSecret =
             String(
@@ -1573,6 +2022,7 @@ export async function handleOcrConfirmation(
                 {
                     success:
                         false,
+
                     message:
                         "OCR owner hashing is not configured."
                 },
@@ -1580,18 +2030,82 @@ export async function handleOcrConfirmation(
             );
         }
 
-        const authenticatedOwnerId =
-            await createOwnerHash(
-                epicUniqueId,
-                ownerSecret
+        /* =================================================
+        GLOBAL BPD SESSION
+        ================================================= */
+
+        const session =
+            await getSessionContext(
+                request,
+                env
             );
 
-        /* =================================================
-           REQUEST BODY
-           ================================================= */
+        if (
+            session.authenticated !==
+            true
+        ) {
+            return jsonResponse(
+                {
+                    success:
+                        false,
 
-        let body =
-            null;
+                    code:
+                        "AUTHENTICATION_REQUIRED",
+
+                    message:
+                        "Authentication required."
+                },
+                401
+            );
+        }
+
+        const accountId =
+            normalizeString(
+                session.userId
+            );
+
+        if (
+            !accountId
+        ) {
+            return jsonResponse(
+                {
+                    success:
+                        false,
+
+                    code:
+                        "ACCOUNT_IDENTITY_MISSING",
+
+                    message:
+                        "Authenticated account identity is unavailable."
+                },
+                409
+            );
+        }
+
+        if (
+            session.active !==
+            true
+        ) {
+            return jsonResponse(
+                {
+                    success:
+                        false,
+
+                    code:
+                        "ACCOUNT_INACTIVE",
+
+                    message:
+                        "This BPD account is not active."
+                },
+                403
+            );
+        }
+
+        /* =================================================
+        REQUEST BODY
+        ================================================= */
+
+        let body;
 
         try {
             body =
@@ -1602,6 +2116,7 @@ export async function handleOcrConfirmation(
                 {
                     success:
                         false,
+
                     message:
                         "Invalid JSON body."
                 },
@@ -1610,8 +2125,8 @@ export async function handleOcrConfirmation(
         }
 
         /* =================================================
-           MODE
-           ================================================= */
+        MODE
+        ================================================= */
 
         const mode =
             normalizeMode(
@@ -1619,8 +2134,8 @@ export async function handleOcrConfirmation(
             );
 
         /* =================================================
-           MATCH ID
-           ================================================= */
+        MATCH ID
+        ================================================= */
 
         const matchId =
             normalizeMatchId(
@@ -1636,6 +2151,7 @@ export async function handleOcrConfirmation(
                 {
                     success:
                         false,
+
                     message:
                         "A valid 16-character matchId is required."
                 },
@@ -1644,32 +2160,30 @@ export async function handleOcrConfirmation(
         }
 
         /* =================================================
-           FIELD DATA
-           ================================================= */
+        FIELD DATA
+        ================================================= */
 
-        const rawFields = (
+        const rawFields =
             Array.isArray(
                 body?.fields
             )
                 ? body.fields
-                : []
-        );
+                : [];
 
         if (
             rawFields.length ===
-                0
+            0
         ) {
             return jsonResponse(
                 {
                     success:
                         false,
+
                     message:
-                        (
-                            mode ===
+                        mode ===
                             CONFIRM_MODE_ADJUSTMENT
-                                ? "At least one adjusted field is required."
-                                : "At least one reviewed field is required."
-                        )
+                            ? "At least one adjusted field is required."
+                            : "At least one reviewed field is required."
                 },
                 400
             );
@@ -1692,6 +2206,7 @@ export async function handleOcrConfirmation(
                 {
                     success:
                         false,
+
                     message:
                         "One or more scoreboard fields are invalid."
                 },
@@ -1700,8 +2215,8 @@ export async function handleOcrConfirmation(
         }
 
         /* =================================================
-           DUPLICATES
-           ================================================= */
+        DUPLICATES
+        ================================================= */
 
         const submittedFieldKeys =
             new Set();
@@ -1726,6 +2241,7 @@ export async function handleOcrConfirmation(
                     {
                         success:
                             false,
+
                         message:
                             "Duplicate scoreboard fields were submitted."
                     },
@@ -1739,8 +2255,8 @@ export async function handleOcrConfirmation(
         }
 
         /* =================================================
-           LOAD CURRENT STORED REPORT
-           ================================================= */
+        LOAD CURRENT REPORT
+        ================================================= */
 
         const existingObject =
             await getCurrentMatchReport(
@@ -1755,6 +2271,7 @@ export async function handleOcrConfirmation(
                 {
                     success:
                         false,
+
                     message:
                         "Stored match report was not found."
                 },
@@ -1762,8 +2279,7 @@ export async function handleOcrConfirmation(
             );
         }
 
-        let existingReport =
-            null;
+        let existingReport;
 
         try {
             existingReport =
@@ -1774,6 +2290,7 @@ export async function handleOcrConfirmation(
                 {
                     success:
                         false,
+
                     message:
                         "Stored match report is invalid."
                 },
@@ -1793,6 +2310,7 @@ export async function handleOcrConfirmation(
                 {
                     success:
                         false,
+
                     message:
                         "Stored match report is invalid."
                 },
@@ -1801,8 +2319,8 @@ export async function handleOcrConfirmation(
         }
 
         /* =================================================
-           VERIFY STORED MATCH
-           ================================================= */
+        VERIFY STORED MATCH
+        ================================================= */
 
         if (
             normalizeMatchId(
@@ -1814,6 +2332,7 @@ export async function handleOcrConfirmation(
                 {
                     success:
                         false,
+
                     message:
                         "Stored match report ID does not match the request."
                 },
@@ -1822,70 +2341,108 @@ export async function handleOcrConfirmation(
         }
 
         /* =================================================
-           OWNERSHIP
-           ================================================= */
+        OWNERSHIP
+        ================================================= */
 
-        const submittedBy =
-            String(
-                existingReport?.submittedBy
-                || ""
-            )
-                .trim();
+        const ownership =
+            await resolveMatchOwnership(
+                env,
+                existingReport
+            );
 
         if (
-            !submittedBy
+            !ownership
         ) {
             return jsonResponse(
                 {
                     success:
                         false,
+
+                    code:
+                        "MATCH_OWNER_MISSING",
+
                     message:
-                        "Stored match report has no owner."
+                        "Stored match report has no valid owner."
                 },
                 409
             );
         }
 
+        const authenticatedOwnerId =
+            await resolveAuthenticatedOwnerHash(
+                session,
+                ownership,
+                ownerSecret
+            );
+
         if (
-            submittedBy !==
-            authenticatedOwnerId
+            !authenticatedOwnerId
         ) {
             return jsonResponse(
                 {
                     success:
                         false,
+
+                    code:
+                        ownership.isLegacy
+                            ? "EPIC_ACCOUNT_REQUIRED"
+                            : "ACCOUNT_IDENTITY_MISSING",
+
                     message:
-                        (
-                            mode ===
+                        ownership.isLegacy
+                            ? "A linked Epic account is required to modify this legacy OCR result."
+                            : "Authenticated account identity is unavailable."
+                },
+                ownership.isLegacy
+                    ? 403
+                    : 409
+            );
+        }
+
+        if (
+            !constantTimeEqual(
+                ownership.ownerId,
+                authenticatedOwnerId
+            )
+        ) {
+            return jsonResponse(
+                {
+                    success:
+                        false,
+
+                    code:
+                        "MATCH_ACCESS_DENIED",
+
+                    message:
+                        mode ===
                             CONFIRM_MODE_ADJUSTMENT
-                                ? "You are not authorized to adjust this match."
-                                : "You are not authorized to confirm this match."
-                        )
+                            ? "You are not authorized to adjust this match."
+                            : "You are not authorized to confirm this match."
                 },
                 403
             );
         }
 
         /* =================================================
-           STORED TEAMS
-           ================================================= */
+        STORED TEAMS
+        ================================================= */
 
-        const teams = (
+        const teams =
             Array.isArray(
                 existingReport?.teams
             )
                 ? existingReport.teams
-                : []
-        );
+                : [];
 
         if (
             teams.length ===
-                0
+            0
         ) {
             return jsonResponse(
                 {
                     success:
                         false,
+
                     message:
                         "Stored match report contains no teams."
                 },
@@ -1894,12 +2451,13 @@ export async function handleOcrConfirmation(
         }
 
         /* =================================================
-           EXPIRATION CHECK MODE
-           ================================================= */
+        EDIT DEADLINE
+        ================================================= */
 
         const editDeadlineAt =
             String(
-                existingReport?.editDeadlineAt
+                existingReport
+                    ?.editDeadlineAt
                 || ""
             )
                 .trim();
@@ -1918,6 +2476,7 @@ export async function handleOcrConfirmation(
                 {
                     success:
                         false,
+
                     message:
                         "The scoreboard modification deadline is unavailable."
                 },
@@ -1933,10 +2492,13 @@ export async function handleOcrConfirmation(
                 {
                     success:
                         false,
+
                     code:
                         "EDIT_WINDOW_CLOSED",
+
                     message:
                         "The deadline to review or modify this scoreboard has passed.",
+
                     editDeadlineAt
                 },
                 409
@@ -1944,12 +2506,12 @@ export async function handleOcrConfirmation(
         }
 
         /* =================================================
-           PROCESS MODE
-           ================================================= */
+        PROCESS MODE
+        ================================================= */
 
-        const result = (
+        const result =
             mode ===
-            CONFIRM_MODE_ADJUSTMENT
+                CONFIRM_MODE_ADJUSTMENT
                 ? processAdjustment(
                     existingReport,
                     teams,
@@ -1960,8 +2522,7 @@ export async function handleOcrConfirmation(
                     teams,
                     fields,
                     submittedFieldKeys
-                )
-        );
+                );
 
         if (
             result?.error
@@ -1970,6 +2531,7 @@ export async function handleOcrConfirmation(
                 {
                     success:
                         false,
+
                     message:
                         result.error.message
                 },
@@ -1978,8 +2540,8 @@ export async function handleOcrConfirmation(
         }
 
         /* =================================================
-           STORE UPDATED CURRENT REPORT
-           ================================================= */
+        STORE UPDATED CURRENT REPORT
+        ================================================= */
 
         const storageResult =
             await updateCurrentMatchReport(
@@ -1989,38 +2551,47 @@ export async function handleOcrConfirmation(
             );
 
         /* =================================================
-           RESPONSE
-           ================================================= */
+        RESPONSE
+        ================================================= */
 
         return jsonResponse(
             {
                 success:
                     true,
+
                 version:
                     OCR_CONFIRM_VERSION,
-                matchId:
-                    matchId,
+
+                matchId,
+
                 mode:
                     result.mode,
+
                 confirmationStatus:
                     result.confirmationStatus,
+
                 confirmedAt:
                     result.confirmedAt
                     || null,
+
                 adjustedAt:
                     result.adjustedAt
                     || null,
+
                 hasDisputes:
                     result.hasDisputes ===
                     true,
+
                 disputeCount:
                     Number(
                         result.disputeCount
                         || 0
                     ),
+
                 adjustmentId:
                     result.adjustmentId
                     || null,
+
                 adjustmentCount:
                     Number(
                         result.adjustmentCount
@@ -2028,11 +2599,13 @@ export async function handleOcrConfirmation(
                             ?.adjustmentCount
                         || 0
                     ),
+
                 changedFieldCount:
                     Number(
                         result.changedFieldCount
                         || 0
                     ),
+
                 currentReportKey:
                     storageResult.objectKey
             },
@@ -2051,6 +2624,7 @@ export async function handleOcrConfirmation(
             {
                 success:
                     false,
+
                 message:
                     "OCR result confirmation failed."
             },

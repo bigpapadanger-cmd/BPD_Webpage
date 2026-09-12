@@ -1,16 +1,59 @@
 "use strict";
 
-// ============================================================
-// BPD GAMING NETWORK
-// OCR JOB STATUS READER
-// ============================================================
+/* =========================================================
+BPD GAMING NETWORK
+OCR JOB STATUS READER
+
+File:
+    functions/api/ocr/jobs/get_job.js
+
+Public Route:
+    GET /api/ocr/jobs/get_job?jobId={jobId}
+
+Purpose:
+    Returns the authenticated user's OCR job status.
+
+Description:
+    - Requires a valid global BPD session.
+    - Verifies ownership before returning job information.
+    - New OCR jobs are owned by identity.accounts.id.
+    - Legacy OCR jobs remain accessible through the linked
+      Epic provider identity used when those jobs were created.
+    - Merges temporary Cloud Run progress with stored state.
+
+Ownership Model:
+    Version 2:
+        ownerType = "account"
+        ownerVersion = 2
+        ownerId = HMAC(identity.accounts.id)
+
+    Legacy:
+        ownerType absent
+        ownerVersion absent
+        submittedBy/ownerId = HMAC(Epic provider subject)
+========================================================= */
 
 import {
-    getStoredSession
-} from "../../../services/common_helpers/reload_sessions.js";
+    getSessionContext,
+    getProviderContext
+} from "../../../services/auth/sessions/session_context.js";
+
+/* =========================================================
+VERSION
+========================================================= */
 
 const GET_JOB_VERSION =
-    "ocr-get-job-1.4";
+    "ocr-get-job-2.0";
+
+const OWNER_TYPE_ACCOUNT =
+    "account";
+
+const OWNER_VERSION_ACCOUNT =
+    2;
+
+/* =========================================================
+STATUS
+========================================================= */
 
 const ALLOWED_STATUSES =
     new Set([
@@ -28,9 +71,9 @@ const MAX_MESSAGE_LENGTH =
 const MAX_STAGE_LENGTH =
     64;
 
-// ============================================================
-// MAIN
-// ============================================================
+/* =========================================================
+MAIN
+========================================================= */
 
 export async function onRequestGet(
     context
@@ -38,21 +81,25 @@ export async function onRequestGet(
     const {
         request,
         env
-    } = context;
+    } =
+        context;
 
     try {
-        // ====================================================
-        // CONFIGURATION
-        // ====================================================
+        /* =================================================
+        CONFIGURATION
+        ================================================= */
 
         if (
             !env.OCR_STORAGE
         ) {
             return jsonResponse(
                 {
-                    success: false,
+                    success:
+                        false,
+
                     message:
                         "OCR storage is not configured.",
+
                     version:
                         GET_JOB_VERSION
                 },
@@ -65,9 +112,12 @@ export async function onRequestGet(
         ) {
             return jsonResponse(
                 {
-                    success: false,
+                    success:
+                        false,
+
                     message:
                         "OCR progress storage is not configured.",
+
                     version:
                         GET_JOB_VERSION
                 },
@@ -80,9 +130,12 @@ export async function onRequestGet(
         ) {
             return jsonResponse(
                 {
-                    success: false,
+                    success:
+                        false,
+
                     message:
                         "OCR owner verification is not configured.",
+
                     version:
                         GET_JOB_VERSION
                 },
@@ -90,24 +143,30 @@ export async function onRequestGet(
             );
         }
 
-        // ====================================================
-        // AUTHENTICATION
-        // ====================================================
+        /* =================================================
+        GLOBAL BPD SESSION
+        ================================================= */
 
         const session =
-            await getStoredSession(
+            await getSessionContext(
                 request,
                 env
             );
 
         if (
-            !session?.sessionData
+            session.authenticated !== true
         ) {
             return jsonResponse(
                 {
-                    success: false,
+                    success:
+                        false,
+
+                    code:
+                        "AUTHENTICATION_REQUIRED",
+
                     message:
                         "Authentication required.",
+
                     version:
                         GET_JOB_VERSION
                 },
@@ -115,39 +174,56 @@ export async function onRequestGet(
             );
         }
 
-        const epicUniqueId =
-            String(
-                session
-                    .sessionData
-                    .EpicUniqueId
-                || ""
-            )
-                .trim();
+        const accountId =
+            normalizeString(
+                session.userId
+            );
 
         if (
-            !epicUniqueId
+            !accountId
         ) {
             return jsonResponse(
                 {
-                    success: false,
+                    success:
+                        false,
+
+                    code:
+                        "ACCOUNT_IDENTITY_MISSING",
+
                     message:
-                        "Authenticated account is incomplete.",
+                        "Authenticated account identity is unavailable.",
+
                     version:
                         GET_JOB_VERSION
                 },
-                401
+                409
             );
         }
 
-        const authenticatedOwnerId =
-            await createOwnerHash(
-                epicUniqueId,
-                env.OCR_OWNER_SECRET
-            );
+        if (
+            session.active !== true
+        ) {
+            return jsonResponse(
+                {
+                    success:
+                        false,
 
-        // ====================================================
-        // JOB ID
-        // ====================================================
+                    code:
+                        "ACCOUNT_INACTIVE",
+
+                    message:
+                        "This BPD account is not active.",
+
+                    version:
+                        GET_JOB_VERSION
+                },
+                403
+            );
+        }
+
+        /* =================================================
+        JOB ID
+        ================================================= */
 
         const url =
             new URL(
@@ -166,9 +242,12 @@ export async function onRequestGet(
         ) {
             return jsonResponse(
                 {
-                    success: false,
+                    success:
+                        false,
+
                     message:
                         "Missing or invalid jobId.",
+
                     version:
                         GET_JOB_VERSION
                 },
@@ -185,9 +264,9 @@ export async function onRequestGet(
         const requestKey =
             `${baseKey}/request.json`;
 
-        // ====================================================
-        // LOAD STATUS
-        // ====================================================
+        /* =================================================
+        LOAD STATUS
+        ================================================= */
 
         const statusObject =
             await env.OCR_STORAGE.get(
@@ -199,9 +278,12 @@ export async function onRequestGet(
         ) {
             return jsonResponse(
                 {
-                    success: false,
+                    success:
+                        false,
+
                     message:
                         "OCR job was not found.",
+
                     version:
                         GET_JOB_VERSION
                 },
@@ -223,9 +305,12 @@ export async function onRequestGet(
 
             return jsonResponse(
                 {
-                    success: false,
+                    success:
+                        false,
+
                     message:
                         "OCR job metadata is invalid.",
+
                     version:
                         GET_JOB_VERSION
                 },
@@ -233,9 +318,9 @@ export async function onRequestGet(
             );
         }
 
-        // ====================================================
-        // VERIFY JOB IDENTIFIER
-        // ====================================================
+        /* =================================================
+        VERIFY JOB IDENTIFIER
+        ================================================= */
 
         const storedJobId =
             sanitizeJobId(
@@ -243,7 +328,8 @@ export async function onRequestGet(
             );
 
         if (
-            storedJobId !== jobId
+            storedJobId !==
+            jobId
         ) {
             console.error(
                 `[OCR GET JOB] Job metadata mismatch for ${jobId}.`
@@ -251,9 +337,12 @@ export async function onRequestGet(
 
             return jsonResponse(
                 {
-                    success: false,
+                    success:
+                        false,
+
                     message:
                         "OCR job metadata is inconsistent.",
+
                     version:
                         GET_JOB_VERSION
                 },
@@ -261,118 +350,40 @@ export async function onRequestGet(
             );
         }
 
-        // ====================================================
-        // VERIFY OWNERSHIP
-        // ====================================================
+        /* =================================================
+        RESOLVE OWNERSHIP METADATA
 
-        let submittedBy =
-            String(
-                statusData?.ownerId
-                || ""
-            )
-                .trim();
+        New jobs store ownership on status.json directly.
 
-        // ====================================================
-        // LEGACY JOB FALLBACK
-        // ====================================================
+        Older jobs may only contain fields.submittedBy in
+        request.json, so retain that fallback temporarily.
+        ================================================= */
 
-        if (
-            !submittedBy
-        ) {
-            const requestObject =
-                await env.OCR_STORAGE.get(
+        const ownership =
+            await resolveStoredOwnership(
+                env,
+                {
+                    jobId,
+                    statusData,
                     requestKey
-                );
-
-            if (
-                !requestObject
-            ) {
-                console.error(
-                    `[OCR GET JOB] Legacy request metadata missing for ${jobId}.`
-                );
-
-                return jsonResponse(
-                    {
-                        success: false,
-                        message:
-                            "OCR job ownership is invalid.",
-                        version:
-                            GET_JOB_VERSION
-                    },
-                    409
-                );
-            }
-
-            const requestData =
-                await readStoredJson(
-                    requestObject
-                );
-
-            if (
-                !requestData
-            ) {
-                console.error(
-                    `[OCR GET JOB] Legacy request metadata invalid for ${jobId}.`
-                );
-
-                return jsonResponse(
-                    {
-                        success: false,
-                        message:
-                            "OCR job ownership is invalid.",
-                        version:
-                            GET_JOB_VERSION
-                    },
-                    409
-                );
-            }
-
-            const requestJobId =
-                sanitizeJobId(
-                    requestData?.jobId
-                );
-
-            if (
-                requestJobId !== jobId
-            ) {
-                console.error(
-                    `[OCR GET JOB] Legacy request job mismatch for ${jobId}.`
-                );
-
-                return jsonResponse(
-                    {
-                        success: false,
-                        message:
-                            "OCR job metadata is inconsistent.",
-                        version:
-                            GET_JOB_VERSION
-                    },
-                    409
-                );
-            }
-
-            submittedBy =
-                String(
-                    requestData
-                        ?.fields
-                        ?.submittedBy
-                    || ""
-                )
-                    .trim();
-        }
+                }
+            );
 
         if (
-            !submittedBy
+            !ownership
         ) {
             console.error(
-                `[OCR GET JOB] Missing owner for ${jobId}.`
+                `[OCR GET JOB] Missing or invalid owner for ${jobId}.`
             );
 
             return jsonResponse(
                 {
-                    success: false,
+                    success:
+                        false,
+
                     message:
                         "OCR job ownership is invalid.",
+
                     version:
                         GET_JOB_VERSION
                 },
@@ -380,17 +391,65 @@ export async function onRequestGet(
             );
         }
 
+        /* =================================================
+        AUTHENTICATED OWNER
+        ================================================= */
+
+        const authenticatedOwnerId =
+            await resolveAuthenticatedOwnerHash(
+                session,
+                ownership,
+                env.OCR_OWNER_SECRET
+            );
+
+        if (
+            !authenticatedOwnerId
+        ) {
+            return jsonResponse(
+                {
+                    success:
+                        false,
+
+                    code:
+                        ownership.isLegacy
+                            ? "EPIC_ACCOUNT_REQUIRED"
+                            : "ACCOUNT_IDENTITY_MISSING",
+
+                    message:
+                        ownership.isLegacy
+                            ? "A linked Epic account is required to access this legacy OCR job."
+                            : "Authenticated account identity is unavailable.",
+
+                    version:
+                        GET_JOB_VERSION
+                },
+                ownership.isLegacy
+                    ? 403
+                    : 409
+            );
+        }
+
+        /* =================================================
+        VERIFY OWNERSHIP
+        ================================================= */
+
         if (
             !constantTimeEqual(
-                submittedBy,
+                ownership.ownerId,
                 authenticatedOwnerId
             )
         ) {
             return jsonResponse(
                 {
-                    success: false,
+                    success:
+                        false,
+
+                    code:
+                        "OCR_JOB_ACCESS_DENIED",
+
                     message:
                         "You are not authorized to access this OCR job.",
+
                     version:
                         GET_JOB_VERSION
                 },
@@ -398,9 +457,9 @@ export async function onRequestGet(
             );
         }
 
-        // ====================================================
-        // MERGE TEMPORARY CLOUD OCR PROGRESS
-        // ====================================================
+        /* =================================================
+        MERGE TEMPORARY CLOUD OCR PROGRESS
+        ================================================= */
 
         const responseStatusData =
             await mergeCloudProgress(
@@ -409,15 +468,18 @@ export async function onRequestGet(
                 statusData
             );
 
-        // ====================================================
-        // RESPONSE
-        // ====================================================
+        /* =================================================
+        RESPONSE
+        ================================================= */
 
         return jsonResponse(
             {
-                success: true,
+                success:
+                    true,
+
                 version:
                     GET_JOB_VERSION,
+
                 job:
                     sanitizeJobResponse(
                         responseStatusData
@@ -436,9 +498,12 @@ export async function onRequestGet(
 
         return jsonResponse(
             {
-                success: false,
+                success:
+                    false,
+
                 message:
                     "Unable to read OCR job.",
+
                 version:
                     GET_JOB_VERSION
             },
@@ -447,9 +512,258 @@ export async function onRequestGet(
     }
 }
 
-// ============================================================
-// STORED JSON
-// ============================================================
+/* =========================================================
+OWNERSHIP RESOLUTION
+========================================================= */
+
+async function resolveStoredOwnership(
+    env,
+    {
+        jobId,
+        statusData,
+        requestKey
+    }
+) {
+    let ownerId =
+        normalizeString(
+            statusData?.ownerId
+        );
+
+    let ownerType =
+        normalizeString(
+            statusData?.ownerType
+        )
+            .toLowerCase();
+
+    let ownerVersion =
+        normalizePositiveInteger(
+            statusData?.ownerVersion
+        );
+
+    if (
+        ownerId
+    ) {
+        return normalizeOwnership({
+            ownerId,
+            ownerType,
+            ownerVersion
+        });
+    }
+
+    /* =====================================================
+    LEGACY REQUEST FALLBACK
+    ===================================================== */
+
+    const requestObject =
+        await env.OCR_STORAGE.get(
+            requestKey
+        );
+
+    if (
+        !requestObject
+    ) {
+        console.error(
+            `[OCR GET JOB] Legacy request metadata missing for ${jobId}.`
+        );
+
+        return null;
+    }
+
+    const requestData =
+        await readStoredJson(
+            requestObject
+        );
+
+    if (
+        !requestData
+    ) {
+        console.error(
+            `[OCR GET JOB] Legacy request metadata invalid for ${jobId}.`
+        );
+
+        return null;
+    }
+
+    const requestJobId =
+        sanitizeJobId(
+            requestData?.jobId
+        );
+
+    if (
+        requestJobId !==
+        jobId
+    ) {
+        console.error(
+            `[OCR GET JOB] Legacy request job mismatch for ${jobId}.`
+        );
+
+        return null;
+    }
+
+    ownerId =
+        normalizeString(
+            requestData?.ownerId
+            || requestData
+                ?.fields
+                ?.submittedBy
+        );
+
+    ownerType =
+        normalizeString(
+            requestData?.ownerType
+            || requestData
+                ?.fields
+                ?.ownerType
+        )
+            .toLowerCase();
+
+    ownerVersion =
+        normalizePositiveInteger(
+            requestData?.ownerVersion
+            ?? requestData
+                ?.fields
+                ?.ownerVersion
+        );
+
+    return normalizeOwnership({
+        ownerId,
+        ownerType,
+        ownerVersion
+    });
+}
+
+function normalizeOwnership(
+    {
+        ownerId,
+        ownerType,
+        ownerVersion
+    }
+) {
+    const normalizedOwnerId =
+        normalizeString(
+            ownerId
+        );
+
+    if (
+        !normalizedOwnerId
+    ) {
+        return null;
+    }
+
+    if (
+        ownerType ===
+            OWNER_TYPE_ACCOUNT
+        && ownerVersion ===
+            OWNER_VERSION_ACCOUNT
+    ) {
+        return {
+            ownerId:
+                normalizedOwnerId,
+
+            ownerType:
+                OWNER_TYPE_ACCOUNT,
+
+            ownerVersion:
+                OWNER_VERSION_ACCOUNT,
+
+            isLegacy:
+                false
+        };
+    }
+
+    /*
+     * Historical jobs did not store ownerType/ownerVersion.
+     * Their submittedBy value was generated from EpicUniqueId.
+     */
+    if (
+        !ownerType
+        && ownerVersion ===
+            null
+    ) {
+        return {
+            ownerId:
+                normalizedOwnerId,
+
+            ownerType:
+                "epic",
+
+            ownerVersion:
+                1,
+
+            isLegacy:
+                true
+        };
+    }
+
+    return null;
+}
+
+/* =========================================================
+AUTHENTICATED OWNER
+========================================================= */
+
+async function resolveAuthenticatedOwnerHash(
+    session,
+    ownership,
+    secret
+) {
+    if (
+        ownership.ownerType ===
+            OWNER_TYPE_ACCOUNT
+        && ownership.ownerVersion ===
+            OWNER_VERSION_ACCOUNT
+    ) {
+        const accountId =
+            normalizeString(
+                session.userId
+            );
+
+        if (
+            !accountId
+        ) {
+            return null;
+        }
+
+        return createOwnerHash(
+            accountId,
+            secret
+        );
+    }
+
+    if (
+        ownership.isLegacy ===
+            true
+    ) {
+        const epic =
+            getProviderContext(
+                session,
+                "epic"
+            );
+
+        const epicAccountId =
+            normalizeString(
+                epic?.accountId
+            );
+
+        if (
+            epic?.linked !== true
+            || !epicAccountId
+        ) {
+            return null;
+        }
+
+        return createOwnerHash(
+            epicAccountId,
+            secret
+        );
+    }
+
+    return null;
+}
+
+/* =========================================================
+STORED JSON
+========================================================= */
 
 async function readStoredJson(
     object
@@ -478,9 +792,9 @@ async function readStoredJson(
     }
 }
 
-// ============================================================
-// TEMPORARY CLOUD OCR PROGRESS
-// ============================================================
+/* =========================================================
+TEMPORARY CLOUD OCR PROGRESS
+========================================================= */
 
 async function mergeCloudProgress(
     env,
@@ -533,7 +847,8 @@ async function mergeCloudProgress(
         !cloudProgress
         || sanitizeJobId(
             cloudProgress.jobId
-        ) !== jobId
+        ) !==
+            jobId
     ) {
         return statusData;
     }
@@ -563,17 +878,22 @@ async function mergeCloudProgress(
 
     return {
         ...statusData,
+
         status:
             "processing",
+
         stage:
             useProvider
                 ? cloudProgress.stage
                 : statusData.stage,
+
         progress,
+
         message:
             useProvider
                 ? cloudProgress.message
                 : statusData.message,
+
         updatedAt:
             useProvider
                 ? (
@@ -581,6 +901,7 @@ async function mergeCloudProgress(
                     || statusData.updatedAt
                 )
                 : statusData.updatedAt,
+
         heartbeatAt:
             useProvider
                 ? (
@@ -588,10 +909,12 @@ async function mergeCloudProgress(
                     || statusData.heartbeatAt
                 )
                 : statusData.heartbeatAt,
+
         work:
             useProvider
                 ? cloudProgress.work
                 : statusData.work,
+
         progressSource:
             useProvider
                 ? "cloud_run"
@@ -599,9 +922,9 @@ async function mergeCloudProgress(
     };
 }
 
-// ============================================================
-// SAFE JOB RESPONSE
-// ============================================================
+/* =========================================================
+SAFE JOB RESPONSE
+========================================================= */
 
 function sanitizeJobResponse(
     statusData
@@ -612,7 +935,8 @@ function sanitizeJobResponse(
         );
 
     const progress =
-        status === "completed"
+        status ===
+            "completed"
             ? 100
             : normalizeProgress(
                 statusData?.progress
@@ -687,7 +1011,8 @@ function sanitizeJobResponse(
                 true
             || normalizeConfirmationStatus(
                 statusData?.confirmationStatus
-            ) === "pending_review",
+            ) ===
+                "pending_review",
 
         confirmationStatus:
             normalizeConfirmationStatus(
@@ -695,14 +1020,16 @@ function sanitizeJobResponse(
             ),
 
         error:
-            status === "failed"
+            status ===
+                "failed"
                 ? sanitizeError(
                     statusData?.error
                 )
                 : null,
 
         matchId:
-            status === "completed"
+            status ===
+                "completed"
                 ? sanitizeMatchId(
                     statusData?.matchId
                 )
@@ -710,9 +1037,58 @@ function sanitizeJobResponse(
     };
 }
 
-// ============================================================
-// PROGRESS DETAILS
-// ============================================================
+/* =========================================================
+NORMALIZATION
+========================================================= */
+
+function normalizeString(
+    value
+) {
+    if (
+        typeof value !==
+            "string"
+    ) {
+        return "";
+    }
+
+    return value.trim();
+}
+
+function normalizePositiveInteger(
+    value
+) {
+    if (
+        value === null
+        || value === undefined
+        || String(
+            value
+        )
+            .trim() ===
+            ""
+    ) {
+        return null;
+    }
+
+    const numeric =
+        Number(
+            value
+        );
+
+    if (
+        !Number.isInteger(
+            numeric
+        )
+        || numeric <= 0
+    ) {
+        return null;
+    }
+
+    return numeric;
+}
+
+/* =========================================================
+PROGRESS DETAILS
+========================================================= */
 
 function normalizeProgressSource(
     value,
@@ -873,12 +1249,12 @@ function sanitizeError(
     };
 }
 
-// ============================================================
-// OWNER HASH
-// ============================================================
+/* =========================================================
+OWNER HASH
+========================================================= */
 
 async function createOwnerHash(
-    epicUniqueId,
+    ownerIdentity,
     secret
 ) {
     const encoder =
@@ -895,6 +1271,7 @@ async function createOwnerHash(
             {
                 name:
                     "HMAC",
+
                 hash:
                     "SHA-256"
             },
@@ -910,7 +1287,7 @@ async function createOwnerHash(
             key,
             encoder.encode(
                 String(
-                    epicUniqueId
+                    ownerIdentity
                 )
             )
         );
@@ -939,9 +1316,9 @@ async function createOwnerHash(
         );
 }
 
-// ============================================================
-// CONSTANT-TIME COMPARE
-// ============================================================
+/* =========================================================
+CONSTANT-TIME COMPARE
+========================================================= */
 
 function constantTimeEqual(
     first,
@@ -992,12 +1369,13 @@ function constantTimeEqual(
             );
     }
 
-    return difference === 0;
+    return difference ===
+        0;
 }
 
-// ============================================================
-// STATUS
-// ============================================================
+/* =========================================================
+STATUS
+========================================================= */
 
 function normalizeStatus(
     value
@@ -1017,9 +1395,9 @@ function normalizeStatus(
         : "unknown";
 }
 
-// ============================================================
-// STAGE
-// ============================================================
+/* =========================================================
+STAGE
+========================================================= */
 
 function normalizeStage(
     value
@@ -1049,9 +1427,9 @@ function normalizeStage(
         : "unknown";
 }
 
-// ============================================================
-// MESSAGE
-// ============================================================
+/* =========================================================
+MESSAGE
+========================================================= */
 
 function normalizeMessage(
     value,
@@ -1094,9 +1472,9 @@ function normalizeMessage(
     }
 }
 
-// ============================================================
-// PROGRESS
-// ============================================================
+/* =========================================================
+PROGRESS
+========================================================= */
 
 function normalizeProgress(
     value
@@ -1125,9 +1503,9 @@ function normalizeProgress(
     );
 }
 
-// ============================================================
-// UPLOAD STATUS
-// ============================================================
+/* =========================================================
+UPLOAD STATUS
+========================================================= */
 
 function normalizeUploadStatus(
     value
@@ -1156,9 +1534,9 @@ function normalizeUploadStatus(
     return null;
 }
 
-// ============================================================
-// TIMESTAMP
-// ============================================================
+/* =========================================================
+TIMESTAMP
+========================================================= */
 
 function normalizeTimestamp(
     value
@@ -1195,9 +1573,9 @@ function normalizeTimestamp(
         .toISOString();
 }
 
-// ============================================================
-// JOB ID
-// ============================================================
+/* =========================================================
+JOB ID
+========================================================= */
 
 function sanitizeJobId(
     value
@@ -1217,9 +1595,9 @@ function sanitizeJobId(
         : null;
 }
 
-// ============================================================
-// MATCH ID
-// ============================================================
+/* =========================================================
+MATCH ID
+========================================================= */
 
 function sanitizeMatchId(
     value
@@ -1239,9 +1617,9 @@ function sanitizeMatchId(
         : null;
 }
 
-// ============================================================
-// RESPONSE
-// ============================================================
+/* =========================================================
+RESPONSE
+========================================================= */
 
 function jsonResponse(
     data,
@@ -1253,9 +1631,11 @@ function jsonResponse(
         ),
         {
             status,
+
             headers: {
                 "Content-Type":
                     "application/json; charset=utf-8",
+
                 "Cache-Control":
                     "no-store"
             }

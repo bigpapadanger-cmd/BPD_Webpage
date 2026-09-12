@@ -1,27 +1,84 @@
 "use strict";
 
-// ============================================================
-// BPD GAMING NETWORK
-// OCR JOB SUBMISSION
-// ============================================================
+/* =========================================================
+BPD GAMING NETWORK
+OCR JOB SUBMISSION
+
+File:
+    functions/api/ocr/jobs/submit_job.js
+
+Public Route:
+    POST /api/ocr/jobs/submit_job
+
+Purpose:
+    Creates and queues an authenticated Rocket League OCR job.
+
+Description:
+    - Requires a valid global BPD session.
+    - Requires a linked Epic provider for Rocket League OCR.
+    - Uses identity.accounts.id as the canonical job owner.
+    - Hashes the account ID before storing ownership metadata.
+    - Never accepts browser-supplied ownership information.
+    - Stores OCR input, request metadata, and job status.
+    - Queues the OCR job for asynchronous processing.
+
+Identity Model:
+    session.userId
+        = identity.accounts.id
+
+    providers.epic.accountId
+        = Epic provider subject
+
+Ownership Model:
+    ownerId
+        = HMAC-SHA256(identity.accounts.id, OCR_OWNER_SECRET)
+
+    ownerType
+        = "account"
+
+    ownerVersion
+        = 2
+
+Important:
+    - Epic is required because this is Rocket League OCR.
+    - Epic account ID is NOT the OCR ownership key.
+    - Browser-supplied submittedBy values are discarded.
+========================================================= */
 
 import {
-    getStoredSession
-} from "../../../services/common_helpers/reload_sessions.js";
+    getSessionContext,
+    getProviderContext
+} from "../../../services/auth/sessions/session_context.js";
+
+/* =========================================================
+VERSION
+========================================================= */
 
 const SUBMIT_JOB_VERSION =
-    "ocr-submit-job-1.4";
+    "ocr-submit-job-2.0";
 
-const JOB_PROGRESS = Object.freeze({
-    QUEUED:
-        2,
-    FAILED:
-        97
-});
+const OWNER_TYPE =
+    "account";
 
-// ============================================================
-// MAIN
-// ============================================================
+const OWNER_VERSION =
+    2;
+
+/* =========================================================
+PROGRESS
+========================================================= */
+
+const JOB_PROGRESS =
+    Object.freeze({
+        QUEUED:
+            2,
+
+        FAILED:
+            97
+    });
+
+/* =========================================================
+MAIN
+========================================================= */
 
 export async function onRequestPost(
     context
@@ -29,13 +86,13 @@ export async function onRequestPost(
     const {
         request,
         env
-    } = context;
+    } =
+        context;
 
     try {
-
-        // ====================================================
-        // CONFIGURATION
-        // ====================================================
+        /* =================================================
+        CONFIGURATION
+        ================================================= */
 
         const configurationError =
             validateConfiguration(
@@ -60,9 +117,9 @@ export async function onRequestPost(
             );
         }
 
-        // ====================================================
-        // CONTENT TYPE
-        // ====================================================
+        /* =================================================
+        CONTENT TYPE
+        ================================================= */
 
         const contentType =
             String(
@@ -94,23 +151,26 @@ export async function onRequestPost(
             );
         }
 
-        // ====================================================
-        // AUTHENTICATED USER
-        // ====================================================
+        /* =================================================
+        GLOBAL BPD SESSION
+        ================================================= */
 
         const session =
-            await getStoredSession(
+            await getSessionContext(
                 request,
                 env
             );
 
         if (
-            !session?.sessionData
+            session.authenticated !== true
         ) {
             return jsonResponse(
                 {
                     success:
                         false,
+
+                    code:
+                        "AUTHENTICATION_REQUIRED",
 
                     message:
                         "Authentication required.",
@@ -122,42 +182,109 @@ export async function onRequestPost(
             );
         }
 
-        const epicUniqueId =
-            String(
-                session
-                    .sessionData
-                    .EpicUniqueId
-                || ""
-            )
-                .trim();
+        const accountId =
+            normalizeString(
+                session.userId
+            );
 
         if (
-            !epicUniqueId
+            !accountId
         ) {
             return jsonResponse(
                 {
                     success:
                         false,
 
+                    code:
+                        "ACCOUNT_IDENTITY_MISSING",
+
                     message:
-                        "Authenticated account is missing an EpicUniqueId.",
+                        "Authenticated account identity is unavailable.",
 
                     version:
                         SUBMIT_JOB_VERSION
                 },
-                401
+                409
             );
         }
 
+        if (
+            session.active !== true
+        ) {
+            return jsonResponse(
+                {
+                    success:
+                        false,
+
+                    code:
+                        "ACCOUNT_INACTIVE",
+
+                    message:
+                        "This BPD account is not active.",
+
+                    version:
+                        SUBMIT_JOB_VERSION
+                },
+                403
+            );
+        }
+
+        /* =================================================
+        EPIC REQUIREMENT
+
+        Rocket League OCR requires a linked Epic identity,
+        but Epic is not used as the ownership identifier.
+        ================================================= */
+
+        const epic =
+            getProviderContext(
+                session,
+                "epic"
+            );
+
+        const epicAccountId =
+            normalizeString(
+                epic?.accountId
+            );
+
+        if (
+            epic?.linked !== true
+            || !epicAccountId
+        ) {
+            return jsonResponse(
+                {
+                    success:
+                        false,
+
+                    code:
+                        "EPIC_ACCOUNT_REQUIRED",
+
+                    message:
+                        "A linked Epic account is required for Rocket League OCR.",
+
+                    version:
+                        SUBMIT_JOB_VERSION
+                },
+                403
+            );
+        }
+
+        /* =================================================
+        TRUSTED OWNER
+
+        New jobs are owned by identity.accounts.id rather
+        than by the Epic provider subject.
+        ================================================= */
+
         const submittedBy =
             await createOwnerHash(
-                epicUniqueId,
+                accountId,
                 env.OCR_OWNER_SECRET
             );
 
-        // ====================================================
-        // FORM DATA
-        // ====================================================
+        /* =================================================
+        FORM DATA
+        ================================================= */
 
         let formData;
 
@@ -181,9 +308,9 @@ export async function onRequestPost(
             );
         }
 
-        // ====================================================
-        // PLAYERS PER TEAM
-        // ====================================================
+        /* =================================================
+        PLAYERS PER TEAM
+        ================================================= */
 
         const playersPerTeam =
             Number(
@@ -217,9 +344,9 @@ export async function onRequestPost(
             );
         }
 
-        // ====================================================
-        // EXPECTED PLAYER NAMES
-        // ====================================================
+        /* =================================================
+        EXPECTED PLAYER NAMES
+        ================================================= */
 
         let expectedPlayerNames;
 
@@ -296,9 +423,9 @@ export async function onRequestPost(
             );
         }
 
-        // ====================================================
-        // IMAGE
-        // ====================================================
+        /* =================================================
+        IMAGE
+        ================================================= */
 
         const image =
             formData.get(
@@ -375,9 +502,9 @@ export async function onRequestPost(
             );
         }
 
-        // ====================================================
-        // NORMALIZE REQUEST FIELDS
-        // ====================================================
+        /* =================================================
+        NORMALIZE REQUEST FIELDS
+        ================================================= */
 
         formData.set(
             "playersPerTeam",
@@ -393,9 +520,9 @@ export async function onRequestPost(
             )
         );
 
-        // ====================================================
-        // JOB
-        // ====================================================
+        /* =================================================
+        JOB
+        ================================================= */
 
         const jobId =
             createJobId();
@@ -421,41 +548,68 @@ export async function onRequestPost(
                 formData
             );
 
-        // ====================================================
-        // TRUSTED SERVER-DERIVED OWNERSHIP
-        // ====================================================
+        /* =================================================
+        TRUSTED SERVER-DERIVED OWNERSHIP
+
+        submittedBy is retained because downstream Cloud Run
+        and existing OCR report structures already use this
+        field.
+
+        Its meaning is now the hashed BPD account ID.
+        ================================================= */
 
         fields.submittedBy =
             submittedBy;
 
-        // ====================================================
-        // REQUEST DATA
-        // ====================================================
+        fields.ownerType =
+            OWNER_TYPE;
+
+        fields.ownerVersion =
+            OWNER_VERSION;
+
+        /* =================================================
+        REQUEST DATA
+        ================================================= */
 
         const requestData = {
             version:
-                "ocr-job-request-1.4",
+                "ocr-job-request-2.0",
 
             jobId,
 
             createdAt:
                 now,
 
+            ownerId:
+                submittedBy,
+
+            ownerType:
+                OWNER_TYPE,
+
+            ownerVersion:
+                OWNER_VERSION,
+
             fields
         };
 
-        // ====================================================
-        // STATUS DATA
-        // ====================================================
+        /* =================================================
+        STATUS DATA
+        ================================================= */
 
         const statusData = {
             version:
-                "ocr-job-state-1.4",
+                "ocr-job-state-2.0",
 
             jobId,
 
             ownerId:
                 submittedBy,
+
+            ownerType:
+                OWNER_TYPE,
+
+            ownerVersion:
+                OWNER_VERSION,
 
             status:
                 "queued",
@@ -528,9 +682,9 @@ export async function onRequestPost(
                 null
         };
 
-        // ====================================================
-        // STORE JOB FILES
-        // ====================================================
+        /* =================================================
+        STORE JOB FILES
+        ================================================= */
 
         await Promise.all([
             env.OCR_STORAGE.put(
@@ -585,9 +739,9 @@ export async function onRequestPost(
             )
         ]);
 
-        // ====================================================
-        // QUEUE JOB
-        // ====================================================
+        /* =================================================
+        QUEUE JOB
+        ================================================= */
 
         try {
             await env.OCR_JOB_QUEUE.send(
@@ -723,9 +877,9 @@ export async function onRequestPost(
             );
         }
 
-        // ====================================================
-        // RESPONSE
-        // ====================================================
+        /* =================================================
+        RESPONSE
+        ================================================= */
 
         return jsonResponse(
             {
@@ -779,9 +933,9 @@ export async function onRequestPost(
     }
 }
 
-// ============================================================
-// CONFIGURATION
-// ============================================================
+/* =========================================================
+CONFIGURATION
+========================================================= */
 
 function validateConfiguration(
     env
@@ -807,9 +961,25 @@ function validateConfiguration(
     return "";
 }
 
-// ============================================================
-// REQUEST FIELDS
-// ============================================================
+/* =========================================================
+NORMALIZATION
+========================================================= */
+
+function normalizeString(
+    value
+) {
+    if (
+        typeof value !== "string"
+    ) {
+        return "";
+    }
+
+    return value.trim();
+}
+
+/* =========================================================
+REQUEST FIELDS
+========================================================= */
 
 function buildRequestFields(
     formData
@@ -827,13 +997,15 @@ function buildRequestFields(
             key === "image"
             || key === "file"
             || key === "submittedBy"
+            || key === "ownerId"
+            || key === "ownerType"
+            || key === "ownerVersion"
         ) {
             continue;
         }
 
         if (
-            typeof value !==
-                "string"
+            typeof value !== "string"
         ) {
             continue;
         }
@@ -879,12 +1051,12 @@ function buildRequestFields(
     return fields;
 }
 
-// ============================================================
-// OWNER HASH
-// ============================================================
+/* =========================================================
+OWNER HASH
+========================================================= */
 
 async function createOwnerHash(
-    epicUniqueId,
+    accountId,
     secret
 ) {
     const encoder =
@@ -917,7 +1089,7 @@ async function createOwnerHash(
             key,
             encoder.encode(
                 String(
-                    epicUniqueId
+                    accountId
                 )
             )
         );
@@ -946,9 +1118,9 @@ async function createOwnerHash(
         );
 }
 
-// ============================================================
-// JOB ID
-// ============================================================
+/* =========================================================
+JOB ID
+========================================================= */
 
 function createJobId() {
     return crypto
@@ -964,9 +1136,9 @@ function createJobId() {
         .toUpperCase();
 }
 
-// ============================================================
-// RESPONSE
-// ============================================================
+/* =========================================================
+RESPONSE
+========================================================= */
 
 function jsonResponse(
     data,

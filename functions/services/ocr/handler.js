@@ -1,48 +1,110 @@
-// ============================================================
-// BPD GAMING NETWORK
-// OCR REQUEST HANDLER
-// ============================================================
+"use strict";
+
+/* =========================================================
+BPD GAMING NETWORK
+OCR REQUEST HANDLER
+
+File:
+    functions/services/ocr/handler.js
+
+Service:
+    Direct OCR request handler
+
+Purpose:
+    Authenticates and forwards a Rocket League OCR request
+    from Cloudflare to the Cloud Run OCR service.
+
+Description:
+    - Requires a valid global BPD session.
+    - Requires a linked Epic account for Rocket League OCR.
+    - Uses identity.accounts.id as the canonical OCR owner.
+    - Replaces all browser-supplied ownership metadata.
+    - Forwards trusted ownership metadata to Cloud Run.
+    - Preserves the Cloud Run HTTP response status.
+
+Identity Model:
+    session.userId
+        = identity.accounts.id
+
+    providers.epic.accountId
+        = Epic provider subject
+
+Ownership Model:
+    submittedBy
+        = HMAC-SHA256(identity.accounts.id, OCR_OWNER_SECRET)
+
+    ownerType
+        = "account"
+
+    ownerVersion
+        = 2
+
+Important:
+    - Epic is required for Rocket League access.
+    - Epic account ID is NOT the OCR ownership key.
+    - No provider tokens are forwarded or stored.
+========================================================= */
+
 import {
-    getStoredSession
-} from "../common_helpers/reload_sessions.js";
+    getSessionContext,
+    getProviderContext
+} from "../auth/sessions/session_context.js";
+
+/* =========================================================
+VERSION
+========================================================= */
+
 const OCR_HANDLER_VERSION =
-    "ocr-handler-2.0";
+    "ocr-handler-3.0";
+
+const OWNER_TYPE =
+    "account";
+
+const OWNER_VERSION =
+    2;
+
+/* =========================================================
+OWNER HASH
+========================================================= */
 
 async function createOwnerHash(
-    epicUniqueId,
+    accountId,
     secret
 ) {
-    const encoder = new TextEncoder();
+    const encoder =
+        new TextEncoder();
 
-    const key = await crypto.subtle.importKey(
-        "raw",
-        encoder.encode(
-            String(
-                secret
+    const key =
+        await crypto.subtle.importKey(
+            "raw",
+            encoder.encode(
+                String(
+                    secret
+                )
+            ),
+            {
+                name:
+                    "HMAC",
+
+                hash:
+                    "SHA-256"
+            },
+            false,
+            [
+                "sign"
+            ]
+        );
+
+    const signature =
+        await crypto.subtle.sign(
+            "HMAC",
+            key,
+            encoder.encode(
+                String(
+                    accountId
+                )
             )
-        ),
-        {
-            name:
-                "HMAC",
-
-            hash:
-                "SHA-256"
-        },
-        false,
-        [
-            "sign"
-        ]
-    );
-
-    const signature = await crypto.subtle.sign(
-        "HMAC",
-        key,
-        encoder.encode(
-            String(
-                epicUniqueId
-            )
-        )
-    );
+        );
 
     return Array.from(
         new Uint8Array(
@@ -67,9 +129,27 @@ async function createOwnerHash(
             ""
         );
 }
-// ============================================================
-// JSON RESPONSE
-// ============================================================
+
+/* =========================================================
+NORMALIZATION
+========================================================= */
+
+function normalizeString(
+    value
+) {
+    if (
+        typeof value !==
+            "string"
+    ) {
+        return "";
+    }
+
+    return value.trim();
+}
+
+/* =========================================================
+JSON RESPONSE
+========================================================= */
 
 function jsonResponse(
     body,
@@ -81,9 +161,10 @@ function jsonResponse(
         ),
         {
             status,
+
             headers: {
                 "Content-Type":
-                    "application/json",
+                    "application/json; charset=utf-8",
 
                 "Cache-Control":
                     "no-store"
@@ -92,24 +173,22 @@ function jsonResponse(
     );
 }
 
-
-// ============================================================
-// MAIN OCR REQUEST
-// ============================================================
+/* =========================================================
+MAIN OCR REQUEST
+========================================================= */
 
 export async function handleOCRRequest(
     request,
     env
 ) {
     try {
-
-        /* ====================================================
-           METHOD
-           ==================================================== */
+        /* =================================================
+        METHOD
+        ================================================= */
 
         if (
-            request.method
-            !== "POST"
+            request.method !==
+            "POST"
         ) {
             return jsonResponse(
                 {
@@ -117,16 +196,18 @@ export async function handleOCRRequest(
                         false,
 
                     error:
-                        "Method not allowed."
+                        "Method not allowed.",
+
+                    handlerVersion:
+                        OCR_HANDLER_VERSION
                 },
                 405
             );
         }
 
-
-        /* ====================================================
-           CONFIGURATION
-           ==================================================== */
+        /* =================================================
+        CONFIGURATION
+        ================================================= */
 
         if (
             !env.OCR_API_URL
@@ -137,7 +218,10 @@ export async function handleOCRRequest(
                         false,
 
                     error:
-                        "OCR API URL is not configured."
+                        "OCR API URL is not configured.",
+
+                    handlerVersion:
+                        OCR_HANDLER_VERSION
                 },
                 503
             );
@@ -152,119 +236,19 @@ export async function handleOCRRequest(
                         false,
 
                     error:
-                        "OCR API authentication is not configured."
+                        "OCR API authentication is not configured.",
+
+                    handlerVersion:
+                        OCR_HANDLER_VERSION
                 },
                 503
             );
         }
-
-        if (
-            !env.OCR_OWNER_SECRET
-        ) {
-            return jsonResponse(
-                {
-                    success:
-                        false,
-
-                    error:
-                        "OCR owner hashing is not configured."
-                },
-                503
-            );
-        }
-
-
-        /* ====================================================
-           REQUEST CONTENT TYPE
-           ==================================================== */
-
-        const contentType =
-            String(
-                request.headers.get(
-                    "Content-Type"
-                )
-                || ""
-            );
-
-        if (
-            !contentType
-                .toLowerCase()
-                .includes(
-                    "multipart/form-data"
-                )
-        ) {
-            return jsonResponse(
-                {
-                    success:
-                        false,
-
-                    error:
-                        "OCR requests must use multipart/form-data."
-                },
-                400
-            );
-        }
-
-
-        /* ====================================================
-           AUTHENTICATED SESSION
-           ==================================================== */
-
-        const session =
-            await getStoredSession(
-                request,
-                env
-            );
-
-        if (
-            !session
-            || !session.sessionData
-        ) {
-            return jsonResponse(
-                {
-                    success:
-                        false,
-
-                    message:
-                        "Authentication required."
-                },
-                401
-            );
-        }
-
-        const epicUniqueId =
-            String(
-                session
-                    .sessionData
-                    .EpicUniqueId
-                || ""
-            ).trim();
-
-        if (
-            !epicUniqueId
-        ) {
-            return jsonResponse(
-                {
-                    success:
-                        false,
-
-                    message:
-                        "Authenticated account is missing an EpicUniqueId."
-                },
-                401
-            );
-        }
-
-
-        /* ====================================================
-           CREATE MASKED OWNER ID
-           ==================================================== */
 
         const ownerSecret =
-            String(
+            normalizeString(
                 env.OCR_OWNER_SECRET
-                || ""
-            ).trim();
+            );
 
         if (
             !ownerSecret
@@ -274,75 +258,212 @@ export async function handleOCRRequest(
                     success:
                         false,
 
-                    message:
-                        "OCR owner hashing is not configured."
+                    error:
+                        "OCR owner hashing is not configured.",
+
+                    handlerVersion:
+                        OCR_HANDLER_VERSION
                 },
                 503
             );
         }
 
+        /* =================================================
+        CONTENT TYPE
+        ================================================= */
+
+        const contentType =
+            normalizeString(
+                request.headers.get(
+                    "Content-Type"
+                )
+            )
+                .toLowerCase();
+
+        if (
+            !contentType.includes(
+                "multipart/form-data"
+            )
+        ) {
+            return jsonResponse(
+                {
+                    success:
+                        false,
+
+                    error:
+                        "OCR requests must use multipart/form-data.",
+
+                    handlerVersion:
+                        OCR_HANDLER_VERSION
+                },
+                400
+            );
+        }
+
+        /* =================================================
+        GLOBAL BPD SESSION
+        ================================================= */
+
+        const session =
+            await getSessionContext(
+                request,
+                env
+            );
+
+        if (
+            session.authenticated !==
+            true
+        ) {
+            return jsonResponse(
+                {
+                    success:
+                        false,
+
+                    code:
+                        "AUTHENTICATION_REQUIRED",
+
+                    message:
+                        "Authentication required.",
+
+                    handlerVersion:
+                        OCR_HANDLER_VERSION
+                },
+                401
+            );
+        }
+
+        const accountId =
+            normalizeString(
+                session.userId
+            );
+
+        if (
+            !accountId
+        ) {
+            return jsonResponse(
+                {
+                    success:
+                        false,
+
+                    code:
+                        "ACCOUNT_IDENTITY_MISSING",
+
+                    message:
+                        "Authenticated account identity is unavailable.",
+
+                    handlerVersion:
+                        OCR_HANDLER_VERSION
+                },
+                409
+            );
+        }
+
+        if (
+            session.active !==
+            true
+        ) {
+            return jsonResponse(
+                {
+                    success:
+                        false,
+
+                    code:
+                        "ACCOUNT_INACTIVE",
+
+                    message:
+                        "This BPD account is not active.",
+
+                    handlerVersion:
+                        OCR_HANDLER_VERSION
+                },
+                403
+            );
+        }
+
+        /* =================================================
+        EPIC REQUIREMENT
+
+        Rocket League OCR requires a linked Epic identity,
+        but Epic is not used as the ownership identifier.
+        ================================================= */
+
+        const epic =
+            getProviderContext(
+                session,
+                "epic"
+            );
+
+        const epicAccountId =
+            normalizeString(
+                epic?.accountId
+            );
+
+        if (
+            epic?.linked !==
+                true
+            || !epicAccountId
+        ) {
+            return jsonResponse(
+                {
+                    success:
+                        false,
+
+                    code:
+                        "EPIC_ACCOUNT_REQUIRED",
+
+                    message:
+                        "A linked Epic account is required for Rocket League OCR.",
+
+                    handlerVersion:
+                        OCR_HANDLER_VERSION
+                },
+                403
+            );
+        }
+
+        /* =================================================
+        CREATE TRUSTED OWNER ID
+        ================================================= */
+
         const submittedBy =
             await createOwnerHash(
-                epicUniqueId,
+                accountId,
                 ownerSecret
             );
 
+        /* =================================================
+        PARSE MULTIPART FORM
 
-        /* ====================================================
-           PARSE MULTIPART FORM
+        The request is rebuilt as FormData so Cloudflare can
+        replace ownership fields before forwarding to Cloud
+        Run.
+        ================================================= */
 
-           The request is intentionally rebuilt as FormData so
-           Cloudflare can inject trusted server-side fields
-           before forwarding it to Cloud Run.
-           ==================================================== */
+        let formData;
 
-        const formData =
-            await request.formData();
+        try {
+            formData =
+                await request.formData();
+        }
+        catch {
+            return jsonResponse(
+                {
+                    success:
+                        false,
 
+                    error:
+                        "Unable to read OCR request form data.",
 
-        const debugFormEntries =
-            Array.from(
-                formData.entries()
-            ).map(
-                function([key, value]) {
-                    return {
-                        key,
-
-                        constructor:
-                            value?.constructor
-                                ?.name ||
-                            null,
-
-                        name:
-                            value?.name ||
-                            null,
-
-                        mime:
-                            value?.type ||
-                            null,
-
-                        size:
-                            value?.size ??
-                            null,
-
-                        hasArrayBuffer:
-                            typeof value?.arrayBuffer ===
-                            "function"
-                    };
-                }
+                    handlerVersion:
+                        OCR_HANDLER_VERSION
+                },
+                400
             );
+        }
 
-        console.error(
-            "[OCR HANDLER] FORM DATA:",
-            JSON.stringify(
-                debugFormEntries
-            )
-        );
-
-
-        /* ====================================================
+        /* =================================================
         VALIDATE IMAGE
-        ==================================================== */
+        ================================================= */
 
         const file =
             formData.get(
@@ -354,8 +475,8 @@ export async function handleOCRRequest(
 
         if (
             !file
-            || typeof file.arrayBuffer
-                !== "function"
+            || typeof file.arrayBuffer !==
+                "function"
         ) {
             return jsonResponse(
                 {
@@ -366,32 +487,21 @@ export async function handleOCRRequest(
                         "Missing file upload.",
 
                     handlerVersion:
-                        OCR_HANDLER_VERSION,
-
-                    formFields:
-                        Array.from(
-                            formData.keys()
-                        ),
-
-                    fileType:
-                        formData.get("file")
-                            ?.constructor
-                            ?.name ||
-                        null,
-
-                    imageType:
-                        formData.get("image")
-                            ?.constructor
-                            ?.name ||
-                        null
+                        OCR_HANDLER_VERSION
                 },
                 400
             );
         }
 
         if (
-            file.size !== undefined
-            && file.size <= 0
+            Number.isFinite(
+                Number(
+                    file.size
+                )
+            )
+            && Number(
+                file.size
+            ) <= 0
         ) {
             return jsonResponse(
                 {
@@ -408,27 +518,59 @@ export async function handleOCRRequest(
             );
         }
 
+        /* =================================================
+        FORCE SERVER-DERIVED OWNERSHIP
 
-        /* ====================================================
-           FORCE SERVER-DERIVED OWNER
-
-           set() replaces any browser-supplied submittedBy.
-           The client is never trusted to provide ownership.
-           ==================================================== */
+        set() replaces any browser-supplied value.
+        ================================================= */
 
         formData.set(
             "submittedBy",
             submittedBy
         );
 
+        formData.set(
+            "ownerType",
+            OWNER_TYPE
+        );
 
-        /* ====================================================
-           FORWARD TO CLOUD RUN
+        formData.set(
+            "ownerVersion",
+            String(
+                OWNER_VERSION
+            )
+        );
 
-           Do NOT manually set Content-Type here.
-           When FormData is used, fetch generates the correct
-           multipart boundary automatically.
-           ==================================================== */
+        /*
+         * Explicitly remove alternate ownership fields that a
+         * browser might attempt to provide.
+         */
+        formData.delete(
+            "ownerId"
+        );
+
+        formData.delete(
+            "accountId"
+        );
+
+        formData.delete(
+            "userId"
+        );
+
+        formData.delete(
+            "EpicUniqueId"
+        );
+
+        formData.delete(
+            "epicUniqueId"
+        );
+
+        /* =================================================
+        FORWARD TO CLOUD RUN
+
+        Do not manually set Content-Type.
+        fetch() generates the multipart boundary.
+        ================================================= */
 
         const upstreamHeaders =
             new Headers();
@@ -458,33 +600,30 @@ export async function handleOCRRequest(
                 }
             );
 
-
-        /* ====================================================
-           READ UPSTREAM RESPONSE
-           ==================================================== */
+        /* =================================================
+        READ UPSTREAM RESPONSE
+        ================================================= */
 
         const responseContentType =
-            String(
+            normalizeString(
                 ocrResponse.headers.get(
                     "Content-Type"
                 )
-                || ""
-            );
+            )
+                .toLowerCase();
 
         let result;
 
         if (
-            responseContentType
-                .toLowerCase()
-                .includes(
-                    "application/json"
-                )
+            responseContentType.includes(
+                "application/json"
+            )
         ) {
             try {
                 result =
                     await ocrResponse.json();
-
-            } catch {
+            }
+            catch {
                 result = {
                     success:
                         false,
@@ -493,8 +632,8 @@ export async function handleOCRRequest(
                         "OCR provider returned invalid JSON."
                 };
             }
-
-        } else {
+        }
+        else {
             const text =
                 await ocrResponse.text();
 
@@ -503,32 +642,29 @@ export async function handleOCRRequest(
                     ocrResponse.ok,
 
                 message:
-                    (
-                        text
-                        || (
-                            ocrResponse.ok
-                                ? "OCR request completed."
-                                : "OCR provider failed."
-                        )
+                    text
+                    || (
+                        ocrResponse.ok
+                            ? "OCR request completed."
+                            : "OCR provider failed."
                     )
             };
         }
 
-
-        /* ====================================================
-           PRESERVE PROVIDER STATUS
-           ==================================================== */
+        /* =================================================
+        PRESERVE PROVIDER STATUS
+        ================================================= */
 
         return jsonResponse(
             {
                 ...(
-                    typeof result
-                        === "object"
-                    && result !== null
+                    typeof result ===
+                        "object"
+                    && result !==
+                        null
                         ? result
                         : {
-                            result:
-                                result
+                            result
                         }
                 ),
 
@@ -537,10 +673,19 @@ export async function handleOCRRequest(
             },
             ocrResponse.status
         );
-
-    } catch (
+    }
+    catch (
         error
     ) {
+        console.error(
+            "OCR request handler failed.",
+            {
+                message:
+                    error?.message
+                    || "Unknown error"
+            }
+        );
+
         return jsonResponse(
             {
                 success:
@@ -548,12 +693,6 @@ export async function handleOCRRequest(
 
                 error:
                     "OCR request failed.",
-
-                details:
-                    String(
-                        error?.message
-                        || error
-                    ),
 
                 handlerVersion:
                     OCR_HANDLER_VERSION

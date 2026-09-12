@@ -1,20 +1,62 @@
 "use strict";
 
-// ============================================================
-// BPD GAMING NETWORK
-// OCR MATCH RESULT
-// ============================================================
+/* =========================================================
+BPD GAMING NETWORK
+OCR MATCH RESULT
+
+File:
+    functions/api/ocr/jobs/get_result.js
+
+Public Route:
+    GET /api/ocr/jobs/get_result?matchId={matchId}
+
+Purpose:
+    Returns a stored OCR scoreboard result to its owner.
+
+Description:
+    - Requires a valid global BPD session.
+    - New OCR results are owned by identity.accounts.id.
+    - Existing Epic-owned OCR results remain accessible.
+    - Uses OCR job lineage when match reports do not yet carry
+      the newer ownerType / ownerVersion metadata.
+    - Returns only sanitized scoreboard and review data.
+
+Ownership Model:
+    Version 2:
+        ownerType = "account"
+        ownerVersion = 2
+        submittedBy = HMAC(identity.accounts.id)
+
+    Legacy:
+        owner metadata absent
+        submittedBy = HMAC(Epic provider subject)
+========================================================= */
 
 import {
-    getStoredSession
-} from "../../../services/common_helpers/reload_sessions.js";
+    getSessionContext,
+    getProviderContext
+} from "../../../services/auth/sessions/session_context.js";
 
 import {
     getCurrentMatchReport
 } from "../../../services/ocr/storage.js";
 
+/* =========================================================
+VERSION
+========================================================= */
+
 const OCR_GET_RESULT_VERSION =
-    "ocr-get-result-3.1";
+    "ocr-get-result-4.0";
+
+const OWNER_TYPE_ACCOUNT =
+    "account";
+
+const OWNER_VERSION_ACCOUNT =
+    2;
+
+/* =========================================================
+ALLOWED SCOREBOARD FIELDS
+========================================================= */
 
 const ALLOWED_SCOREBOARD_FIELDS =
     new Set([
@@ -36,9 +78,9 @@ const ALLOWED_CONFIRMATION_STATUSES =
         "confirmed_with_disputes"
     ]);
 
-// ============================================================
-// MAIN
-// ============================================================
+/* =========================================================
+MAIN
+========================================================= */
 
 export async function onRequestGet(
     context
@@ -49,9 +91,9 @@ export async function onRequestGet(
     } = context;
 
     try {
-        // ====================================================
-        // CONFIGURATION
-        // ====================================================
+        /* =================================================
+        CONFIGURATION
+        ================================================= */
 
         if (
             !env.OCR_STORAGE
@@ -81,24 +123,25 @@ export async function onRequestGet(
             );
         }
 
-        // ====================================================
-        // AUTHENTICATION
-        // ====================================================
+        /* =================================================
+        GLOBAL BPD SESSION
+        ================================================= */
 
         const session =
-            await getStoredSession(
+            await getSessionContext(
                 request,
                 env
             );
 
         if (
-            !session
-            || !session.sessionData
+            session.authenticated !== true
         ) {
             return jsonResponse(
                 {
                     success:
                         false,
+                    code:
+                        "AUTHENTICATION_REQUIRED",
                     message:
                         "Authentication required."
                 },
@@ -106,38 +149,46 @@ export async function onRequestGet(
             );
         }
 
-        const epicUniqueId =
-            String(
-                session
-                    .sessionData
-                    .EpicUniqueId
-                || ""
-            )
-                .trim();
+        const accountId =
+            normalizeString(
+                session.userId
+            );
 
         if (
-            !epicUniqueId
+            !accountId
         ) {
             return jsonResponse(
                 {
                     success:
                         false,
+                    code:
+                        "ACCOUNT_IDENTITY_MISSING",
                     message:
-                        "Authenticated account is missing an EpicUniqueId."
+                        "Authenticated account identity is unavailable."
                 },
-                401
+                409
             );
         }
 
-        const authenticatedOwnerId =
-            await createOwnerHash(
-                epicUniqueId,
-                env.OCR_OWNER_SECRET
+        if (
+            session.active !== true
+        ) {
+            return jsonResponse(
+                {
+                    success:
+                        false,
+                    code:
+                        "ACCOUNT_INACTIVE",
+                    message:
+                        "This BPD account is not active."
+                },
+                403
             );
+        }
 
-        // ====================================================
-        // MATCH ID
-        // ====================================================
+        /* =================================================
+        MATCH ID
+        ================================================= */
 
         const url =
             new URL(
@@ -167,9 +218,9 @@ export async function onRequestGet(
             );
         }
 
-        // ====================================================
-        // LOAD MATCH REPORT
-        // ====================================================
+        /* =================================================
+        LOAD MATCH REPORT
+        ================================================= */
 
         let reportObject =
             await getCurrentMatchReport(
@@ -180,10 +231,10 @@ export async function onRequestGet(
         /*
          * Temporary legacy fallback.
          *
-         * New reports:
+         * Current:
          * match-reports/{matchId}/current.json
          *
-         * Legacy reports:
+         * Legacy:
          * match-reports/{matchId}.json
          */
         if (
@@ -252,9 +303,9 @@ export async function onRequestGet(
             );
         }
 
-        // ====================================================
-        // MATCH ID VERIFICATION
-        // ====================================================
+        /* =================================================
+        MATCH ID VERIFICATION
+        ================================================= */
 
         const storedMatchId =
             sanitizeMatchId(
@@ -278,19 +329,34 @@ export async function onRequestGet(
             );
         }
 
-        // ====================================================
-        // OWNERSHIP VERIFICATION
-        // ====================================================
+        /* =================================================
+        JOB LINEAGE
+        ================================================= */
 
-        const submittedBy =
-            String(
-                matchReport?.submittedBy
-                || ""
-            )
-                .trim();
+        const jobId =
+            sanitizeJobId(
+                matchReport?.jobId
+            );
+
+        /* =================================================
+        OWNERSHIP RESOLUTION
+
+        Match reports may not yet contain ownerType and
+        ownerVersion because Cloud Run historically only
+        propagated submittedBy.
+
+        If needed, inspect the originating OCR job.
+        ================================================= */
+
+        const ownership =
+            await resolveMatchOwnership(
+                env,
+                matchReport,
+                jobId
+            );
 
         if (
-            !submittedBy
+            !ownership
         ) {
             return jsonResponse(
                 {
@@ -299,15 +365,52 @@ export async function onRequestGet(
                     code:
                         "MATCH_OWNER_MISSING",
                     message:
-                        "Stored match report has no owner."
+                        "Stored match report has no valid owner."
                 },
                 409
             );
         }
 
+        /* =================================================
+        AUTHENTICATED OWNER
+        ================================================= */
+
+        const authenticatedOwnerId =
+            await resolveAuthenticatedOwnerHash(
+                session,
+                ownership,
+                env.OCR_OWNER_SECRET
+            );
+
+        if (
+            !authenticatedOwnerId
+        ) {
+            return jsonResponse(
+                {
+                    success:
+                        false,
+                    code:
+                        ownership.isLegacy
+                            ? "EPIC_ACCOUNT_REQUIRED"
+                            : "ACCOUNT_IDENTITY_MISSING",
+                    message:
+                        ownership.isLegacy
+                            ? "A linked Epic account is required to access this legacy OCR result."
+                            : "Authenticated account identity is unavailable."
+                },
+                ownership.isLegacy
+                    ? 403
+                    : 409
+            );
+        }
+
+        /* =================================================
+        VERIFY OWNERSHIP
+        ================================================= */
+
         if (
             !constantTimeEqual(
-                submittedBy,
+                ownership.ownerId,
                 authenticatedOwnerId
             )
         ) {
@@ -324,18 +427,9 @@ export async function onRequestGet(
             );
         }
 
-        // ====================================================
-        // JOB LINEAGE
-        // ====================================================
-
-        const jobId =
-            sanitizeJobId(
-                matchReport?.jobId
-            );
-
-        // ====================================================
-        // CONFIRMATION STATE
-        // ====================================================
+        /* =================================================
+        CONFIRMATION STATE
+        ================================================= */
 
         const confirmationStatus =
             sanitizeConfirmationStatus(
@@ -354,9 +448,9 @@ export async function onRequestGet(
                 "pending_review"
         );
 
-        // ====================================================
-        // EDIT DEADLINE
-        // ====================================================
+        /* =================================================
+        EDIT DEADLINE
+        ================================================= */
 
         const editDeadlineAt =
             sanitizeTimestamp(
@@ -386,9 +480,9 @@ export async function onRequestGet(
                 editDeadlineAt
             );
 
-        // ====================================================
-        // SANITIZE SCOREBOARD
-        // ====================================================
+        /* =================================================
+        SANITIZE SCOREBOARD
+        ================================================= */
 
         const result =
             sanitizePublicScoreboard(
@@ -417,9 +511,9 @@ export async function onRequestGet(
             );
         }
 
-        // ====================================================
-        // RESPONSE
-        // ====================================================
+        /* =================================================
+        RESPONSE
+        ================================================= */
 
         return jsonResponse(
             {
@@ -485,9 +579,365 @@ export async function onRequestGet(
     }
 }
 
-// ============================================================
-// PUBLIC SCOREBOARD
-// ============================================================
+/* =========================================================
+OWNERSHIP RESOLUTION
+========================================================= */
+
+async function resolveMatchOwnership(
+    env,
+    matchReport,
+    jobId
+) {
+    const reportOwnerId =
+        normalizeString(
+            matchReport?.ownerId
+            || matchReport?.submittedBy
+        );
+
+    const reportOwnerType =
+        normalizeString(
+            matchReport?.ownerType
+        )
+            .toLowerCase();
+
+    const reportOwnerVersion =
+        normalizePositiveInteger(
+            matchReport?.ownerVersion
+        );
+
+    /*
+     * Explicit account ownership on the report is authoritative.
+     */
+    if (
+        reportOwnerId
+        && reportOwnerType ===
+            OWNER_TYPE_ACCOUNT
+        && reportOwnerVersion ===
+            OWNER_VERSION_ACCOUNT
+    ) {
+        return {
+            ownerId:
+                reportOwnerId,
+            ownerType:
+                OWNER_TYPE_ACCOUNT,
+            ownerVersion:
+                OWNER_VERSION_ACCOUNT,
+            isLegacy:
+                false
+        };
+    }
+
+    /*
+     * If a job ID exists, inspect the originating job.
+     *
+     * This supports new Cloud Run output that still only
+     * propagates submittedBy without ownerType/version.
+     */
+    if (
+        jobId
+    ) {
+        const jobOwnership =
+            await resolveJobOwnership(
+                env,
+                jobId
+            );
+
+        if (
+            jobOwnership
+        ) {
+            /*
+             * If both the report and job have owner hashes,
+             * they must agree.
+             */
+            if (
+                reportOwnerId
+                && !constantTimeEqual(
+                    reportOwnerId,
+                    jobOwnership.ownerId
+                )
+            ) {
+                return null;
+            }
+
+            return jobOwnership;
+        }
+    }
+
+    /*
+     * No ownership-version metadata and no usable job lineage
+     * means this is treated as a pre-v2 Epic-owned report.
+     */
+    if (
+        reportOwnerId
+        && !reportOwnerType
+        && reportOwnerVersion ===
+            null
+    ) {
+        return {
+            ownerId:
+                reportOwnerId,
+            ownerType:
+                "epic",
+            ownerVersion:
+                1,
+            isLegacy:
+                true
+        };
+    }
+
+    return null;
+}
+
+/* =========================================================
+JOB OWNERSHIP RESOLUTION
+========================================================= */
+
+async function resolveJobOwnership(
+    env,
+    jobId
+) {
+    const baseKey =
+        `ocr-jobs/${jobId}`;
+
+    const statusObject =
+        await env.OCR_STORAGE.get(
+            `${baseKey}/status.json`
+        );
+
+    if (
+        statusObject
+    ) {
+        const statusData =
+            await readStoredJson(
+                statusObject
+            );
+
+        if (
+            statusData
+            && sanitizeJobId(
+                statusData?.jobId
+            ) ===
+                jobId
+        ) {
+            const ownership =
+                normalizeStoredOwnership(
+                    statusData?.ownerId,
+                    statusData?.ownerType,
+                    statusData?.ownerVersion
+                );
+
+            if (
+                ownership
+            ) {
+                return ownership;
+            }
+        }
+    }
+
+    const requestObject =
+        await env.OCR_STORAGE.get(
+            `${baseKey}/request.json`
+        );
+
+    if (
+        !requestObject
+    ) {
+        return null;
+    }
+
+    const requestData =
+        await readStoredJson(
+            requestObject
+        );
+
+    if (
+        !requestData
+        || sanitizeJobId(
+            requestData?.jobId
+        ) !==
+            jobId
+    ) {
+        return null;
+    }
+
+    return normalizeStoredOwnership(
+        requestData?.ownerId
+            || requestData
+                ?.fields
+                ?.submittedBy,
+        requestData?.ownerType
+            || requestData
+                ?.fields
+                ?.ownerType,
+        requestData?.ownerVersion
+            ?? requestData
+                ?.fields
+                ?.ownerVersion
+    );
+}
+
+function normalizeStoredOwnership(
+    ownerId,
+    ownerType,
+    ownerVersion
+) {
+    const normalizedOwnerId =
+        normalizeString(
+            ownerId
+        );
+
+    const normalizedOwnerType =
+        normalizeString(
+            ownerType
+        )
+            .toLowerCase();
+
+    const normalizedOwnerVersion =
+        normalizePositiveInteger(
+            ownerVersion
+        );
+
+    if (
+        !normalizedOwnerId
+    ) {
+        return null;
+    }
+
+    if (
+        normalizedOwnerType ===
+            OWNER_TYPE_ACCOUNT
+        && normalizedOwnerVersion ===
+            OWNER_VERSION_ACCOUNT
+    ) {
+        return {
+            ownerId:
+                normalizedOwnerId,
+            ownerType:
+                OWNER_TYPE_ACCOUNT,
+            ownerVersion:
+                OWNER_VERSION_ACCOUNT,
+            isLegacy:
+                false
+        };
+    }
+
+    if (
+        !normalizedOwnerType
+        && normalizedOwnerVersion ===
+            null
+    ) {
+        return {
+            ownerId:
+                normalizedOwnerId,
+            ownerType:
+                "epic",
+            ownerVersion:
+                1,
+            isLegacy:
+                true
+        };
+    }
+
+    return null;
+}
+
+/* =========================================================
+AUTHENTICATED OWNER
+========================================================= */
+
+async function resolveAuthenticatedOwnerHash(
+    session,
+    ownership,
+    secret
+) {
+    if (
+        ownership.ownerType ===
+            OWNER_TYPE_ACCOUNT
+        && ownership.ownerVersion ===
+            OWNER_VERSION_ACCOUNT
+    ) {
+        const accountId =
+            normalizeString(
+                session.userId
+            );
+
+        if (
+            !accountId
+        ) {
+            return null;
+        }
+
+        return createOwnerHash(
+            accountId,
+            secret
+        );
+    }
+
+    if (
+        ownership.isLegacy ===
+            true
+    ) {
+        const epic =
+            getProviderContext(
+                session,
+                "epic"
+            );
+
+        const epicAccountId =
+            normalizeString(
+                epic?.accountId
+            );
+
+        if (
+            epic?.linked !== true
+            || !epicAccountId
+        ) {
+            return null;
+        }
+
+        return createOwnerHash(
+            epicAccountId,
+            secret
+        );
+    }
+
+    return null;
+}
+
+/* =========================================================
+STORED JSON
+========================================================= */
+
+async function readStoredJson(
+    object
+) {
+    try {
+        const data =
+            JSON.parse(
+                await object.text()
+            );
+
+        if (
+            !data
+            || typeof data !==
+                "object"
+            || Array.isArray(
+                data
+            )
+        ) {
+            return null;
+        }
+
+        return data;
+    }
+    catch {
+        return null;
+    }
+}
+
+/* =========================================================
+PUBLIC SCOREBOARD
+========================================================= */
 
 function sanitizePublicScoreboard(
     matchReport,
@@ -505,6 +955,7 @@ function sanitizePublicScoreboard(
 
     const publicTeams =
         [];
+
     const storedActiveFields =
         Array.isArray(
             matchReport?.activeFields
@@ -530,10 +981,8 @@ function sanitizePublicScoreboard(
                 function(
                     field
                 ) {
-                    return (
-                        ALLOWED_SCOREBOARD_FIELDS.has(
-                            field
-                        )
+                    return ALLOWED_SCOREBOARD_FIELDS.has(
+                        field
                     );
                 }
             );
@@ -542,6 +991,7 @@ function sanitizePublicScoreboard(
         new Set(
             activeFields
         );
+
     for (
         let teamArrayIndex = 0;
         teamArrayIndex < teams.length;
@@ -606,6 +1056,7 @@ function sanitizePublicScoreboard(
 
             const publicReviewFields =
                 {};
+
             for (
                 const field
                 of activeFieldSet
@@ -644,13 +1095,6 @@ function sanitizePublicScoreboard(
                         effectiveValue
                     );
 
-                /*
-                 * Always expose the scoreboard property.
-                 *
-                 * This is important because the client must
-                 * distinguish an unresolved OCR value from a
-                 * field that was stripped from the response.
-                 */
                 publicPlayer[
                     field
                 ] =
@@ -693,7 +1137,7 @@ function sanitizePublicScoreboard(
 
         if (
             publicPlayers.length >
-            0
+                0
         ) {
             publicTeams.push({
                 team:
@@ -724,9 +1168,9 @@ function sanitizePublicScoreboard(
     };
 }
 
-// ============================================================
-// REVIEW FIELD
-// ============================================================
+/* =========================================================
+REVIEW FIELD
+========================================================= */
 
 function sanitizeReviewField(
     reviewField,
@@ -743,12 +1187,6 @@ function sanitizeReviewField(
             ? value
             : fallbackValue;
 
-    /*
-     * Preserve the review field even if the OCR value is null.
-     *
-     * A null value means unresolved and must remain editable on
-     * the client. The evidence itself is still useful.
-     */
     return {
         value:
             sanitizedValue,
@@ -779,9 +1217,9 @@ function sanitizeReviewField(
     };
 }
 
-// ============================================================
-// ENGINE EVIDENCE
-// ============================================================
+/* =========================================================
+ENGINE EVIDENCE
+========================================================= */
 
 function sanitizeEngineEvidence(
     evidence
@@ -806,16 +1244,13 @@ function sanitizeEngineEvidence(
                 evidence
             );
 
-        return (
-            value !==
-                null
-                ? value
-                : null
-        );
+        return value !==
+            null
+            ? value
+            : null;
     }
 
-    const sanitized =
-        {};
+    const sanitized = {};
 
     const value =
         sanitizeScoreboardValue(
@@ -825,7 +1260,7 @@ function sanitizeEngineEvidence(
 
     if (
         value !==
-        null
+            null
     ) {
         sanitized.value =
             value;
@@ -850,27 +1285,92 @@ function sanitizeEngineEvidence(
 
     if (
         confidence !==
-        null
+            null
     ) {
         sanitized.confidence =
             confidence;
     }
 
-    if (
-        Object.keys(
-            sanitized
-        ).length ===
+    return Object.keys(
+        sanitized
+    ).length ===
         0
+        ? null
+        : sanitized;
+}
+
+/* =========================================================
+NORMALIZATION
+========================================================= */
+
+function normalizeString(
+    value
+) {
+    if (
+        typeof value !==
+            "string"
+    ) {
+        return "";
+    }
+
+    return value.trim();
+}
+
+function normalizePositiveInteger(
+    value
+) {
+    if (
+        value === null
+        || value === undefined
+        || String(
+            value
+        )
+            .trim() ===
+            ""
     ) {
         return null;
     }
 
-    return sanitized;
+    const numeric =
+        Number(
+            value
+        );
+
+    if (
+        !Number.isInteger(
+            numeric
+        )
+        || numeric <= 0
+    ) {
+        return null;
+    }
+
+    return numeric;
 }
 
-// ============================================================
-// SCOREBOARD VALUE
-// ============================================================
+function normalizeCount(
+    value
+) {
+    const numeric =
+        Number(
+            value
+        );
+
+    if (
+        !Number.isInteger(
+            numeric
+        )
+        || numeric < 0
+    ) {
+        return 0;
+    }
+
+    return numeric;
+}
+
+/* =========================================================
+SCOREBOARD VALUE
+========================================================= */
 
 function sanitizeScoreboardValue(
     value
@@ -905,9 +1405,9 @@ function sanitizeScoreboardValue(
     return numeric;
 }
 
-// ============================================================
-// MIDDLE STAT
-// ============================================================
+/* =========================================================
+MIDDLE STAT
+========================================================= */
 
 function sanitizeMiddleStat(
     value
@@ -920,22 +1420,20 @@ function sanitizeMiddleStat(
             .trim()
             .toLowerCase();
 
-    return (
-        [
-            "assists",
-            "demos",
-            "damage"
-        ].includes(
-            middleStat
-        )
-            ? middleStat
-            : null
-    );
+    return [
+        "assists",
+        "demos",
+        "damage"
+    ].includes(
+        middleStat
+    )
+        ? middleStat
+        : null;
 }
 
-// ============================================================
-// CONFIRMATION STATUS
-// ============================================================
+/* =========================================================
+CONFIRMATION STATUS
+========================================================= */
 
 function sanitizeConfirmationStatus(
     value
@@ -948,42 +1446,16 @@ function sanitizeConfirmationStatus(
             .trim()
             .toLowerCase();
 
-    return (
-        ALLOWED_CONFIRMATION_STATUSES.has(
-            status
-        )
-            ? status
-            : null
-    );
+    return ALLOWED_CONFIRMATION_STATUSES.has(
+        status
+    )
+        ? status
+        : null;
 }
 
-// ============================================================
-// COUNT
-// ============================================================
-
-function normalizeCount(
-    value
-) {
-    const numeric =
-        Number(
-            value
-        );
-
-    if (
-        !Number.isInteger(
-            numeric
-        )
-        || numeric < 0
-    ) {
-        return 0;
-    }
-
-    return numeric;
-}
-
-// ============================================================
-// TIMESTAMP
-// ============================================================
+/* =========================================================
+TIMESTAMP
+========================================================= */
 
 function sanitizeTimestamp(
     value
@@ -1020,9 +1492,9 @@ function sanitizeTimestamp(
         .toISOString();
 }
 
-// ============================================================
-// TEXT
-// ============================================================
+/* =========================================================
+TEXT
+========================================================= */
 
 function sanitizeText(
     value
@@ -1034,15 +1506,13 @@ function sanitizeText(
         )
             .trim();
 
-    return (
-        text
-        || null
-    );
+    return text
+        || null;
 }
 
-// ============================================================
-// CONFIDENCE
-// ============================================================
+/* =========================================================
+CONFIDENCE
+========================================================= */
 
 function sanitizeConfidence(
     value
@@ -1076,12 +1546,12 @@ function sanitizeConfidence(
     return numeric;
 }
 
-// ============================================================
-// OWNER HASH
-// ============================================================
+/* =========================================================
+OWNER HASH
+========================================================= */
 
 async function createOwnerHash(
-    epicUniqueId,
+    ownerIdentity,
     secret
 ) {
     const encoder =
@@ -1113,7 +1583,7 @@ async function createOwnerHash(
             key,
             encoder.encode(
                 String(
-                    epicUniqueId
+                    ownerIdentity
                 )
             )
         );
@@ -1142,9 +1612,9 @@ async function createOwnerHash(
         );
 }
 
-// ============================================================
-// CONSTANT-TIME STRING COMPARE
-// ============================================================
+/* =========================================================
+CONSTANT-TIME STRING COMPARE
+========================================================= */
 
 function constantTimeEqual(
     first,
@@ -1169,37 +1639,39 @@ function constantTimeEqual(
             )
         );
 
-    if (
-        firstBytes.length !==
-        secondBytes.length
-    ) {
-        return false;
-    }
+    const maxLength =
+        Math.max(
+            firstBytes.length,
+            secondBytes.length
+        );
 
     let difference =
-        0;
+        firstBytes.length
+        ^ secondBytes.length;
 
     for (
         let index = 0;
-        index < firstBytes.length;
+        index < maxLength;
         index += 1
     ) {
         difference |=
-            firstBytes[
-                index
-            ]
-            ^ secondBytes[
-                index
-            ];
+            (
+                firstBytes[index]
+                || 0
+            )
+            ^ (
+                secondBytes[index]
+                || 0
+            );
     }
 
     return difference ===
         0;
 }
 
-// ============================================================
-// JOB ID
-// ============================================================
+/* =========================================================
+JOB ID
+========================================================= */
 
 function sanitizeJobId(
     value
@@ -1212,20 +1684,16 @@ function sanitizeJobId(
             .trim()
             .toUpperCase();
 
-    if (
-        !/^[A-Z0-9]{16}$/.test(
-            jobId
-        )
-    ) {
-        return null;
-    }
-
-    return jobId;
+    return /^[A-Z0-9]{16}$/.test(
+        jobId
+    )
+        ? jobId
+        : null;
 }
 
-// ============================================================
-// MATCH ID
-// ============================================================
+/* =========================================================
+MATCH ID
+========================================================= */
 
 function sanitizeMatchId(
     value
@@ -1238,20 +1706,16 @@ function sanitizeMatchId(
             .trim()
             .toUpperCase();
 
-    if (
-        !/^[A-Z0-9]{16}$/.test(
-            matchId
-        )
-    ) {
-        return null;
-    }
-
-    return matchId;
+    return /^[A-Z0-9]{16}$/.test(
+        matchId
+    )
+        ? matchId
+        : null;
 }
 
-// ============================================================
-// RESPONSE
-// ============================================================
+/* =========================================================
+RESPONSE
+========================================================= */
 
 function jsonResponse(
     data,
