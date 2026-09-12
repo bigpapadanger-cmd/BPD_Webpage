@@ -21,6 +21,7 @@ Description:
     - Receives the OAuth callback request.
     - Delegates processing to the centralized OAuth service.
     - Returns the service response.
+    - Redirects unexpected failures back to the login page.
     - Contains no provider-specific identity logic.
 
 Important:
@@ -119,25 +120,25 @@ export async function onRequestGet(
             }
         );
 
-        return Response.json(
-            {
-                success:
-                    false,
+        const loginUrl =
+            new URL(
+                "/Login",
+                context.request.url
+            );
 
-                message:
-                    "OAuth callback failed unexpectedly.",
+        loginUrl.searchParams.set(
+            "error",
+            "oauth_callback_failed"
+        );
 
-                debugId
-            },
-            {
-                status:
-                    500,
+        loginUrl.searchParams.set(
+            "debugId",
+            debugId
+        );
 
-                headers: {
-                    "Cache-Control":
-                        "no-store"
-                }
-            }
+        return Response.redirect(
+            loginUrl.href,
+            302
         );
     }
 }

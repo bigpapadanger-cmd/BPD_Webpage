@@ -867,11 +867,49 @@ async function startProviderLogin(
         if (
             !response.ok
         ) {
+            const errorCode =
+                normalizeString(
+                    data?.error
+                );
+
+            switch (
+                errorCode
+            ) {
+                case "CAPTCHA_REQUIRED":
+                case "CAPTCHA_INVALID":
+                    throw new Error(
+                        "LOGIN_VERIFICATION_FAILED"
+                    );
+
+                case "CAPTCHA_NOT_CONFIGURED":
+                case "CAPTCHA_SERVICE_UNAVAILABLE":
+                    throw new Error(
+                        "LOGIN_VERIFICATION_UNAVAILABLE"
+                    );
+
+                case "SB_PUB_KEY_MISSING":
+                case "SUPABASE_URL_MISSING":
+                    throw new Error(
+                        "LOGIN_PROVIDER_CONFIGURATION_ERROR"
+                    );
+
+                default:
+                    throw new Error(
+                        errorCode
+                        || `LOGIN_PROVIDER_HTTP_${response.status}`
+                    );
+            }
+        }
+
+        if (
+            data?.success !==
+            true
+        ) {
             throw new Error(
                 normalizeString(
                     data?.error
                 )
-                || `LOGIN_PROVIDER_HTTP_${response.status}`
+                || "LOGIN_PROVIDER_START_FAILED"
             );
         }
 
@@ -898,20 +936,62 @@ async function startProviderLogin(
         redirecting =
             false;
 
+        const errorCode =
+            normalizeString(
+                error?.message
+            );
+
         console.error(
             "LOGIN PAGE: Failed to start provider authentication.",
             {
                 provider,
                 message:
-                    error?.message
+                    errorCode
                     || "Unknown error"
             }
         );
 
+        let message =
+            "Sign in could not be started. Please verify again and retry.";
+
+        if (
+            navigator.onLine ===
+            false
+        ) {
+            message =
+                "You are offline. Sign in is unavailable.";
+        }
+        else if (
+            errorCode ===
+            "LOGIN_VERIFICATION_FAILED"
+        ) {
+            message =
+                "Human verification failed. Please verify again.";
+        }
+        else if (
+            errorCode ===
+            "LOGIN_VERIFICATION_UNAVAILABLE"
+        ) {
+            message =
+                "Human verification is currently unavailable.";
+        }
+        else if (
+            errorCode ===
+            "LOGIN_PROVIDER_CONFIGURATION_ERROR"
+        ) {
+            message =
+                `${config.label} sign in is temporarily unavailable due to a configuration error.`;
+        }
+        else if (
+            errorCode ===
+            "LOGIN_PROVIDER_REDIRECT_MISSING"
+        ) {
+            message =
+                `${config.label} sign in could not be started. Please try again.`;
+        }
+
         showStatus(
-            navigator.onLine === false
-                ? "You are offline. Sign in is unavailable."
-                : "Sign in could not be started. Please verify again and retry.",
+            message,
             "error"
         );
 
@@ -923,6 +1003,62 @@ async function startProviderLogin(
 
         resetTurnstile();
     }
+}
+
+/* =========================================================
+OAUTH CALLBACK ERROR
+========================================================= */
+
+function showOAuthCallbackError() {
+    const url =
+        new URL(
+            window.location.href
+        );
+
+    const error =
+        normalizeString(
+            url.searchParams.get(
+                "error"
+            )
+        );
+
+    if (
+        !error
+    ) {
+        return;
+    }
+
+    let message =
+        "Sign in could not be completed. Please try again.";
+
+    if (
+        error ===
+        "oauth_callback_failed"
+    ) {
+        message =
+            "Authentication could not be completed. Please try signing in again.";
+    }
+
+    showStatus(
+        message,
+        "error"
+    );
+
+    url.searchParams.delete(
+        "error"
+    );
+
+    url.searchParams.delete(
+        "debugId"
+    );
+
+    window.history.replaceState(
+        {},
+        "",
+        url.pathname
+        + url.search
+        + url.hash
+    );
 }
 
 /* =========================================================
@@ -1215,6 +1351,7 @@ export async function initializePage() {
     if (
         initialized
     ) {
+        showOAuthCallbackError();
         await loadLoginState();
         return;
     }
