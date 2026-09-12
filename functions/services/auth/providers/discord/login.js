@@ -315,14 +315,10 @@ SUPABASE CONFIGURATION
 function getSupabaseConfiguration(
     env
 ) {
-    const supabaseUrl =
+    const configuredUrl =
         normalizeString(
             env?.SUPABASE_URL
-        )
-            .replace(
-                /\/+$/u,
-                ""
-            );
+        );
 
     const publishableKey =
         normalizeString(
@@ -330,7 +326,7 @@ function getSupabaseConfiguration(
         );
 
     if (
-        !supabaseUrl
+        !configuredUrl
     ) {
         throw new Error(
             "SUPABASE_URL_MISSING"
@@ -345,8 +341,22 @@ function getSupabaseConfiguration(
         );
     }
 
+    let origin;
+
+    try {
+        origin =
+            new URL(
+                configuredUrl
+            ).origin;
+    }
+    catch {
+        throw new Error(
+            "SUPABASE_URL_INVALID"
+        );
+    }
+
     return {
-        supabaseUrl,
+        origin,
         publishableKey
     };
 }
@@ -361,13 +371,13 @@ function buildDiscordAuthorizeUrl(
     codeChallenge
 ) {
     const {
-        supabaseUrl,
+        origin,
         publishableKey
     } =
         getSupabaseConfiguration(
             env
         );
-
+        
     const callbackUrl =
         new URL(
             "/api/auth/_oauth/callback",
@@ -376,8 +386,10 @@ function buildDiscordAuthorizeUrl(
 
     const authorizeUrl =
         new URL(
-            `${supabaseUrl}/auth/v1/authorize`
+            `${origin}/auth/v1/authorize`
         );
+
+
 
     authorizeUrl.searchParams.set(
         "provider",

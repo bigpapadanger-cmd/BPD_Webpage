@@ -308,14 +308,10 @@ SUPABASE CONFIGURATION
 function getSupabaseConfiguration(
     env
 ) {
-    const url =
+    const configuredUrl =
         normalizeString(
             env?.SUPABASE_URL
-        )
-            .replace(
-                /\/+$/u,
-                ""
-            );
+        );
 
     const publishableKey =
         normalizeString(
@@ -323,7 +319,7 @@ function getSupabaseConfiguration(
         );
 
     if (
-        !url
+        !configuredUrl
     ) {
         throw new Error(
             "SUPABASE_URL_MISSING"
@@ -334,12 +330,26 @@ function getSupabaseConfiguration(
         !publishableKey
     ) {
         throw new Error(
-            "SUPABASE_PUBLISHABLE_KEY_MISSING"
+            "SB_PUB_KEY_MISSING"
+        );
+    }
+
+    let origin;
+
+    try {
+        origin =
+            new URL(
+                configuredUrl
+            ).origin;
+    }
+    catch {
+        throw new Error(
+            "SUPABASE_URL_INVALID"
         );
     }
 
     return {
-        url,
+        origin,
         publishableKey
     };
 }
@@ -354,7 +364,7 @@ function buildGoogleAuthorizeUrl(
     codeChallenge
 ) {
     const {
-        url,
+        origin,
         publishableKey
     } =
         getSupabaseConfiguration(
@@ -369,7 +379,7 @@ function buildGoogleAuthorizeUrl(
 
     const authorizeUrl =
         new URL(
-            `${url}/auth/v1/authorize`
+            `${origin}/auth/v1/authorize`
         );
 
     authorizeUrl.searchParams.set(
@@ -392,15 +402,6 @@ function buildGoogleAuthorizeUrl(
         "s256"
     );
 
-    /*
-     * Supabase Auth requires an API key for the authorize
-     * request.
-     *
-     * This must be the PUBLIC publishable/anon key.
-     *
-     * Never use a service-role/secret key here because this
-     * URL is returned to the browser.
-     */
     authorizeUrl.searchParams.set(
         "apikey",
         publishableKey
@@ -408,7 +409,6 @@ function buildGoogleAuthorizeUrl(
 
     return authorizeUrl.href;
 }
-
 /* =========================================================
 TURNSTILE RESPONSE
 ========================================================= */

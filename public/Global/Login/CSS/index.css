@@ -9,11 +9,13 @@ Purpose:
     Styles the public BPD Gaming Network authentication page.
 
 Description:
-    - Centers the authentication card.
-    - Displays login providers vertically.
-    - Provides consistent provider buttons and icon treatment.
-    - Supports loading, unavailable, and offline states.
-    - Supports responsive layouts and reduced motion.
+    - Centers the authentication interface in the viewport.
+    - Provides a clear outer login shell and inner card.
+    - Displays authentication providers vertically.
+    - Styles Turnstile verification consistently.
+    - Supports loading, offline, unavailable, and error states.
+    - Provides responsive behavior for smaller screens.
+    - Supports reduced-motion preferences.
 ========================================================= */
 
 /* =========================================================
@@ -22,38 +24,85 @@ PAGE
 
 .login-page {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     justify-content: center;
 
     width: 100%;
-    min-height: 100%;
+    min-height: 100vh;
 
     padding:
         clamp(
-            24px,
+            20px,
             5vh,
-            64px
+            56px
         )
         clamp(
-            16px,
+            14px,
             4vw,
-            32px
+            28px
         );
 
     box-sizing: border-box;
 }
 
 /* =========================================================
-CARD
+OUTER LOGIN SHELL
+========================================================= */
+
+.login-shell {
+    width: 100%;
+    max-width: 520px;
+
+    padding: 14px;
+
+    border:
+        1px solid
+        rgba(
+            255,
+            255,
+            255,
+            0.07
+        );
+
+    border-radius: 20px;
+
+    background:
+        rgba(
+            13,
+            15,
+            22,
+            0.55
+        );
+
+    box-shadow:
+        0 28px 70px
+            rgba(
+                0,
+                0,
+                0,
+                0.36
+            ),
+        0 0 28px
+            rgba(
+                139,
+                92,
+                246,
+                0.05
+            );
+
+    box-sizing: border-box;
+}
+
+/* =========================================================
+LOGIN CARD
 ========================================================= */
 
 .login-card {
     width: 100%;
-    max-width: 460px;
 
     padding:
         clamp(
-            22px,
+            24px,
             4vw,
             34px
         );
@@ -64,7 +113,7 @@ CARD
             139,
             92,
             246,
-            0.28
+            0.30
         );
 
     border-radius: 14px;
@@ -76,30 +125,30 @@ CARD
                 24,
                 27,
                 36,
-                0.96
+                0.98
             ),
             rgba(
                 15,
                 17,
                 24,
-                0.97
+                0.98
             )
         );
 
     box-shadow:
-        0 18px 45px
+        inset 0 1px 0
             rgba(
-                0,
-                0,
-                0,
-                0.32
+                255,
+                255,
+                255,
+                0.025
             ),
-        0 0 22px
+        0 14px 34px
             rgba(
-                139,
-                92,
-                246,
-                0.07
+                0,
+                0,
+                0,
+                0.22
             );
 
     box-sizing: border-box;
@@ -146,17 +195,23 @@ HEADER
             2.1rem
         );
 
-    line-height: 1.1;
+    font-weight: 700;
+
+    line-height: 1.12;
 }
 
 .login-card__description {
-    margin: 0;
+    max-width: 390px;
+
+    margin:
+        0
+        auto;
 
     color: #aeb4c0;
 
     font-size: 0.9rem;
 
-    line-height: 1.5;
+    line-height: 1.55;
 }
 
 /* =========================================================
@@ -164,11 +219,16 @@ STATUS
 ========================================================= */
 
 .login-status {
-    margin-bottom: 18px;
+    width: 100%;
+
+    margin:
+        0
+        0
+        18px;
 
     padding:
-        10px
-        12px;
+        11px
+        13px;
 
     border:
         1px solid
@@ -179,7 +239,7 @@ STATUS
             0.10
         );
 
-    border-radius: 8px;
+    border-radius: 9px;
 
     background:
         rgba(
@@ -193,9 +253,11 @@ STATUS
 
     font-size: 0.8rem;
 
-    line-height: 1.4;
+    line-height: 1.45;
 
     text-align: center;
+
+    box-sizing: border-box;
 }
 
 .login-status[hidden] {
@@ -208,7 +270,7 @@ STATUS
             248,
             113,
             113,
-            0.32
+            0.34
         );
 
     background:
@@ -216,7 +278,7 @@ STATUS
             127,
             29,
             29,
-            0.12
+            0.14
         );
 
     color: #fca5a5;
@@ -236,16 +298,63 @@ STATUS
             20,
             83,
             45,
-            0.10
+            0.12
         );
 
     color: #86efac;
 }
 
+.login-status[data-status="info"] {
+    border-color:
+        rgba(
+            96,
+            165,
+            250,
+            0.24
+        );
+
+    background:
+        rgba(
+            30,
+            64,
+            175,
+            0.08
+        );
+
+    color: #bfdbfe;
+}
+
+/* =========================================================
+TURNSTILE
+========================================================= */
+
+.login-turnstile {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    width: 100%;
+
+    min-height: 65px;
+
+    margin:
+        0
+        0
+        20px;
+
+    padding:
+        4px
+        0;
+
+    box-sizing: border-box;
+}
+
+.login-turnstile:empty {
+    min-height: 65px;
+}
+
 /* =========================================================
 PROVIDER LIST
-
-Providers are intentionally vertical.
 ========================================================= */
 
 .login-providers {
@@ -268,13 +377,16 @@ PROVIDER BUTTON
 
     grid-template-columns:
         34px
-        1fr
+        minmax(
+            0,
+            1fr
+        )
         34px;
 
     align-items: center;
 
     width: 100%;
-    min-height: 52px;
+    min-height: 54px;
 
     padding:
         8px
@@ -310,15 +422,11 @@ PROVIDER BUTTON
     transition:
         border-color 0.2s ease,
         background 0.2s ease,
-        box-shadow 0.25s ease,
+        box-shadow 0.2s ease,
         transform 0.2s ease,
         opacity 0.2s ease;
 }
 
-/*
- * Empty third grid column keeps the text visually centered
- * while the icon remains left-aligned.
- */
 .login-provider::after {
     content: "";
 
@@ -348,12 +456,12 @@ PROVIDER HOVER
         );
 
     box-shadow:
-        0 0 10px
+        0 0 12px
             rgba(
                 139,
                 92,
                 246,
-                0.25
+                0.22
             ),
         inset 0 0 8px
             rgba(
@@ -446,6 +554,8 @@ PROVIDER ICON
             255,
             0.035
         );
+
+    box-sizing: border-box;
 }
 
 .login-provider__icon {
@@ -506,7 +616,7 @@ HELP
 
     font-size: 0.75rem;
 
-    line-height: 1.5;
+    line-height: 1.55;
 
     text-align: center;
 }
@@ -528,6 +638,7 @@ FOOTER
 
 .login-card__footer {
     display: flex;
+    align-items: center;
     justify-content: center;
 
     margin-top: 20px;
@@ -583,22 +694,34 @@ PAGE STATES
 }
 
 /* =========================================================
-SMALL VIEWPORT
+RESPONSIVE
 ========================================================= */
 
 @media (max-width: 540px) {
     .login-page {
+        min-height: 100dvh;
+
         padding:
-            20px
-            12px;
+            16px
+            10px;
+    }
+
+    .login-shell {
+        padding: 8px;
+
+        border-radius: 14px;
     }
 
     .login-card {
         padding:
-            20px
+            22px
             16px;
 
         border-radius: 11px;
+    }
+
+    .login-card__header {
+        margin-bottom: 20px;
     }
 
     .login-provider {
@@ -606,7 +729,10 @@ SMALL VIEWPORT
 
         grid-template-columns:
             32px
-            1fr
+            minmax(
+                0,
+                1fr
+            )
             32px;
 
         padding:
@@ -631,27 +757,27 @@ SMALL VIEWPORT
     .login-provider__label {
         font-size: 0.82rem;
     }
+
+    .login-card__help {
+        margin-top: 20px;
+
+        padding-top: 16px;
+    }
 }
+
 /* =========================================================
-TURNSTILE
+SHORT VIEWPORT
 ========================================================= */
 
-.login-turnstile {
-    display: flex;
-    align-items: center;
-    justify-content: center;
+@media (max-height: 720px) and (min-width: 541px) {
+    .login-page {
+        align-items: flex-start;
 
-    width: 100%;
-
-    margin:
-        0
-        0
-        18px;
+        padding-top: 24px;
+        padding-bottom: 24px;
+    }
 }
 
-.login-turnstile:empty {
-    min-height: 65px;
-}
 /* =========================================================
 REDUCED MOTION
 ========================================================= */

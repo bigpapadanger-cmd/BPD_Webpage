@@ -19,6 +19,7 @@ export const OAUTH_PKCE_COOKIE ="bpd_oauth_pkce";
 export const OAUTH_RETURN_COOKIE = "bpd_oauth_return";
 export const OAUTH_COOKIE_MAX_AGE_SECONDS =300;
 export const OAUTH_ACCOUNT_COOKIE ="bpd_oauth_account";
+export const OAUTH_STATE_COOKIE ="bpd_oauth_state";
 
 export const AUTH_STATE_COOKIE = "bpd_epic_state";
 export const AUTH_SESSION_COOKIE = "bpd_session";

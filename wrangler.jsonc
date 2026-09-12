@@ -17,6 +17,7 @@
         "OCR_JOB_PROCESS_URL": "https://bpd-gaming-network.com/api/ocr/jobs/process_job",
         "OCR_JOB_PROGRESS_URL": "https://bpd-gaming-network.com/api/ocr/jobs/progress",
         "SUPABASE_URL": "https://xslrwamnfqgoziaczgsn.supabase.co/rest/v1/",
+        "SB_CALLBACK_URL":"https://xslrwamnfqgoziaczgsn.supabase.co/auth/v1/callback",
         "DISCORD_ADMIN_ROLE_ID": "1548306582226468985",
         "DISCORD_MOD_ROLE_ID": "1548306818491613235",
         "DISCORD_LEAGUE_STAFF_ROLE_ID":"1548306980035235871",
