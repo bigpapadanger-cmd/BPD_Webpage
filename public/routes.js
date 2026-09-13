@@ -183,7 +183,9 @@ export const ROUTES = {
         module:
             "/Tabs/RocketLeague/Registration/JS/index.js",
         sitemap:
-            true
+            true,
+        requiresAuth:
+            true,
     },
 
     "/RocketLeague/SubmitMatchResults": {
@@ -221,7 +223,7 @@ export const ROUTES = {
             "/Tabs/RocketLeague/Index/JS/index.js",
 
         sitemap:
-            true,
+            false,
         requiresAuth:
             true,
     },

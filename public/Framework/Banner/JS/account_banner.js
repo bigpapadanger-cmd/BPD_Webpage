@@ -17,6 +17,7 @@ Description:
     - Displays the user's global BPD display name.
     - Displays icons for linked authentication providers.
     - Provides Profile, Sign In, and Logout actions.
+    - Forces Profile navigation directly to /Account.
     - Avoids displaying account data that cannot be verified.
     - Refreshes automatically when authentication or network
       availability changes.
@@ -741,6 +742,17 @@ function renderSignedIn(
 
     profileLink.classList.add(
         "bpd-account-banner__profile"
+    );
+
+    profileLink.addEventListener(
+        "click",
+        event => {
+            event.preventDefault();
+
+            window.location.assign(
+                PROFILE_URL
+            );
+        }
     );
 
     actions.appendChild(
