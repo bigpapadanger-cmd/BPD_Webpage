@@ -14,12 +14,14 @@ Purpose:
 Description:
     - Reads the centralized BPD session context.
     - Returns the canonical global account identity.
-    - Loads the canonical BPD display name from
-      identity.accounts.
+    - Loads safe canonical account data through the exposed
+      api.get_account_session_identity Supabase RPC.
     - Returns normalized provider authentication state.
     - Returns safe session timing information.
     - Never exposes raw Cloudflare KV session data.
     - Never exposes provider access tokens or secrets.
+    - Never queries the private identity schema directly
+      through PostgREST.
 
 Identity:
     user.userId
@@ -245,8 +247,12 @@ function getSupabaseConfiguration(
 /* =========================================================
 LOAD CANONICAL ACCOUNT
 
-Loads the account row directly from identity.accounts using
-the trusted identity.accounts.id stored in the server session.
+Loads safe canonical account data through:
+
+    api.get_account_session_identity(p_account_id uuid)
+
+The private identity schema remains unexposed through
+PostgREST.
 
 The browser never supplies accountId.
 ========================================================= */
@@ -281,9 +287,19 @@ async function getCanonicalAccount(
 
     const url =
         new URL(
-            "accounts",
+            "rpc/get_account_session_identity",
             configuration.url
         );
+
+    /*
+     * Temporary diagnostic logging.
+     *
+     * Safe:
+     * - Does not log SUPABASE_AUTH.
+     * - Does not log provider tokens.
+     *
+     * Remove once the RPC integration has been verified.
+     */
     console.log(
         "AUTH SESSION RPC REQUEST:",
         {
@@ -294,27 +310,16 @@ async function getCanonicalAccount(
                 normalizedAccountId
         }
     );
-    url.searchParams.set(
-        "id",
-        `eq.${normalizedAccountId}`
-    );
 
-    url.searchParams.set(
-        "select",
-        "id,display_name,role,active"
-    );
-
-    url.searchParams.set(
-        "limit",
-        "1"
-    );
+    const startedAt =
+        Date.now();
 
     const response =
         await fetch(
             url.href,
             {
                 method:
-                    "GET",
+                    "POST",
 
                 headers: {
                     "apikey":
@@ -323,14 +328,38 @@ async function getCanonicalAccount(
                     "Authorization":
                         `Bearer ${configuration.apiKey}`,
 
+                    "Content-Type":
+                        "application/json",
+
                     "Accept":
                         "application/json",
 
+                    "Content-Profile":
+                        "api",
+
                     "Accept-Profile":
-                        "identity"
-                }
+                        "api"
+                },
+
+                body:
+                    JSON.stringify({
+                        p_account_id:
+                            normalizedAccountId
+                    })
             }
         );
+
+    console.log(
+        "AUTH SESSION RPC RESPONSE:",
+        {
+            status:
+                response.status,
+
+            elapsedMs:
+                Date.now() -
+                startedAt
+        }
+    );
 
     if (
         !response.ok
@@ -590,9 +619,6 @@ export async function handleAuthSession(
                      * name.
                      *
                      * identity.accounts.display_name
-                     *
-                     * This is intentionally separate from
-                     * provider display names.
                      */
                     displayName:
                         account?.displayName
@@ -601,10 +627,6 @@ export async function handleAuthSession(
                     /*
                      * Use the canonical account row when it
                      * was successfully resolved.
-                     *
-                     * Session values remain the fallback only
-                     * for authenticated transitional sessions
-                     * without userId.
                      */
                     role:
                         account?.role
