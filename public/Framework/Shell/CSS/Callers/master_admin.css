@@ -1,10 +1,10 @@
 /*
 =========================================================
 BPD GAMING NETWORK
-ROCKET LEAGUE MASTER CSS
+ADMIN MASTER CSS
 =========================================================
 
-Used for all valid /RocketLeague routes.
+Used for all valid /Admin routes.
 */
 
 /* =========================================================
@@ -23,8 +23,8 @@ Used for all valid /RocketLeague routes.
 
 @import url("../Sidebar/sidebar.css");
 @import url("../Sidebar/hover.css");
-@import url("../Sidebar/rl_AuthSidebar.css");
-
+@import url("/Global/Admin/Sidebar/CSS/index.css");
+@import url("/Global/Admin/TaskBoard/CSS/index.css");
 /* =========================================================
    GLOBAL
    ========================================================= */
@@ -32,15 +32,9 @@ Used for all valid /RocketLeague routes.
 @import url("/Global/Links/links.css");
 
 /* =========================================================
-   ROCKET LEAGUE
+   ADMIN
    ========================================================= */
 
-@import url("/Tabs/RocketLeague/Index/CSS/index.css");
-@import url("/Tabs/RocketLeague/Registration/CSS/index.css");
+@import url("/Global/Admin/Home/CSS/index.css");
 
-/* =========================================================
-   OCR / MATCH RESULTS
-   ========================================================= */
 
-@import url("/ocr/CSS/disputes.css");
-@import url("/ocr/CSS/submitimg.css");

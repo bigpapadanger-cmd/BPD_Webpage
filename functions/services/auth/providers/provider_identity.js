@@ -5,7 +5,7 @@ BPD GAMING NETWORK
 AUTHORITATIVE PROVIDER IDENTITY SERVICE
 
 File:
-    functions/services/auth/provider_identity.js
+    functions/services/auth/providers/provider_identity.js
 
 Purpose:
     Verifies that a canonical BPD account has an active

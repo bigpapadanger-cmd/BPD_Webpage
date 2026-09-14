@@ -11,7 +11,7 @@ Public Route:
     GET /api/auth/session
 
 Service:
-    functions/services/auth/account/session.js
+    functions/services/auth/account/get_session.js
 
 Purpose:
     Returns the current global BPD authentication state.
@@ -31,7 +31,7 @@ Important:
 
 import {
     handleAuthSession
-} from "../../services/auth/account/session.js";
+} from "../../services/auth/account/get_session.js";
 
 /* =========================================================
 GET
