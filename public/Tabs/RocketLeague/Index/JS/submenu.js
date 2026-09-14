@@ -185,8 +185,7 @@ function handleOutsideClick(event) {
 function handleViewportChange() {
     document
         .querySelectorAll(
-            "#sidebar .sidebar-menu-toggle" +
-            '[aria-expanded="true"]'
+            '#sidebar .sidebar-menu-toggle[aria-expanded="true"]'
         )
         .forEach(function(button) {
             const submenuId =

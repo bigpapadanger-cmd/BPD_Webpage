@@ -5,24 +5,50 @@ BPD GAMING NETWORK
 LOGIN PAGE CONTROLLER
 
 File:
-    Global/Login/JS/index.js
+    /Global/Login/JS/index.js
 
 Purpose:
     Controls the public BPD Gaming Network login page.
 
 Description:
-    - Checks the current global authentication session.
+    - Uses Framework/Auth/auth.js as the single client-side
+      authentication state source.
     - Redirects already-authenticated users.
     - Loads and renders Cloudflare Turnstile.
     - Requires successful Turnstile verification before login.
     - Starts provider authentication through server routes.
+    - Uses /scripts/apiRoutes.js for all browser API paths.
     - Preserves a safe local returnTo destination.
     - Disables authentication controls while offline or while
-      BPD services are unavailable.
+      BPD authentication services are unavailable.
+    - Subscribes to centralized authentication state changes.
+
+Authentication State:
+    /Framework/Auth/auth.js
+
+API Routes:
+    /scripts/apiRoutes.js
+
+Security:
+    - Client authentication state is UI/navigation state only.
+    - Provider authentication is completed and validated by
+      server-side OAuth services.
+    - Turnstile verification is validated server-side.
+    - Browser-controlled returnTo values are restricted to
+      same-origin relative paths.
+
+Important:
+    - This page does not call /api/auth/session directly.
+    - authenticated:false means confirmed signed-out state.
+    - Authentication-service failure is not treated as logout.
 ========================================================= */
 
 import {
-    BPD_AUTH_SESSION_URL,
+    getAuthState,
+    subscribeToAuthState
+} from "/Framework/Auth/auth.js";
+
+import {
     BPD_AUTH_GOOGLE_LOGIN_URL,
     BPD_AUTH_DISCORD_LOGIN_URL,
     BPD_AUTH_EPIC_LOGIN_URL
@@ -33,7 +59,7 @@ import {
 } from "/scripts/apiConnection.js";
 
 /* =========================================================
-CONSTANTS
+PAGE / ASSET CONSTANTS
 ========================================================= */
 
 const DEFAULT_AUTHENTICATED_REDIRECT =
@@ -108,6 +134,9 @@ let turnstileWidgetId =
     null;
 
 let turnstileLoadingPromise =
+    null;
+
+let unsubscribeAuthState =
     null;
 
 /* =========================================================
@@ -262,6 +291,36 @@ function getReturnTo() {
 }
 
 /* =========================================================
+AUTHENTICATED REDIRECT
+========================================================= */
+
+function redirectAuthenticatedUser() {
+    if (
+        redirecting
+    ) {
+        return;
+    }
+
+    redirecting =
+        true;
+
+    sessionReady =
+        false;
+
+    setProviderButtonsEnabled(
+        false
+    );
+
+    setPageState(
+        "redirecting"
+    );
+
+    window.location.replace(
+        getReturnTo()
+    );
+}
+
+/* =========================================================
 PROVIDER BUTTON STATE
 ========================================================= */
 
@@ -284,10 +343,14 @@ function setProviderButtonsEnabled(
 
 function updateProviderButtonState() {
     const enabled =
-        sessionReady === true
-        && captchaToken.length > 0
-        && redirecting === false
-        && navigator.onLine !== false;
+        sessionReady ===
+            true
+        && captchaToken.length >
+            0
+        && redirecting ===
+            false
+        && navigator.onLine !==
+            false;
 
     setProviderButtonsEnabled(
         enabled
@@ -358,52 +421,6 @@ function initializeProviderIcons() {
             handleProviderIconError
         );
     }
-}
-
-/* =========================================================
-SESSION
-========================================================= */
-
-async function loadSession() {
-    const response =
-        await apiFetch(
-            BPD_AUTH_SESSION_URL,
-            {
-                method:
-                    "GET",
-
-                credentials:
-                    "same-origin",
-
-                cache:
-                    "no-store",
-
-                headers: {
-                    "Accept":
-                        "application/json"
-                }
-            }
-        );
-
-    if (
-        response.status === 401
-        || response.status === 403
-    ) {
-        return {
-            authenticated:
-                false
-        };
-    }
-
-    if (
-        !response.ok
-    ) {
-        throw new Error(
-            `LOGIN_SESSION_HTTP_${response.status}`
-        );
-    }
-
-    return response.json();
 }
 
 /* =========================================================
@@ -667,7 +684,7 @@ async function initializeTurnstile() {
 
     if (
         turnstileWidgetId !==
-            null
+        null
     ) {
         return;
     }
@@ -712,7 +729,8 @@ function resetTurnstile() {
         "";
 
     if (
-        turnstileWidgetId !== null
+        turnstileWidgetId !==
+            null
         && window.turnstile
         && typeof window.turnstile.reset ===
             "function"
@@ -870,6 +888,7 @@ async function startProviderLogin(
             const errorCode =
                 normalizeString(
                     data?.error
+                    || data?.code
                 );
 
             switch (
@@ -889,6 +908,8 @@ async function startProviderLogin(
 
                 case "SB_PUB_KEY_MISSING":
                 case "SUPABASE_URL_MISSING":
+                case "EPIC_CLIENT_ID_MISSING":
+                case "EPIC_CLIENT_SECRET_MISSING":
                     throw new Error(
                         "LOGIN_PROVIDER_CONFIGURATION_ERROR"
                     );
@@ -908,6 +929,7 @@ async function startProviderLogin(
             throw new Error(
                 normalizeString(
                     data?.error
+                    || data?.code
                 )
                 || "LOGIN_PROVIDER_START_FAILED"
             );
@@ -945,6 +967,7 @@ async function startProviderLogin(
             "LOGIN PAGE: Failed to start provider authentication.",
             {
                 provider,
+
                 message:
                     errorCode
                     || "Unknown error"
@@ -996,7 +1019,8 @@ async function startProviderLogin(
         );
 
         setPageState(
-            navigator.onLine === false
+            navigator.onLine ===
+                false
                 ? "offline"
                 : "verification-required"
         );
@@ -1121,20 +1145,24 @@ function registerProviderEvents() {
 }
 
 /* =========================================================
-NETWORK STATUS
+APPLY AUTH STATE
 ========================================================= */
 
-function handleNetworkStatus(
-    event
+async function applyAuthState(
+    authState
 ) {
-    const online =
-        event?.detail?.online;
-
-    const apiReady =
-        event?.detail?.apiReady;
+    if (
+        redirecting
+    ) {
+        return;
+    }
 
     if (
-        online === false
+        !authState
+        || authState.status ===
+            "unknown"
+        || authState.status ===
+            "loading"
     ) {
         sessionReady =
             false;
@@ -1143,114 +1171,71 @@ function handleNetworkStatus(
             false
         );
 
-        showStatus(
-            "You are offline. Sign in is unavailable.",
-            "error"
-        );
-
         setPageState(
-            "offline"
+            "loading"
         );
 
         return;
     }
 
     if (
-        online === true
-        && apiReady === false
-    ) {
-        sessionReady =
-            false;
-
-        setProviderButtonsEnabled(
-            false
-        );
-
-        showStatus(
-            "BPD authentication services are currently unavailable.",
-            "error"
-        );
-
-        setPageState(
+        authState.available !==
+            true
+        || authState.status ===
             "unavailable"
+    ) {
+        sessionReady =
+            false;
+
+        setProviderButtonsEnabled(
+            false
+        );
+
+        showStatus(
+            navigator.onLine ===
+                false
+                ? "You are offline. Sign in is unavailable."
+                : "BPD authentication services are currently unavailable.",
+            "error"
+        );
+
+        setPageState(
+            navigator.onLine ===
+                false
+                ? "offline"
+                : "unavailable"
         );
 
         return;
     }
 
     if (
-        online === true
-        && apiReady === true
+        authState.authenticated ===
+        true
     ) {
-        void loadLoginState();
+        redirectAuthenticatedUser();
+        return;
     }
-}
 
-/* =========================================================
-LOAD LOGIN STATE
-========================================================= */
-
-async function loadLoginState() {
-    clearStatus();
-
+    /*
+     * At this point auth.js has positively confirmed:
+     *
+     *     available: true
+     *     authenticated: false
+     *
+     * Login can safely be enabled.
+     */
     sessionReady =
-        false;
+        true;
 
     redirecting =
         false;
 
-    setProviderButtonsEnabled(
-        false
-    );
-
     setPageState(
-        "loading"
+        "verification-required"
     );
-
-    if (
-        navigator.onLine === false
-    ) {
-        showStatus(
-            "You are offline. Sign in is unavailable.",
-            "error"
-        );
-
-        setPageState(
-            "offline"
-        );
-
-        return;
-    }
 
     try {
-        const session =
-            await loadSession();
-
-        if (
-            session?.authenticated ===
-            true
-        ) {
-            redirecting =
-                true;
-
-            setPageState(
-                "redirecting"
-            );
-
-            window.location.replace(
-                getReturnTo()
-            );
-
-            return;
-        }
-
-        sessionReady =
-            true;
-
-        setPageState(
-            "verification-required"
-        );
-
         await initializeTurnstile();
 
         updateProviderButtonState();
@@ -1258,15 +1243,6 @@ async function loadLoginState() {
     catch (
         error
     ) {
-        console.error(
-            "LOGIN PAGE: Failed to load authentication state.",
-            {
-                message:
-                    error?.message
-                    || "Unknown error"
-            }
-        );
-
         sessionReady =
             false;
 
@@ -1292,11 +1268,11 @@ async function loadLoginState() {
 
         if (
             error?.message ===
-            "TURNSTILE_ELEMENT_MISSING"
+                "TURNSTILE_ELEMENT_MISSING"
             || error?.message ===
-            "TURNSTILE_SCRIPT_LOAD_FAILED"
+                "TURNSTILE_SCRIPT_LOAD_FAILED"
             || error?.message ===
-            "TURNSTILE_API_UNAVAILABLE"
+                "TURNSTILE_API_UNAVAILABLE"
         ) {
             showStatus(
                 "Human verification is currently unavailable.",
@@ -1310,18 +1286,183 @@ async function loadLoginState() {
             return;
         }
 
+        throw error;
+    }
+}
+
+/* =========================================================
+LOAD LOGIN STATE
+========================================================= */
+
+async function loadLoginState(
+    {
+        force = false
+    } = {}
+) {
+    if (
+        redirecting
+    ) {
+        return;
+    }
+
+    clearStatus();
+
+    sessionReady =
+        false;
+
+    setProviderButtonsEnabled(
+        false
+    );
+
+    setPageState(
+        "loading"
+    );
+
+    if (
+        navigator.onLine ===
+        false
+    ) {
         showStatus(
-            navigator.onLine === false
+            "You are offline. Sign in is unavailable.",
+            "error"
+        );
+
+        setPageState(
+            "offline"
+        );
+
+        return;
+    }
+
+    try {
+        const authState =
+            await getAuthState({
+                force
+            });
+
+        await applyAuthState(
+            authState
+        );
+    }
+    catch (
+        error
+    ) {
+        console.error(
+            "LOGIN PAGE: Failed to load authentication state.",
+            {
+                message:
+                    error?.message
+                    || "Unknown error"
+            }
+        );
+
+        sessionReady =
+            false;
+
+        setProviderButtonsEnabled(
+            false
+        );
+
+        showStatus(
+            navigator.onLine ===
+                false
                 ? "You are offline. Sign in is unavailable."
                 : "BPD authentication services are currently unavailable.",
             "error"
         );
 
         setPageState(
-            navigator.onLine === false
+            navigator.onLine ===
+                false
                 ? "offline"
                 : "unavailable"
         );
+    }
+}
+
+/* =========================================================
+CENTRAL AUTH STATE CHANGE
+========================================================= */
+
+function handleAuthStateChanged(
+    authState
+) {
+    void applyAuthState(
+        authState
+    );
+}
+
+/* =========================================================
+NETWORK STATUS
+========================================================= */
+
+function handleNetworkStatus(
+    event
+) {
+    const online =
+        event?.detail?.online;
+
+    const apiReady =
+        event?.detail?.apiReady;
+
+    if (
+        online ===
+        false
+    ) {
+        sessionReady =
+            false;
+
+        setProviderButtonsEnabled(
+            false
+        );
+
+        showStatus(
+            "You are offline. Sign in is unavailable.",
+            "error"
+        );
+
+        setPageState(
+            "offline"
+        );
+
+        return;
+    }
+
+    if (
+        online ===
+            true
+        && apiReady ===
+            false
+    ) {
+        sessionReady =
+            false;
+
+        setProviderButtonsEnabled(
+            false
+        );
+
+        showStatus(
+            "BPD authentication services are currently unavailable.",
+            "error"
+        );
+
+        setPageState(
+            "unavailable"
+        );
+
+        return;
+    }
+
+    if (
+        online ===
+            true
+        && apiReady ===
+            true
+    ) {
+        void loadLoginState({
+            force:
+                true
+        });
     }
 }
 
@@ -1330,16 +1471,14 @@ REGISTER GLOBAL EVENTS
 ========================================================= */
 
 function registerGlobalEvents() {
+    unsubscribeAuthState =
+        subscribeToAuthState(
+            handleAuthStateChanged
+        );
+
     document.addEventListener(
         "bpd:network-status",
         handleNetworkStatus
-    );
-
-    document.addEventListener(
-        "bpd:auth-changed",
-        function() {
-            void loadLoginState();
-        }
     );
 }
 
@@ -1348,18 +1487,17 @@ INITIALIZATION
 ========================================================= */
 
 export async function initializePage() {
+    showOAuthCallbackError();
+
     if (
         initialized
     ) {
-        showOAuthCallbackError();
         await loadLoginState();
         return;
     }
 
     initializeProviderIcons();
-
     registerProviderEvents();
-
     registerGlobalEvents();
 
     initialized =

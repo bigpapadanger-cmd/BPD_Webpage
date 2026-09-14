@@ -1,0 +1,202 @@
+/* =========================================================
+BPD GAMING NETWORK
+ADMIN TASKBOARD STYLES
+
+File:
+    public/Global/Admin/TaskBoard/CSS/index.js
+Purpose:
+    Base styling for the Admin Taskboard page.
+
+Preliminary Test Goals:
+    - Keep Admin shell layout readable.
+    - Provide clear loading/error/access states.
+    - Display Taskboard API responses cleanly.
+    - Support desktop and smaller screens.
+========================================================= */
+
+[hidden] {
+    display: none !important;
+}
+
+html,
+body {
+    margin: 0;
+    min-height: 100%;
+}
+
+body {
+    min-height: 100vh;
+}
+
+/* =========================================================
+TASKBOARD PAGE
+========================================================= */
+
+#taskboardContent,
+#taskboardLoading,
+#taskboardDenied,
+#taskboardError {
+    box-sizing: border-box;
+}
+
+/* =========================================================
+MAIN TASKBOARD CONTENT
+========================================================= */
+
+#taskboardContent {
+    min-height: 100vh;
+    padding: 32px;
+}
+
+#taskboardContent > header {
+    margin-bottom: 32px;
+}
+
+#taskboardContent h1 {
+    margin-top: 0;
+    margin-bottom: 12px;
+}
+
+#taskboardContent h2 {
+    margin-top: 0;
+    margin-bottom: 14px;
+}
+
+/* =========================================================
+STATUS
+========================================================= */
+
+#taskboardStatus {
+    margin-top: 12px;
+    margin-bottom: 0;
+}
+
+/* =========================================================
+REFRESH BUTTON
+========================================================= */
+
+#taskboardRefresh {
+    margin-top: 8px;
+    padding: 8px 14px;
+    cursor: pointer;
+}
+
+#taskboardRefresh:disabled {
+    cursor: wait;
+    opacity: 0.6;
+}
+
+/* =========================================================
+DATA SECTIONS
+========================================================= */
+
+#taskboardContent section {
+    margin-bottom: 24px;
+    padding: 20px;
+    border: 1px solid currentColor;
+    border-radius: 8px;
+}
+
+/* =========================================================
+JSON OUTPUT
+========================================================= */
+
+#taskSummaryOutput,
+#taskListOutput,
+#taskAssigneesOutput {
+    margin: 0;
+    padding: 16px;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    border: 1px solid currentColor;
+    border-radius: 6px;
+    font-family:
+        Consolas,
+        Monaco,
+        "Courier New",
+        monospace;
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+/* =========================================================
+LOADING / DENIED / ERROR STATES
+========================================================= */
+
+#taskboardLoading,
+#taskboardDenied,
+#taskboardError {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    text-align: center;
+}
+
+#taskboardLoading p,
+#taskboardDenied p,
+#taskboardError p {
+    max-width: 600px;
+}
+
+/* =========================================================
+SIDEBAR OFFSET
+
+Assumes your existing Admin sidebar uses the standard
+sidebar-collapsed body class.
+
+Adjust these widths only if your sidebar CSS uses different
+expanded/collapsed widths.
+========================================================= */
+
+body:not(.sidebar-collapsed) #taskboardContent,
+body:not(.sidebar-collapsed) #taskboardLoading,
+body:not(.sidebar-collapsed) #taskboardDenied,
+body:not(.sidebar-collapsed) #taskboardError {
+    margin-left: 240px;
+}
+
+body.sidebar-collapsed #taskboardContent,
+body.sidebar-collapsed #taskboardLoading,
+body.sidebar-collapsed #taskboardDenied,
+body.sidebar-collapsed #taskboardError {
+    margin-left: 72px;
+}
+
+/* =========================================================
+TRANSITIONS
+========================================================= */
+
+body:not(.animations-off) #taskboardContent,
+body:not(.animations-off) #taskboardLoading,
+body:not(.animations-off) #taskboardDenied,
+body:not(.animations-off) #taskboardError {
+    transition:
+        margin-left 0.2s ease;
+}
+
+/* =========================================================
+RESPONSIVE
+========================================================= */
+
+@media (
+    max-width: 700px
+) {
+    #taskboardContent {
+        padding: 20px;
+    }
+
+    #taskboardContent section {
+        padding: 14px;
+    }
+
+    #taskSummaryOutput,
+    #taskListOutput,
+    #taskAssigneesOutput {
+        padding: 12px;
+        font-size: 0.82rem;
+    }
+}

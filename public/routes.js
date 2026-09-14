@@ -31,6 +31,10 @@ Minecraft:
 ARK:
     /Framework/Shell/CSS/Callers/master_ark.css
 
+Admin:
+    /Framework/Shell/CSS/Callers/master_ark.css
+
+
 The route root determines which master CSS caller is loaded.
 
 Unknown, global, required, dashboard, and error routes
@@ -53,7 +57,10 @@ export const MASTER_CSS_MAP =
             "/Framework/Shell/CSS/Callers/master_mc.css",
 
         Ark:
-            "/Framework/Shell/CSS/Callers/master_ark.css"
+            "/Framework/Shell/CSS/Callers/master_ark.css",
+
+        Admin:
+            "/Framework/Shell/CSS/Callers/master_admin.css"
     });
 
 /* =========================================================
@@ -478,6 +485,50 @@ export const ROUTES = {
 
         requiresAuth:
             false,
+
+        sitemap:
+            false
+    },
+    // =====================================================
+    // ADMIN PAGES
+    // =====================================================
+
+    "/Admin": {
+        title:
+            "Admin Management Page | BPD Gaming Network",
+        body:
+            "/Global/Admin/Home/HTML/index.html",
+        header:
+            "/Framework/Shell/HTML/Header/header.html",
+        sidebar:
+            "/Framework/Shell/HTML/Sidebar/admin.html",
+        footer:
+            "/Framework/Shell/HTML/Footer/footer.html",
+        module:
+            "/Global/Admin/Home/JS/index.html",
+
+        requiresAuth:
+            true,
+
+        sitemap:
+            false
+    },
+       "/Admin/Taskboard": {
+        title:
+            "Taskboard | BPD Gaming Network",
+        body:
+            "/Global/Admin/TaskBoard/HTML/index.html",
+        header:
+            "/Framework/Shell/HTML/Header/header.html",
+        sidebar:
+            "/Framework/Shell/HTML/Sidebar/admin.html",
+        footer:
+            "/Framework/Shell/HTML/Footer/footer.html",
+        module:
+            "/Global/Admin/TaskBoard/JS/index.html",
+
+        requiresAuth:
+            true,
 
         sitemap:
             false

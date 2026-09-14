@@ -1,0 +1,121 @@
+<!-- =========================================================
+BPD GAMING NETWORK
+ADMIN TASKBOARD PAGE
+
+File:
+    public/admin/taskboard/index.html
+
+Purpose:
+    Initial Admin Taskboard integration test page.
+========================================================= -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>
+        Taskboard | BPD Gaming Network Admin
+    </title>
+</head>
+
+<body>
+    <aside
+        id="sidebar"
+        class="sidebar"
+    ></aside>
+
+    <main
+        id="taskboardLoading"
+    >
+        <p>
+            Loading Taskboard...
+        </p>
+    </main>
+
+    <main
+        id="taskboardContent"
+        hidden
+    >
+        <header>
+            <h1>
+                Taskboard
+            </h1>
+
+            <button
+                id="taskboardRefresh"
+                type="button"
+            >
+                Refresh
+            </button>
+
+            <p
+                id="taskboardStatus"
+                aria-live="polite"
+            >
+                Waiting for Taskboard data...
+            </p>
+        </header>
+
+        <section>
+            <h2>
+                Task Summary
+            </h2>
+
+            <pre id="taskSummaryOutput"></pre>
+        </section>
+
+        <section>
+            <h2>
+                Tasks
+            </h2>
+
+            <pre id="taskListOutput"></pre>
+        </section>
+
+        <section>
+            <h2>
+                Assignees
+            </h2>
+
+            <pre id="taskAssigneesOutput"></pre>
+        </section>
+    </main>
+
+    <main
+        id="taskboardDenied"
+        hidden
+    >
+        <h1>
+            Access Denied
+        </h1>
+
+        <p>
+            You are not authorized to access the Admin Taskboard.
+        </p>
+    </main>
+
+    <main
+        id="taskboardError"
+        hidden
+    >
+        <h1>
+            Taskboard Unavailable
+        </h1>
+
+        <p id="taskboardErrorMessage">
+            The Taskboard could not be loaded.
+        </p>
+    </main>
+
+    <script
+        type="module"
+        src="/admin/taskboard/taskboard.js"
+    ></script>
+</body>
+</html>

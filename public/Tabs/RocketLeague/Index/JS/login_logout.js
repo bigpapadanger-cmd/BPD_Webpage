@@ -1,30 +1,87 @@
 "use strict";
 
-import { apiFetch, requireApiConnection } from "../../../../scripts/apiConnection.js";
+/* =========================================================
+BPD GAMING NETWORK
+ROCKET LEAGUE AUTH BUTTONS
+
+File:
+    /Tabs/RocketLeague/JS/login_logout.js
+
+Purpose:
+    Controls Rocket League login and logout buttons.
+
+Description:
+    - Sends Rocket League sign-in through the global Login
+      page rather than starting Epic OAuth directly.
+    - Preserves Rocket League as the post-login destination.
+    - Uses centralized API route constants.
+    - Logs out through the global BPD logout endpoint.
+    - Invalidates centralized client authentication state
+      after logout.
+    - Does not use localStorage as authentication or Rocket
+      League registration state.
+
+Authentication:
+    Global login:
+        /Login?returnTo=/RocketLeague
+
+    Logout:
+        POST /api/auth/logout
+
+Important:
+    - Epic OAuth is started by the global Login page.
+    - Turnstile verification remains part of the global login
+      flow.
+    - This module does not directly call the Epic login API.
+    - This module does not maintain independent auth state.
+========================================================= */
+
 import {
-    EPIC_LOGIN_URL,
+    invalidateAuthState
+} from "/Framework/Auth/auth.js";
+
+import {
     BPD_AUTH_LOGOUT_URL
 } from "/scripts/apiRoutes.js";
 
-async function handleEpicLogin() {
-    try {
-        await requireApiConnection();
+import {
+    apiFetch
+} from "../../../../scripts/apiConnection.js";
 
-        window.location.assign(
-            EPIC_LOGIN_URL
-        );
-    }
-    catch (
-        error
-    ) {
-        console.error(
-            "AUTH BUTTONS: Login connection check failed.",
-            error
+/* =========================================================
+PAGE CONSTANTS
+========================================================= */
+
+const LOGIN_PAGE_URL =
+    "/Login";
+
+const ROCKET_LEAGUE_PAGE_URL =
+    "/RocketLeague";
+
+/* =========================================================
+LOGIN
+========================================================= */
+
+function handleEpicLogin() {
+    const loginUrl =
+        new URL(
+            LOGIN_PAGE_URL,
+            window.location.origin
         );
 
-        return;
-    }
+    loginUrl.searchParams.set(
+        "returnTo",
+        ROCKET_LEAGUE_PAGE_URL
+    );
+
+    window.location.assign(
+        loginUrl.href
+    );
 }
+
+/* =========================================================
+LOGOUT
+========================================================= */
 
 async function handleLogout() {
     const logoutButton =
@@ -32,44 +89,78 @@ async function handleLogout() {
             "sidebarLogoutButton"
         );
 
-    if (!logoutButton) {
+    if (
+        !logoutButton
+    ) {
         return;
     }
 
-    logoutButton.disabled = true;
+    logoutButton.disabled =
+        true;
 
     try {
-        const response = await apiFetch(
-            BPD_AUTH_LOGOUT_URL,
-            {
-                method: "POST",
-                credentials: "same-origin",
-                headers: {
-                    "accept": "application/json"
-                }
-            }
-        );
+        const response =
+            await apiFetch(
+                BPD_AUTH_LOGOUT_URL,
+                {
+                    method:
+                        "POST",
 
-        if (!response.ok) {
+                    credentials:
+                        "same-origin",
+
+                    cache:
+                        "no-store",
+
+                    headers: {
+                        "Accept":
+                            "application/json"
+                    }
+                }
+            );
+
+        if (
+            !response.ok
+        ) {
             throw new Error(
                 `Logout failed: ${response.status}`
             );
         }
-        localStorage.removeItem(
-            "bpdRocketLeagueRegistrationAccepted"
-        );
+
+        /*
+         * The server session is gone. Invalidate the shared
+         * client auth cache before leaving the current page.
+         */
+        invalidateAuthState();
+
         window.location.assign(
-            "/RocketLeague"
+            ROCKET_LEAGUE_PAGE_URL
         );
-    } catch (error) {
+    }
+    catch (
+        error
+    ) {
         console.error(
-            "AUTH BUTTONS: Logout failed.",
-            error
+            "ROCKET LEAGUE AUTH BUTTONS: Logout failed.",
+            {
+                name:
+                    error?.name
+                    || "Error",
+
+                message:
+                    error?.message
+                    || "Unknown error"
+            }
         );
 
-        logoutButton.disabled = false;
+        logoutButton.disabled =
+            false;
     }
 }
+
+/* =========================================================
+INITIALIZATION
+========================================================= */
 
 export function initializeButtons() {
     const loginButton =
@@ -91,27 +182,31 @@ export function initializeButtons() {
         loginButton,
         loginHomepageButton
     ]
-        .filter(Boolean)
-        .forEach((button) => {
-            if (
-                button.dataset.initialized ===
-                "true"
-            ) {
-                return;
+        .filter(
+            Boolean
+        )
+        .forEach(
+            button => {
+                if (
+                    button.dataset.initialized ===
+                    "true"
+                ) {
+                    return;
+                }
+
+                button.addEventListener(
+                    "click",
+                    handleEpicLogin
+                );
+
+                button.dataset.initialized =
+                    "true";
             }
-
-            button.addEventListener(
-                "click",
-                handleEpicLogin
-            );
-
-            button.dataset.initialized =
-                "true";
-        });
+        );
 
     if (
-        logoutButton &&
-        logoutButton.dataset.initialized !==
+        logoutButton
+        && logoutButton.dataset.initialized !==
             "true"
     ) {
         logoutButton.addEventListener(

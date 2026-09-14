@@ -13,7 +13,9 @@ import {
 import {
     OCR_SCRIPT_ID
 } from "/scripts/cacheHandler.js";
-
+import {
+    authorizeRoute
+} from "/Framework/Auth/auth.js";
 const OCR_SCRIPTS = [
     "/ocr/JS/submit_core.js",
     "/ocr/JS/submit_img.js",
@@ -251,7 +253,23 @@ export async function initializePage() {
             "OCR page was not found."
         );
     }
+    const {
+        evaluation
+    } =
+        await authorizeRoute({
+            required:
+                true,
 
+            provider:
+                "epic"
+        });
+
+    if (
+        evaluation.allowed !==
+        true
+    ) {
+        return false;
+    }
     if (
         page.dataset.initialized ===
         "true"

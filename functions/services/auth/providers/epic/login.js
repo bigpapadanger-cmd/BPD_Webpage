@@ -2,7 +2,7 @@
 
 /* =========================================================
 BPD GAMING NETWORK
-EPIC OAUTH LOGIN SERVICE
+EPIC OAUTH LOGIN / AUTHORIZATION START SERVICE
 
 File:
     functions/services/auth/providers/epic/login.js
@@ -20,38 +20,40 @@ Callback Service:
     functions/services/auth/providers/epic/callback.js
 
 Purpose:
-    Starts direct Epic Games OAuth authentication.
+    Starts direct Epic Games OAuth authentication for both
+    global login and authenticated provider linking.
 
 Description:
-    - Accepts a Turnstile-protected login request.
-    - Verifies CAPTCHA through the shared Turnstile service.
-    - Validates the requested local return destination.
-    - Generates and stores OAuth state.
-    - Builds the Epic Games authorization URL.
-    - Returns the authorization URL to the browser as JSON.
+    - Starts direct Epic Games OAuth.
+    - Supports normal login mode.
+    - Supports authenticated account-link mode.
+    - Generates secure OAuth state.
+    - Stores OAuth context in short-lived HttpOnly cookies.
+    - Stores the target BPD account ID only for link mode.
+    - Returns the Epic authorization URL.
+    - Normal login requests remain Turnstile protected.
 
-Flow:
-    Browser
-    ↓
-    Turnstile verification
-    ↓
-    Generate OAuth state
-    ↓
-    Store state in short-lived HttpOnly cookie
-    ↓
-    Return Epic authorization URL
-    ↓
-    Browser redirects to Epic Games
-    ↓
-    Epic authenticates user
-    ↓
-    Epic redirects to /api/auth/epic/callback
+Modes:
+    login
+        User is signing into BPD with Epic.
+
+    link
+        Existing authenticated BPD account is linking Epic.
+
+Security:
+    - Link mode accountId must come from trusted server-side
+      session authorization.
+    - Browser input must never determine the accountId used
+      for link mode.
+    - OAuth state must be verified by the callback.
+    - Link mode must later verify that the current BPD
+      session account matches the stored target account.
+    - Epic access tokens are never stored here.
 
 Important:
-    - This service does NOT create the BPD session.
-    - This service does NOT write identity.accounts.
-    - This service does NOT write Rocket League data.
-    - OAuth state values and credentials must never be logged.
+    - This service does NOT create identity.accounts.
+    - This service does NOT link identity.account_identities.
+    - Final identity handling occurs in the Epic callback.
 ========================================================= */
 
 import {
@@ -69,10 +71,12 @@ import {
 import {
     EPIC_AUTHORIZE_URL,
     AUTH_STATE_COOKIE,
-    AUTH_STATE_MAX_AGE_SECONDS
+    AUTH_STATE_MAX_AGE_SECONDS,
+    OAUTH_RETURN_COOKIE,
+    OAUTH_MODE_COOKIE,
+    OAUTH_ACCOUNT_COOKIE
 } from "../../../config/api_vars.js";
 
-import { OAUTH_RETURN_COOKIE } from "../../../config/api_vars.js";
 /* =========================================================
 CONSTANTS
 ========================================================= */
@@ -80,6 +84,11 @@ CONSTANTS
 const DEFAULT_RETURN_TO =
     "/Account";
 
+const OAUTH_MODE_LOGIN =
+    "login";
+
+const OAUTH_MODE_LINK =
+    "link";
 
 /* =========================================================
 NORMALIZATION
@@ -96,6 +105,22 @@ function normalizeString(
     }
 
     return value.trim();
+}
+
+function normalizeMode(
+    value
+) {
+    const mode =
+        normalizeString(
+            value
+        )
+            .toLowerCase();
+
+    return (
+        mode === OAUTH_MODE_LINK
+        ? OAUTH_MODE_LINK
+        : OAUTH_MODE_LOGIN
+    );
 }
 
 /* =========================================================
@@ -322,7 +347,178 @@ function buildEpicAuthorizeUrl(
 }
 
 /* =========================================================
-MAIN
+START EPIC AUTHORIZATION
+
+This function is reusable by:
+    - normal Epic login
+    - authenticated Epic linking
+
+For link mode:
+    accountId MUST already have been derived from the
+    authenticated server-side BPD session.
+========================================================= */
+
+export function startEpicAuthorization(
+    request,
+    env,
+    {
+        mode = OAUTH_MODE_LOGIN,
+        accountId = null,
+        returnTo = DEFAULT_RETURN_TO
+    } = {}
+) {
+    const normalizedMode =
+        normalizeMode(
+            mode
+        );
+
+    const normalizedAccountId =
+        normalizeString(
+            accountId
+        );
+
+    const normalizedReturnTo =
+        normalizeReturnTo(
+            returnTo
+        );
+
+    if (
+        normalizedMode ===
+            OAUTH_MODE_LINK
+        && !normalizedAccountId
+    ) {
+        throw new Error(
+            "EPIC_LINK_ACCOUNT_REQUIRED"
+        );
+    }
+
+    const configuration =
+        getEpicConfiguration(
+            env
+        );
+
+    if (
+        configuration.valid !==
+        true
+    ) {
+        const error =
+            new Error(
+                "EPIC_OAUTH_NOT_CONFIGURED"
+            );
+
+        error.configuration = {
+            hasClientId:
+                Boolean(
+                    configuration.clientId
+                ),
+
+            hasRedirectUri:
+                Boolean(
+                    configuration.redirectUri
+                )
+        };
+
+        throw error;
+    }
+
+    const state =
+        createRandomState();
+
+    if (
+        !state
+    ) {
+        throw new Error(
+            "OAUTH_STATE_GENERATION_FAILED"
+        );
+    }
+
+    const stateCookie =
+        createCookie(
+            request,
+            AUTH_STATE_COOKIE,
+            state,
+            AUTH_STATE_MAX_AGE_SECONDS
+        );
+
+    const returnCookie =
+        createCookie(
+            request,
+            OAUTH_RETURN_COOKIE,
+            normalizedReturnTo,
+            AUTH_STATE_MAX_AGE_SECONDS
+        );
+
+    const modeCookie =
+        createCookie(
+            request,
+            OAUTH_MODE_COOKIE,
+            normalizedMode,
+            AUTH_STATE_MAX_AGE_SECONDS
+        );
+
+    if (
+        !stateCookie
+        || !returnCookie
+        || !modeCookie
+    ) {
+        throw new Error(
+            "OAUTH_COOKIE_CREATION_FAILED"
+        );
+    }
+
+    const cookies = [
+        stateCookie,
+        returnCookie,
+        modeCookie
+    ];
+
+    if (
+        normalizedMode ===
+        OAUTH_MODE_LINK
+    ) {
+        const accountCookie =
+            createCookie(
+                request,
+                OAUTH_ACCOUNT_COOKIE,
+                normalizedAccountId,
+                AUTH_STATE_MAX_AGE_SECONDS
+            );
+
+        if (
+            !accountCookie
+        ) {
+            throw new Error(
+                "OAUTH_ACCOUNT_COOKIE_CREATION_FAILED"
+            );
+        }
+
+        cookies.push(
+            accountCookie
+        );
+    }
+
+    const redirectUrl =
+        buildEpicAuthorizeUrl(
+            configuration.clientId,
+            configuration.redirectUri,
+            state
+        );
+
+    return {
+        provider:
+            "epic",
+
+        mode:
+            normalizedMode,
+
+        redirectUrl,
+
+        cookies
+    };
+}
+
+/* =========================================================
+MAIN LOGIN
 ========================================================= */
 
 export async function handleEpicLogin(
@@ -371,6 +567,15 @@ export async function handleEpicLogin(
             400
         );
     }
+
+    /* =====================================================
+    TURNSTILE
+
+    Public Epic login is CAPTCHA protected.
+
+    Authenticated provider linking will call
+    startEpicAuthorization() server-side instead.
+    ===================================================== */
 
     const captchaToken =
         normalizeString(
@@ -457,93 +662,25 @@ export async function handleEpicLogin(
         );
 
     try {
-        const configuration =
-            getEpicConfiguration(
-                env
-            );
-
-        if (
-            configuration.valid !==
-            true
-        ) {
-            console.error(
-                "EPIC LOGIN: OAuth configuration missing or invalid.",
+        const authorization =
+            startEpicAuthorization(
+                request,
+                env,
                 {
-                    debugId,
+                    mode:
+                        OAUTH_MODE_LOGIN,
 
-                    hasClientId:
-                        Boolean(
-                            configuration.clientId
-                        ),
-
-                    hasRedirectUri:
-                        Boolean(
-                            configuration.redirectUri
-                        )
+                    returnTo
                 }
-            );
-
-            return jsonResponse(
-                {
-                    success:
-                        false,
-
-                    error:
-                        "EPIC_OAUTH_NOT_CONFIGURED",
-
-                    debugId
-                },
-                503
-            );
-        }
-
-        const state =
-            createRandomState();
-
-        if (
-            !state
-        ) {
-            throw new Error(
-                "OAUTH_STATE_GENERATION_FAILED"
-            );
-        }
-
-        const stateCookie =
-            createCookie(
-                request,
-                AUTH_STATE_COOKIE,
-                state,
-                AUTH_STATE_MAX_AGE_SECONDS
-            );
-
-        const returnCookie =
-            createCookie(
-                request,
-                OAUTH_RETURN_COOKIE,
-                returnTo,
-                AUTH_STATE_MAX_AGE_SECONDS
-            );
-
-        if (
-            !stateCookie
-            || !returnCookie
-        ) {
-            throw new Error(
-                "OAUTH_COOKIE_CREATION_FAILED"
-            );
-        }
-
-        const redirectUrl =
-            buildEpicAuthorizeUrl(
-                configuration.clientId,
-                configuration.redirectUri,
-                state
             );
 
         console.info(
             "EPIC LOGIN: Authorization initialized.",
             {
-                debugId
+                debugId,
+
+                mode:
+                    OAUTH_MODE_LOGIN
             }
         );
 
@@ -555,13 +692,12 @@ export async function handleEpicLogin(
                 provider:
                     "epic",
 
-                redirectUrl
+                redirectUrl:
+                    authorization
+                        .redirectUrl
             },
             200,
-            [
-                stateCookie,
-                returnCookie
-            ]
+            authorization.cookies
         );
     }
     catch (
@@ -581,6 +717,43 @@ export async function handleEpicLogin(
                     || "Unknown error"
             }
         );
+
+        if (
+            error?.message ===
+            "EPIC_OAUTH_NOT_CONFIGURED"
+        ) {
+            console.error(
+                "EPIC LOGIN: OAuth configuration missing or invalid.",
+                {
+                    debugId,
+
+                    hasClientId:
+                        error
+                            ?.configuration
+                            ?.hasClientId ===
+                        true,
+
+                    hasRedirectUri:
+                        error
+                            ?.configuration
+                            ?.hasRedirectUri ===
+                        true
+                }
+            );
+
+            return jsonResponse(
+                {
+                    success:
+                        false,
+
+                    error:
+                        "EPIC_OAUTH_NOT_CONFIGURED",
+
+                    debugId
+                },
+                503
+            );
+        }
 
         return jsonResponse(
             {

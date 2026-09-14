@@ -1,0 +1,48 @@
+/* =========================================================
+BPD GAMING NETWORK
+ADMIN MANAGEMENT STYLES
+
+File:
+    public/admin/admin.css
+
+Purpose:
+    Base styling for the Admin Management landing page.
+========================================================= */
+
+[hidden] {
+    display: none !important;
+}
+
+html,
+body {
+    margin: 0;
+    min-height: 100%;
+}
+
+body {
+    min-height: 100vh;
+}
+
+.admin-page {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    box-sizing: border-box;
+}
+
+.admin-panel {
+    width: 100%;
+    max-width: 900px;
+    text-align: center;
+}
+
+.admin-title {
+    margin: 0;
+}
+
+.admin-status {
+    margin: 0;
+    text-align: center;
+}

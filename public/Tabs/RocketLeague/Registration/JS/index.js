@@ -1597,41 +1597,67 @@ function populateProfileForm(
 }
 
 /* =========================================================
-AUTH + PROFILE LOAD
+AUTHENTICATED EPIC USER
+
+Uses centralized client auth state only for displaying the
+currently linked Epic identity.
+
+Rocket League APIs remain authoritative for access.
 ========================================================= */
 
 async function getAuthenticatedEpicUser() {
-    try {
-        if (
-            window.BPDAuth
-            && typeof window.BPDAuth.getSession ===
-                "function"
-        ) {
-            const session =
-                await window.BPDAuth.getSession();
+    const authState =
+        await getAuthState();
 
-            return (
-                session?.sessionData
-                || session?.user
-                || session
-                || null
-            );
-        }
-    }
-    catch (
-        error
+    if (
+        authState?.available !==
+        true
     ) {
-        console.error(
-            "ROCKET LEAGUE REGISTRATION: Could not read Epic session.",
-            {
-                message:
-                    error?.message
-                    || "Unknown error"
-            }
-        );
+        return null;
     }
 
-    return null;
+    if (
+        !hasActiveAccount(
+            authState
+        )
+    ) {
+        return null;
+    }
+
+    if (
+        !hasLinkedProvider(
+            "epic",
+            authState
+        )
+    ) {
+        return null;
+    }
+
+    const epicProvider =
+        getProvider(
+            "epic",
+            authState
+        );
+
+    if (
+        !epicProvider
+    ) {
+        return null;
+    }
+
+    return {
+        EpicUniqueId:
+            epicProvider.accountId
+            || null,
+
+        EpicDisplayName:
+            epicProvider.displayName
+            || "",
+
+        EpicPreferredUsername:
+            epicProvider.preferredUsername
+            || null
+    };
 }
 
 async function loadRocketLeagueProfile() {
@@ -1722,8 +1748,28 @@ async function loadRocketLeagueProfile() {
 
     if (
         response.status === 401
-        || result.requiresEpicLogin ===
-            true
+    ) {
+        const loginUrl =
+            new URL(
+                "/Login",
+                window.location.origin
+            );
+
+        loginUrl.searchParams.set(
+            "returnTo",
+            "/RocketLeague/Profile"
+        );
+
+        window.location.replace(
+            loginUrl.href
+        );
+
+        return null;
+    }
+
+    if (
+        response.status === 403
+        || result.requiresEpicLogin === true
     ) {
         window.location.replace(
             "/RocketLeague"

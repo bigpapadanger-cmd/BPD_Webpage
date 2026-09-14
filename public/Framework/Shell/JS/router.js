@@ -9,7 +9,7 @@ File:
 
 Purpose:
     Controls global SPA navigation, shell fragment loading,
-    route authentication, route CSS, route modules, sidebar
+    route authorization, route CSS, route modules, sidebar
     initialization, OCR runtime state, and persistent shell
     components.
 
@@ -17,13 +17,24 @@ Description:
     - Resolves routes from /routes.js.
     - Loads header, sidebar, page, and footer fragments.
     - Applies route-specific master stylesheets.
-    - Uses apiFetch() for API connectivity/authentication.
-    - Distinguishes signed-out state from unavailable API state.
-    - Does not redirect protected routes merely because the
-      network or authentication API is unavailable.
+    - Uses Framework/Auth/auth.js as the single client-side
+      authentication state source.
+    - Supports route-specific auth requirements.
+    - Distinguishes confirmed signed-out state from auth/API
+      unavailability.
+    - Redirects confirmed signed-out protected routes to
+      /Login?returnTo=...
+    - Does not redirect protected routes merely because
+      authentication status is unavailable.
     - Initializes the persistent account banner outside the
       route-rendering lifecycle.
     - Protects asynchronous navigation from race conditions.
+
+Security:
+    - Client route authorization is navigation/UX only.
+    - Protected APIs must independently enforce server-side
+      authorization.
+    - Provider checks in this router are not authoritative.
 ========================================================= */
 
 import {
@@ -47,11 +58,6 @@ import {
 } from "./initialization.js";
 
 import {
-    BPD_AUTH_SESSION_URL
-} from "../../../scripts/apiRoutes.js";
-
-import {
-    apiFetch,
     initializeApiConnectionMonitor
 } from "../../../scripts/apiConnection.js";
 
@@ -63,6 +69,10 @@ import {
     initializeAccountBanner
 } from "../../Banner/JS/account_banner.js";
 
+import {
+    authorizeRoute
+} from "../../Auth/auth.js";
+
 /* =========================================================
 ROUTER CONFIGURATION
 ========================================================= */
@@ -73,8 +83,8 @@ const DEFAULT_ROUTE =
 const ERROR_ROUTE =
     "/Error";
 
-const AUTH_FALLBACK_ROUTE =
-    "/RocketLeague";
+const LOGIN_ROUTE =
+    "/Login";
 
 const MASTER_CSS_LINK_ID =
     "bpdMasterCss";
@@ -794,6 +804,79 @@ async function handleRoutingButtonPressed(
 }
 
 /* =========================================================
+ROUTE AUTH REQUIREMENTS
+========================================================= */
+
+function getRouteAuthRequirements(
+    routeConfig
+) {
+    if (
+        routeConfig?.auth
+        && typeof routeConfig.auth ===
+            "object"
+        && !Array.isArray(
+            routeConfig.auth
+        )
+    ) {
+        return {
+            required:
+                routeConfig.auth.required ===
+                true,
+
+            provider:
+                typeof routeConfig.auth.provider ===
+                    "string"
+                    ? routeConfig.auth.provider
+                        .trim()
+                        .toLowerCase()
+                    : null,
+
+            role:
+                typeof routeConfig.auth.role ===
+                    "string"
+                    ? routeConfig.auth.role
+                        .trim()
+                        .toLowerCase()
+                    : null
+        };
+    }
+
+    /*
+     * Temporary compatibility with routes that still use:
+     *
+     *     requiresAuth: true
+     *
+     * These can be migrated to auth:{} one at a time.
+     */
+    if (
+        routeConfig?.requiresAuth ===
+        true
+    ) {
+        return {
+            required:
+                true,
+
+            provider:
+                null,
+
+            role:
+                null
+        };
+    }
+
+    return {
+        required:
+            false,
+
+        provider:
+            null,
+
+        role:
+            null
+    };
+}
+
+/* =========================================================
 ROUTE TESTING
 ========================================================= */
 
@@ -815,10 +898,10 @@ export function testRoute(
         found:
             route.found,
 
-        requiresAuth:
-            route.config
-                ?.requiresAuth ===
-            true,
+        auth:
+            getRouteAuthRequirements(
+                route.config
+            ),
 
         sitemap:
             route.config
@@ -1065,197 +1148,18 @@ async function activateRouteScripts(
 }
 
 /* =========================================================
-AUTH SESSION NORMALIZATION
+LOGIN DESTINATION
 ========================================================= */
 
-function createUnavailableAuthSession(
-    error = null
+function createLoginDestination(
+    requestedPath
 ) {
-    return {
-        available:
-            false,
-
-        authenticated:
-            false,
-
-        user:
-            null,
-
-        error
-    };
-}
-
-function createSignedOutAuthSession() {
-    return {
-        available:
-            true,
-
-        authenticated:
-            false,
-
-        user:
-            null
-    };
-}
-
-function normalizeRouterAuthSession(
-    result
-) {
-    const normalizedResult =
-        result
-        && typeof result ===
-            "object"
-            ? result
-            : {};
-
-    return {
-        ...normalizedResult,
-
-        available:
-            normalizedResult.available !==
-            false,
-
-        authenticated:
-            normalizedResult.authenticated ===
-            true,
-
-        user:
-            normalizedResult.user
-            || normalizedResult.sessionData
-            || null
-    };
-}
-
-/* =========================================================
-AUTHENTICATION
-========================================================= */
-
-async function loadRouterAuthSession() {
-    /* -----------------------------------------------------
-    GLOBAL AUTH CLIENT
-    ----------------------------------------------------- */
-
-    if (
-        window.BPDAuth
-        && typeof window.BPDAuth
-            .getSession ===
-            "function"
-    ) {
-        try {
-            const result =
-                await window.BPDAuth
-                    .getSession();
-
-            return normalizeRouterAuthSession(
-                result
-            );
-        }
-        catch (
-            error
-        ) {
-            console.warn(
-                "ROUTER: Global authentication client is unavailable.",
-                error
-            );
-
-            return createUnavailableAuthSession(
-                error
-            );
-        }
-    }
-
-    /* -----------------------------------------------------
-    DIRECT AUTH API
-    ----------------------------------------------------- */
-
-    let response;
-
-    try {
-        response =
-            await apiFetch(
-                BPD_AUTH_SESSION_URL,
-                {
-                    method:
-                        "GET",
-
-                    credentials:
-                        "same-origin",
-
-                    cache:
-                        "no-store",
-
-                    headers: {
-                        "Accept":
-                            "application/json"
-                    }
-                }
-            );
-    }
-    catch (
-        error
-    ) {
-        console.warn(
-            "ROUTER: Authentication API could not be reached.",
-            error
-        );
-
-        return createUnavailableAuthSession(
-            error
-        );
-    }
-
-    /*
-     * A server or connectivity problem must not be interpreted
-     * as an explicit logout.
-     */
-    if (
-        !response.ok
-    ) {
-        if (
-            response.status ===
-                401
-            || response.status ===
-                403
-        ) {
-            return createSignedOutAuthSession();
-        }
-
-        console.warn(
-            "ROUTER: Authentication API returned an unavailable response.",
-            {
-                status:
-                    response.status
-            }
-        );
-
-        return createUnavailableAuthSession(
-            new Error(
-                `Authentication API returned ${response.status}.`
-            )
-        );
-    }
-
-    let result;
-
-    try {
-        result =
-            await response.json();
-    }
-    catch (
-        error
-    ) {
-        console.warn(
-            "ROUTER: Authentication API returned invalid JSON.",
-            error
-        );
-
-        return createUnavailableAuthSession(
-            error
-        );
-    }
-
-    return normalizeRouterAuthSession(
-        result
+    return (
+        LOGIN_ROUTE
+        + "?returnTo="
+        + encodeURIComponent(
+            requestedPath
+        )
     );
 }
 
@@ -1266,16 +1170,37 @@ AUTHENTICATION ENFORCEMENT
 async function enforceRouteAuthentication(
     route
 ) {
+    const requirements =
+        getRouteAuthRequirements(
+            route.config
+        );
+
+    const authRequired =
+        requirements.required ===
+            true
+        || Boolean(
+            requirements.provider
+        )
+        || Boolean(
+            requirements.role
+        );
+
     if (
-        route.config
-            ?.requiresAuth !==
-        true
+        !authRequired
     ) {
         return {
             route,
 
-            authSession:
+            authState:
                 null,
+
+            authEvaluation: {
+                allowed:
+                    true,
+
+                status:
+                    "allowed"
+            },
 
             redirected:
                 false,
@@ -1285,19 +1210,26 @@ async function enforceRouteAuthentication(
         };
     }
 
-    const authSession =
-        await loadRouterAuthSession();
+    const {
+        state,
+        evaluation
+    } =
+        await authorizeRoute(
+            requirements
+        );
 
     /* -----------------------------------------------------
     AUTH SERVICE UNAVAILABLE
 
-    Keep the requested route rather than treating an
-    unavailable API as a logout.
+    An unavailable auth API is not a confirmed logout.
+
+    Keep the requested route loaded. Protected API requests
+    will still independently enforce server authorization.
     ----------------------------------------------------- */
 
     if (
-        authSession.available ===
-        false
+        evaluation.status ===
+        "unavailable"
     ) {
         document.body.dataset.authAvailable =
             "false";
@@ -1317,7 +1249,11 @@ async function enforceRouteAuthentication(
         return {
             route,
 
-            authSession,
+            authState:
+                state,
+
+            authEvaluation:
+                evaluation,
 
             redirected:
                 false,
@@ -1331,17 +1267,21 @@ async function enforceRouteAuthentication(
         "true";
 
     /* -----------------------------------------------------
-    AUTHENTICATED
+    AUTHORIZED
     ----------------------------------------------------- */
 
     if (
-        authSession.authenticated ===
+        evaluation.allowed ===
         true
     ) {
         return {
             route,
 
-            authSession,
+            authState:
+                state,
+
+            authEvaluation:
+                evaluation,
 
             redirected:
                 false,
@@ -1352,89 +1292,239 @@ async function enforceRouteAuthentication(
     }
 
     /* -----------------------------------------------------
-    SIGNED OUT
+    CONFIRMED SIGNED OUT
     ----------------------------------------------------- */
 
-    const fallbackRoute =
-        resolveRoute(
-            AUTH_FALLBACK_ROUTE
-        );
-
-    const fallbackUrl =
-        AUTH_FALLBACK_ROUTE
-        + "?returnTo="
-        + encodeURIComponent(
-            route.requestedPath
-        );
-
-    window.history.replaceState(
-        {},
-        "",
-        fallbackUrl
-    );
-
-    document.dispatchEvent(
-        new CustomEvent(
-            "bpd:route-auth-denied",
-            {
-                detail: {
-                    requestedPath:
-                        route.requestedPath,
-
-                    fallbackPath:
-                        AUTH_FALLBACK_ROUTE
-                }
-            }
-        )
-    );
-
-    return {
-        route:
-            fallbackRoute,
-
-        authSession,
-
-        redirected:
-            true,
-
-        authUnavailable:
-            false
-    };
-}
-
-/* =========================================================
-AUTH STATE EVENTS
-========================================================= */
-
-function dispatchAuthState(
-    authSession
-) {
     if (
-        !authSession
+        evaluation.status ===
+        "signed_out"
     ) {
-        return;
+        const loginRoute =
+            resolveRoute(
+                LOGIN_ROUTE
+            );
+
+        const loginDestination =
+            createLoginDestination(
+                route.requestedPath
+            );
+
+        window.history.replaceState(
+            {},
+            "",
+            loginDestination
+        );
+
+        document.dispatchEvent(
+            new CustomEvent(
+                "bpd:route-auth-denied",
+                {
+                    detail: {
+                        requestedPath:
+                            route.requestedPath,
+
+                        reason:
+                            "signed_out",
+
+                        fallbackPath:
+                            LOGIN_ROUTE
+                    }
+                }
+            )
+        );
+
+        return {
+            route:
+                loginRoute,
+
+            authState:
+                state,
+
+            authEvaluation:
+                evaluation,
+
+            redirected:
+                true,
+
+            authUnavailable:
+                false
+        };
     }
 
-    document.dispatchEvent(
-        new CustomEvent(
-            "bpd:auth-changed",
-            {
-                detail: {
-                    available:
-                        authSession.available !==
-                        false,
+    /* -----------------------------------------------------
+    ACCOUNT INVALID / INACTIVE
 
-                    authenticated:
-                        authSession.authenticated ===
-                        true,
+    Do not convert this into a fake logout.
 
-                    user:
-                        authSession.user
-                        || null
+    Keep the requested route loaded so the UI can show the
+    appropriate account state. Server APIs remain protected.
+    ----------------------------------------------------- */
+
+    if (
+        evaluation.status ===
+        "account_invalid"
+    ) {
+        document.dispatchEvent(
+            new CustomEvent(
+                "bpd:route-auth-denied",
+                {
+                    detail: {
+                        requestedPath:
+                            route.requestedPath,
+
+                        reason:
+                            "account_invalid"
+                    }
                 }
-            }
-        )
+            )
+        );
+
+        return {
+            route,
+
+            authState:
+                state,
+
+            authEvaluation:
+                evaluation,
+
+            redirected:
+                false,
+
+            authUnavailable:
+                false
+        };
+    }
+
+    /* -----------------------------------------------------
+    PROVIDER REQUIRED
+
+    This is navigation/UX only.
+
+    Protected server APIs independently verify the provider
+    identity against Supabase.
+    ----------------------------------------------------- */
+
+    if (
+        evaluation.status ===
+        "provider_required"
+    ) {
+        document.dispatchEvent(
+            new CustomEvent(
+                "bpd:route-provider-required",
+                {
+                    detail: {
+                        requestedPath:
+                            route.requestedPath,
+
+                        provider:
+                            evaluation
+                                .requiredProvider
+                            || null
+                    }
+                }
+            )
+        );
+
+        return {
+            route,
+
+            authState:
+                state,
+
+            authEvaluation:
+                evaluation,
+
+            redirected:
+                false,
+
+            authUnavailable:
+                false
+        };
+    }
+
+    /* -----------------------------------------------------
+    ROLE REQUIRED
+    ----------------------------------------------------- */
+
+    if (
+        evaluation.status ===
+        "role_required"
+    ) {
+        document.dispatchEvent(
+            new CustomEvent(
+                "bpd:route-auth-denied",
+                {
+                    detail: {
+                        requestedPath:
+                            route.requestedPath,
+
+                        reason:
+                            "role_required",
+
+                        role:
+                            evaluation
+                                .requiredRole
+                            || null
+                    }
+                }
+            )
+        );
+
+        return {
+            route,
+
+            authState:
+                state,
+
+            authEvaluation:
+                evaluation,
+
+            redirected:
+                false,
+
+            authUnavailable:
+                false
+        };
+    }
+
+    /* -----------------------------------------------------
+    UNKNOWN AUTH RESULT
+
+    Do not redirect because we do not have affirmative proof
+    that the user is signed out.
+    ----------------------------------------------------- */
+
+    console.error(
+        "ROUTER: Unrecognized authorization result.",
+        {
+            requestedPath:
+                route.requestedPath,
+
+            status:
+                evaluation.status
+                || null
+        }
     );
+
+    document.body.dataset.authAvailable =
+        "false";
+
+    return {
+        route,
+
+        authState:
+            state,
+
+        authEvaluation:
+            evaluation,
+
+        redirected:
+            false,
+
+        authUnavailable:
+            true
+    };
 }
 
 /* =========================================================
@@ -1498,17 +1588,11 @@ function setPageLoading(
 SIDEBAR
 ========================================================= */
 
-async function initializeLoadedSidebar(
-    authSession
-) {
+async function initializeLoadedSidebar() {
     try {
         await loadSidebarHover();
 
         initializeSidebar();
-
-        dispatchAuthState(
-            authSession
-        );
     }
     catch (
         error
@@ -1758,7 +1842,7 @@ async function loadShell() {
 
     try {
         /* -------------------------------------------------
-        AUTHENTICATION
+        AUTHORIZATION
         ------------------------------------------------- */
 
         const authCheck =
@@ -1793,6 +1877,11 @@ async function loadShell() {
                 authCheck.authUnavailable ===
                 true
             );
+
+        document.body.dataset.authStatus =
+            authCheck.authEvaluation
+                ?.status
+            || "not_required";
 
         /* -------------------------------------------------
         MASTER CSS
@@ -1899,9 +1988,7 @@ async function loadShell() {
         SIDEBAR
         ------------------------------------------------- */
 
-        await initializeLoadedSidebar(
-            authCheck.authSession
-        );
+        await initializeLoadedSidebar();
 
         if (
             !isCurrentNavigation(
@@ -1972,6 +2059,11 @@ async function loadShell() {
 
                         authUnavailable:
                             authCheck.authUnavailable,
+
+                        authStatus:
+                            authCheck.authEvaluation
+                                ?.status
+                            || null,
 
                         masterCss:
                             getMasterCssForRoute(
@@ -2081,7 +2173,6 @@ window.addEventListener(
     }
 );
 
-
 /* =========================================================
 PUBLIC ROUTER API
 ========================================================= */
@@ -2101,7 +2192,9 @@ STARTUP
 ========================================================= */
 
 applyInitialSidebarLayoutState();
+
 void initializeApiConnectionMonitor();
+
 initializeGlobalOcr();
 
 /*

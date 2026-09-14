@@ -1,0 +1,74 @@
+<!-- =========================================================
+BPD GAMING NETWORK
+ADMIN MANAGEMENT PAGE
+
+File:
+    public/admin/index.html
+
+Purpose:
+    Base landing page for the BPD Gaming Network Admin
+    management system.
+========================================================= -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Admin Management | BPD Gaming Network</title>
+
+    <link
+        rel="stylesheet"
+        href="/admin/admin.css"
+    >
+</head>
+
+<body>
+    <main
+        id="adminContent"
+        class="admin-page"
+        hidden
+    >
+        <section class="admin-panel">
+            <h1 class="admin-title">
+                Admin Management
+            </h1>
+        </section>
+    </main>
+
+    <main
+        id="adminLoading"
+        class="admin-page"
+    >
+        <p class="admin-status">
+            Verifying admin access...
+        </p>
+    </main>
+
+    <main
+        id="adminDenied"
+        class="admin-page"
+        hidden
+    >
+        <section class="admin-panel">
+            <h1>
+                Access Denied
+            </h1>
+
+            <p>
+                You are not authorized to access Admin Management.
+            </p>
+        </section>
+    </main>
+
+    <script
+        src="/admin/admin.js"
+        defer
+    ></script>
+</body>
+</html>

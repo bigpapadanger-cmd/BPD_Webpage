@@ -66,9 +66,9 @@ import {
 } from "../common_helpers/responses.js";
 
 import {
-    getSessionContext,
-    getProviderContext
-} from "../auth/sessions/session_context.js";
+    authorizeRequest,
+    isAuthorizationError
+} from "../auth/authorization.js";
 
 import {
     ensureRocketLeaguePlayer
@@ -217,37 +217,52 @@ function getRequestLocation(
 
 /* =========================================================
 EPIC PROVIDER
+
+Important:
+    - Epic ownership comes from the database-verified
+      authorization provider.
+    - Session provider data may supply non-authoritative
+      display metadata only.
+    - Epic account ownership is never taken from the browser
+      or trusted solely from Cloudflare KV.
 ========================================================= */
 
 function buildEpicUser(
-    sessionContext
+    authorization
 ) {
-    const epic =
-        getProviderContext(
-            sessionContext,
-            "epic"
-        );
+    const verifiedEpic =
+        authorization?.provider
+        || null;
+
+    const sessionEpic =
+        authorization?.providers?.epic
+        || null;
 
     return {
         linked:
-            epic?.linked === true,
+            Boolean(
+                verifiedEpic?.subject
+            ),
 
         authenticated:
-            epic?.authenticated === true,
+            sessionEpic?.authenticated ===
+            true,
 
         EpicUniqueId:
             normalizeNullableString(
-                epic?.accountId
+                verifiedEpic?.subject
             ),
 
         EpicDisplayName:
             normalizeNullableString(
-                epic?.displayName
+                verifiedEpic?.displayUsername
+                || sessionEpic?.displayName
             ),
 
         EpicPreferredUsername:
             normalizeNullableString(
-                epic?.preferredUsername
+                sessionEpic?.preferredUsername
+                || verifiedEpic?.displayUsername
             )
     };
 }
@@ -790,21 +805,197 @@ function validateRegistrationPayload(
 
 /* =========================================================
 AUTHENTICATED ROCKET LEAGUE CONTEXT
+
+Security:
+    Rocket League requires:
+        - Valid BPD browser session.
+        - Canonical identity.accounts.id.
+        - Active BPD account.
+        - Active Epic identity verified against Supabase.
+
+    Epic provider ownership is verified by:
+        authorization.js
+            ↓
+        provider_identity.js
+            ↓
+        api.verify_account_provider_identity
+            ↓
+        identity.account_identities
 ========================================================= */
 
 async function getAuthenticatedContext(
     request,
     env
 ) {
-    const sessionContext =
-        await getSessionContext(
-            request,
-            env
-        );
+    let authorization;
 
-    if (
-        sessionContext.authenticated !== true
+    try {
+        authorization =
+            await authorizeRequest(
+                request,
+                env,
+                {
+                    account:
+                        true,
+
+                    provider:
+                        "epic"
+                }
+            );
+    }
+    catch (
+        error
     ) {
+        if (
+            !isAuthorizationError(
+                error
+            )
+        ) {
+            throw error;
+        }
+
+        if (
+            error.code ===
+            "AUTH_REQUIRED"
+        ) {
+            return {
+                error:
+                    json(
+                        {
+                            success:
+                                false,
+
+                            authenticated:
+                                false,
+
+                            requiresEpicLogin:
+                                false,
+
+                            code:
+                                "AUTH_REQUIRED",
+
+                            message:
+                                "Login is required to access the Rocket League profile."
+                        },
+                        401
+                    )
+            };
+        }
+
+        if (
+            error.code ===
+            "ACCOUNT_IDENTITY_MISSING"
+        ) {
+            return {
+                error:
+                    json(
+                        {
+                            success:
+                                false,
+
+                            authenticated:
+                                true,
+
+                            requiresEpicLogin:
+                                false,
+
+                            code:
+                                "ACCOUNT_IDENTITY_MISSING",
+
+                            message:
+                                "Your global BPD account identity could not be resolved."
+                        },
+                        401
+                    )
+            };
+        }
+
+        if (
+            error.code ===
+            "ACCOUNT_INACTIVE"
+        ) {
+            return {
+                error:
+                    json(
+                        {
+                            success:
+                                false,
+
+                            authenticated:
+                                true,
+
+                            requiresEpicLogin:
+                                false,
+
+                            code:
+                                "ACCOUNT_INACTIVE",
+
+                            message:
+                                "This BPD account is not active."
+                        },
+                        403
+                    )
+            };
+        }
+
+        if (
+            error.code ===
+            "PROVIDER_REQUIRED"
+            && error?.details?.provider ===
+                "epic"
+        ) {
+            return {
+                error:
+                    json(
+                        {
+                            success:
+                                false,
+
+                            authenticated:
+                                true,
+
+                            requiresEpicLogin:
+                                true,
+
+                            code:
+                                "EPIC_ACCOUNT_REQUIRED",
+
+                            message:
+                                "A linked Epic account is required to access Rocket League."
+                        },
+                        403
+                    )
+            };
+        }
+
+        if (
+            error.code ===
+            "PROVIDER_VERIFICATION_UNAVAILABLE"
+        ) {
+            return {
+                error:
+                    json(
+                        {
+                            success:
+                                false,
+
+                            authenticated:
+                                true,
+
+                            requiresEpicLogin:
+                                false,
+
+                            code:
+                                "AUTHORIZATION_UNAVAILABLE",
+
+                            message:
+                                "Epic account authorization is temporarily unavailable."
+                        },
+                        503
+                    )
+            };
+        }
+
         return {
             error:
                 json(
@@ -813,27 +1004,39 @@ async function getAuthenticatedContext(
                             false,
 
                         authenticated:
-                            false,
-
-                        requiresEpicLogin:
                             true,
 
+                        requiresEpicLogin:
+                            false,
+
                         code:
-                            "AUTH_REQUIRED",
+                            error.code
+                            || "AUTHORIZATION_FAILED",
 
                         message:
-                            "Login is required to access the Rocket League profile."
+                            "You are not authorized to access this Rocket League resource."
                     },
-                    401
+                    Number.isInteger(
+                        error.status
+                    )
+                        ? error.status
+                        : 403
                 )
         };
     }
 
     const accountId =
         normalizeNullableString(
-            sessionContext.userId
+            authorization.accountId
         );
 
+    /*
+     * Defense in depth.
+     *
+     * authorizeRequest({ account: true }) already guarantees
+     * this value, but Rocket League should never proceed
+     * without an explicit canonical account ID.
+     */
     if (
         !accountId
     ) {
@@ -856,45 +1059,26 @@ async function getAuthenticatedContext(
                         message:
                             "Your global BPD account identity could not be resolved."
                     },
-                    409
-                )
-        };
-    }
-
-    if (
-        sessionContext.active !== true
-    ) {
-        return {
-            error:
-                json(
-                    {
-                        success:
-                            false,
-
-                        authenticated:
-                            true,
-
-                        requiresEpicLogin:
-                            false,
-
-                        code:
-                            "ACCOUNT_INACTIVE",
-
-                        message:
-                            "This BPD account is not active."
-                    },
-                    403
+                    500
                 )
         };
     }
 
     const epicUser =
         buildEpicUser(
-            sessionContext
+            authorization
         );
 
+    /*
+     * Defense in depth.
+     *
+     * requireProvider("epic") has already verified the
+     * identity against Supabase. If no provider subject is
+     * present here, fail closed.
+     */
     if (
-        epicUser.linked !== true
+        epicUser.linked !==
+            true
         || !epicUser.EpicUniqueId
     ) {
         return {
@@ -908,27 +1092,27 @@ async function getAuthenticatedContext(
                             true,
 
                         requiresEpicLogin:
-                            true,
-
-                        accountId,
-
-                        userId:
-                            accountId,
+                            false,
 
                         code:
-                            "EPIC_ACCOUNT_REQUIRED",
+                            "EPIC_IDENTITY_VERIFICATION_INVALID",
 
                         message:
-                            "A linked Epic account is required to access Rocket League."
+                            "The verified Epic account identity could not be resolved."
                     },
-                    409
+                    503
                 )
         };
     }
 
     return {
-        sessionContext,
+        authorization,
+
+        sessionContext:
+            authorization.sessionContext,
+
         accountId,
+
         epicUser
     };
 }

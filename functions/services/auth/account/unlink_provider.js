@@ -12,21 +12,30 @@ Purpose:
     authenticated global BPD account.
 
 Description:
-    Validates the active BPD session, removes the provider
-    identity through Supabase, and synchronizes the
-    centralized Cloudflare KV session.
+    - Uses centralized server-side account authorization.
+    - Resolves identity.accounts.id from the trusted BPD
+      session.
+    - Validates the requested provider.
+    - Removes the provider identity through Supabase.
+    - Synchronizes the centralized Cloudflare KV session.
+    - Invalidates the browser session if KV synchronization
+      fails after the authoritative database unlink.
 
 Database RPC:
     api.unlink_account_identity
 
 Flow:
-    Authenticated BPD session
+    Browser request
         ↓
-    Resolve identity.accounts.id from session
+    authorizeRequest({
+        account: true
+    })
+        ↓
+    identity.accounts.id from trusted session
         ↓
     Validate provider
         ↓
-    Call api.unlink_account_identity
+    api.unlink_account_identity
         ↓
     Database verifies:
         - provider belongs to account
@@ -35,16 +44,21 @@ Flow:
         ↓
     Remove provider from centralized KV session
 
-Important:
+Security:
     - Account ID is NEVER accepted from the browser.
-    - session.userId is the authoritative target account.
+    - authorization.accountId is the authoritative target
+      identity.accounts.id.
+    - Provider unlink is authoritative in Supabase first.
+    - Client-side provider state is never trusted.
+    - If session synchronization fails after database unlink,
+      the current session is invalidated to prevent stale
+      provider state from remaining trusted.
+
+Important:
     - Unlinking does NOT delete identity.accounts.
     - Unlinking does NOT detach core.rl_players.
     - Unlinking Google removes its Supabase auth bridge
       through the database RPC.
-    - If session synchronization fails after the database
-      unlink succeeds, the current BPD session is destroyed
-      and its browser cookie is cleared.
 ========================================================= */
 
 import {
@@ -58,8 +72,9 @@ import {
 } from "../sessions/session.js";
 
 import {
-    getSessionContext
-} from "../sessions/session_context.js";
+    authorizeRequest,
+    isAuthorizationError
+} from "../authorization.js";
 
 /* =========================================================
 SUPPORTED PROVIDERS
@@ -81,7 +96,8 @@ function normalizeString(
     value
 ) {
     if (
-        typeof value !== "string"
+        typeof value !==
+        "string"
     ) {
         return "";
     }
@@ -143,7 +159,8 @@ async function getRequestedProvider(
 
     if (
         !body
-        || typeof body !== "object"
+        || typeof body !==
+            "object"
         || Array.isArray(
             body
         )
@@ -165,7 +182,7 @@ function getSupabaseApiKey(
     env
 ) {
     return normalizeString(
-        env.SUPABASE_AUTH
+        env?.SUPABASE_AUTH
     );
 }
 
@@ -221,7 +238,7 @@ async function unlinkAccountIdentity(
 ) {
     const supabaseUrl =
         normalizeString(
-            env.SUPABASE_URL
+            env?.SUPABASE_URL
         );
 
     const apiKey =
@@ -255,6 +272,9 @@ async function unlinkAccountIdentity(
                 headers: {
                     "apikey":
                         apiKey,
+
+                    "Authorization":
+                        `Bearer ${apiKey}`,
 
                     "Content-Profile":
                         "api",
@@ -334,7 +354,8 @@ async function unlinkAccountIdentity(
 
     if (
         !record
-        || typeof record !== "object"
+        || typeof record !==
+            "object"
         || Array.isArray(
             record
         )
@@ -358,7 +379,8 @@ async function unlinkAccountIdentity(
 
     if (
         !resolvedAccountId
-        || resolvedAccountId !== accountId
+        || resolvedAccountId !==
+            accountId
     ) {
         throw new Error(
             "Provider unlink returned an unexpected account."
@@ -367,7 +389,8 @@ async function unlinkAccountIdentity(
 
     if (
         !resolvedProvider
-        || resolvedProvider !== provider
+        || resolvedProvider !==
+            provider
     ) {
         throw new Error(
             "Provider unlink returned an unexpected provider."
@@ -382,7 +405,8 @@ async function unlinkAccountIdentity(
             resolvedProvider,
 
         unlinked:
-            record.unlinked === true,
+            record.unlinked ===
+            true,
 
         remainingLoginIdentities:
             Number.isFinite(
@@ -397,6 +421,99 @@ async function unlinkAccountIdentity(
                 )
                 : null
     };
+}
+
+/* =========================================================
+AUTHORIZATION ERROR RESPONSE
+========================================================= */
+
+function getAuthorizationErrorResponse(
+    error,
+    debugId
+) {
+    if (
+        error.code ===
+        "AUTH_REQUIRED"
+    ) {
+        return json(
+            {
+                success:
+                    false,
+
+                code:
+                    "AUTH_REQUIRED",
+
+                message:
+                    "You must be signed in to unlink an authentication provider.",
+
+                debugId
+            },
+            401
+        );
+    }
+
+    if (
+        error.code ===
+        "ACCOUNT_INACTIVE"
+    ) {
+        return json(
+            {
+                success:
+                    false,
+
+                code:
+                    "ACCOUNT_INACTIVE",
+
+                message:
+                    "This BPD account is not active.",
+
+                debugId
+            },
+            403
+        );
+    }
+
+    if (
+        error.code ===
+        "ACCOUNT_IDENTITY_MISSING"
+    ) {
+        return json(
+            {
+                success:
+                    false,
+
+                code:
+                    "SESSION_IDENTITY_INVALID",
+
+                message:
+                    "Your authenticated account could not be resolved.",
+
+                debugId
+            },
+            401
+        );
+    }
+
+    return json(
+        {
+            success:
+                false,
+
+            code:
+                error.code
+                || "AUTHORIZATION_FAILED",
+
+            message:
+                "Your BPD account could not be authorized for this request.",
+
+            debugId
+        },
+        Number.isInteger(
+            error.status
+        )
+            ? error.status
+            : 403
+    );
 }
 
 /* =========================================================
@@ -507,71 +624,61 @@ export async function handleUnlinkProvider(
 
     try {
         /* =================================================
-        AUTHENTICATED GLOBAL ACCOUNT
+        CENTRAL ACCOUNT AUTHORIZATION
         ================================================= */
 
-        const session =
-            await getSessionContext(
-                request,
-                env
-            );
+        let authorization;
 
-        if (
-            session.authenticated !== true
-        ) {
-            return json(
-                {
-                    success:
-                        false,
-
-                    code:
-                        "AUTH_REQUIRED",
-
-                    message:
-                        "You must be signed in to unlink an authentication provider.",
-
-                    debugId
-                },
-                401
-            );
+        try {
+            authorization =
+                await authorizeRequest(
+                    request,
+                    env,
+                    {
+                        account:
+                            true
+                    }
+                );
         }
-
-        if (
-            session.active !== true
+        catch (
+            error
         ) {
-            return json(
-                {
-                    success:
-                        false,
-
-                    code:
-                        "ACCOUNT_INACTIVE",
-
-                    message:
-                        "This BPD account is not active.",
-
+            if (
+                isAuthorizationError(
+                    error
+                )
+            ) {
+                return getAuthorizationErrorResponse(
+                    error,
                     debugId
-                },
-                403
-            );
+                );
+            }
+
+            throw error;
         }
 
         const accountId =
             normalizeString(
-                session.userId
+                authorization.accountId
             );
 
         const sessionId =
             normalizeString(
-                session.sessionId
+                authorization.sessionId
             );
 
         if (
             !accountId
             || !sessionId
         ) {
+            /*
+             * authorizeRequest({ account: true }) should
+             * guarantee accountId. sessionId is also
+             * required because the provider cache must be
+             * synchronized after the database unlink.
+             */
             console.error(
-                "UNLINK PROVIDER: Session identity incomplete.",
+                "UNLINK PROVIDER: Authorization identity incomplete.",
                 {
                     debugId,
 
@@ -600,7 +707,7 @@ export async function handleUnlinkProvider(
 
                     debugId
                 },
-                409
+                500
             );
         }
 
@@ -658,8 +765,12 @@ export async function handleUnlinkProvider(
         /* =================================================
         DATABASE SOURCE OF TRUTH
 
-        The browser never supplies accountId.
-        session.userId determines the target account.
+        Browser never supplies accountId.
+
+        authorization.accountId was resolved from the
+        server-side BPD session.
+
+        Supabase performs the authoritative provider unlink.
         ================================================= */
 
         let result;
@@ -703,7 +814,8 @@ export async function handleUnlinkProvider(
         }
 
         if (
-            result.unlinked !== true
+            result.unlinked !==
+            true
         ) {
             console.error(
                 "UNLINK PROVIDER: RPC did not confirm unlink.",
@@ -734,12 +846,11 @@ export async function handleUnlinkProvider(
         /* =================================================
         CENTRALIZED SESSION SYNCHRONIZATION
 
-        Supabase has already completed the authoritative
-        provider unlink.
+        Supabase is authoritative and has already completed
+        the provider unlink.
 
-        If KV synchronization fails, invalidate both the KV
-        session and browser session cookie so stale provider
-        authentication cannot remain trusted.
+        If KV synchronization fails, invalidate the current
+        session so stale provider state cannot remain trusted.
         ================================================= */
 
         try {

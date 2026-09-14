@@ -12,37 +12,48 @@ Purpose:
 
 Description:
     - Creates the banner locally without requiring an HTML fetch.
+    - Uses Framework/Auth/auth.js as the single client auth source.
     - Remains visible when the internet or API is unavailable.
-    - Loads the global BPD authentication session when available.
-    - Displays the user's global BPD display name.
+    - Displays the user's global BPD account state.
     - Displays icons for linked authentication providers.
     - Provides Profile, Sign In, and Logout actions.
-    - Forces Profile navigation directly to /Account.
-    - Avoids displaying account data that cannot be verified.
-    - Refreshes automatically when authentication or network
-      availability changes.
+    - Refreshes automatically when auth or network state changes.
+    - Avoids making an independent /api/auth/session request.
 
 Authentication:
-    GET /api/auth/session
-    GET /api/auth/logout
+    Global auth state:
+        Framework/Auth/auth.js
+
+    Logout:
+        GET /api/auth/logout
+
+Security:
+    - The banner is UI only and is not a security boundary.
+    - Provider linkage displayed here is session/UI state only.
+    - Protected APIs independently verify authorization server-side.
 
 Important:
-    - The banner itself does not depend on API availability.
     - authenticated refers to the global BPD session.
     - BPD display name is the primary displayed identity.
     - Provider identities are shown only as linked-system icons.
     - Epic linkage is provider state, not global login state.
-    - No provider token or sensitive identity data is exposed.
 ========================================================= */
 
 import {
-    BPD_AUTH_SESSION_URL,
     BPD_AUTH_LOGOUT_URL
 } from "../../../scripts/apiRoutes.js";
 
 import {
     apiFetch
 } from "../../../scripts/apiConnection.js";
+
+import {
+    getAuthState,
+    peekAuthState,
+    refreshAuthState,
+    subscribeToAuthState,
+    invalidateAuthState
+} from "../../Auth/auth.js";
 
 /* =========================================================
 CONSTANTS
@@ -59,9 +70,6 @@ const FALLBACK_IMAGE_URL =
 
 /* =========================================================
 LOCAL BANNER MARKUP
-
-This markup is intentionally stored locally in the module so
-the banner can render without requesting an HTML fragment.
 ========================================================= */
 
 const BANNER_MARKUP = `
@@ -140,6 +148,9 @@ let initialized =
     false;
 
 let refreshPromise =
+    null;
+
+let unsubscribeAuthState =
     null;
 
 /* =========================================================
@@ -367,11 +378,11 @@ DISPLAY NAME
 ========================================================= */
 
 function getDisplayName(
-    session
+    authState
 ) {
     const directDisplayName =
         normalizeString(
-            session?.displayName
+            authState?.displayName
         );
 
     if (
@@ -380,30 +391,46 @@ function getDisplayName(
         return directDisplayName;
     }
 
-    const userDisplayName =
+    const googleDisplayName =
         normalizeString(
-            session
-                ?.user
+            authState
+                ?.providers
+                ?.google
                 ?.displayName
         );
 
     if (
-        userDisplayName
+        googleDisplayName
     ) {
-        return userDisplayName;
+        return googleDisplayName;
     }
 
-    const accountDisplayName =
+    const epicDisplayName =
         normalizeString(
-            session
-                ?.account
+            authState
+                ?.providers
+                ?.epic
                 ?.displayName
         );
 
     if (
-        accountDisplayName
+        epicDisplayName
     ) {
-        return accountDisplayName;
+        return epicDisplayName;
+    }
+
+    const discordDisplayName =
+        normalizeString(
+            authState
+                ?.providers
+                ?.discord
+                ?.displayName
+        );
+
+    if (
+        discordDisplayName
+    ) {
+        return discordDisplayName;
     }
 
     return "Profile";
@@ -508,7 +535,7 @@ PROVIDER ICON GROUP
 ========================================================= */
 
 function createProviderIcons(
-    session
+    authState
 ) {
     const container =
         document.createElement(
@@ -520,9 +547,9 @@ function createProviderIcons(
 
     const linkedProviders =
         Array.isArray(
-            session?.linkedProviders
+            authState?.linkedProviders
         )
-            ? session.linkedProviders
+            ? authState.linkedProviders
             : [];
 
     const uniqueProviders =
@@ -568,7 +595,7 @@ function createProviderIcons(
 }
 
 /* =========================================================
-LOCAL LOADING STATE
+LOADING STATE
 ========================================================= */
 
 function renderLoading() {
@@ -650,14 +677,11 @@ function renderSignedOut() {
         message
     );
 
-    const signInLink =
+    actions.appendChild(
         createLink(
             "Sign In",
             LOGIN_URL
-        );
-
-    actions.appendChild(
-        signInLink
+        )
     );
 
     setBannerState(
@@ -670,7 +694,7 @@ SIGNED IN
 ========================================================= */
 
 function renderSignedIn(
-    session
+    authState
 ) {
     const {
         status,
@@ -691,10 +715,6 @@ function renderSignedIn(
     actions.innerHTML =
         "";
 
-    /* -----------------------------------------------------
-    BPD DISPLAY NAME
-    ----------------------------------------------------- */
-
     const username =
         document.createElement(
             "span"
@@ -705,20 +725,16 @@ function renderSignedIn(
 
     username.textContent =
         getDisplayName(
-            session
+            authState
         );
 
     status.appendChild(
         username
     );
 
-    /* -----------------------------------------------------
-    LINKED PROVIDER ICONS
-    ----------------------------------------------------- */
-
     const providerIcons =
         createProviderIcons(
-            session
+            authState
         );
 
     if (
@@ -730,10 +746,6 @@ function renderSignedIn(
         );
     }
 
-    /* -----------------------------------------------------
-    PROFILE
-    ----------------------------------------------------- */
-
     const profileLink =
         createLink(
             "Profile",
@@ -744,24 +756,16 @@ function renderSignedIn(
         "bpd-account-banner__profile"
     );
 
-    profileLink.addEventListener(
-        "click",
-        event => {
-            event.preventDefault();
-
-            window.location.assign(
-                PROFILE_URL
-            );
-        }
-    );
+    /*
+     * Let the global router intercept this anchor naturally
+     * when data-router-link is present.
+     */
+    profileLink.dataset.routerLink =
+        "";
 
     actions.appendChild(
         profileLink
     );
-
-    /* -----------------------------------------------------
-    LOGOUT
-    ----------------------------------------------------- */
 
     actions.appendChild(
         createButton(
@@ -864,69 +868,62 @@ function renderUnavailable() {
 }
 
 /* =========================================================
-SESSION LOAD
+AUTH STATE RENDER
 ========================================================= */
 
-async function loadAccountSession() {
-    const response =
-        await apiFetch(
-            BPD_AUTH_SESSION_URL,
-            {
-                method:
-                    "GET",
-
-                credentials:
-                    "same-origin",
-
-                cache:
-                    "no-store",
-
-                headers: {
-                    "Accept":
-                        "application/json"
-                }
-            }
-        );
-
+function renderAuthState(
+    authState
+) {
     if (
-        response.status ===
-        401
-        || response.status ===
-            403
+        navigator.onLine !==
+        true
     ) {
-        return {
-            available:
-                true,
-
-            authenticated:
-                false
-        };
+        renderOffline();
+        return;
     }
 
     if (
-        !response.ok
+        !authState
+        || authState.status ===
+            "unknown"
+        || authState.status ===
+            "loading"
     ) {
-        throw new Error(
-            `Account session request failed: ${response.status}`
-        );
+        renderLoading();
+        return;
     }
 
-    const session =
-        await response.json();
+    if (
+        authState.available !==
+        true
+    ) {
+        renderUnavailable();
+        return;
+    }
 
-    return {
-        ...session,
+    if (
+        authState.authenticated ===
+        true
+    ) {
+        renderSignedIn(
+            authState
+        );
 
-        available:
-            true
-    };
+        return;
+    }
+
+    renderSignedOut();
 }
 
 /* =========================================================
 REFRESH
 ========================================================= */
 
-export async function refreshAccountBanner() {
+export async function refreshAccountBanner(
+    {
+        force = false
+    } = {}
+) {
     ensureBannerMarkup();
 
     if (
@@ -946,50 +943,41 @@ export async function refreshAccountBanner() {
     refreshPromise =
         (
             async () => {
-                try {
-                    const session =
-                        await loadAccountSession();
+                const authState =
+                    await getAuthState({
+                        force
+                    });
 
-                    if (
-                        session?.authenticated ===
-                        true
-                    ) {
-                        renderSignedIn(
-                            session
-                        );
-
-                        return;
-                    }
-
-                    renderSignedOut();
-                }
-                catch (
-                    error
-                ) {
-                    console.error(
-                        "ACCOUNT BANNER: Session load failed.",
-                        {
-                            message:
-                                error?.message
-                                || "Unknown error"
-                        }
-                    );
-
-                    if (
-                        navigator.onLine !==
-                        true
-                    ) {
-                        renderOffline();
-                        return;
-                    }
-
-                    renderUnavailable();
-                }
+                renderAuthState(
+                    authState
+                );
             }
         )();
 
     try {
         await refreshPromise;
+    }
+    catch (
+        error
+    ) {
+        console.error(
+            "ACCOUNT BANNER: Auth refresh failed.",
+            {
+                message:
+                    error?.message
+                    || "Unknown error"
+            }
+        );
+
+        if (
+            navigator.onLine !==
+            true
+        ) {
+            renderOffline();
+        }
+        else {
+            renderUnavailable();
+        }
     }
     finally {
         refreshPromise =
@@ -1037,6 +1025,18 @@ async function handleLogout() {
             );
         }
 
+        /*
+         * The server has destroyed the session.
+         * Invalidate the shared client auth cache before
+         * navigating away.
+         */
+        invalidateAuthState();
+
+        await refreshAuthState({
+            force:
+                true
+        });
+
         window.location.assign(
             "/"
         );
@@ -1069,8 +1069,12 @@ async function handleLogout() {
 AUTH STATE EVENTS
 ========================================================= */
 
-function handleAuthStateChanged() {
-    void refreshAccountBanner();
+function handleAuthStateChanged(
+    authState
+) {
+    renderAuthState(
+        authState
+    );
 }
 
 /* =========================================================
@@ -1110,7 +1114,10 @@ function handleNetworkStatus(
         && apiReady ===
             true
     ) {
-        void refreshAccountBanner();
+        void refreshAccountBanner({
+            force:
+                true
+        });
     }
 }
 
@@ -1119,10 +1126,10 @@ REGISTER EVENTS
 ========================================================= */
 
 function registerAccountBannerEvents() {
-    document.addEventListener(
-        "bpd:auth-changed",
-        handleAuthStateChanged
-    );
+    unsubscribeAuthState =
+        subscribeToAuthState(
+            handleAuthStateChanged
+        );
 
     document.addEventListener(
         "bpd:network-status",
@@ -1135,16 +1142,17 @@ INITIALIZATION
 ========================================================= */
 
 export async function initializeAccountBanner() {
-    /*
-     * Banner construction is completely local.
-     * It must succeed independently of network/API state.
-     */
     ensureBannerMarkup();
 
     if (
         initialized
     ) {
+        renderAuthState(
+            peekAuthState()
+        );
+
         void refreshAccountBanner();
+
         return;
     }
 
@@ -1163,16 +1171,10 @@ export async function initializeAccountBanner() {
 
     renderWaitingForConnection();
 
-    /*
-     * Do not depend exclusively on receiving a
-     * bpd:network-status event.
-     *
-     * The API monitor may have completed before this
-     * controller registered its event listener.
-     *
-     * apiFetch() will verify the API connection itself when
-     * necessary.
-     */
+    renderAuthState(
+        peekAuthState()
+    );
+
     void refreshAccountBanner();
 }
 

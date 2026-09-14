@@ -5,18 +5,21 @@ BPD GAMING NETWORK
 ACCOUNT PAGE CONTROLLER
 
 File:
-    Account/JS/account.js
+    /Global/Account/JS/index.js
 
 Purpose:
     Controls the authenticated global BPD Gaming Network
     account page.
 
 Description:
+    - Uses Framework/Auth/auth.js as the single client-side
+      authentication state source.
+    - Uses /scripts/apiRoutes.js for all browser API paths.
     - Requires an authenticated global BPD account session.
     - Redirects confirmed signed-out users to /Login.
     - Preserves /Account when authentication cannot be
       verified because the network or API is unavailable.
-    - Displays the user's global BPD display name.
+    - Displays the canonical global BPD display name.
     - Displays account role and active status.
     - Displays linked authentication providers.
     - Displays provider-specific usernames where available.
@@ -26,29 +29,45 @@ Description:
     - Starts provider linking through the generic link route.
     - Unlinks providers through the generic unlink route.
     - Provides permanent account deletion.
-    - Refreshes the persistent account banner when global
-      account or provider state changes.
+    - Refreshes centralized auth state after account or
+      provider mutations.
 
-Authentication:
-    GET    /api/auth/session
-    POST   /api/auth/account/profile
-    GET    /api/auth/link?provider={provider}
-    POST   /api/auth/unlink
-    DELETE /api/auth/account
+Authentication State:
+    /Framework/Auth/auth.js
+
+API Routes:
+    /scripts/apiRoutes.js
+
+Security:
+    - Client authentication state is UI/navigation state only.
+    - Protected API routes independently enforce server-side
+      authorization.
+    - identity.accounts.id is never supplied by the browser.
+    - Provider identities are linked identities, not the
+      canonical BPD account identity.
 
 Important:
     - /Account requires authentication.
-    - A confirmed 401/403 redirects to /Login.
+    - Confirmed signed-out state redirects to /Login.
     - API/network failure is NOT treated as signed-out state.
     - identity.accounts.id is the canonical BPD account ID.
-    - Global BPD display name is separate from provider names.
-    - Provider identities are account linkages, not the
-      canonical BPD identity.
-    - The browser never supplies identity.accounts.id.
+    - identity.accounts.display_name is the canonical BPD
+      display name.
+    - Provider display names remain provider-specific.
 ========================================================= */
 
 import {
-    BPD_AUTH_SESSION_URL
+    getAuthState,
+    refreshAuthState,
+    subscribeToAuthState,
+    invalidateAuthState
+} from "/Framework/Auth/auth.js";
+
+import {
+    BPD_AUTH_ACCOUNT_PROFILE_URL,
+    BPD_AUTH_ACCOUNT_URL,
+    BPD_AUTH_LINK_URL,
+    BPD_AUTH_UNLINK_URL
 } from "/scripts/apiRoutes.js";
 
 import {
@@ -56,23 +75,14 @@ import {
 } from "/scripts/apiConnection.js";
 
 /* =========================================================
-CONSTANTS
+PAGE / ASSET CONSTANTS
 ========================================================= */
 
 const LOGIN_URL =
     "/Login";
 
-const PROFILE_UPDATE_URL =
-    "/api/auth/account/profile";
-
-const PROVIDER_LINK_URL =
-    "/api/auth/link";
-
-const PROVIDER_UNLINK_URL =
-    "/api/auth/unlink";
-
-const ACCOUNT_DELETE_URL =
-    "/api/auth/account";
+const ACCOUNT_RETURN_URL =
+    "/Account";
 
 const FALLBACK_IMAGE_URL =
     "/images/bad_image/fallback.png";
@@ -120,7 +130,7 @@ const PROVIDER_CONFIG =
 STATE
 ========================================================= */
 
-let currentSession =
+let currentAuthState =
     null;
 
 let originalDisplayName =
@@ -137,6 +147,9 @@ let deletingAccount =
 
 let redirectingToLogin =
     false;
+
+let unsubscribeAuthState =
+    null;
 
 /* =========================================================
 NORMALIZATION
@@ -303,7 +316,11 @@ function redirectToLogin() {
     );
 
     const returnTo =
-        `${window.location.pathname}${window.location.search}${window.location.hash}`;
+        (
+            window.location.pathname
+            + window.location.search
+            + window.location.hash
+        );
 
     const loginUrl =
         new URL(
@@ -325,47 +342,12 @@ function redirectToLogin() {
 DISPLAY NAME
 ========================================================= */
 
-function getSessionDisplayName(
-    session
+function getAccountDisplayName(
+    authState
 ) {
-    const directDisplayName =
-        normalizeString(
-            session?.displayName
-        );
-
-    if (
-        directDisplayName
-    ) {
-        return directDisplayName;
-    }
-
-    const userDisplayName =
-        normalizeString(
-            session
-                ?.user
-                ?.displayName
-        );
-
-    if (
-        userDisplayName
-    ) {
-        return userDisplayName;
-    }
-
-    const accountDisplayName =
-        normalizeString(
-            session
-                ?.account
-                ?.displayName
-        );
-
-    if (
-        accountDisplayName
-    ) {
-        return accountDisplayName;
-    }
-
-    return "";
+    return normalizeString(
+        authState?.displayName
+    );
 }
 
 /* =========================================================
@@ -373,17 +355,11 @@ ACCOUNT ROLE
 ========================================================= */
 
 function getAccountRole(
-    session
+    authState
 ) {
     const role =
         normalizeString(
-            session?.role
-            || session
-                ?.user
-                ?.role
-            || session
-                ?.account
-                ?.role
+            authState?.role
         );
 
     if (
@@ -407,34 +383,12 @@ ACCOUNT ACTIVE STATE
 ========================================================= */
 
 function isAccountActive(
-    session
+    authState
 ) {
-    if (
-        typeof session?.active ===
-        "boolean"
-    ) {
-        return session.active;
-    }
-
-    if (
-        typeof session
-            ?.user
-            ?.active ===
-        "boolean"
-    ) {
-        return session.user.active;
-    }
-
-    if (
-        typeof session
-            ?.account
-            ?.active ===
-        "boolean"
-    ) {
-        return session.account.active;
-    }
-
-    return true;
+    return (
+        authState?.active ===
+        true
+    );
 }
 
 /* =========================================================
@@ -442,13 +396,13 @@ LINKED PROVIDERS
 ========================================================= */
 
 function getLinkedProviders(
-    session
+    authState
 ) {
     const linkedProviders =
         Array.isArray(
-            session?.linkedProviders
+            authState?.linkedProviders
         )
-            ? session.linkedProviders
+            ? authState.linkedProviders
             : [];
 
     return new Set(
@@ -467,7 +421,7 @@ PROVIDER CONTEXT
 ========================================================= */
 
 function getProviderContext(
-    session,
+    authState,
     providerName
 ) {
     const normalizedProvider =
@@ -482,12 +436,15 @@ function getProviderContext(
     }
 
     const providers =
-        session?.providers;
+        authState?.providers;
 
     if (
         !providers
         || typeof providers !==
             "object"
+        || Array.isArray(
+            providers
+        )
     ) {
         return null;
     }
@@ -513,12 +470,12 @@ PROVIDER DISPLAY NAME
 ========================================================= */
 
 function getProviderDisplayName(
-    session,
+    authState,
     providerName
 ) {
     const provider =
         getProviderContext(
-            session,
+            authState,
             providerName
         );
 
@@ -531,7 +488,6 @@ function getProviderDisplayName(
     const candidates = [
         provider.displayName,
         provider.preferredUsername,
-        provider.username,
         provider.email
     ];
 
@@ -635,7 +591,7 @@ PROVIDER STATUS
 function setProviderStatus(
     providerName,
     connected,
-    session
+    authState
 ) {
     const normalizedProvider =
         normalizeProviderName(
@@ -675,7 +631,7 @@ function setProviderStatus(
     ) {
         const providerDisplayName =
             getProviderDisplayName(
-                session,
+                authState,
                 normalizedProvider
             );
 
@@ -714,11 +670,11 @@ RENDER PROVIDERS
 ========================================================= */
 
 function renderProviders(
-    session
+    authState
 ) {
     const linkedProviders =
         getLinkedProviders(
-            session
+            authState
         );
 
     for (
@@ -732,7 +688,7 @@ function renderProviders(
             linkedProviders.has(
                 providerName
             ),
-            session
+            authState
         );
     }
 }
@@ -795,7 +751,7 @@ RENDER ACCOUNT INFORMATION
 ========================================================= */
 
 function renderAccountInformation(
-    session
+    authState
 ) {
     const {
         accountStatus,
@@ -808,7 +764,7 @@ function renderAccountInformation(
     ) {
         const active =
             isAccountActive(
-                session
+                authState
             );
 
         accountStatus.textContent =
@@ -827,7 +783,7 @@ function renderAccountInformation(
     ) {
         accountRole.textContent =
             getAccountRole(
-                session
+                authState
             );
     }
 }
@@ -837,7 +793,7 @@ RENDER PROFILE
 ========================================================= */
 
 function renderProfile(
-    session
+    authState
 ) {
     const {
         displayName,
@@ -853,8 +809,8 @@ function renderProfile(
     }
 
     originalDisplayName =
-        getSessionDisplayName(
-            session
+        getAccountDisplayName(
+            authState
         );
 
     displayName.value =
@@ -872,7 +828,7 @@ DANGER ZONE
 ========================================================= */
 
 function renderDangerZone(
-    authenticated
+    enabled
 ) {
     const {
         deleteAccountButton
@@ -886,7 +842,7 @@ function renderDangerZone(
     }
 
     deleteAccountButton.disabled =
-        !authenticated
+        !enabled
         || deletingAccount;
 }
 
@@ -957,6 +913,10 @@ function updateProfileSaveState() {
 
     if (
         savingProfile
+        || currentAuthState?.authenticated !==
+            true
+        || currentAuthState?.active !==
+            true
     ) {
         saveProfileButton.disabled =
             true;
@@ -981,76 +941,27 @@ function updateProfileSaveState() {
 }
 
 /* =========================================================
-LOAD SESSION
-========================================================= */
-
-async function loadAccountSession() {
-    const response =
-        await apiFetch(
-            BPD_AUTH_SESSION_URL,
-            {
-                method:
-                    "GET",
-
-                credentials:
-                    "same-origin",
-
-                cache:
-                    "no-store",
-
-                headers: {
-                    "Accept":
-                        "application/json"
-                }
-            }
-        );
-
-    if (
-        response.status ===
-        401
-        || response.status ===
-            403
-    ) {
-        return {
-            authenticated:
-                false,
-
-            confirmedSignedOut:
-                true
-        };
-    }
-
-    if (
-        !response.ok
-    ) {
-        throw new Error(
-            `Account session request failed: ${response.status}`
-        );
-    }
-
-    return response.json();
-}
-
-/* =========================================================
 RENDER AUTHENTICATED ACCOUNT
 ========================================================= */
 
 function renderAuthenticatedAccount(
-    session
+    authState
 ) {
-    currentSession =
-        session;
+    currentAuthState =
+        authState;
+
+    clearStatusMessage();
 
     renderProfile(
-        session
+        authState
     );
 
     renderProviders(
-        session
+        authState
     );
 
     renderAccountInformation(
-        session
+        authState
     );
 
     renderDangerZone(
@@ -1059,6 +970,60 @@ function renderAuthenticatedAccount(
 
     setPageState(
         "ready"
+    );
+}
+
+/* =========================================================
+RENDER INACTIVE ACCOUNT
+========================================================= */
+
+function renderInactiveAccount(
+    authState
+) {
+    currentAuthState =
+        authState;
+
+    renderProfile(
+        authState
+    );
+
+    renderProviders(
+        authState
+    );
+
+    renderAccountInformation(
+        authState
+    );
+
+    disableAccountControls();
+
+    showStatusMessage(
+        "This BPD account is currently inactive.",
+        "error"
+    );
+
+    setPageState(
+        "inactive"
+    );
+}
+
+/* =========================================================
+RENDER INVALID ACCOUNT
+========================================================= */
+
+function renderInvalidAccount() {
+    currentAuthState =
+        null;
+
+    disableAccountControls();
+
+    showStatusMessage(
+        "The authenticated BPD account could not be resolved.",
+        "error"
+    );
+
+    setPageState(
+        "invalid"
     );
 }
 
@@ -1086,10 +1051,88 @@ function renderUnavailable() {
 }
 
 /* =========================================================
+APPLY AUTH STATE
+========================================================= */
+
+function applyAuthState(
+    authState
+) {
+    if (
+        redirectingToLogin
+    ) {
+        return;
+    }
+
+    currentAuthState =
+        authState
+        || null;
+
+    if (
+        !authState
+        || authState.status ===
+            "unknown"
+        || authState.status ===
+            "loading"
+    ) {
+        setPageState(
+            "loading"
+        );
+
+        return;
+    }
+
+    if (
+        authState.status ===
+            "unavailable"
+        || authState.available !==
+            true
+    ) {
+        renderUnavailable();
+        return;
+    }
+
+    if (
+        authState.authenticated !==
+            true
+    ) {
+        redirectToLogin();
+        return;
+    }
+
+    if (
+        !normalizeString(
+            authState.userId
+        )
+    ) {
+        renderInvalidAccount();
+        return;
+    }
+
+    if (
+        authState.active !==
+        true
+    ) {
+        renderInactiveAccount(
+            authState
+        );
+
+        return;
+    }
+
+    renderAuthenticatedAccount(
+        authState
+    );
+}
+
+/* =========================================================
 LOAD ACCOUNT
 ========================================================= */
 
-async function loadAccount() {
+async function loadAccount(
+    {
+        force = false
+    } = {}
+) {
     if (
         redirectingToLogin
     ) {
@@ -1103,34 +1146,20 @@ async function loadAccount() {
     );
 
     try {
-        const session =
-            await loadAccountSession();
+        const authState =
+            await getAuthState({
+                force
+            });
 
-        if (
-            session?.authenticated !==
-            true
-        ) {
-            if (
-                session?.confirmedSignedOut ===
-                true
-            ) {
-                redirectToLogin();
-                return;
-            }
-
-            renderUnavailable();
-            return;
-        }
-
-        renderAuthenticatedAccount(
-            session
+        applyAuthState(
+            authState
         );
     }
     catch (
         error
     ) {
         console.error(
-            "ACCOUNT PAGE: Failed to load account.",
+            "ACCOUNT PAGE: Failed to load auth state.",
             {
                 message:
                     error?.message
@@ -1138,10 +1167,6 @@ async function loadAccount() {
             }
         );
 
-        /*
-         * A failed request does not prove the user is signed
-         * out. Leave /Account loaded and disable controls.
-         */
         renderUnavailable();
     }
 }
@@ -1155,7 +1180,7 @@ async function saveProfile(
 ) {
     const response =
         await apiFetch(
-            PROFILE_UPDATE_URL,
+            BPD_AUTH_ACCOUNT_PROFILE_URL,
             {
                 method:
                     "POST",
@@ -1235,8 +1260,11 @@ async function handleProfileSubmit(
         !displayName
         || !saveProfileButton
         || savingProfile
-        || currentSession
+        || currentAuthState
             ?.authenticated !==
+            true
+        || currentAuthState
+            ?.active !==
             true
     ) {
         return;
@@ -1281,19 +1309,15 @@ async function handleProfileSubmit(
             validation.value
         );
 
-        originalDisplayName =
-            validation.value;
+        const refreshedState =
+            await refreshAuthState({
+                force:
+                    true
+            });
 
-        displayName.value =
-            validation.value;
-
-        document.dispatchEvent(
-            new CustomEvent(
-                "bpd:auth-changed"
-            )
+        applyAuthState(
+            refreshedState
         );
-
-        await loadAccount();
 
         showStatusMessage(
             "Profile updated successfully.",
@@ -1337,8 +1361,10 @@ function linkProvider(
     providerName
 ) {
     if (
-        currentSession?.authenticated !==
-        true
+        currentAuthState?.authenticated !==
+            true
+        || currentAuthState?.active !==
+            true
     ) {
         return;
     }
@@ -1364,13 +1390,18 @@ function linkProvider(
 
     const linkUrl =
         new URL(
-            PROVIDER_LINK_URL,
+            BPD_AUTH_LINK_URL,
             window.location.origin
         );
 
     linkUrl.searchParams.set(
         "provider",
         normalizedProvider
+    );
+
+    linkUrl.searchParams.set(
+        "returnTo",
+        ACCOUNT_RETURN_URL
     );
 
     window.location.assign(
@@ -1393,12 +1424,12 @@ async function unlinkProvider(
     if (
         !normalizedProvider
     ) {
-        return;
+        return null;
     }
 
     const response =
         await apiFetch(
-            PROVIDER_UNLINK_URL,
+            BPD_AUTH_UNLINK_URL,
             {
                 method:
                     "POST",
@@ -1425,39 +1456,33 @@ async function unlinkProvider(
             }
         );
 
+    let body =
+        null;
+
+    try {
+        body =
+            await response.json();
+    }
+    catch {
+        // Response body is optional.
+    }
+
     if (
         !response.ok
     ) {
-        let message =
-            `Provider unlink failed: ${response.status}`;
-
-        try {
-            const body =
-                await response.json();
-
-            const serverMessage =
-                normalizeString(
-                    body?.message
-                    || body?.error
-                );
-
-            if (
-                serverMessage
-            ) {
-                message =
-                    serverMessage;
-            }
-        }
-        catch {
-            // Response body is optional.
-        }
+        const message =
+            normalizeString(
+                body?.message
+                || body?.error
+            )
+            || `Provider unlink failed: ${response.status}`;
 
         throw new Error(
             message
         );
     }
 
-    return response.json();
+    return body;
 }
 
 /* =========================================================
@@ -1468,8 +1493,10 @@ async function handleProviderAction(
     event
 ) {
     if (
-        currentSession?.authenticated !==
-        true
+        currentAuthState?.authenticated !==
+            true
+        || currentAuthState?.active !==
+            true
     ) {
         return;
     }
@@ -1537,17 +1564,31 @@ async function handleProviderAction(
     clearStatusMessage();
 
     try {
-        await unlinkProvider(
-            providerName
-        );
+        const result =
+            await unlinkProvider(
+                providerName
+            );
 
-        document.dispatchEvent(
-            new CustomEvent(
-                "bpd:auth-changed"
-            )
-        );
+        const refreshedState =
+            await refreshAuthState({
+                force:
+                    true
+            });
 
-        await loadAccount();
+        if (
+            result?.sessionReset ===
+                true
+            || refreshedState
+                ?.authenticated !==
+                true
+        ) {
+            redirectToLogin();
+            return;
+        }
+
+        applyAuthState(
+            refreshedState
+        );
 
         showStatusMessage(
             `${config?.label || providerName} disconnected successfully.`,
@@ -1575,7 +1616,15 @@ async function handleProviderAction(
             "error"
         );
 
-        await loadAccount();
+        const refreshedState =
+            await refreshAuthState({
+                force:
+                    true
+            });
+
+        applyAuthState(
+            refreshedState
+        );
     }
 }
 
@@ -1586,7 +1635,7 @@ DELETE ACCOUNT REQUEST
 async function deleteAccount() {
     const response =
         await apiFetch(
-            ACCOUNT_DELETE_URL,
+            BPD_AUTH_ACCOUNT_URL,
             {
                 method:
                     "DELETE",
@@ -1604,39 +1653,33 @@ async function deleteAccount() {
             }
         );
 
+    let body =
+        null;
+
+    try {
+        body =
+            await response.json();
+    }
+    catch {
+        // Response body is optional.
+    }
+
     if (
         !response.ok
     ) {
-        let message =
-            `Account deletion failed: ${response.status}`;
-
-        try {
-            const body =
-                await response.json();
-
-            const serverMessage =
-                normalizeString(
-                    body?.message
-                    || body?.error
-                );
-
-            if (
-                serverMessage
-            ) {
-                message =
-                    serverMessage;
-            }
-        }
-        catch {
-            // Response body is optional.
-        }
+        const message =
+            normalizeString(
+                body?.message
+                || body?.error
+            )
+            || `Account deletion failed: ${response.status}`;
 
         throw new Error(
             message
         );
     }
 
-    return response.json();
+    return body;
 }
 
 /* =========================================================
@@ -1645,8 +1688,8 @@ DELETE ACCOUNT CONFIRMATION
 
 function confirmAccountDeletion() {
     const displayName =
-        getSessionDisplayName(
-            currentSession
+        getAccountDisplayName(
+            currentAuthState
         );
 
     const firstConfirmation =
@@ -1689,8 +1732,11 @@ async function handleDeleteAccount() {
     if (
         !deleteAccountButton
         || deletingAccount
-        || currentSession
+        || currentAuthState
             ?.authenticated !==
+            true
+        || currentAuthState
+            ?.active !==
             true
     ) {
         return;
@@ -1719,11 +1765,7 @@ async function handleDeleteAccount() {
     try {
         await deleteAccount();
 
-        document.dispatchEvent(
-            new CustomEvent(
-                "bpd:auth-changed"
-            )
-        );
+        invalidateAuthState();
 
         window.location.assign(
             "/"
@@ -1754,7 +1796,12 @@ async function handleDeleteAccount() {
             "Delete Account";
 
         renderDangerZone(
-            true
+            currentAuthState
+                ?.authenticated ===
+                true
+            && currentAuthState
+                ?.active ===
+                true
         );
     }
 }
@@ -1819,11 +1866,15 @@ function registerDangerZoneEvents() {
 }
 
 /* =========================================================
-AUTH STATE CHANGE
+CENTRAL AUTH STATE CHANGE
 ========================================================= */
 
-function handleAuthStateChanged() {
-    void loadAccount();
+function handleAuthStateChanged(
+    authState
+) {
+    applyAuthState(
+        authState
+    );
 }
 
 /* =========================================================
@@ -1855,7 +1906,10 @@ function handleNetworkStatus(
         && apiReady ===
             true
     ) {
-        void loadAccount();
+        void loadAccount({
+            force:
+                true
+        });
     }
 }
 
@@ -1864,10 +1918,10 @@ REGISTER GLOBAL EVENTS
 ========================================================= */
 
 function registerGlobalEvents() {
-    document.addEventListener(
-        "bpd:auth-changed",
-        handleAuthStateChanged
-    );
+    unsubscribeAuthState =
+        subscribeToAuthState(
+            handleAuthStateChanged
+        );
 
     document.addEventListener(
         "bpd:network-status",
@@ -1888,13 +1942,9 @@ export async function initializePage() {
     }
 
     initializeProviderIcons();
-
     registerProfileEvents();
-
     registerProviderEvents();
-
     registerDangerZoneEvents();
-
     registerGlobalEvents();
 
     initialized =

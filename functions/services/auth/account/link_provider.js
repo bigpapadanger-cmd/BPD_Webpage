@@ -16,43 +16,54 @@ Supported Providers:
     - Discord
     - Epic Games
 
+Provider Engines:
+    Google
+        → Supabase Auth
+
+    Discord
+        → Supabase Auth
+
+    Epic
+        → Direct Epic Games OAuth
+
 Flow:
     Authenticated BPD session
         ↓
-    Validate target provider
+    Central server authorization
         ↓
-    Preserve target identity.accounts.id
+    Resolve identity.accounts.id
         ↓
-    Mark OAuth mode as "link"
+    Validate provider
         ↓
-    Generate PKCE verifier + challenge
+    Start provider-specific OAuth flow
         ↓
-    Store temporary OAuth context in HttpOnly cookies
+    Provider callback
         ↓
-    Redirect into provider OAuth
-        ↓
-    Provider returns to /api/auth/_oauth/callback
-        ↓
-    Callback links the authenticated provider identity to
-    the existing identity.accounts.id
+    Link provider identity to existing BPD account
+
+Security:
+    - This service requires an authenticated active BPD
+      account.
+    - identity.accounts.id comes only from the trusted server
+      session.
+    - Browser input never determines the target account ID.
+    - Epic link mode passes the trusted account ID into the
+      direct Epic OAuth context.
+    - Google/Discord link mode stores the trusted account ID
+      in short-lived HttpOnly OAuth context.
+    - Final provider ownership must still be verified by the
+      provider callback and database.
 
 Important:
     - This service NEVER creates identity.accounts.
-    - The current BPD session determines the target account.
-    - The browser never supplies identity.accounts.id.
     - Email is never used to determine account ownership.
     - OAuth verifier/state values must never be logged.
     - Provider identity ownership is finalized only after
       successful provider authentication in the callback.
-
-Compatibility:
-    - Google and Discord are intended to use Supabase Auth.
-    - Epic compatibility is enabled through the same provider
-      dispatch path for initial integration testing.
-    - If Epic requires the existing direct Epic OAuth flow,
-      only the Epic starter will need to be replaced later;
-      the account-linking contract can remain unchanged.
 ========================================================= */
+import {
+    verifyAccountProviderIdentity
+} from "../providers/provider_identity.js";
 
 import {
     json,
@@ -64,17 +75,24 @@ import {
 } from "../sessions/session.js";
 
 import {
-    getSessionContext
-} from "../sessions/session_context.js";
+    authorizeRequest,
+    isAuthorizationError
+} from "../authorization.js";
+
+import {
+    startEpicAuthorization
+} from "../providers/epic/login.js";
 
 import {
     SUPABASE_OAUTH_AUTHORIZE_URL,
-    OAUTH_RETURN_URL
+    OAUTH_RETURN_URL,
+    OAUTH_MODE_COOKIE,
+    OAUTH_PROVIDER_COOKIE,
+    OAUTH_ACCOUNT_COOKIE,
+    OAUTH_COOKIE_MAX_AGE_SECONDS,
+    OAUTH_PKCE_COOKIE
 } from "../../config/api_vars.js";
 
-import { OAUTH_MODE_COOKIE, OAUTH_PROVIDER_COOKIE, OAUTH_ACCOUNT_COOKIE,
-        OAUTH_COOKIE_MAX_AGE_SECONDS, OAUTH_PKCE_COOKIE
-} from "../../config/api_vars.js";
 /* =========================================================
 CONSTANTS
 ========================================================= */
@@ -82,8 +100,8 @@ CONSTANTS
 const OAUTH_MODE_LINK =
     "link";
 
-
-
+const DEFAULT_RETURN_TO =
+    "/Account";
 
 /* =========================================================
 SUPPORTED PROVIDERS
@@ -132,7 +150,7 @@ const PROVIDER_CONFIG =
                 "Epic Games",
 
             authEngine:
-                "supabase"
+                "epic"
         }
     });
 
@@ -151,6 +169,48 @@ function normalizeString(
     }
 
     return value.trim();
+}
+
+/* =========================================================
+RETURN DESTINATION
+========================================================= */
+
+function normalizeReturnTo(
+    value
+) {
+    const returnTo =
+        normalizeString(
+            value
+        );
+
+    if (
+        !returnTo
+        || !returnTo.startsWith(
+            "/"
+        )
+        || returnTo.startsWith(
+            "//"
+        )
+    ) {
+        return DEFAULT_RETURN_TO;
+    }
+
+    return returnTo;
+}
+
+function getReturnTo(
+    request
+) {
+    const url =
+        new URL(
+            request.url
+        );
+
+    return normalizeReturnTo(
+        url.searchParams.get(
+            "returnTo"
+        )
+    );
 }
 
 /* =========================================================
@@ -317,10 +377,10 @@ function getProviderConfig(
 }
 
 /* =========================================================
-CREATE OAUTH CONTEXT COOKIES
+CREATE SUPABASE OAUTH CONTEXT COOKIES
 ========================================================= */
 
-function createOAuthContextCookies(
+function createSupabaseOAuthContextCookies(
     request,
     provider,
     accountId,
@@ -402,9 +462,11 @@ async function startSupabaseProviderLink(
 
     if (
         !providerConfig
+        || providerConfig.authEngine !==
+            "supabase"
     ) {
         throw new Error(
-            "OAuth provider configuration was not found."
+            "Supabase OAuth provider configuration was not found."
         );
     }
 
@@ -453,7 +515,7 @@ async function startSupabaseProviderLink(
     );
 
     const cookies =
-        createOAuthContextCookies(
+        createSupabaseOAuthContextCookies(
             request,
             providerConfig.provider,
             accountId,
@@ -475,13 +537,51 @@ async function startSupabaseProviderLink(
 }
 
 /* =========================================================
+EPIC PROVIDER LINK FLOW
+========================================================= */
+
+function startEpicProviderLink(
+    request,
+    env,
+    accountId,
+    returnTo
+) {
+    /*
+     * accountId originates from authorizeRequest().
+     *
+     * It is never accepted from the browser.
+     */
+
+    const authorization =
+        startEpicAuthorization(
+            request,
+            env,
+            {
+                mode:
+                    OAUTH_MODE_LINK,
+
+                accountId,
+
+                returnTo
+            }
+        );
+
+    return redirect(
+        authorization.redirectUrl,
+        authorization.cookies
+    );
+}
+
+/* =========================================================
 START PROVIDER LINK
 ========================================================= */
 
 async function startProviderLink(
     request,
+    env,
     accountId,
-    provider
+    provider,
+    returnTo
 ) {
     const providerConfig =
         getProviderConfig(
@@ -507,8 +607,113 @@ async function startProviderLink(
         );
     }
 
+    if (
+        providerConfig.authEngine ===
+        "epic"
+    ) {
+        return startEpicProviderLink(
+            request,
+            env,
+            accountId,
+            returnTo
+        );
+    }
+
     throw new Error(
         "Provider authentication engine is not supported."
+    );
+}
+
+/* =========================================================
+AUTHORIZATION ERROR RESPONSE
+========================================================= */
+
+function getAuthorizationErrorResponse(
+    error,
+    debugId
+) {
+    if (
+        error.code ===
+        "AUTH_REQUIRED"
+    ) {
+        return json(
+            {
+                success:
+                    false,
+
+                code:
+                    "AUTH_REQUIRED",
+
+                message:
+                    "You must be signed in to link an account provider.",
+
+                debugId
+            },
+            401
+        );
+    }
+
+    if (
+        error.code ===
+        "ACCOUNT_INACTIVE"
+    ) {
+        return json(
+            {
+                success:
+                    false,
+
+                code:
+                    "ACCOUNT_INACTIVE",
+
+                message:
+                    "This BPD account is not active.",
+
+                debugId
+            },
+            403
+        );
+    }
+
+    if (
+        error.code ===
+        "ACCOUNT_IDENTITY_MISSING"
+    ) {
+        return json(
+            {
+                success:
+                    false,
+
+                code:
+                    "ACCOUNT_ID_REQUIRED",
+
+                message:
+                    "Your BPD account identity could not be resolved.",
+
+                debugId
+            },
+            401
+        );
+    }
+
+    return json(
+        {
+            success:
+                false,
+
+            code:
+                error.code
+                || "AUTHORIZATION_FAILED",
+
+            message:
+                "Your BPD account could not be authorized for provider linking.",
+
+            debugId
+        },
+        Number.isInteger(
+            error.status
+        )
+            ? error.status
+            : 403
     );
 }
 
@@ -524,56 +729,52 @@ export async function handleLinkProvider(
         crypto.randomUUID();
 
     try {
-        /* -------------------------------------------------
-        AUTHENTICATED BPD SESSION
-        ------------------------------------------------- */
+        /* =================================================
+        CENTRAL ACCOUNT AUTHORIZATION
+        ================================================= */
 
-        const session =
-            await getSessionContext(
-                request,
-                env
-            );
+        let authorization;
 
-        if (
-            session.authenticated !==
-            true
-        ) {
-            return json(
-                {
-                    success:
-                        false,
-
-                    code:
-                        "AUTH_REQUIRED",
-
-                    message:
-                        "You must be signed in to link an account provider.",
-
-                    debugId
-                },
-                401
-            );
+        try {
+            authorization =
+                await authorizeRequest(
+                    request,
+                    env,
+                    {
+                        account:
+                            true
+                    }
+                );
         }
+        catch (
+            error
+        ) {
+            if (
+                isAuthorizationError(
+                    error
+                )
+            ) {
+                return getAuthorizationErrorResponse(
+                    error,
+                    debugId
+                );
+            }
 
-        /* -------------------------------------------------
-        CANONICAL ACCOUNT ID
-        ------------------------------------------------- */
+            throw error;
+        }
 
         const accountId =
             normalizeString(
-                session.userId
+                authorization.accountId
             );
 
         if (
             !accountId
         ) {
-            console.error(
-                "LINK PROVIDER: Authenticated session has no global account ID.",
-                {
-                    debugId
-                }
-            );
-
+            /*
+             * authorizeRequest({ account: true }) should
+             * already prevent this. Fail closed anyway.
+             */
             return json(
                 {
                     success:
@@ -587,38 +788,13 @@ export async function handleLinkProvider(
 
                     debugId
                 },
-                409
+                500
             );
         }
 
-        /* -------------------------------------------------
-        ACCOUNT ACTIVE
-        ------------------------------------------------- */
-
-        if (
-            session.active !==
-            true
-        ) {
-            return json(
-                {
-                    success:
-                        false,
-
-                    code:
-                        "ACCOUNT_INACTIVE",
-
-                    message:
-                        "This BPD account is not active.",
-
-                    debugId
-                },
-                403
-            );
-        }
-
-        /* -------------------------------------------------
+        /* =================================================
         PROVIDER
-        ------------------------------------------------- */
+        ================================================= */
 
         const provider =
             getProvider(
@@ -673,20 +849,69 @@ export async function handleLinkProvider(
             );
         }
 
-        /* -------------------------------------------------
-        EXISTING PROVIDER LINK
-        ------------------------------------------------- */
+        /* =========================================================
+        AUTHORITATIVE EXISTING PROVIDER CHECK
 
-        const existingProvider =
-            session.providers
-                ?.[
+        Supabase is the source of truth for linked provider identity.
+
+        Session provider state may be stale, so it is not used as
+        the final decision for whether a provider is already linked.
+        ========================================================= */
+
+        let existingProviderIdentity =
+            null;
+
+        try {
+            existingProviderIdentity =
+                await verifyAccountProviderIdentity(
+                    env,
+                    accountId,
                     provider
-                ]
-            || null;
+                );
+        }
+        catch (
+            error
+        ) {
+            console.error(
+                "LINK PROVIDER: Existing provider verification failed.",
+                {
+                    debugId,
+
+                    provider,
+
+                    status:
+                        error?.status
+                        || null,
+
+                    upstreamCode:
+                        error?.upstreamCode
+                        || null,
+
+                    message:
+                        error?.message
+                        || "Unknown error"
+                }
+            );
+
+            return json(
+                {
+                    success:
+                        false,
+
+                    code:
+                        "PROVIDER_VERIFICATION_UNAVAILABLE",
+
+                    message:
+                        "The current provider linkage could not be verified.",
+
+                    debugId
+                },
+                503
+            );
+        }
 
         if (
-            existingProvider?.linked ===
-            true
+            existingProviderIdentity
         ) {
             return json(
                 {
@@ -705,9 +930,18 @@ export async function handleLinkProvider(
             );
         }
 
-        /* -------------------------------------------------
+        /* =================================================
+        RETURN DESTINATION
+        ================================================= */
+
+        const returnTo =
+            getReturnTo(
+                request
+            );
+
+        /* =================================================
         START LINK
-        ------------------------------------------------- */
+        ================================================= */
 
         console.info(
             "LINK PROVIDER: Link flow started.",
@@ -727,8 +961,10 @@ export async function handleLinkProvider(
 
         return await startProviderLink(
             request,
+            env,
             accountId,
-            provider
+            provider,
+            returnTo
         );
     }
     catch (

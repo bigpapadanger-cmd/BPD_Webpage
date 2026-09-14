@@ -1,0 +1,113 @@
+<!-- =========================================================
+BPD GAMING NETWORK
+ADMIN SIDEBAR NAVIGATION
+
+Purpose:
+    Sidebar navigation specifically for the Admin Management
+    area.
+
+Navigation:
+    - Dashboard
+    - Taskboard
+    - Terms of Service
+    - Privacy Policy
+========================================================= -->
+
+<div class="sidebar-toggle-box">
+    <button
+        id="sidebarToggle"
+        class="sidebar-toggle"
+        type="button"
+        aria-label="Toggle navigation"
+        aria-expanded="true"
+    >
+        <span aria-hidden="true"></span>
+        <span aria-hidden="true"></span>
+        <span aria-hidden="true"></span>
+    </button>
+</div>
+
+<nav
+    class="sidebar-navigation"
+    aria-label="Admin navigation"
+>
+    <div class="sidebar-navigation-top">
+        <a
+            href="/Dashboard"
+            class="nav-item"
+            data-router-link
+            data-nav-route="/Dashboard"
+            data-tooltip="Dashboard"
+        >
+            <span
+                class="nav-icon"
+                aria-hidden="true"
+            >
+                📊
+            </span>
+
+            <span class="nav-label">
+                Dashboard
+            </span>
+        </a>
+
+        <a
+            href="/Admin/Taskboard"
+            class="nav-item"
+            data-router-link
+            data-nav-route="/Admin/Taskboard"
+            data-tooltip="Taskboard"
+        >
+            <span
+                class="nav-icon"
+                aria-hidden="true"
+            >
+                📋
+            </span>
+
+            <span class="nav-label">
+                Taskboard
+            </span>
+        </a>
+    </div>
+
+    <div class="sidebar-navigation-bottom">
+        <a
+            href="/TOS"
+            class="nav-item"
+            data-router-link
+            data-nav-route="/TOS"
+            data-tooltip="Terms Of Service"
+        >
+            <span
+                class="nav-icon"
+                aria-hidden="true"
+            >
+                📜
+            </span>
+
+            <span class="nav-label">
+                TOS
+            </span>
+        </a>
+
+        <a
+            href="/Privacy"
+            class="nav-item"
+            data-router-link
+            data-nav-route="/Privacy"
+            data-tooltip="Privacy Policy"
+        >
+            <span
+                class="nav-icon"
+                aria-hidden="true"
+            >
+                👁️‍🗨️
+            </span>
+
+            <span class="nav-label">
+                Privacy Policy
+            </span>
+        </a>
+    </div>
+</nav>

@@ -11,39 +11,53 @@ Public Route:
     GET /api/auth/epic/callback
 
 Purpose:
-    Completes Epic OAuth authentication and connects the Epic
-    identity to the canonical global BPD account.
+    Completes direct Epic Games OAuth authentication for
+    global BPD login and authenticated Epic account linking.
 
 Description:
-    - Validates the Epic OAuth state cookie.
-    - Exchanges the authorization code for an Epic token.
-    - Loads the authenticated Epic profile.
-    - Resolves the Epic identity through identity.accounts.
-    - Ensures the global account has a Rocket League player.
-    - Creates or updates the centralized BPD browser session.
-    - Redirects new accounts to account setup.
-    - Redirects existing accounts to the requested local page.
-    - Stores no Epic access token in the BPD session.
+    - Validates Epic OAuth state.
+    - Determines whether the flow is login or link.
+    - Exchanges the Epic authorization code.
+    - Loads the authenticated Epic identity.
+    - Login mode resolves or creates the canonical BPD
+      account through api.resolve_epic_identity.
+    - Link mode attaches Epic to the already-authenticated
+      canonical BPD account through api.link_epic_identity.
+    - Synchronizes Epic provider state into the centralized
+      Cloudflare KV session.
+    - Never stores Epic access tokens.
 
-Identity Flow:
-    Epic account ID
-        ↓
-    api.resolve_epic_identity
-        ↓
+Identity:
     identity.accounts.id
-        ↓
-    api.ensure_rocketleague_player
-        ↓
-    core.rl_players.account_id
-        ↓
-    BPD session UserId
+        = canonical global BPD account ID
+
+    identity.account_identities.provider_subject
+        = Epic account ID
+
+Security:
+    - OAuth state must match the HttpOnly state cookie.
+    - Link mode requires an existing active BPD account.
+    - Link mode requires the stored target account ID to
+      exactly match the current authenticated session.
+    - Link mode never creates identity.accounts.
+    - Epic provider_subject ownership is enforced by the
+      database RPC.
+    - Browser-submitted account IDs are never trusted.
+    - Epic access tokens are temporary and never persisted.
+
+Modes:
+    login
+        Epic may resolve an existing BPD account or create
+        a new BPD account.
+
+    link
+        Epic is attached only to the currently authenticated
+        BPD account.
 
 Important:
-    - identity.accounts.id is the canonical global account ID.
-    - Epic account ID is a provider identity, not UserId.
-    - Rocket League ownership uses core.rl_players.account_id.
-    - Existing BPD sessions cannot silently switch accounts.
-    - Epic access tokens are temporary and never persisted.
+    - Rocket League player creation does not occur here.
+    - Linking Epic does not automatically create
+      core.rl_players.
 ========================================================= */
 
 import {
@@ -54,7 +68,10 @@ import {
 import {
     EPIC_TOKEN_URL,
     EPIC_USER_INFO_URL,
-    AUTH_STATE_COOKIE
+    AUTH_STATE_COOKIE,
+    OAUTH_RETURN_COOKIE,
+    OAUTH_MODE_COOKIE,
+    OAUTH_ACCOUNT_COOKIE
 } from "../../../config/api_vars.js";
 
 import {
@@ -62,7 +79,6 @@ import {
     clearCookie,
     createSession,
     createSessionCookie,
-    getSessionIdFromRequest,
     attachProviderToSession,
     setSessionUser
 } from "../../sessions/session.js";
@@ -71,7 +87,11 @@ import {
     getSessionContext
 } from "../../sessions/session_context.js";
 
-import { OAUTH_RETURN_COOKIE } from "../../../config/api_vars.js";
+import {
+    authorizeRequest,
+    isAuthorizationError
+} from "../../authorization.js";
+
 /* =========================================================
 CONSTANTS
 ========================================================= */
@@ -81,6 +101,12 @@ const DEFAULT_RETURN_TO =
 
 const NEW_ACCOUNT_RETURN_TO =
     "/Account?setup=1";
+
+const OAUTH_MODE_LOGIN =
+    "login";
+
+const OAUTH_MODE_LINK =
+    "link";
 
 /* =========================================================
 NORMALIZATION
@@ -109,6 +135,25 @@ function normalizeNullableString(
 
     return normalized
         || null;
+}
+
+function normalizeMode(
+    value
+) {
+    const mode =
+        normalizeString(
+            value
+        )
+            .toLowerCase();
+
+    if (
+        mode === OAUTH_MODE_LOGIN
+        || mode === OAUTH_MODE_LINK
+    ) {
+        return mode;
+    }
+
+    return "";
 }
 
 /* =========================================================
@@ -168,12 +213,12 @@ function getSupabaseConfiguration(
 ) {
     const url =
         normalizeString(
-            env.SUPABASE_URL
+            env?.SUPABASE_URL
         );
 
     const apiKey =
         normalizeString(
-            env.SUPABASE_AUTH
+            env?.SUPABASE_AUTH
         );
 
     if (
@@ -228,6 +273,9 @@ async function callApiRpc(
                     "apikey":
                         configuration.apiKey,
 
+                    "Authorization":
+                        `Bearer ${configuration.apiKey}`,
+
                     "Content-Type":
                         "application/json",
 
@@ -270,7 +318,8 @@ async function callApiRpc(
         const message =
             (
                 responseData
-                && typeof responseData === "object"
+                && typeof responseData ===
+                    "object"
                 && !Array.isArray(
                     responseData
                 )
@@ -297,7 +346,8 @@ async function callApiRpc(
         error.upstreamCode =
             (
                 responseData
-                && typeof responseData === "object"
+                && typeof responseData ===
+                    "object"
                 && !Array.isArray(
                     responseData
                 )
@@ -310,12 +360,22 @@ async function callApiRpc(
         throw error;
     }
 
+    const record =
+        Array.isArray(
+            responseData
+        )
+            ? (
+                responseData[0]
+                || null
+            )
+            : responseData;
+
     if (
-        !responseData
-        || typeof responseData !==
+        !record
+        || typeof record !==
             "object"
         || Array.isArray(
-            responseData
+            record
         )
     ) {
         throw new Error(
@@ -323,11 +383,11 @@ async function callApiRpc(
         );
     }
 
-    return responseData;
+    return record;
 }
 
 /* =========================================================
-RESOLVE EPIC GLOBAL IDENTITY
+RESOLVE EPIC LOGIN IDENTITY
 ========================================================= */
 
 async function resolveEpicIdentity(
@@ -351,7 +411,7 @@ async function resolveEpicIdentity(
     const accountId =
         normalizeNullableString(
             result.account_id
-            || result.accountId
+            ?? result.accountId
         );
 
     if (
@@ -372,18 +432,98 @@ async function resolveEpicIdentity(
             || "user",
 
         active:
-            result.active === true,
+            result.active ===
+            true,
 
         createdAccount:
-            result.created_account === true
-            || result.createdAccount === true,
+            result.created_account ===
+                true
+            || result.createdAccount ===
+                true,
 
         createdIdentity:
-            result.created_identity === true
-            || result.createdIdentity === true
+            result.created_identity ===
+                true
+            || result.createdIdentity ===
+                true
     };
 }
 
+/* =========================================================
+LINK EPIC IDENTITY
+========================================================= */
+
+async function linkEpicIdentity(
+    env,
+    accountId,
+    epicProfile
+) {
+    const result =
+        await callApiRpc(
+            env,
+            "link_epic_identity",
+            {
+                p_account_id:
+                    accountId,
+
+                p_provider_subject:
+                    epicProfile.epicAccountId,
+
+                p_display_username:
+                    epicProfile.displayName
+                    || epicProfile.preferredUsername
+            }
+        );
+
+    const resolvedAccountId =
+        normalizeNullableString(
+            result.account_id
+            ?? result.accountId
+        );
+
+    if (
+        !resolvedAccountId
+    ) {
+        throw new Error(
+            "Epic identity linking returned no account ID."
+        );
+    }
+
+    if (
+        resolvedAccountId !== accountId
+    ) {
+        const error =
+            new Error(
+                "Epic identity was linked to an unexpected BPD account."
+            );
+
+        error.code =
+            "LINK_ACCOUNT_MISMATCH";
+
+        throw error;
+    }
+
+    return {
+        accountId:
+            resolvedAccountId,
+
+        role:
+            normalizeString(
+                result.role
+            )
+            || "user",
+
+        active:
+            result.active ===
+            true,
+
+        linkedIdentity:
+            result.linked_identity ===
+                true
+            || result.linkedIdentity ===
+                true
+    };
+}
 
 /* =========================================================
 EPIC TOKEN EXCHANGE
@@ -395,17 +535,17 @@ async function exchangeEpicCode(
 ) {
     const clientId =
         normalizeString(
-            env.EPIC_CLIENT_ID
+            env?.EPIC_CLIENT_ID
         );
 
     const clientSecret =
         normalizeString(
-            env.EPIC_CLIENT_SECRET
+            env?.EPIC_CLIENT_SECRET
         );
 
     const redirectUri =
         normalizeString(
-            env.EPIC_REDIRECT_URI
+            env?.EPIC_REDIRECT_URI
         );
 
     if (
@@ -603,65 +743,34 @@ async function loadEpicProfile(
         );
     }
 
-    const displayName =
-        normalizeNullableString(
-            profile?.displayName
-            || profile?.display_name
-            || profile?.preferred_username
-        );
-
-    const preferredUsername =
-        normalizeNullableString(
-            profile?.preferred_username
-        );
-
     return {
         epicAccountId,
 
-        displayName,
+        displayName:
+            normalizeNullableString(
+                profile?.displayName
+                || profile?.display_name
+                || profile?.preferred_username
+            ),
 
-        preferredUsername
+        preferredUsername:
+            normalizeNullableString(
+                profile?.preferred_username
+            )
     };
 }
 
 /* =========================================================
-WRITE BPD SESSION
+PROVIDER SESSION DATA
 ========================================================= */
 
-async function establishBpdSession(
-    request,
-    env,
-    identity,
+function buildEpicProviderData(
     epicProfile
 ) {
-    const currentSession =
-        await getSessionContext(
-            request,
-            env
-        );
+    const now =
+        Date.now();
 
-    /*
-     * Never allow an OAuth callback to silently change the
-     * authenticated browser from one BPD account to another.
-     */
-    if (
-        currentSession.authenticated === true
-        && currentSession.userId
-        && currentSession.userId !==
-            identity.accountId
-    ) {
-        const error =
-            new Error(
-                "The Epic account belongs to a different BPD account."
-            );
-
-        error.code =
-            "ACCOUNT_LINK_CONFLICT";
-
-        throw error;
-    }
-
-    const providerData = {
+    return {
         Linked:
             true,
 
@@ -678,23 +787,63 @@ async function establishBpdSession(
             epicProfile.preferredUsername,
 
         AuthenticatedAt:
-            Date.now()
+            now,
+
+        LinkedAt:
+            now
     };
+}
 
-    /* =====================================================
-    EXISTING BPD SESSION
-    ===================================================== */
+/* =========================================================
+LOGIN SESSION
+========================================================= */
 
+async function establishLoginSession(
+    request,
+    env,
+    identity,
+    epicProfile
+) {
+    const currentSession =
+        await getSessionContext(
+            request,
+            env
+        );
+
+    /*
+     * Never allow an OAuth login callback to silently move
+     * an already-authenticated browser to another BPD
+     * account.
+     */
     if (
-        currentSession.authenticated === true
+        currentSession.authenticated ===
+            true
+        && currentSession.userId
+        && currentSession.userId !==
+            identity.accountId
     ) {
-        const sessionId =
-            getSessionIdFromRequest(
-                request
+        const error =
+            new Error(
+                "The Epic account belongs to a different BPD account."
             );
 
+        error.code =
+            "ACCOUNT_LINK_CONFLICT";
+
+        throw error;
+    }
+
+    const providerData =
+        buildEpicProviderData(
+            epicProfile
+        );
+
+    if (
+        currentSession.authenticated ===
+        true
+    ) {
         if (
-            !sessionId
+            !currentSession.sessionId
         ) {
             throw new Error(
                 "Authenticated session has no session ID."
@@ -703,7 +852,7 @@ async function establishBpdSession(
 
         await setSessionUser(
             env,
-            sessionId,
+            currentSession.sessionId,
             {
                 userId:
                     identity.accountId,
@@ -718,7 +867,7 @@ async function establishBpdSession(
 
         await attachProviderToSession(
             env,
-            sessionId,
+            currentSession.sessionId,
             "epic",
             providerData
         );
@@ -726,7 +875,7 @@ async function establishBpdSession(
         const cookie =
             createSessionCookie(
                 request,
-                sessionId
+                currentSession.sessionId
             );
 
         if (
@@ -738,14 +887,12 @@ async function establishBpdSession(
         }
 
         return {
-            sessionId,
+            sessionId:
+                currentSession.sessionId,
+
             cookie
         };
     }
-
-    /* =====================================================
-    NEW BPD SESSION
-    ===================================================== */
 
     const created =
         await createSession(
@@ -767,21 +914,10 @@ async function establishBpdSession(
             }
         );
 
-    const sessionId =
-        created.sessionId;
-
-    if (
-        !sessionId
-    ) {
-        throw new Error(
-            "Failed to create BPD session."
-        );
-    }
-
     const cookie =
         createSessionCookie(
             request,
-            sessionId
+            created.sessionId
         );
 
     if (
@@ -793,9 +929,195 @@ async function establishBpdSession(
     }
 
     return {
-        sessionId,
+        sessionId:
+            created.sessionId,
+
         cookie
     };
+}
+
+/* =========================================================
+LINK CONTEXT
+========================================================= */
+
+async function getLinkContext(
+    request,
+    env
+) {
+    const targetAccountId =
+        normalizeString(
+            getCookie(
+                request,
+                OAUTH_ACCOUNT_COOKIE
+            )
+        );
+
+    if (
+        !targetAccountId
+    ) {
+        return {
+            valid:
+                false,
+
+            code:
+                "LINK_ACCOUNT_MISSING"
+        };
+    }
+
+    let authorization;
+
+    try {
+        authorization =
+            await authorizeRequest(
+                request,
+                env,
+                {
+                    account:
+                        true
+                }
+            );
+    }
+    catch (
+        error
+    ) {
+        if (
+            isAuthorizationError(
+                error
+            )
+        ) {
+            return {
+                valid:
+                    false,
+
+                code:
+                    error.code
+                    || "AUTH_REQUIRED"
+            };
+        }
+
+        throw error;
+    }
+
+    if (
+        authorization.accountId !==
+        targetAccountId
+    ) {
+        return {
+            valid:
+                false,
+
+            code:
+                "LINK_ACCOUNT_MISMATCH"
+        };
+    }
+
+    if (
+        !authorization.sessionId
+    ) {
+        return {
+            valid:
+                false,
+
+            code:
+                "SESSION_IDENTITY_INVALID"
+        };
+    }
+
+    return {
+        valid:
+            true,
+
+        accountId:
+            authorization.accountId,
+
+        sessionId:
+            authorization.sessionId,
+
+        authorization
+    };
+}
+
+/* =========================================================
+ESTABLISH LINKED SESSION
+========================================================= */
+
+async function establishLinkedSession(
+    env,
+    linkContext,
+    linkedAccount,
+    epicProfile
+) {
+    if (
+        linkedAccount.accountId !==
+        linkContext.accountId
+    ) {
+        const error =
+            new Error(
+                "Linked Epic identity returned an unexpected account."
+            );
+
+        error.code =
+            "LINK_ACCOUNT_MISMATCH";
+
+        throw error;
+    }
+
+    await attachProviderToSession(
+        env,
+        linkContext.sessionId,
+        "epic",
+        buildEpicProviderData(
+            epicProfile
+        )
+    );
+
+    await setSessionUser(
+        env,
+        linkContext.sessionId,
+        {
+            userId:
+                linkedAccount.accountId,
+
+            role:
+                linkedAccount.role,
+
+            active:
+                linkedAccount.active
+        }
+    );
+}
+
+/* =========================================================
+CLEAR EPIC OAUTH COOKIES
+========================================================= */
+
+function getOAuthClearCookies(
+    request
+) {
+    return [
+        clearCookie(
+            request,
+            AUTH_STATE_COOKIE
+        ),
+
+        clearCookie(
+            request,
+            OAUTH_RETURN_COOKIE
+        ),
+
+        clearCookie(
+            request,
+            OAUTH_MODE_COOKIE
+        ),
+
+        clearCookie(
+            request,
+            OAUTH_ACCOUNT_COOKIE
+        )
+    ]
+        .filter(
+            Boolean
+        );
 }
 
 /* =========================================================
@@ -825,6 +1147,22 @@ export async function handleEpicCallback(
         normalizeString(
             url.searchParams.get(
                 "state"
+            )
+        );
+
+    const mode =
+        normalizeMode(
+            getCookie(
+                request,
+                OAUTH_MODE_COOKIE
+            )
+        );
+
+    const requestedReturnTo =
+        normalizeReturnTo(
+            getCookie(
+                request,
+                OAUTH_RETURN_COOKIE
             )
         );
 
@@ -888,7 +1226,8 @@ export async function handleEpicCallback(
 
         if (
             !storedState
-            || storedState !== state
+            || storedState !==
+                state
         ) {
             return json(
                 {
@@ -908,16 +1247,80 @@ export async function handleEpicCallback(
         }
 
         /* =================================================
-        RETURN DESTINATION
+        MODE VALIDATION
         ================================================= */
 
-        const requestedReturnTo =
-            normalizeReturnTo(
-                getCookie(
-                    request,
-                    OAUTH_RETURN_COOKIE
-                )
+        if (
+            !mode
+        ) {
+            return json(
+                {
+                    success:
+                        false,
+
+                    code:
+                        "EPIC_OAUTH_MODE_INVALID",
+
+                    message:
+                        "Epic OAuth operation mode is invalid.",
+
+                    debugId
+                },
+                400
             );
+        }
+
+        /* =================================================
+        VALIDATE LINK SESSION BEFORE PROVIDER EXCHANGE
+        ================================================= */
+
+        let linkContext =
+            null;
+
+        if (
+            mode ===
+            OAUTH_MODE_LINK
+        ) {
+            linkContext =
+                await getLinkContext(
+                    request,
+                    env
+                );
+
+            if (
+                linkContext.valid !==
+                true
+            ) {
+                console.warn(
+                    "EPIC CALLBACK: Link context validation failed.",
+                    {
+                        debugId,
+
+                        code:
+                            linkContext.code
+                    }
+                );
+
+                return json(
+                    {
+                        success:
+                            false,
+
+                        code:
+                            linkContext.code,
+
+                        message:
+                            "The Epic account-link request is no longer valid.",
+
+                        debugId
+                    },
+                    linkContext.code ===
+                        "AUTH_REQUIRED"
+                        ? 401
+                        : 409
+                );
+            }
+        }
 
         /* =================================================
         EPIC TOKEN + PROFILE
@@ -937,11 +1340,136 @@ export async function handleEpicCallback(
 
         /*
          * token.accessToken intentionally goes no further.
-         * It is not stored in KV or Supabase.
+         * It is never written to KV or Supabase.
          */
 
         /* =================================================
-        GLOBAL IDENTITY
+        EXPLICIT LINK MODE
+        ================================================= */
+
+        if (
+            mode ===
+            OAUTH_MODE_LINK
+        ) {
+            let linkedAccount;
+
+            try {
+                linkedAccount =
+                    await linkEpicIdentity(
+                        env,
+                        linkContext.accountId,
+                        epicProfile
+                    );
+            }
+            catch (
+                error
+            ) {
+                console.error(
+                    "EPIC CALLBACK: Epic identity link failed.",
+                    {
+                        debugId,
+
+                        upstreamStatus:
+                            error?.upstreamStatus
+                            || null,
+
+                        upstreamCode:
+                            error?.upstreamCode
+                            || null,
+
+                        message:
+                            error?.message
+                            || "Unknown error"
+                    }
+                );
+
+                const conflict =
+                    error?.upstreamCode ===
+                        "23505"
+                    || String(
+                        error?.message
+                        || ""
+                    )
+                        .includes(
+                            "PROVIDER_IDENTITY_ALREADY_LINKED"
+                        );
+
+                return json(
+                    {
+                        success:
+                            false,
+
+                        code:
+                            conflict
+                                ? "PROVIDER_IDENTITY_ALREADY_LINKED"
+                                : (
+                                    error?.upstreamCode
+                                    || "EPIC_LINK_FAILED"
+                                ),
+
+                        message:
+                            conflict
+                                ? "This Epic account is already linked to a different BPD account."
+                                : "Epic Games could not be linked to this BPD account.",
+
+                        debugId
+                    },
+                    conflict
+                        ? 409
+                        : 502
+                );
+            }
+
+            if (
+                linkedAccount.active !==
+                true
+            ) {
+                return json(
+                    {
+                        success:
+                            false,
+
+                        code:
+                            "ACCOUNT_INACTIVE",
+
+                        message:
+                            "This BPD account is not active.",
+
+                        debugId
+                    },
+                    403
+                );
+            }
+
+            await establishLinkedSession(
+                env,
+                linkContext,
+                linkedAccount,
+                epicProfile
+            );
+
+            console.info(
+                "EPIC CALLBACK: Epic provider link completed.",
+                {
+                    debugId,
+
+                    linkedIdentity:
+                        linkedAccount
+                            .linkedIdentity ===
+                        true
+                }
+            );
+
+            return redirect(
+                requestedReturnTo,
+                getOAuthClearCookies(
+                    request
+                )
+            );
+        }
+
+        /* =================================================
+        NORMAL LOGIN MODE
         ================================================= */
 
         const identity =
@@ -949,11 +1477,13 @@ export async function handleEpicCallback(
                 env,
                 epicProfile.epicAccountId,
                 epicProfile.displayName
-                || epicProfile.preferredUsername
+                || epicProfile
+                    .preferredUsername
             );
 
         if (
-            identity.active !== true
+            identity.active !==
+            true
         ) {
             return json(
                 {
@@ -972,69 +1502,53 @@ export async function handleEpicCallback(
             );
         }
 
-
-
-        /* =================================================
-        CENTRALIZED BPD SESSION
-        ================================================= */
-
         const session =
-            await establishBpdSession(
+            await establishLoginSession(
                 request,
                 env,
-                {
-                    accountId:
-                        identity.accountId,
-
-                    role:
-                        identity.role,
-
-                    active:
-                        identity.active
-                },
+                identity,
                 epicProfile
             );
 
-        if (
-            !session.cookie
-        ) {
-            throw new Error(
-                "Failed to create BPD session cookie."
-            );
-        }
-
-        /* =================================================
-        SUCCESS DESTINATION
-        ================================================= */
-
         const successDestination =
-            identity.createdAccount === true
+            identity.createdAccount ===
+                true
                 ? NEW_ACCOUNT_RETURN_TO
                 : requestedReturnTo;
 
-        /* =================================================
-        CLEAR ONE-TIME OAUTH COOKIES
-        ================================================= */
-
-        const stateCookie =
-            clearCookie(
-                request,
-                AUTH_STATE_COOKIE
+        const cookies =
+            getOAuthClearCookies(
+                request
             );
 
-        const returnCookie =
-            clearCookie(
-                request,
-                OAUTH_RETURN_COOKIE
+        if (
+            session.cookie
+        ) {
+            cookies.unshift(
+                session.cookie
             );
+        }
+
+        console.info(
+            "EPIC CALLBACK: Epic authentication completed.",
+            {
+                debugId,
+
+                mode,
+
+                createdAccount:
+                    identity.createdAccount ===
+                    true,
+
+                createdIdentity:
+                    identity.createdIdentity ===
+                    true
+            }
+        );
 
         return redirect(
             successDestination,
-            [
-                session.cookie,
-                stateCookie,
-                returnCookie
-            ]
+            cookies
         );
     }
     catch (
@@ -1044,6 +1558,10 @@ export async function handleEpicCallback(
             "EPIC CALLBACK: Unexpected failure.",
             {
                 debugId,
+
+                mode:
+                    mode
+                    || null,
 
                 name:
                     error?.name
@@ -1064,11 +1582,11 @@ export async function handleEpicCallback(
             }
         );
 
-        const status =
+        const conflict =
             error?.code ===
                 "ACCOUNT_LINK_CONFLICT"
-                ? 409
-                : 500;
+            || error?.code ===
+                "LINK_ACCOUNT_MISMATCH";
 
         return json(
             {
@@ -1081,14 +1599,15 @@ export async function handleEpicCallback(
                     || "EPIC_CALLBACK_FAILED",
 
                 message:
-                    error?.code ===
-                        "ACCOUNT_LINK_CONFLICT"
-                        ? "This Epic account is linked to a different BPD account."
+                    conflict
+                        ? "This Epic account cannot be linked to the current BPD account."
                         : "Epic authentication could not be completed.",
 
                 debugId
             },
-            status
+            conflict
+                ? 409
+                : 500
         );
     }
 }
