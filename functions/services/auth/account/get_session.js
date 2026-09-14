@@ -284,7 +284,16 @@ async function getCanonicalAccount(
             "accounts",
             configuration.url
         );
+    console.log(
+        "AUTH SESSION RPC REQUEST:",
+        {
+            url:
+                url.href,
 
+            accountId:
+                normalizedAccountId
+        }
+    );
     url.searchParams.set(
         "id",
         `eq.${normalizedAccountId}`
