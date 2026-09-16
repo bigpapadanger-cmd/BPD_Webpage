@@ -299,7 +299,7 @@ async function getCanonicalAccount(
      * - Does not log provider tokens.
      *
      * Remove once the RPC integration has been verified.
-     */
+     
     console.log(
         "AUTH SESSION RPC REQUEST:",
         {
@@ -310,7 +310,7 @@ async function getCanonicalAccount(
                 normalizedAccountId
         }
     );
-
+    */
     const startedAt =
         Date.now();
 

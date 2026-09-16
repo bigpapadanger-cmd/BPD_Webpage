@@ -18,13 +18,13 @@ Supported Providers:
 
 Provider Engines:
     Google
-        → Supabase Auth
+        -> Supabase Auth
 
     Discord
-        → Supabase Auth
+        -> Supabase Auth
 
     Epic
-        → Direct Epic Games OAuth
+        -> Direct Epic Games OAuth
 
 Flow:
     Authenticated BPD session
@@ -35,6 +35,8 @@ Flow:
         ↓
     Validate provider
         ↓
+    Verify provider is not already linked
+        ↓
     Start provider-specific OAuth flow
         ↓
     Provider callback
@@ -42,25 +44,31 @@ Flow:
     Link provider identity to existing BPD account
 
 Security:
-    - This service requires an authenticated active BPD
-      account.
-    - identity.accounts.id comes only from the trusted server
-      session.
+    - Requires an authenticated active canonical BPD account.
+    - identity.accounts.id comes only from trusted session
+      authorization.
     - Browser input never determines the target account ID.
-    - Epic link mode passes the trusted account ID into the
-      direct Epic OAuth context.
-    - Google/Discord link mode stores the trusted account ID
-      in short-lived HttpOnly OAuth context.
-    - Final provider ownership must still be verified by the
-      provider callback and database.
+    - Google/Discord link mode stores trusted account context
+      in short-lived HttpOnly cookies.
+    - Epic receives the trusted account ID through its
+      server-created OAuth context.
+    - Provider ownership is finalized only after successful
+      provider authentication in the callback.
+    - SUPABASE_AUTH is never exposed to the browser.
+
+Supabase OAuth:
+    - Supabase origin comes from env.SUPABASE_URL.
+    - Public authorize API key comes from env.SB_PUB_KEY.
+    - Callback URL is derived from the current request.
+    - No static callback/authorize URL configuration is
+      required.
 
 Important:
     - This service NEVER creates identity.accounts.
     - Email is never used to determine account ownership.
     - OAuth verifier/state values must never be logged.
-    - Provider identity ownership is finalized only after
-      successful provider authentication in the callback.
 ========================================================= */
+
 import {
     verifyAccountProviderIdentity
 } from "../providers/provider_identity.js";
@@ -84,11 +92,10 @@ import {
 } from "../providers/epic/login.js";
 
 import {
-    SUPABASE_OAUTH_AUTHORIZE_URL,
-    OAUTH_RETURN_URL,
     OAUTH_MODE_COOKIE,
     OAUTH_PROVIDER_COOKIE,
     OAUTH_ACCOUNT_COOKIE,
+    OAUTH_RETURN_COOKIE,
     OAUTH_COOKIE_MAX_AGE_SECONDS,
     OAUTH_PKCE_COOKIE
 } from "../../config/api_vars.js";
@@ -161,14 +168,10 @@ NORMALIZATION
 function normalizeString(
     value
 ) {
-    if (
-        typeof value !==
+    return typeof value ===
         "string"
-    ) {
-        return "";
-    }
-
-    return value.trim();
+        ? value.trim()
+        : "";
 }
 
 /* =========================================================
@@ -245,7 +248,7 @@ function toBase64Url(
             "_"
         )
         .replace(
-            /=+$/g,
+            /=+$/u,
             ""
         );
 }
@@ -289,44 +292,56 @@ async function createPkceChallenge(
 }
 
 /* =========================================================
-OAUTH CONFIGURATION
+SUPABASE CONFIGURATION
 ========================================================= */
 
-function getOAuthConfiguration() {
-    const authorizeUrl =
+function getSupabaseConfiguration(
+    env
+) {
+    const configuredUrl =
         normalizeString(
-            SUPABASE_OAUTH_AUTHORIZE_URL
+            env?.SUPABASE_URL
         );
 
-    const returnUrl =
+    const publishableKey =
         normalizeString(
-            OAUTH_RETURN_URL
+            env?.SB_PUB_KEY
         );
 
     if (
-        !authorizeUrl
-        || !returnUrl
+        !configuredUrl
     ) {
-        return null;
+        throw new Error(
+            "SUPABASE_URL_MISSING"
+        );
     }
+
+    if (
+        !publishableKey
+    ) {
+        throw new Error(
+            "SB_PUB_KEY_MISSING"
+        );
+    }
+
+    let origin;
 
     try {
-        return {
-            authorizeUrl:
-                new URL(
-                    authorizeUrl
-                ),
-
-            returnUrl:
-                new URL(
-                    returnUrl
-                )
-                    .toString()
-        };
+        origin =
+            new URL(
+                configuredUrl
+            ).origin;
     }
     catch {
-        return null;
+        throw new Error(
+            "SUPABASE_URL_INVALID"
+        );
     }
+
+    return {
+        origin,
+        publishableKey
+    };
 }
 
 /* =========================================================
@@ -377,6 +392,19 @@ function getProviderConfig(
 }
 
 /* =========================================================
+SUPABASE CALLBACK URL
+========================================================= */
+
+function getSupabaseCallbackUrl(
+    request
+) {
+    return new URL(
+        "/api/auth/_oauth/callback",
+        request.url
+    ).href;
+}
+
+/* =========================================================
 CREATE SUPABASE OAUTH CONTEXT COOKIES
 ========================================================= */
 
@@ -384,7 +412,8 @@ function createSupabaseOAuthContextCookies(
     request,
     provider,
     accountId,
-    verifier
+    verifier,
+    returnTo
 ) {
     const pkceCookie =
         createCookie(
@@ -418,11 +447,20 @@ function createSupabaseOAuthContextCookies(
             OAUTH_COOKIE_MAX_AGE_SECONDS
         );
 
+    const returnCookie =
+        createCookie(
+            request,
+            OAUTH_RETURN_COOKIE,
+            returnTo,
+            OAUTH_COOKIE_MAX_AGE_SECONDS
+        );
+
     if (
         !pkceCookie
         || !providerCookie
         || !modeCookie
         || !accountCookie
+        || !returnCookie
     ) {
         return null;
     }
@@ -431,8 +469,73 @@ function createSupabaseOAuthContextCookies(
         pkceCookie,
         providerCookie,
         modeCookie,
-        accountCookie
+        accountCookie,
+        returnCookie
     ];
+}
+
+/* =========================================================
+BUILD SUPABASE AUTHORIZE URL
+========================================================= */
+
+function buildSupabaseAuthorizeUrl(
+    request,
+    env,
+    provider,
+    challenge
+) {
+    const {
+        origin,
+        publishableKey
+    } =
+        getSupabaseConfiguration(
+            env
+        );
+
+    const callbackUrl =
+        getSupabaseCallbackUrl(
+            request
+        );
+
+    const authorizeUrl =
+        new URL(
+            `${origin}/auth/v1/authorize`
+        );
+
+    authorizeUrl.searchParams.set(
+        "provider",
+        provider
+    );
+
+    authorizeUrl.searchParams.set(
+        "redirect_to",
+        callbackUrl
+    );
+
+    authorizeUrl.searchParams.set(
+        "code_challenge",
+        challenge
+    );
+
+    authorizeUrl.searchParams.set(
+        "code_challenge_method",
+        "s256"
+    );
+
+    /*
+     * Supabase Auth requires the public project key for
+     * authorize requests.
+     *
+     * SB_PUB_KEY is intentionally browser-visible.
+     *
+     * Never use SUPABASE_AUTH here.
+     */
+    authorizeUrl.searchParams.set(
+        "apikey",
+        publishableKey
+    );
+
+    return authorizeUrl;
 }
 
 /* =========================================================
@@ -441,20 +544,11 @@ SUPABASE PROVIDER LINK FLOW
 
 async function startSupabaseProviderLink(
     request,
+    env,
     accountId,
-    provider
+    provider,
+    returnTo
 ) {
-    const configuration =
-        getOAuthConfiguration();
-
-    if (
-        !configuration
-    ) {
-        throw new Error(
-            "OAuth configuration is invalid."
-        );
-    }
-
     const providerConfig =
         getProviderConfig(
             provider
@@ -466,7 +560,7 @@ async function startSupabaseProviderLink(
             "supabase"
     ) {
         throw new Error(
-            "Supabase OAuth provider configuration was not found."
+            "SUPABASE_PROVIDER_CONFIG_INVALID"
         );
     }
 
@@ -483,55 +577,37 @@ async function startSupabaseProviderLink(
         || !challenge
     ) {
         throw new Error(
-            "PKCE generation failed."
+            "PKCE_GENERATION_FAILED"
         );
     }
 
     const authorizeUrl =
-        new URL(
-            configuration
-                .authorizeUrl
-                .toString()
+        buildSupabaseAuthorizeUrl(
+            request,
+            env,
+            providerConfig.provider,
+            challenge
         );
-
-    authorizeUrl.searchParams.set(
-        "provider",
-        providerConfig.provider
-    );
-
-    authorizeUrl.searchParams.set(
-        "redirect_to",
-        configuration.returnUrl
-    );
-
-    authorizeUrl.searchParams.set(
-        "code_challenge",
-        challenge
-    );
-
-    authorizeUrl.searchParams.set(
-        "code_challenge_method",
-        "s256"
-    );
 
     const cookies =
         createSupabaseOAuthContextCookies(
             request,
             providerConfig.provider,
             accountId,
-            verifier
+            verifier,
+            returnTo
         );
 
     if (
         !cookies
     ) {
         throw new Error(
-            "OAuth link cookies could not be created."
+            "OAUTH_LINK_COOKIE_CREATION_FAILED"
         );
     }
 
     return redirect(
-        authorizeUrl.toString(),
+        authorizeUrl.href,
         cookies
     );
 }
@@ -592,7 +668,7 @@ async function startProviderLink(
         !providerConfig
     ) {
         throw new Error(
-            "Provider configuration was not found."
+            "PROVIDER_CONFIG_MISSING"
         );
     }
 
@@ -602,8 +678,10 @@ async function startProviderLink(
     ) {
         return startSupabaseProviderLink(
             request,
+            env,
             accountId,
-            provider
+            provider,
+            returnTo
         );
     }
 
@@ -620,7 +698,7 @@ async function startProviderLink(
     }
 
     throw new Error(
-        "Provider authentication engine is not supported."
+        "PROVIDER_AUTH_ENGINE_UNSUPPORTED"
     );
 }
 
@@ -771,10 +849,6 @@ export async function handleLinkProvider(
         if (
             !accountId
         ) {
-            /*
-             * authorizeRequest({ account: true }) should
-             * already prevent this. Fail closed anyway.
-             */
             return json(
                 {
                     success:
@@ -849,14 +923,14 @@ export async function handleLinkProvider(
             );
         }
 
-        /* =========================================================
+        /* =================================================
         AUTHORITATIVE EXISTING PROVIDER CHECK
 
-        Supabase is the source of truth for linked provider identity.
+        Supabase is authoritative for linked identities.
 
-        Session provider state may be stale, so it is not used as
-        the final decision for whether a provider is already linked.
-        ========================================================= */
+        Session provider state is intentionally not trusted
+        as the final linkage decision.
+        ================================================= */
 
         let existingProviderIdentity =
             null;
@@ -951,11 +1025,12 @@ export async function handleLinkProvider(
                 provider,
 
                 authEngine:
-                    providerConfig
-                        .authEngine,
+                    providerConfig.authEngine,
 
                 hasAccountId:
-                    true
+                    true,
+
+                returnTo
             }
         );
 
@@ -989,13 +1064,37 @@ export async function handleLinkProvider(
             }
         );
 
+        let code =
+            "LINK_PROVIDER_FAILED";
+
+        if (
+            error?.message ===
+            "SUPABASE_URL_MISSING"
+        ) {
+            code =
+                "SUPABASE_URL_MISSING";
+        }
+        else if (
+            error?.message ===
+            "SB_PUB_KEY_MISSING"
+        ) {
+            code =
+                "SB_PUB_KEY_MISSING";
+        }
+        else if (
+            error?.message ===
+            "SUPABASE_URL_INVALID"
+        ) {
+            code =
+                "SUPABASE_URL_INVALID";
+        }
+
         return json(
             {
                 success:
                     false,
 
-                code:
-                    "LINK_PROVIDER_FAILED",
+                code,
 
                 message:
                     "Account provider linking could not be started.",
