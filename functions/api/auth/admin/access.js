@@ -122,6 +122,19 @@ function handleApiError(
                     ?? null
             }
         );
+        console.log(
+            "[ADMIN ACCESS ENV CHECK]",
+            {
+                hasGuildId:
+                    Boolean(env?.DISCORD_AUTHZ_GUILD_ID),
+
+                guildIdLength:
+                    String(
+                        env?.DISCORD_AUTHZ_GUILD_ID
+                        || ""
+                    ).length
+            }
+        );
     }
 
     /*
