@@ -2,44 +2,70 @@
 
 /* =========================================================
 BPD GAMING NETWORK
-DISCORD GUILD ROLE SERVICE
+DISCORD AUTHORIZATION GUILD ROLE SERVICE
 
 File:
     functions/services/auth/providers/discord/guild_roles.js
 
 Purpose:
     Retrieves and evaluates a connected Discord user's roles
-    in the configured BPD Gaming Network Discord guild.
+    in the configured BPD Gaming Network authorization guild.
 
 Description:
-    - Reads a Discord guild member using the existing bot.
-    - Uses the configured Discord guild and bot credentials.
+    - Reads a Discord guild member using the dedicated
+      authorization bot.
+    - Uses the configured BPD authorization guild and bot
+      credentials.
     - Returns the member's current Discord role IDs.
     - Evaluates configured BPD staff role IDs.
     - Provides reusable helpers for authorization throughout
       the website.
     - Does not perform Discord login or account linking.
+    - Does not use the installable MatchBot.
     - Does not trust Discord user IDs supplied by clients.
 
 Required Environment:
-    DISCORD_GUILD_ID
-    DISCORD_BOT_TOKEN
+    DISCORD_AUTHZ_GUILD_ID
+    DISCORD_AUTHZ_BOT_TOKEN
 
 Configured Staff Roles:
-    DISCORD_ADMIN_ROLE_ID
-    DISCORD_MOD_ROLE_ID
-    DISCORD_LEAGUE_STAFF_ROLE_ID
+    DISCORD_AUTHZ_ADMIN_ROLE_ID
+    DISCORD_AUTHZ_MOD_ROLE_ID
+    DISCORD_AUTHZ_LEAGUE_STAFF_ROLE_ID
 
-Important:
+Architecture:
+    Canonical Discord authentication:
+        Supabase Discord OAuth
+            ↓
+        identity.account_identities
+            ↓
+        verified Discord provider_subject
+
+    BPD guild authorization:
+        verified Discord provider_subject
+            ↓
+        this service
+            ↓
+        dedicated authorization bot
+            ↓
+        fixed BPD Gaming Network guild
+            ↓
+        current Discord role IDs
+
+    MatchBot:
+        Completely separate.
+        Uses DISCORD_MATCHBOT_* configuration.
+        Never participates in BPD staff authorization.
+
+Security:
     - The Discord user ID passed to this service must come
       from the authenticated account's verified linked
       Discord identity.
     - Never accept a Discord user ID directly from a browser
       and use it for authorization.
-    - Discord login/account linking is handled separately.
-    - This service performs authorization-related guild role
-      lookup only.
     - Role IDs, not role names, are authoritative.
+    - Authorization bot credentials are server-only.
+    - MatchBot credentials are never used here.
 ========================================================= */
 
 /* =========================================================
@@ -132,30 +158,30 @@ function normalizeRoleIds(
 }
 
 /* =========================================================
-CONFIGURATION
+AUTHORIZATION CONFIGURATION
 ========================================================= */
 
-function getDiscordConfiguration(
+function getDiscordAuthorizationConfiguration(
     env
 ) {
     const guildId =
         normalizeString(
-            env?.DISCORD_GUILD_ID
+            env?.DISCORD_AUTHZ_GUILD_ID
         );
 
     const botToken =
         normalizeString(
-            env?.DISCORD_BOT_TOKEN
+            env?.DISCORD_AUTHZ_BOT_TOKEN
         );
 
     if (
         !guildId
     ) {
         throw new DiscordGuildRolesError(
-            "Discord guild configuration is missing.",
+            "Discord authorization guild configuration is missing.",
             {
                 code:
-                    "DISCORD_GUILD_ID_MISSING",
+                    "DISCORD_AUTHZ_GUILD_ID_MISSING",
 
                 status:
                     500
@@ -167,10 +193,10 @@ function getDiscordConfiguration(
         !botToken
     ) {
         throw new DiscordGuildRolesError(
-            "Discord bot configuration is missing.",
+            "Discord authorization bot configuration is missing.",
             {
                 code:
-                    "DISCORD_BOT_TOKEN_MISSING",
+                    "DISCORD_AUTHZ_BOT_TOKEN_MISSING",
 
                 status:
                     500
@@ -180,21 +206,22 @@ function getDiscordConfiguration(
 
     return {
         guildId,
+
         botToken,
 
         adminRoleId:
             normalizeString(
-                env?.DISCORD_ADMIN_ROLE_ID
+                env?.DISCORD_AUTHZ_ADMIN_ROLE_ID
             ),
 
         modRoleId:
             normalizeString(
-                env?.DISCORD_MOD_ROLE_ID
+                env?.DISCORD_AUTHZ_MOD_ROLE_ID
             ),
 
         leagueStaffRoleId:
             normalizeString(
-                env?.DISCORD_LEAGUE_STAFF_ROLE_ID
+                env?.DISCORD_AUTHZ_LEAGUE_STAFF_ROLE_ID
             )
     };
 }
@@ -274,10 +301,10 @@ function createDiscordResponseError(
     ) {
         case 401:
             return new DiscordGuildRolesError(
-                "Discord rejected the configured bot credentials.",
+                "Discord rejected the configured authorization bot credentials.",
                 {
                     code:
-                        "DISCORD_BOT_UNAUTHORIZED",
+                        "DISCORD_AUTHZ_BOT_UNAUTHORIZED",
 
                     status:
                         503,
@@ -292,10 +319,10 @@ function createDiscordResponseError(
 
         case 403:
             return new DiscordGuildRolesError(
-                "The Discord bot cannot access the configured guild member.",
+                "The Discord authorization bot cannot access the configured guild member.",
                 {
                     code:
-                        "DISCORD_BOT_FORBIDDEN",
+                        "DISCORD_AUTHZ_BOT_FORBIDDEN",
 
                     status:
                         503,
@@ -310,10 +337,10 @@ function createDiscordResponseError(
 
         case 404:
             return new DiscordGuildRolesError(
-                "The connected Discord account is not a member of the configured guild.",
+                "The connected Discord account is not a member of the configured authorization guild.",
                 {
                     code:
-                        "DISCORD_GUILD_MEMBER_NOT_FOUND",
+                        "DISCORD_AUTHZ_GUILD_MEMBER_NOT_FOUND",
 
                     status:
                         403,
@@ -325,10 +352,10 @@ function createDiscordResponseError(
 
         case 429:
             return new DiscordGuildRolesError(
-                "Discord role verification is temporarily rate limited.",
+                "Discord authorization role verification is temporarily rate limited.",
                 {
                     code:
-                        "DISCORD_RATE_LIMITED",
+                        "DISCORD_AUTHZ_RATE_LIMITED",
 
                     status:
                         503,
@@ -344,13 +371,14 @@ function createDiscordResponseError(
         default:
             return new DiscordGuildRolesError(
                 discordMessage
-                || "Discord guild role verification failed.",
+                || "Discord authorization guild role verification failed.",
                 {
                     code:
-                        "DISCORD_GUILD_REQUEST_FAILED",
+                        "DISCORD_AUTHZ_GUILD_REQUEST_FAILED",
 
                     status:
-                        response.status >= 500
+                        response.status >=
+                        500
                             ? 503
                             : 500,
 
@@ -382,7 +410,7 @@ async function requestDiscordGuildMember(
         guildId,
         botToken
     } =
-        getDiscordConfiguration(
+        getDiscordAuthorizationConfiguration(
             env
         );
 
@@ -437,10 +465,10 @@ async function requestDiscordGuildMember(
             "AbortError"
         ) {
             throw new DiscordGuildRolesError(
-                "Discord role verification timed out.",
+                "Discord authorization role verification timed out.",
                 {
                     code:
-                        "DISCORD_REQUEST_TIMEOUT",
+                        "DISCORD_AUTHZ_REQUEST_TIMEOUT",
 
                     status:
                         503,
@@ -452,10 +480,10 @@ async function requestDiscordGuildMember(
         }
 
         throw new DiscordGuildRolesError(
-            "Discord role verification is currently unavailable.",
+            "Discord authorization role verification is currently unavailable.",
             {
                 code:
-                    "DISCORD_REQUEST_FAILED",
+                    "DISCORD_AUTHZ_REQUEST_FAILED",
 
                 status:
                     503,
@@ -532,7 +560,7 @@ export function evaluateDiscordStaffRoles(
         modRoleId,
         leagueStaffRoleId
     } =
-        getDiscordConfiguration(
+        getDiscordAuthorizationConfiguration(
             env
         );
 
@@ -569,7 +597,7 @@ export function evaluateDiscordStaffRoles(
 /* =========================================================
 GET GUILD MEMBER
 
-Returns normalized guild-member information.
+Returns normalized BPD authorization-guild member data.
 
 The Discord user ID supplied here must already have been
 resolved from the authenticated user's linked Discord
@@ -635,9 +663,6 @@ export async function getDiscordGuildMember(
 
 /* =========================================================
 GET GUILD ROLES
-
-Convenience function for callers that only need roles and
-normalized staff state.
 ========================================================= */
 
 export async function getDiscordGuildRoles(
