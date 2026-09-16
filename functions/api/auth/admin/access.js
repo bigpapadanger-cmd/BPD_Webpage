@@ -122,19 +122,6 @@ function handleApiError(
                     ?? null
             }
         );
-        console.log(
-            "[ADMIN ACCESS ENV CHECK]",
-            {
-                hasGuildId:
-                    Boolean(env?.DISCORD_AUTHZ_GUILD_ID),
-
-                guildIdLength:
-                    String(
-                        env?.DISCORD_AUTHZ_GUILD_ID
-                        || ""
-                    ).length
-            }
-        );
     }
 
     /*
@@ -173,13 +160,23 @@ export async function onRequestGet(
         const {
             request,
             env
-        } =
-            context;
+        } = context;
 
-        /*
-         * This performs the existing canonical-account +
-         * Discord guild-role authorization chain.
-         */
+        console.log(
+            "[ADMIN ACCESS ENV CHECK]",
+            {
+                hasGuildId:
+                    Boolean(
+                        env?.DISCORD_AUTHZ_GUILD_ID
+                    ),
+
+                hasBotToken:
+                    Boolean(
+                        env?.DISCORD_AUTHZ_BOT_TOKEN
+                    )
+            }
+        );
+
         await authorizeAdminContext(
             request,
             env
@@ -187,11 +184,8 @@ export async function onRequestGet(
 
         return jsonResponse(
             {
-                success:
-                    true,
-
-                authorized:
-                    true
+                success: true,
+                authorized: true
             },
             200
         );
@@ -204,7 +198,6 @@ export async function onRequestGet(
         );
     }
 }
-
 /* =========================================================
 METHOD FALLBACK
 ========================================================= */
