@@ -58,6 +58,7 @@ import {
     hasLinkedProvider,
     getProvider
 } from "../../../../Framework/Auth/auth.js";
+//sync file correction
 
 /* =========================================================
 CONFIGURATION
