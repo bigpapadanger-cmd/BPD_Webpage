@@ -2,42 +2,49 @@
 
 /* =========================================================
 BPD GAMING NETWORK
-ROCKET LEAGUE PROFILE ROUTE
+ROCKET LEAGUE SESSION ROUTE
 
 File:
-    functions/api/auth/rocketleague/profile.js
+    functions/api/auth/rocketleague/session.js
 
 Public Route:
-    /api/auth/rocketleague/profile
+    GET /api/auth/rocketleague/session
 
 Service:
-    functions/services/rl/profile.js
+    functions/services/rl/session.js
 
 Purpose:
-    Thin Cloudflare Pages Functions route for Rocket League
-    profile operations.
+    Returns the Rocket League-specific authentication and
+    session state for the current BPD browser session.
 
 Responsibilities:
-    - Receive Rocket League profile requests.
+    - Receive the Rocket League session request.
     - Log safe request metadata.
-    - Delegate profile handling to the Rocket League service.
+    - Delegate Rocket League session evaluation to the
+      service layer.
     - Return the service response.
 
 Important:
-    - Rocket League profile logic does not belong here.
-    - Session, Supabase, and profile persistence logic belong
-      in the service layer.
+    - This is NOT the global BPD authentication endpoint.
+    - Global authentication is handled by:
+          GET /api/auth/session
+    - Rocket League may require Epic-specific state in
+      addition to a valid global BPD session.
+    - This route does not load profile registration data.
+    - This route does not perform region detection.
+    - This route does not determine Rocket League access
+      independently of the service layer.
 ========================================================= */
 
 import {
-    handleRocketLeagueProfile
-} from "../../../services/rl/profile.js";
+    handleRocketLeagueSession
+} from "../../../services/rl/session.js";
 
 /* =========================================================
-ROUTE
+GET
 ========================================================= */
 
-export async function onRequest(
+export async function onRequestGet(
     context
 ) {
     const debugId =
@@ -49,7 +56,7 @@ export async function onRequest(
         );
 
     console.info(
-        "RL PROFILE ROUTE: Request received.",
+        "RL SESSION ROUTE: Request received.",
         {
             debugId,
 
@@ -63,15 +70,18 @@ export async function onRequest(
 
     try {
         const response =
-            await handleRocketLeagueProfile(
+            await handleRocketLeagueSession(
                 context.request,
                 context.env
             );
 
         console.info(
-            "RL PROFILE ROUTE: Request completed.",
+            "RL SESSION ROUTE: Request completed.",
             {
                 debugId,
+
+                pathname:
+                    requestUrl.pathname,
 
                 status:
                     response.status
@@ -84,13 +94,20 @@ export async function onRequest(
         error
     ) {
         console.error(
-            "RL PROFILE ROUTE: Unexpected failure.",
+            "RL SESSION ROUTE: Unexpected failure.",
             {
                 debugId,
+
+                pathname:
+                    requestUrl.pathname,
 
                 name:
                     error?.name
                     || "Error",
+
+                code:
+                    error?.code
+                    || null,
 
                 message:
                     error?.message
@@ -107,8 +124,14 @@ export async function onRequest(
                 success:
                     false,
 
+                authenticated:
+                    false,
+
+                code:
+                    "ROCKET_LEAGUE_SESSION_ROUTE_FAILED",
+
                 message:
-                    "Rocket League profile request failed unexpectedly.",
+                    "Rocket League session request failed unexpectedly.",
 
                 debugId
             },

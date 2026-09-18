@@ -27,9 +27,13 @@ Responsibilities:
 Important:
     - This is NOT the global BPD authentication endpoint.
     - Global authentication is handled by:
-        GET /api/auth/session
+          GET /api/auth/session
     - Rocket League may require Epic-specific state in
       addition to a valid global BPD session.
+    - This route does not load profile registration data.
+    - This route does not perform region detection.
+    - This route does not determine Rocket League access
+      independently of the service layer.
 ========================================================= */
 
 import {
@@ -76,6 +80,9 @@ export async function onRequestGet(
             {
                 debugId,
 
+                pathname:
+                    requestUrl.pathname,
+
                 status:
                     response.status
             }
@@ -91,9 +98,16 @@ export async function onRequestGet(
             {
                 debugId,
 
+                pathname:
+                    requestUrl.pathname,
+
                 name:
                     error?.name
                     || "Error",
+
+                code:
+                    error?.code
+                    || null,
 
                 message:
                     error?.message
@@ -109,6 +123,12 @@ export async function onRequestGet(
             {
                 success:
                     false,
+
+                authenticated:
+                    false,
+
+                code:
+                    "ROCKET_LEAGUE_SESSION_ROUTE_FAILED",
 
                 message:
                     "Rocket League session request failed unexpectedly.",

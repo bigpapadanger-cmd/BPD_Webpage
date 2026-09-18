@@ -14,7 +14,9 @@ Responsibilities:
     - Loads authenticated Epic identity.
     - Loads existing Rocket League profile state.
     - Handles eligibility and policy acknowledgements.
-    - Handles optional region/time-zone detection.
+    - Handles strictly opt-in region/time-zone detection.
+    - Never detects region/time-zone data until the user enables it.
+    - Clears detected region/time-zone data when detection is disabled.
     - Handles Player Profile preferences.
     - Allows optional email and phone information.
     - Warns when no direct contact information is supplied.
@@ -22,7 +24,8 @@ Responsibilities:
     - Verifies Discord notification eligibility server-side.
     - Provides MatchBot installation when required.
     - Handles weekly availability.
-    - Preserves incomplete registration drafts locally.
+    - Preserves non-sensitive incomplete registration drafts locally.
+    - Does not restore consent or location opt-in from local drafts.
     - Submits Rocket League profile setup to the server.
 
 Discord Requirements:
@@ -37,6 +40,8 @@ Security:
     - The browser does not determine Discord eligibility.
     - The browser does not supply canonical account IDs.
     - Epic identity is display-only on the client.
+    - Consent is never restored from local draft storage.
+    - Region detection is disabled by default.
     - Server APIs remain authoritative.
 ========================================================= */
 
@@ -45,7 +50,8 @@ import {
 } from "./timezone.js";
 
 import {
-    ROCKET_LEAGUE_PROFILE_URL, DISCORD_NOTIFICATION_STATUS_URL
+    ROCKET_LEAGUE_PROFILE_URL,
+    DISCORD_NOTIFICATION_STATUS_URL
 } from "../../../../scripts/apiRoutes.js";
 
 import {
@@ -58,7 +64,6 @@ import {
     hasLinkedProvider,
     getProvider
 } from "../../../../Framework/Auth/auth.js";
-//sync file correction
 
 /* =========================================================
 CONFIGURATION
@@ -66,7 +71,6 @@ CONFIGURATION
 
 const REGISTRATION_DRAFT_KEY =
     "bpdRocketLeagueRegistrationDraft";
-
 
 const REGISTRATION_CONFIG =
     Object.freeze({
@@ -891,6 +895,19 @@ function updateDirectContactWarning() {
 
 /* =========================================================
 REGION + TIMEZONE
+
+Detection is strictly opt-in.
+
+Rules:
+    - New registration sessions start with detection disabled.
+    - A normal profile GET does not request location detection.
+    - A fresh location request is made only when the user
+      explicitly checks the detection toggle.
+    - Unchecking immediately clears all client-side detected
+      region/time-zone values and hides the display fields.
+    - Saved server-side region preferences may be displayed
+      when loading an existing profile, but loading the form
+      does not perform a fresh location lookup.
 ========================================================= */
 
 function getAutoDetectRegionEnabled() {
@@ -900,21 +917,6 @@ function getAutoDetectRegionEnabled() {
         )?.checked ===
         true
     );
-}
-
-function getBrowserTimezone() {
-    try {
-        return (
-            Intl
-                .DateTimeFormat()
-                .resolvedOptions()
-                .timeZone
-            || ""
-        );
-    }
-    catch {
-        return "";
-    }
 }
 
 function normalizeLocation(
@@ -963,6 +965,25 @@ function normalizeLocation(
     };
 }
 
+function hasLocationData(
+    location
+) {
+    return Boolean(
+        normalizeString(
+            location?.region
+        )
+        || normalizeString(
+            location?.country
+        )
+        || normalizeString(
+            location?.countryCode
+        )
+        || normalizeString(
+            location?.timezone
+        )
+    );
+}
+
 function formatLocation(
     location
 ) {
@@ -985,6 +1006,22 @@ function formatLocation(
             ", "
         )
         : "Location unavailable";
+}
+
+function setDetectedRegionFieldsVisible(
+    visible
+) {
+    const fields =
+        document.getElementById(
+            "detectedRegionFields"
+        );
+
+    if (
+        fields
+    ) {
+        fields.hidden =
+            !visible;
+    }
 }
 
 function applyLocation(
@@ -1032,8 +1069,7 @@ function applyTimezone(
         normalizeString(
             timezone
         )
-        || currentLocation.timezone
-        || getBrowserTimezone();
+        || currentLocation.timezone;
 
     setInputValue(
         "timezone",
@@ -1070,69 +1106,237 @@ function clearDetectedRegion() {
 
     setInputValue(
         "detectedLocation",
-        "Detection disabled"
+        ""
     );
 
     setInputValue(
         "timezoneDisplay",
-        "Detection disabled"
+        ""
     );
 
     setInputValue(
         "timezone",
         ""
     );
+
+    setDetectedRegionFieldsVisible(
+        false
+    );
 }
 
-function updateRegionDetectionState() {
-    const enabled =
-        getAutoDetectRegionEnabled();
-
-    const fields =
-        document.getElementById(
-            "detectedRegionFields"
-        );
-
+function showStoredRegion(
+    location,
+    timezone
+) {
     if (
-        fields
-    ) {
-        fields.classList.toggle(
-            "detection-disabled",
-            !enabled
-        );
-    }
-
-    if (
-        !enabled
+        !hasLocationData(
+            location
+        )
+        && !normalizeString(
+            timezone
+        )
     ) {
         clearDetectedRegion();
 
         return;
     }
 
-    if (
-        currentLocation.region
-        || currentLocation.country
-    ) {
-        applyLocation(
-            currentLocation
-        );
+    setDetectedRegionFieldsVisible(
+        true
+    );
 
-        applyTimezone(
-            currentLocation.timezone
-        );
+    applyLocation(
+        location
+    );
+
+    applyTimezone(
+        timezone
+    );
+}
+
+async function detectRegion() {
+    if (
+        !getAutoDetectRegionEnabled()
+    ) {
+        clearDetectedRegion();
 
         return;
     }
+
+    setDetectedRegionFieldsVisible(
+        true
+    );
 
     setInputValue(
         "detectedLocation",
         "Detecting…"
     );
 
-    applyTimezone(
+    setInputValue(
+        "timezoneDisplay",
+        "Detecting…"
+    );
+
+    setInputValue(
+        "timezone",
         ""
     );
+
+    try {
+        const url =
+            new URL(
+                ROCKET_LEAGUE_PROFILE_URL,
+                window.location.origin
+            );
+
+        url.searchParams.set(
+            "detectLocation",
+            "true"
+        );
+
+        const response =
+            await apiFetch(
+                url.pathname
+                + url.search,
+                {
+                    method:
+                        "GET",
+
+                    credentials:
+                        "same-origin",
+
+                    cache:
+                        "no-store",
+
+                    headers: {
+                        "Accept":
+                            "application/json"
+                    }
+                }
+            );
+
+        const result =
+            await response
+                .json()
+                .catch(
+                    () => ({})
+                );
+
+        if (
+            !getAutoDetectRegionEnabled()
+        ) {
+            clearDetectedRegion();
+
+            return;
+        }
+
+        if (
+            !response.ok
+            || result.success !==
+                true
+        ) {
+            throw new Error(
+                result.message
+                || "Region detection failed."
+            );
+        }
+
+        const detectedLocation =
+            normalizeLocation(
+                result,
+                {}
+            );
+
+        if (
+            !hasLocationData(
+                detectedLocation
+            )
+        ) {
+            throw new Error(
+                "Region detection returned no usable location data."
+            );
+        }
+
+        applyLocation(
+            detectedLocation
+        );
+
+        applyTimezone(
+            detectedLocation.timezone
+        );
+    }
+    catch (
+        error
+    ) {
+        console.error(
+            "ROCKET LEAGUE REGISTRATION: Region detection failed.",
+            {
+                name:
+                    error?.name
+                    || "Error",
+
+                message:
+                    error?.message
+                    || "Unknown error"
+            }
+        );
+
+        if (
+            !getAutoDetectRegionEnabled()
+        ) {
+            clearDetectedRegion();
+
+            return;
+        }
+
+        currentLocation = {
+            city:
+                "",
+
+            region:
+                "",
+
+            country:
+                "",
+
+            countryCode:
+                "",
+
+            timezone:
+                ""
+        };
+
+        setDetectedRegionFieldsVisible(
+            true
+        );
+
+        setInputValue(
+            "detectedLocation",
+            "Location unavailable"
+        );
+
+        setInputValue(
+            "timezoneDisplay",
+            "Time zone unavailable"
+        );
+
+        setInputValue(
+            "timezone",
+            ""
+        );
+    }
+}
+
+async function handleRegionDetectionChange() {
+    if (
+        !getAutoDetectRegionEnabled()
+    ) {
+        clearDetectedRegion();
+
+        return;
+    }
+
+    await detectRegion();
 }
 
 /* =========================================================
@@ -1741,9 +1945,14 @@ function normalizeProfile(
             || authUser
         );
 
+    /*
+     * Normal profile loading must use only previously stored
+     * profile location data. Top-level request location is
+     * reserved for the explicit detectLocation=true request.
+     */
     const location =
         normalizeLocation(
-            result,
+            {},
             profile
         );
 
@@ -1796,13 +2005,7 @@ function normalizeProfile(
             profile.autoDetectRegion ===
                 true
             || profile.auto_detect_region ===
-                true
-            || (
-                profile.autoDetectRegion ===
-                    undefined
-                && profile.auto_detect_region ===
-                    undefined
-            ),
+                true,
 
         timezone:
             normalizeString(
@@ -1889,6 +2092,10 @@ function populateProfileForm(
         "Epic Games"
     );
 
+    /*
+     * Required acknowledgements come only from persisted
+     * server-authoritative profile state.
+     */
     setCheckboxValue(
         "ageConsent",
         profile.ageConsent
@@ -1899,10 +2106,23 @@ function populateProfileForm(
         profile.policyConsent
     );
 
+    /*
+     * Region detection is session-explicit.
+     *
+     * Even if a previous profile had automatic detection
+     * enabled, loading this registration page does not treat
+     * that old setting as permission to perform another
+     * location lookup.
+     *
+     * The user must explicitly check the box during the
+     * current page session.
+     */
     setCheckboxValue(
         "autoDetectRegion",
-        profile.autoDetectRegion
+        false
     );
+
+    clearDetectedRegion();
 
     setInputValue(
         "email",
@@ -1958,26 +2178,10 @@ function populateProfileForm(
         profile.reminderMode
     );
 
-    if (
-        profile.autoDetectRegion
-    ) {
-        applyLocation(
-            profile.location
-        );
-
-        applyTimezone(
-            profile.timezone
-        );
-    }
-    else {
-        clearDetectedRegion();
-    }
-
     populateAvailability(
         profile.availability
     );
 
-    updateRegionDetectionState();
     updateModeField();
     updateDirectContactWarning();
     updateNotificationState();
@@ -1993,7 +2197,7 @@ async function getAuthenticatedEpicUser() {
 
     if (
         authState?.available !==
-        true
+            true
         || !hasActiveAccount(
             authState
         )
@@ -2113,7 +2317,7 @@ async function loadRocketLeagueProfile() {
 
     if (
         response.status ===
-        401
+            401
     ) {
         const loginUrl =
             new URL(
@@ -2225,11 +2429,70 @@ function readRegistrationDraft() {
 function saveRegistrationDraft(
     payload
 ) {
+    /*
+     * Consent and location opt-in are deliberately excluded.
+     *
+     * A local draft must never manufacture or restore:
+     *     ageConsent
+     *     policyConsent
+     *     autoDetectRegion
+     *     location
+     *     timezone
+     */
+    const draft = {
+        showOnlineStatus:
+            payload?.showOnlineStatus ===
+            true,
+
+        email:
+            normalizeString(
+                payload?.email
+            ),
+
+        phone:
+            normalizeString(
+                payload?.phone
+            ),
+
+        preferredMode:
+            normalizeString(
+                payload?.preferredMode
+            ),
+
+        otherMode:
+            normalizeString(
+                payload?.otherMode
+            ),
+
+        availability:
+            Array.isArray(
+                payload?.availability
+            )
+                ? payload.availability
+                : [],
+
+        notificationsEnabled:
+            payload?.notificationsEnabled ===
+            true,
+
+        notificationMethod:
+            normalizeString(
+                payload?.notificationMethod
+            )
+            || null,
+
+        reminderMode:
+            normalizeString(
+                payload?.reminderMode
+            )
+            || null
+    };
+
     try {
         localStorage.setItem(
             REGISTRATION_DRAFT_KEY,
             JSON.stringify(
-                payload
+                draft
             )
         );
     }
@@ -2268,20 +2531,17 @@ function populateDraft(
         return;
     }
 
-    setCheckboxValue(
-        "ageConsent",
-        draft.ageConsent
-    );
-
-    setCheckboxValue(
-        "policyConsent",
-        draft.policyConsent
-    );
-
-    setCheckboxValue(
-        "autoDetectRegion",
-        draft.autoDetectRegion
-    );
+    /*
+     * Draft restoration never changes:
+     *     ageConsent
+     *     policyConsent
+     *     autoDetectRegion
+     *     location
+     *     timezone
+     *
+     * Those values must come from the server or from an
+     * explicit user action during the current form session.
+     */
 
     setInputValue(
         "email",
@@ -2333,27 +2593,10 @@ function populateDraft(
         draft.reminderMode
     );
 
-    if (
-        draft.autoDetectRegion
-        && draft.location
-    ) {
-        applyLocation(
-            draft.location
-        );
-
-        applyTimezone(
-            draft.timezone
-        );
-    }
-    else {
-        clearDetectedRegion();
-    }
-
     populateAvailability(
         draft.availability
     );
 
-    updateRegionDetectionState();
     updateModeField();
     updateDirectContactWarning();
     updateNotificationState();
@@ -2737,11 +2980,36 @@ async function submitRegistration(
             setBackendWarning(
                 true,
                 result.message
-                || "Your registration was received, but permanent profile saving is not available yet."
+                || "Your registration could not be confirmed as saved."
             );
 
             showMessage(
-                "Registration received, but permanent profile saving is not yet complete.",
+                "Your Rocket League profile could not be confirmed as saved.",
+                "warning"
+            );
+
+            return;
+        }
+
+        if (
+            result.registrationAccepted !==
+                true
+            || result.profileComplete !==
+                true
+            || result.rocketLeagueAccess !==
+                true
+        ) {
+            saveRegistrationDraft(
+                payload
+            );
+
+            setBackendWarning(
+                false
+            );
+
+            showMessage(
+                result.message
+                || "Your profile was saved, but registration requirements are still incomplete.",
                 "warning"
             );
 
@@ -2755,7 +3023,7 @@ async function submitRegistration(
         );
 
         showMessage(
-            "Rocket League profile saved. Redirecting…",
+            "Rocket League registration completed. Redirecting…",
             "success"
         );
 
@@ -2820,7 +3088,7 @@ export async function initializePage() {
 
     if (
         form.dataset.initialized ===
-        "true"
+            "true"
     ) {
         return;
     }
@@ -2840,14 +3108,16 @@ export async function initializePage() {
         "Epic Games"
     );
 
-    setInputValue(
-        "detectedLocation",
-        "Detecting…"
+    /*
+     * Region detection starts disabled and empty.
+     * No location/time-zone lookup occurs during initialization.
+     */
+    setCheckboxValue(
+        "autoDetectRegion",
+        false
     );
 
-    applyTimezone(
-        ""
-    );
+    clearDetectedRegion();
 
     /* =====================================================
     REGION DETECTION
@@ -2859,7 +3129,7 @@ export async function initializePage() {
         )
         ?.addEventListener(
             "change",
-            updateRegionDetectionState
+            handleRegionDetectionChange
         );
 
     /* =====================================================
@@ -3038,7 +3308,6 @@ export async function initializePage() {
         submitRegistration
     );
 
-    updateRegionDetectionState();
     updateModeField();
     updateDirectContactWarning();
     updateNotificationState();
@@ -3068,7 +3337,7 @@ export async function initializePage() {
 
     if (
         profileResult.profileLoaded ===
-        false
+            false
     ) {
         setBackendWarning(
             true,
