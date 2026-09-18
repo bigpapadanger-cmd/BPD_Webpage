@@ -11,26 +11,26 @@ Purpose:
     Initializes the Admin Taskboard page and performs the
     preliminary Taskboard API integration.
 
-Preliminary Test:
+Responsibilities:
     - Verify Admin access.
-    - Load Admin sidebar.
     - Load task summary.
     - Load task list.
     - Load task assignees.
     - Display returned API data for verification.
     - Allow manual refresh.
+    - Export initializePage() for the BPD router.
 
 Security:
     - Discord authorization is performed server-side.
     - Client-side role claims are never trusted.
     - Task APIs independently enforce permissions.
     - Supabase credentials never reach the browser.
-========================================================= */
 
-import {
-    initializeAdminSidebar,
-    loadAdminSidebarHover
-} from "/Framework/Shell/JS/Admin/sidebar.js";
+Important:
+    - Sidebar HTML and sidebar behavior are handled by the
+      global router/shell.
+    - This module must not load or initialize the sidebar.
+========================================================= */
 
 /* =========================================================
 ENDPOINTS
@@ -38,9 +38,6 @@ ENDPOINTS
 
 const ADMIN_ACCESS_URL =
     "/api/auth/admin/access";
-
-const ADMIN_SIDEBAR_URL =
-    "/Framework/Shell/HTML/Admin/sidebar.html";
 
 const TASKS_URL =
     "/api/auth/admin/tasks";
@@ -52,69 +49,76 @@ const TASK_ASSIGNEES_URL =
     "/api/auth/admin/tasks/task-assignees";
 
 /* =========================================================
-ELEMENTS
+ELEMENT LOOKUP
 ========================================================= */
 
-const taskboardContent =
-    document.getElementById(
-        "taskboardContent"
-    );
+function getTaskboardElements() {
+    return {
+        taskboardContent:
+            document.getElementById(
+                "taskboardContent"
+            ),
 
-const taskboardLoading =
-    document.getElementById(
-        "taskboardLoading"
-    );
+        taskboardLoading:
+            document.getElementById(
+                "taskboardLoading"
+            ),
 
-const taskboardDenied =
-    document.getElementById(
-        "taskboardDenied"
-    );
+        taskboardDenied:
+            document.getElementById(
+                "taskboardDenied"
+            ),
 
-const taskboardError =
-    document.getElementById(
-        "taskboardError"
-    );
+        taskboardError:
+            document.getElementById(
+                "taskboardError"
+            ),
 
-const taskboardErrorMessage =
-    document.getElementById(
-        "taskboardErrorMessage"
-    );
+        taskboardErrorMessage:
+            document.getElementById(
+                "taskboardErrorMessage"
+            ),
 
-const sidebar =
-    document.getElementById(
-        "sidebar"
-    );
+        taskboardRefresh:
+            document.getElementById(
+                "taskboardRefresh"
+            ),
 
-const taskboardRefresh =
-    document.getElementById(
-        "taskboardRefresh"
-    );
+        taskSummaryOutput:
+            document.getElementById(
+                "taskSummaryOutput"
+            ),
 
-const taskSummaryOutput =
-    document.getElementById(
-        "taskSummaryOutput"
-    );
+        taskListOutput:
+            document.getElementById(
+                "taskListOutput"
+            ),
 
-const taskListOutput =
-    document.getElementById(
-        "taskListOutput"
-    );
+        taskAssigneesOutput:
+            document.getElementById(
+                "taskAssigneesOutput"
+            ),
 
-const taskAssigneesOutput =
-    document.getElementById(
-        "taskAssigneesOutput"
-    );
-
-const taskboardStatus =
-    document.getElementById(
-        "taskboardStatus"
-    );
+        taskboardStatus:
+            document.getElementById(
+                "taskboardStatus"
+            )
+    };
+}
 
 /* =========================================================
 PAGE STATE
 ========================================================= */
 
 function hideAllTaskboardStates() {
+    const {
+        taskboardContent,
+        taskboardLoading,
+        taskboardDenied,
+        taskboardError
+    } =
+        getTaskboardElements();
+
     if (
         taskboardContent
     ) {
@@ -145,6 +149,11 @@ function hideAllTaskboardStates() {
 }
 
 function showTaskboardLoading() {
+    const {
+        taskboardLoading
+    } =
+        getTaskboardElements();
+
     hideAllTaskboardStates();
 
     if (
@@ -156,6 +165,11 @@ function showTaskboardLoading() {
 }
 
 function showTaskboardAuthorized() {
+    const {
+        taskboardContent
+    } =
+        getTaskboardElements();
+
     hideAllTaskboardStates();
 
     if (
@@ -167,6 +181,11 @@ function showTaskboardAuthorized() {
 }
 
 function showTaskboardDenied() {
+    const {
+        taskboardDenied
+    } =
+        getTaskboardElements();
+
     hideAllTaskboardStates();
 
     if (
@@ -181,6 +200,12 @@ function showTaskboardError(
     message =
         "The Taskboard could not be loaded."
 ) {
+    const {
+        taskboardError,
+        taskboardErrorMessage
+    } =
+        getTaskboardElements();
+
     hideAllTaskboardStates();
 
     if (
@@ -205,6 +230,11 @@ STATUS
 function setTaskboardStatus(
     message
 ) {
+    const {
+        taskboardStatus
+    } =
+        getTaskboardElements();
+
     if (
         !taskboardStatus
     ) {
@@ -260,57 +290,12 @@ async function verifyAdminAccess() {
     return {
         authorized:
             response.ok
-            && result?.authorized === true,
+            && result?.authorized ===
+                true,
 
         status:
             response.status
     };
-}
-
-/* =========================================================
-LOAD ADMIN SIDEBAR
-========================================================= */
-
-async function loadAdminSidebar() {
-    if (
-        !sidebar
-    ) {
-        throw new Error(
-            "Admin sidebar container was not found."
-        );
-    }
-
-    const response =
-        await fetch(
-            ADMIN_SIDEBAR_URL,
-            {
-                cache:
-                    "no-store"
-            }
-        );
-
-    if (
-        !response.ok
-    ) {
-        throw new Error(
-            `Admin sidebar failed: ${response.status}`
-        );
-    }
-
-    sidebar.innerHTML =
-        await response.text();
-}
-
-/* =========================================================
-INITIALIZE ADMIN SHELL
-========================================================= */
-
-async function initializeAdminShell() {
-    await loadAdminSidebar();
-
-    await loadAdminSidebarHover();
-
-    initializeAdminSidebar();
 }
 
 /* =========================================================
@@ -452,12 +437,17 @@ function renderJson(
 
 /* =========================================================
 LOAD TASKBOARD DATA
-
-These requests are intentionally executed together so the
-preliminary test verifies all three primary read endpoints.
 ========================================================= */
 
 async function loadTaskboardData() {
+    const {
+        taskboardRefresh,
+        taskSummaryOutput,
+        taskListOutput,
+        taskAssigneesOutput
+    } =
+        getTaskboardElements();
+
     setTaskboardStatus(
         "Loading task data..."
     );
@@ -544,8 +534,20 @@ REFRESH
 ========================================================= */
 
 function setupTaskboardRefresh() {
+    const {
+        taskboardRefresh
+    } =
+        getTaskboardElements();
+
     if (
         !taskboardRefresh
+    ) {
+        return;
+    }
+
+    if (
+        taskboardRefresh.dataset.initialized ===
+        "true"
     ) {
         return;
     }
@@ -564,6 +566,9 @@ function setupTaskboardRefresh() {
             }
         }
     );
+
+    taskboardRefresh.dataset.initialized =
+        "true";
 }
 
 /* =========================================================
@@ -577,10 +582,10 @@ async function initializeTaskboard() {
 }
 
 /* =========================================================
-INITIALIZE TASKBOARD PAGE
+ROUTER ENTRY POINT
 ========================================================= */
 
-async function initializeTaskboardPage() {
+export async function initializePage() {
     showTaskboardLoading();
 
     try {
@@ -591,10 +596,13 @@ async function initializeTaskboardPage() {
             !access.authorized
         ) {
             if (
-                access.status === 401
-                || access.status === 403
+                access.status ===
+                    401
+                || access.status ===
+                    403
             ) {
                 showTaskboardDenied();
+
                 return;
             }
 
@@ -604,8 +612,6 @@ async function initializeTaskboardPage() {
 
             return;
         }
-
-        await initializeAdminShell();
 
         showTaskboardAuthorized();
 
@@ -640,9 +646,3 @@ async function initializeTaskboardPage() {
         );
     }
 }
-
-/* =========================================================
-START
-========================================================= */
-
-initializeTaskboardPage();

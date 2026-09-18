@@ -5,28 +5,27 @@ BPD GAMING NETWORK
 ADMIN MANAGEMENT CLIENT
 
 File:
-    public/Admin/admin.js
+    public/Global/Admin/Home/JS/index.js
 
 Purpose:
-    Initializes the Admin Management area.
+    Initializes the Admin Management page when loaded by the
+    BPD client-side router.
 
 Responsibilities:
     - Verify server-side Admin authorization.
-    - Load Admin-specific sidebar content.
-    - Load shared sidebar hover content.
-    - Initialize Admin sidebar behavior.
     - Reveal Admin content only after authorization succeeds.
+    - Export initializePage() for the BPD router.
 
 Security:
     - Discord authorization is performed server-side.
     - Client-side role claims are never trusted.
     - Admin API endpoints independently enforce permissions.
-========================================================= */
 
-import {
-    initializeAdminSidebar,
-    loadAdminSidebarHover
-} from "/Framework/Shell/JS/Admin/sidebar.js";
+Important:
+    - Sidebar HTML and sidebar behavior are handled by the
+      global router/shell.
+    - This module must not load or initialize the sidebar.
+========================================================= */
 
 /* =========================================================
 CONSTANTS
@@ -35,57 +34,91 @@ CONSTANTS
 const ADMIN_ACCESS_URL =
     "/api/auth/admin/access";
 
-const ADMIN_SIDEBAR_URL =
-    "/Framework/Shell/HTML/Admin/sidebar.html";
-
 /* =========================================================
-ELEMENTS
+ELEMENT LOOKUP
 ========================================================= */
 
-const adminContent =
-    document.getElementById(
-        "adminContent"
-    );
+function getAdminElements() {
+    return {
+        adminContent:
+            document.getElementById(
+                "adminContent"
+            ),
 
-const adminLoading =
-    document.getElementById(
-        "adminLoading"
-    );
+        adminLoading:
+            document.getElementById(
+                "adminLoading"
+            ),
 
-const adminDenied =
-    document.getElementById(
-        "adminDenied"
-    );
-
-const sidebar =
-    document.getElementById(
-        "sidebar"
-    );
+        adminDenied:
+            document.getElementById(
+                "adminDenied"
+            )
+    };
+}
 
 /* =========================================================
 PAGE STATE
 ========================================================= */
 
 function showAuthorized() {
-    adminLoading.hidden =
-        true;
+    const {
+        adminContent,
+        adminLoading,
+        adminDenied
+    } =
+        getAdminElements();
 
-    adminDenied.hidden =
-        true;
+    if (
+        adminLoading
+    ) {
+        adminLoading.hidden =
+            true;
+    }
 
-    adminContent.hidden =
-        false;
+    if (
+        adminDenied
+    ) {
+        adminDenied.hidden =
+            true;
+    }
+
+    if (
+        adminContent
+    ) {
+        adminContent.hidden =
+            false;
+    }
 }
 
 function showDenied() {
-    adminLoading.hidden =
-        true;
+    const {
+        adminContent,
+        adminLoading,
+        adminDenied
+    } =
+        getAdminElements();
 
-    adminContent.hidden =
-        true;
+    if (
+        adminLoading
+    ) {
+        adminLoading.hidden =
+            true;
+    }
 
-    adminDenied.hidden =
-        false;
+    if (
+        adminContent
+    ) {
+        adminContent.hidden =
+            true;
+    }
+
+    if (
+        adminDenied
+    ) {
+        adminDenied.hidden =
+            false;
+    }
 }
 
 /* =========================================================
@@ -126,60 +159,16 @@ async function verifyAdminAccess() {
 
     return (
         response.ok
-        && result?.authorized === true
+        && result?.authorized ===
+            true
     );
 }
 
 /* =========================================================
-LOAD ADMIN SIDEBAR
+ROUTER ENTRY POINT
 ========================================================= */
 
-async function loadAdminSidebar() {
-    if (
-        !sidebar
-    ) {
-        throw new Error(
-            "Admin sidebar container was not found."
-        );
-    }
-
-    const response =
-        await fetch(
-            ADMIN_SIDEBAR_URL,
-            {
-                cache:
-                    "no-store"
-            }
-        );
-
-    if (
-        !response.ok
-    ) {
-        throw new Error(
-            `Admin sidebar failed: ${response.status}`
-        );
-    }
-
-    sidebar.innerHTML =
-        await response.text();
-}
-
-/* =========================================================
-INITIALIZE ADMIN SHELL
-========================================================= */
-
-async function initializeAdminShell() {
-    await loadAdminSidebar();
-    await loadAdminSidebarHover();
-
-    initializeAdminSidebar();
-}
-
-/* =========================================================
-INITIALIZE ADMIN PAGE
-========================================================= */
-
-async function initializeAdminPage() {
+export async function initializePage() {
     try {
         const authorized =
             await verifyAdminAccess();
@@ -188,10 +177,9 @@ async function initializeAdminPage() {
             !authorized
         ) {
             showDenied();
+
             return;
         }
-
-        await initializeAdminShell();
 
         showAuthorized();
     }
@@ -199,16 +187,18 @@ async function initializeAdminPage() {
         error
     ) {
         console.error(
-            "[ADMIN INITIALIZATION FAILED]",
-            error
+            "ADMIN MANAGEMENT: Initialization failed.",
+            {
+                name:
+                    error?.name
+                    || "Error",
+
+                message:
+                    error?.message
+                    || "Unknown error"
+            }
         );
 
         showDenied();
     }
 }
-
-/* =========================================================
-START
-========================================================= */
-
-initializeAdminPage();
