@@ -14,15 +14,16 @@ Service:
     functions/services/rl/session.js
 
 Purpose:
-    Returns the Rocket League-specific authentication and
-    session state for the current BPD browser session.
+    Returns the Rocket League-specific authentication,
+    registration, profile, and access state for the current
+    BPD browser session.
 
 Responsibilities:
     - Receive the Rocket League session request.
     - Log safe request metadata.
-    - Delegate Rocket League session evaluation to the
+    - Delegate all Rocket League session evaluation to the
       service layer.
-    - Return the service response.
+    - Return the service response unchanged.
 
 Important:
     - This is NOT the global BPD authentication endpoint.
@@ -30,10 +31,11 @@ Important:
           GET /api/auth/session
     - Rocket League may require Epic-specific state in
       addition to a valid global BPD session.
-    - This route does not load profile registration data.
+    - This route does not independently evaluate registration.
     - This route does not perform region detection.
-    - This route does not determine Rocket League access
-      independently of the service layer.
+    - This route does not create or modify identities.
+    - This route does not independently determine Rocket
+      League access.
 ========================================================= */
 
 import {
@@ -126,6 +128,39 @@ export async function onRequestGet(
 
                 authenticated:
                     false,
+
+                epicLinked:
+                    false,
+
+                requiresEpicLogin:
+                    false,
+
+                profileLoaded:
+                    false,
+
+                registrationStatus:
+                    "incomplete",
+
+                ageConsent:
+                    false,
+
+                policyConsent:
+                    false,
+
+                registrationAccepted:
+                    false,
+
+                profileComplete:
+                    false,
+
+                rocketLeagueAccess:
+                    false,
+
+                profileError:
+                    null,
+
+                user:
+                    null,
 
                 code:
                     "ROCKET_LEAGUE_SESSION_ROUTE_FAILED",
