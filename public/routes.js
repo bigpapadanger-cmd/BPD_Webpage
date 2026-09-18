@@ -1,5 +1,4 @@
-/*
-=========================================================
+/* =========================================================
 BPD GAMING NETWORK
 ROUTE CONFIGURATION
 =========================================================
@@ -32,8 +31,7 @@ ARK:
     /Framework/Shell/CSS/Callers/master_ark.css
 
 Admin:
-    /Framework/Shell/CSS/Callers/master_ark.css
-
+    /Framework/Shell/CSS/Callers/master_admin.css
 
 The route root determines which master CSS caller is loaded.
 
@@ -42,8 +40,8 @@ fall back to master.css.
 */
 
 /* =========================================================
-   MASTER CSS CALLERS
-   ========================================================= */
+MASTER CSS CALLERS
+========================================================= */
 
 export const MASTER_CSS_PATH =
     "/Framework/Shell/CSS/Callers/master.css";
@@ -64,8 +62,8 @@ export const MASTER_CSS_MAP =
     });
 
 /* =========================================================
-   ROUTES
-   ========================================================= */
+ROUTES
+========================================================= */
 
 export const ROUTES = {
 
@@ -76,14 +74,19 @@ export const ROUTES = {
     "/": {
         title:
             "BPD Gaming Network",
+
         body:
             "/Framework/Shell/HTML/Body/body.html",
+
         header:
             "/Framework/Shell/HTML/Header/header.html",
+
         sidebar:
             "/Framework/Shell/HTML/Sidebar/mainmenu.html",
+
         footer:
             "/Framework/Shell/HTML/Footer/footer.html",
+
         module:
             null,
 
@@ -94,38 +97,50 @@ export const ROUTES = {
     "/Dashboard": {
         title:
             "Dashboard | BPD Gaming Network",
+
         body:
             "/Global/Index/HTML/home.html",
+
         header:
             "/Framework/Shell/HTML/Header/header.html",
+
         sidebar:
             "/Framework/Shell/HTML/Sidebar/dashboard.html",
+
         footer:
             "/Framework/Shell/HTML/Footer/footer.html",
+
         module:
             "/Global/Index/JS/index.js",
 
         sitemap:
             true
     },
+
     "/Account": {
         title:
             "Dashboard | BPD Gaming Network",
+
         body:
             "/Global/Account/HTML/index.html",
+
         header:
             "/Framework/Shell/HTML/Header/header.html",
+
         sidebar:
             "/Framework/Shell/HTML/Sidebar/dashboard.html",
+
         footer:
             "/Framework/Shell/HTML/Footer/footer.html",
+
         module:
             "/Global/Account/JS/index.js",
 
         sitemap:
             false,
+
         requiresAuth:
-            true,
+            true
     },
 
     "/Login": {
@@ -151,8 +166,9 @@ export const ROUTES = {
             false,
 
         requiresAuth:
-            false,
+            false
     },
+
     // =====================================================
     // ROCKET LEAGUE
     // =====================================================
@@ -160,14 +176,19 @@ export const ROUTES = {
     "/RocketLeague": {
         title:
             "Rocket League | BPD Gaming Network",
+
         body:
             "/Tabs/RocketLeague/Index/HTML/index.html",
+
         header:
             "/Framework/Shell/HTML/Header/header.html",
+
         sidebar:
             "/Framework/Shell/HTML/Sidebar/rl_menu.html",
+
         footer:
             "/Framework/Shell/HTML/Footer/footer.html",
+
         module:
             "/Tabs/RocketLeague/Index/JS/index.js",
 
@@ -178,36 +199,48 @@ export const ROUTES = {
     "/RocketLeague/Profile": {
         title:
             "Rocket League Profile | BPD Gaming Network",
+
         body:
             "/Tabs/RocketLeague/Registration/HTML/index.html",
+
         header:
             "/Framework/Shell/HTML/Header/header.html",
 
         sidebar:
-            "/Framework/Shell/HTML/Sidebar/mainmenu.html",
+            null,
+
         footer:
             "/Framework/Shell/HTML/Footer/footer.html",
+
         module:
             "/Tabs/RocketLeague/Registration/JS/index.js",
+
         sitemap:
             true,
+
         requiresAuth:
-            true,
+            true
     },
 
     "/RocketLeague/SubmitMatchResults": {
         title:
             "Submit Match Results | BPD Gaming Network",
+
         body:
             "/ocr/HTML/submitimg.html",
+
         header:
             "/Framework/Shell/HTML/Header/header.html",
+
         sidebar:
-            "/Framework/Shell/HTML/Sidebar/rl_AuthSidebar.html",
+            "/Framework/Shell/HTML/Sidebar/rl_menu.html",
+
         footer:
             "/Framework/Shell/HTML/Footer/footer.html",
+
         module:
             "/ocr/JS/index.js",
+
         requiresAuth:
             true,
 
@@ -218,34 +251,45 @@ export const ROUTES = {
     "/RocketLeague/ImageScanning": {
         title:
             "Rocket League Image Scanning | BPD Gaming Network",
+
         body:
             "/Tabs/RocketLeague/Index/HTML/index.html",
+
         header:
             "/Framework/Shell/HTML/Header/header.html",
+
         sidebar:
             "/Framework/Shell/HTML/Sidebar/rl_AuthSidebar.html",
+
         footer:
             "/Framework/Shell/HTML/Footer/footer.html",
+
         module:
             "/Tabs/RocketLeague/Index/JS/index.js",
 
         sitemap:
             false,
+
         requiresAuth:
-            true,
+            true
     },
 
     "/RocketLeague/Leaderboards": {
         title:
             "Rocket League Leaderboards | BPD Gaming Network",
+
         body:
             "/Tabs/RocketLeague/Index/HTML/index.html",
+
         header:
             "/Framework/Shell/HTML/Header/header.html",
+
         sidebar:
-            "/Tabs/RocketLeague/Sidebars/HTML/rl_AuthSidebar.html",
+            "/Framework/Shell/HTML/Sidebar/rl_AuthSidebar.html",
+
         footer:
             "/Framework/Shell/HTML/Footer/footer.html",
+
         module:
             "/Tabs/RocketLeague/Index/JS/index.js",
 
@@ -256,16 +300,22 @@ export const ROUTES = {
     "/RocketLeague/MatchResults": {
         title:
             "Match Results | BPD Gaming Network",
+
         body:
             "/Tabs/RocketLeague/MatchResults/HTML/index.html",
+
         header:
             "/Framework/Shell/HTML/Header/header.html",
+
         sidebar:
             "/Framework/Shell/HTML/Sidebar/rocketleague.html",
+
         footer:
             "/Framework/Shell/HTML/Footer/footer.html",
+
         module:
             "/Tabs/RocketLeague/MatchResults/JS/index.js",
+
         requiresAuth:
             true,
 
@@ -280,14 +330,19 @@ export const ROUTES = {
     "/About": {
         title:
             "About Us | BPD Gaming Network",
+
         body:
             "/Required/About/HTML/index.html",
+
         header:
             "/Framework/Shell/HTML/Header/header.html",
+
         sidebar:
             "/Framework/Shell/HTML/Sidebar/mainmenu.html",
+
         footer:
             "/Framework/Shell/HTML/Footer/footer.html",
+
         module:
             "/Required/About/JS/index.js",
 
@@ -298,14 +353,19 @@ export const ROUTES = {
     "/FAQ": {
         title:
             "Frequently Asked Questions | BPD Gaming Network",
+
         body:
             "/Required/FAQ/HTML/index.html",
+
         header:
             "/Framework/Shell/HTML/Header/header.html",
+
         sidebar:
             "/Framework/Shell/HTML/Sidebar/mainmenu.html",
+
         footer:
             "/Framework/Shell/HTML/Footer/footer.html",
+
         module:
             "/Required/FAQ/JS/index.js",
 
@@ -316,14 +376,19 @@ export const ROUTES = {
     "/Privacy": {
         title:
             "Privacy Policy | BPD Gaming Network",
+
         body:
             "/Required/PrivacyPolicy/HTML/index.html",
+
         header:
             "/Framework/Shell/HTML/Header/header.html",
+
         sidebar:
             "/Framework/Shell/HTML/Sidebar/mainmenu.html",
+
         footer:
             "/Framework/Shell/HTML/Footer/footer.html",
+
         module:
             "/Required/PrivacyPolicy/JS/index.js",
 
@@ -334,14 +399,19 @@ export const ROUTES = {
     "/TOS": {
         title:
             "Terms of Service | BPD Gaming Network",
+
         body:
             "/Required/TOS/HTML/index.html",
+
         header:
             "/Framework/Shell/HTML/Header/header.html",
+
         sidebar:
             "/Framework/Shell/HTML/Sidebar/mainmenu.html",
+
         footer:
             "/Framework/Shell/HTML/Footer/footer.html",
+
         module:
             "/Required/TOS/JS/index.js",
 
@@ -356,14 +426,19 @@ export const ROUTES = {
     "/Minecraft": {
         title:
             "Minecraft | BPD Gaming Network",
+
         body:
             "/Tabs/Minecraft/HTML/index.html",
+
         header:
             "/Framework/Shell/HTML/Header/header.html",
+
         sidebar:
             "/Framework/Shell/HTML/Sidebar/mainmenu.html",
+
         footer:
             "/Framework/Shell/HTML/Footer/footer.html",
+
         module:
             "/Tabs/Minecraft/JS/index.js",
 
@@ -374,14 +449,19 @@ export const ROUTES = {
     "/Minecraft/Mods": {
         title:
             "Minecraft Mods | BPD Gaming Network",
+
         body:
             "/Tabs/Minecraft/HTML/mods.html",
+
         header:
             "/Framework/Shell/HTML/Header/header.html",
+
         sidebar:
             "/Framework/Shell/HTML/Sidebar/mainmenu.html",
+
         footer:
             "/Framework/Shell/HTML/Footer/footer.html",
+
         module:
             "/Tabs/Minecraft/JS/mods.js",
 
@@ -392,14 +472,19 @@ export const ROUTES = {
     "/Minecraft/Announcements": {
         title:
             "Minecraft Announcements | BPD Gaming Network",
+
         body:
             "/Tabs/Minecraft/HTML/announcements.html",
+
         header:
             "/Framework/Shell/HTML/Header/header.html",
+
         sidebar:
             "/Framework/Shell/HTML/Sidebar/mainmenu.html",
+
         footer:
             "/Framework/Shell/HTML/Footer/footer.html",
+
         module:
             "/Tabs/Minecraft/JS/announcements.js",
 
@@ -414,14 +499,19 @@ export const ROUTES = {
     "/Ark": {
         title:
             "ARK: Survival Ascended | BPD Gaming Network",
+
         body:
             "/Tabs/Ark/HTML/index.html",
+
         header:
             "/Framework/Shell/HTML/Header/header.html",
+
         sidebar:
             "/Framework/Shell/HTML/Sidebar/mainmenu.html",
+
         footer:
             "/Framework/Shell/HTML/Footer/footer.html",
+
         module:
             "/Tabs/Ark/JS/index.js",
 
@@ -432,14 +522,19 @@ export const ROUTES = {
     "/Ark/Mods": {
         title:
             "ARK: Survival Ascended Mods | BPD Gaming Network",
+
         body:
             "/Tabs/Ark/HTML/mods.html",
+
         header:
             "/Framework/Shell/HTML/Header/header.html",
+
         sidebar:
             "/Framework/Shell/HTML/Sidebar/mainmenu.html",
+
         footer:
             "/Framework/Shell/HTML/Footer/footer.html",
+
         module:
             "/Tabs/Ark/JS/mods.js",
 
@@ -450,14 +545,19 @@ export const ROUTES = {
     "/Ark/Announcements": {
         title:
             "ARK: Survival Ascended Announcements | BPD Gaming Network",
+
         body:
             "/Tabs/Ark/HTML/announcements.html",
+
         header:
             "/Framework/Shell/HTML/Header/header.html",
+
         sidebar:
             "/Framework/Shell/HTML/Sidebar/mainmenu.html",
+
         footer:
             "/Framework/Shell/HTML/Footer/footer.html",
+
         module:
             "/Tabs/Ark/JS/announcements.js",
 
@@ -472,14 +572,19 @@ export const ROUTES = {
     "/Error": {
         title:
             "Page Not Found | BPD Gaming Network",
+
         body:
             "/Global/404/HTML/404.html",
+
         header:
             "/Framework/Shell/HTML/Header/header.html",
+
         sidebar:
             "/Framework/Shell/HTML/Sidebar/mainmenu.html",
+
         footer:
             "/Framework/Shell/HTML/Footer/footer.html",
+
         module:
             null,
 
@@ -489,6 +594,7 @@ export const ROUTES = {
         sitemap:
             false
     },
+
     // =====================================================
     // ADMIN PAGES
     // =====================================================
@@ -496,16 +602,21 @@ export const ROUTES = {
     "/Admin": {
         title:
             "Admin Management Page | BPD Gaming Network",
+
         body:
             "/Global/Admin/Home/HTML/index.html",
+
         header:
             "/Framework/Shell/HTML/Header/header.html",
+
         sidebar:
             "/Framework/Shell/HTML/Sidebar/admin.html",
+
         footer:
             "/Framework/Shell/HTML/Footer/footer.html",
+
         module:
-            "/Global/Admin/Home/JS/index.html",
+            "/Global/Admin/Home/JS/index.js",
 
         requiresAuth:
             true,
@@ -513,19 +624,25 @@ export const ROUTES = {
         sitemap:
             false
     },
-       "/Admin/Taskboard": {
+
+    "/Admin/Taskboard": {
         title:
             "Taskboard | BPD Gaming Network",
+
         body:
             "/Global/Admin/TaskBoard/HTML/index.html",
+
         header:
             "/Framework/Shell/HTML/Header/header.html",
+
         sidebar:
             "/Framework/Shell/HTML/Sidebar/admin.html",
+
         footer:
             "/Framework/Shell/HTML/Footer/footer.html",
+
         module:
-            "/Global/Admin/TaskBoard/JS/index.html",
+            "/Global/Admin/TaskBoard/JS/index.js",
 
         requiresAuth:
             true,
@@ -536,8 +653,8 @@ export const ROUTES = {
 };
 
 /* =========================================================
-   ROUTE NORMALIZATION
-   ========================================================= */
+ROUTE NORMALIZATION
+========================================================= */
 
 export function normalizeRoutePath(
     value
@@ -581,8 +698,8 @@ export function normalizeRoutePath(
 }
 
 /* =========================================================
-   ROUTE ROOT
-   ========================================================= */
+ROUTE ROOT
+========================================================= */
 
 export function getRouteRoot(
     routePath
@@ -617,8 +734,8 @@ export function getRouteRoot(
 }
 
 /* =========================================================
-   MASTER CSS RESOLUTION
-   ========================================================= */
+MASTER CSS RESOLUTION
+========================================================= */
 
 export function getMasterCssForRoute(
     routePath
@@ -663,8 +780,8 @@ export function getMasterCssForRoute(
 }
 
 /* =========================================================
-   ROUTE RESOLUTION
-   ========================================================= */
+ROUTE RESOLUTION
+========================================================= */
 
 export function getRouteConfig(
     routePath
@@ -685,8 +802,8 @@ export function getRouteConfig(
 }
 
 /* =========================================================
-   ROUTE EXISTS
-   ========================================================= */
+ROUTE EXISTS
+========================================================= */
 
 export function routeExists(
     routePath
@@ -705,8 +822,8 @@ export function routeExists(
 }
 
 /* =========================================================
-   HEADER VISIBILITY
-   ========================================================= */
+HEADER VISIBILITY
+========================================================= */
 
 export const HEADER_MAP = {
     "/":
@@ -771,9 +888,9 @@ export const HEADER_MAP = {
 };
 
 /* =========================================================
-   SITEMAP PRIORITIES
-   Only routes with sitemap: true belong here.
-   ========================================================= */
+SITEMAP PRIORITIES
+Only routes with sitemap: true belong here.
+========================================================= */
 
 export const PRIORITY_MAP = {
     "/":
