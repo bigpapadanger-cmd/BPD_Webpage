@@ -446,10 +446,12 @@ PLAYER PROFILE
     --rank-color: #ff8ebd;
 }
 
-.rocket-league-page .rank-supersonic {
+.rocket-league-page .rank-supersonic-legend {
     --rank-color: #e8ecff;
 }
-
+.rocket-league-page .rank-unavailable {
+    --rank-color: #7f8799;
+}
 /*
 =========================================================
 PROFILE WARNING

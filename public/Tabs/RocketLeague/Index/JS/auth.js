@@ -404,6 +404,11 @@ function applyRocketLeagueAuthView(
             "rocketLeagueAccessCallout"
         );
 
+    const accessButton =
+        document.getElementById(
+            "mainRLLoginButton"
+        );
+
     if (
         loggedOutContent
     ) {
@@ -418,13 +423,6 @@ function applyRocketLeagueAuthView(
             !rocketLeagueAccess;
     }
 
-    /*
-     * The player-profile/rank area only makes sense once a
-     * verified Epic identity is linked.
-     *
-     * An authenticated Google/Discord-only account should
-     * not see an empty Rocket League profile shell.
-     */
     if (
         playerProfile
     ) {
@@ -434,12 +432,63 @@ function applyRocketLeagueAuthView(
     }
 
     /*
-     * The access callout remains visible until full Rocket
-     * League access has been granted.
+     * Access CTA
      *
-     * We can later adjust its text depending on whether the
-     * missing requirement is Epic or profile completion.
+     * Epic not linked:
+     *     Login with Epic for Full Access
+     *
+     * Epic linked but RL registration incomplete:
+     *     Create Rocket League Profile for Full Access
+     *
+     * Full access:
+     *     Hide CTA
      */
+    if (
+        accessButton
+    ) {
+        const buttonText =
+            accessButton.querySelector(
+                "span:last-child"
+            );
+
+        if (
+            authenticated
+            && epicLinked
+            && !rocketLeagueAccess
+        ) {
+            if (
+                buttonText
+            ) {
+                buttonText.textContent =
+                    "Create Rocket League Profile for Full Access";
+            }
+
+            accessButton.setAttribute(
+                "aria-label",
+                "Create Rocket League Profile for full access"
+            );
+
+            accessButton.dataset.action =
+                "create-profile";
+        }
+        else {
+            if (
+                buttonText
+            ) {
+                buttonText.textContent =
+                    "Login with Epic for Full Access";
+            }
+
+            accessButton.setAttribute(
+                "aria-label",
+                "Login with Epic Games for full Rocket League access"
+            );
+
+            accessButton.dataset.action =
+                "epic-login";
+        }
+    }
+
     if (
         accessCallout
     ) {

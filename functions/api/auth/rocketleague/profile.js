@@ -142,18 +142,6 @@ async function handleRequest(
                 success:
                     false,
 
-                authenticated:
-                    false,
-
-                epicLinked:
-                    false,
-
-                requiresEpicLogin:
-                    false,
-
-                profileExists:
-                    false,
-
                 profileLoaded:
                     false,
 

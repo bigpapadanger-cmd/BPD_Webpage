@@ -8,12 +8,15 @@ File:
     /Tabs/RocketLeague/Index/JS/connect_epic.js
 
 Purpose:
-    Controls Rocket League login and logout buttons.
+    Controls Rocket League login, profile-setup, and logout
+    buttons.
 
 Description:
     - Sends Rocket League sign-in through the global Login
       page rather than starting Epic OAuth directly.
     - Preserves Rocket League as the post-login destination.
+    - Sends Epic-linked users with incomplete Rocket League
+      access to the Rocket League Profile page.
     - Uses centralized API route constants.
     - Logs out through the global BPD logout endpoint.
     - Invalidates centralized client authentication state
@@ -25,6 +28,9 @@ Authentication:
     Global login:
         /Login?returnTo=/RocketLeague
 
+    Rocket League profile:
+        /RocketLeague/Profile
+
     Logout:
         POST /api/auth/logout
 
@@ -34,6 +40,9 @@ Important:
       flow.
     - This module does not directly call the Epic login API.
     - This module does not maintain independent auth state.
+    - mainRLLoginButton uses data-action set by auth.js:
+          epic-login
+          create-profile
 ========================================================= */
 
 import {
@@ -58,8 +67,35 @@ const LOGIN_PAGE_URL =
 const ROCKET_LEAGUE_PAGE_URL =
     "/RocketLeague";
 
+const ROCKET_LEAGUE_PROFILE_PAGE_URL =
+    "/RocketLeague/Profile";
+
 /* =========================================================
-LOGIN
+NAVIGATION
+========================================================= */
+
+function navigateTo(
+    path
+) {
+    if (
+        window.BPDRouter
+        && typeof window.BPDRouter.navigate ===
+            "function"
+    ) {
+        void window.BPDRouter.navigate(
+            path
+        );
+
+        return;
+    }
+
+    window.location.assign(
+        path
+    );
+}
+
+/* =========================================================
+EPIC LOGIN
 ========================================================= */
 
 function handleEpicLogin() {
@@ -77,6 +113,42 @@ function handleEpicLogin() {
     window.location.assign(
         loginUrl.href
     );
+}
+
+/* =========================================================
+ROCKET LEAGUE PROFILE
+========================================================= */
+
+function handleCreateProfile() {
+    navigateTo(
+        ROCKET_LEAGUE_PROFILE_PAGE_URL
+    );
+}
+
+/* =========================================================
+MAIN ROCKET LEAGUE CTA
+========================================================= */
+
+function handleMainRocketLeagueAction(
+    event
+) {
+    const button =
+        event.currentTarget;
+
+    const action =
+        button?.dataset?.action
+        || "epic-login";
+
+    if (
+        action ===
+        "create-profile"
+    ) {
+        handleCreateProfile();
+
+        return;
+    }
+
+    handleEpicLogin();
 }
 
 /* =========================================================
@@ -174,33 +246,47 @@ export function initializeEpicConnection() {
             "sidebarLogoutButton"
         );
 
-    [
-        loginButton,
-        loginHomepageButton
-    ]
-        .filter(
-            Boolean
-        )
-        .forEach(
-            function(
-                button
-            ) {
-                if (
-                    button.dataset.initialized ===
-                    "true"
-                ) {
-                    return;
-                }
-
-                button.addEventListener(
-                    "click",
-                    handleEpicLogin
-                );
-
-                button.dataset.initialized =
-                    "true";
-            }
+    /*
+     * Sidebar login is always a global login/Epic-link action.
+     */
+    if (
+        loginButton
+        && loginButton.dataset.initialized !==
+            "true"
+    ) {
+        loginButton.addEventListener(
+            "click",
+            handleEpicLogin
         );
+
+        loginButton.dataset.initialized =
+            "true";
+    }
+
+    /*
+     * Homepage CTA is dynamic.
+     *
+     * auth.js sets:
+     *
+     *     data-action="epic-login"
+     *
+     * or:
+     *
+     *     data-action="create-profile"
+     */
+    if (
+        loginHomepageButton
+        && loginHomepageButton.dataset.initialized !==
+            "true"
+    ) {
+        loginHomepageButton.addEventListener(
+            "click",
+            handleMainRocketLeagueAction
+        );
+
+        loginHomepageButton.dataset.initialized =
+            "true";
+    }
 
     if (
         logoutButton
