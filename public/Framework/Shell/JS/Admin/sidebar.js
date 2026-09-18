@@ -1,12 +1,11 @@
 "use strict";
 
-/*
-=========================================================
+/* =========================================================
 BPD GAMING NETWORK
 ADMIN SIDEBAR MODULE
 
 File:
-    Framework/Shell/JS/Admin/sidebar.js
+    /Framework/Shell/JS/Admin/sidebar.js
 
 Purpose:
     Initializes and manages the Admin-specific sidebar.
@@ -16,6 +15,19 @@ Admin Navigation:
     - Taskboard
     - Terms of Service
     - Privacy Policy
+
+Initialization Priority:
+
+    CRITICAL
+    - Apply saved sidebar state.
+    - Apply theme and animation settings.
+    - Initialize sidebar toggle.
+    - Mark active Admin navigation.
+    - Initialize disabled navigation state.
+
+    DEFERRED
+    - Initialize tooltip behavior.
+    - Initialize resize handling.
 
 Description:
     - Maintains user-controlled sidebar state.
@@ -31,38 +43,61 @@ Security:
     - Admin authorization remains server-side.
     - This module does not determine Admin permissions.
     - Admin API endpoints remain independently protected.
-=========================================================
-*/
+========================================================= */
 
 let adminSidebarResizeInitialized =
     false;
 
-/*
-=========================================================
+let adminSidebarDeferredInitialized =
+    false;
+
+/* =========================================================
 INITIALIZE ADMIN SIDEBAR
 
-Call after Admin sidebar HTML and sidebar hover HTML have
-been loaded into the DOM.
-=========================================================
-*/
+Runs the critical sidebar behavior required for immediate
+interaction and correct initial rendering.
+========================================================= */
 
 export function initializeAdminSidebar() {
+    initializeAdminSidebarCritical();
+}
+
+/* =========================================================
+CRITICAL INITIALIZATION
+========================================================= */
+
+export function initializeAdminSidebarCritical() {
     applyAdminGlobalSettings();
     setupAdminSidebarToggle();
     setupAdminActiveNavigation();
     setupAdminDisabledNavigation();
+}
+
+/* =========================================================
+DEFERRED INITIALIZATION
+
+Call after the sidebar hover HTML has been loaded.
+========================================================= */
+
+export function initializeAdminSidebarDeferred() {
+    if (
+        adminSidebarDeferredInitialized
+    ) {
+        return;
+    }
+
+    adminSidebarDeferredInitialized =
+        true;
+
     setupAdminSidebarTooltips();
     setupAdminSidebarResize();
 }
 
-/*
-=========================================================
+/* =========================================================
 LOAD ADMIN SIDEBAR HOVER TOOLTIP HTML
 
-The Admin sidebar can continue using the shared sidebar
-tooltip markup.
-=========================================================
-*/
+The Admin sidebar uses the shared sidebar tooltip markup.
+========================================================= */
 
 export async function loadAdminSidebarHover() {
     const hoverFile =
@@ -115,6 +150,8 @@ export async function loadAdminSidebarHover() {
                 container.firstElementChild
             );
         }
+
+        return true;
     }
     catch (
         error
@@ -123,18 +160,18 @@ export async function loadAdminSidebarHover() {
             "ADMIN SIDEBAR HOVER LOAD FAILED:",
             error
         );
+
+        return false;
     }
 }
 
-/*
-=========================================================
+/* =========================================================
 GLOBAL SETTINGS
 
 Uses the same saved user preferences as the normal site
 shell so switching between the public site and Admin area
 does not unexpectedly change sidebar/theme behavior.
-=========================================================
-*/
+========================================================= */
 
 function applyAdminGlobalSettings() {
     const sidebar =
@@ -211,11 +248,9 @@ function applyAdminGlobalSettings() {
     );
 }
 
-/*
-=========================================================
+/* =========================================================
 SET ADMIN SIDEBAR STATE
-=========================================================
-*/
+========================================================= */
 
 function setAdminSidebarCollapsed(
     sidebar,
@@ -262,11 +297,9 @@ function setAdminSidebarCollapsed(
     }
 }
 
-/*
-=========================================================
+/* =========================================================
 ADMIN SIDEBAR TOGGLE
-=========================================================
-*/
+========================================================= */
 
 function setupAdminSidebarToggle() {
     const sidebar =
@@ -282,6 +315,14 @@ function setupAdminSidebarToggle() {
     if (
         !sidebar
         || !sidebarToggle
+    ) {
+        return;
+    }
+
+    if (
+        sidebarToggle.dataset
+            .adminSidebarInitialized ===
+        "true"
     ) {
         return;
     }
@@ -313,13 +354,14 @@ function setupAdminSidebarToggle() {
             hideAdminSidebarTooltip();
         }
     );
+
+    sidebarToggle.dataset.adminSidebarInitialized =
+        "true";
 }
 
-/*
-=========================================================
+/* =========================================================
 ADMIN SIDEBAR RESIZE
-=========================================================
-*/
+========================================================= */
 
 function setupAdminSidebarResize() {
     if (
@@ -378,11 +420,9 @@ function handleAdminSidebarResize() {
     hideAdminSidebarTooltip();
 }
 
-/*
-=========================================================
+/* =========================================================
 ADMIN SIDEBAR TOOLTIPS
-=========================================================
-*/
+========================================================= */
 
 function setupAdminSidebarTooltips() {
     const sidebar =
@@ -417,6 +457,14 @@ function setupAdminSidebarTooltips() {
         function(
             item
         ) {
+            if (
+                item.dataset
+                    .adminTooltipInitialized ===
+                "true"
+            ) {
+                return;
+            }
+
             item.addEventListener(
                 "mouseenter",
                 function(
@@ -485,25 +533,36 @@ function setupAdminSidebarTooltips() {
                 "mouseleave",
                 hideAdminSidebarTooltip
             );
+
+            item.dataset.adminTooltipInitialized =
+                "true";
         }
     );
 
-    sidebar.addEventListener(
-        "mouseleave",
-        hideAdminSidebarTooltip
-    );
+    if (
+        sidebar.dataset
+            .adminTooltipContainerInitialized !==
+        "true"
+    ) {
+        sidebar.addEventListener(
+            "mouseleave",
+            hideAdminSidebarTooltip
+        );
 
-    sidebar.addEventListener(
-        "scroll",
-        hideAdminSidebarTooltip
-    );
+        sidebar.addEventListener(
+            "scroll",
+            hideAdminSidebarTooltip
+        );
+
+        sidebar.dataset
+            .adminTooltipContainerInitialized =
+            "true";
+    }
 }
 
-/*
-=========================================================
+/* =========================================================
 SHOW ADMIN SIDEBAR TOOLTIP
-=========================================================
-*/
+========================================================= */
 
 function showAdminSidebarTooltip(
     tooltip,
@@ -530,11 +589,9 @@ function showAdminSidebarTooltip(
     );
 }
 
-/*
-=========================================================
+/* =========================================================
 HIDE ADMIN SIDEBAR TOOLTIP
-=========================================================
-*/
+========================================================= */
 
 function hideAdminSidebarTooltip() {
     const tooltip =
@@ -558,23 +615,9 @@ function hideAdminSidebarTooltip() {
     );
 }
 
-/*
-=========================================================
+/* =========================================================
 ADMIN ACTIVE NAVIGATION
-
-Admin routes are evaluated against the current browser path.
-
-Examples:
-    /Dashboard
-        -> Dashboard active
-
-    /Admin/Taskboard
-        -> Taskboard active
-
-    /Admin/Taskboard/TASK-A7K9Q2
-        -> Taskboard remains active
-=========================================================
-*/
+========================================================= */
 
 function setupAdminActiveNavigation() {
     const currentPath =
@@ -606,15 +649,17 @@ function setupAdminActiveNavigation() {
                     `${route}/`
                 );
 
+            const active =
+                exactMatch
+                || childMatch;
+
             item.classList.toggle(
                 "active",
-                exactMatch
-                || childMatch
+                active
             );
 
             if (
-                exactMatch
-                || childMatch
+                active
             ) {
                 item.setAttribute(
                     "aria-current",
@@ -630,11 +675,9 @@ function setupAdminActiveNavigation() {
     );
 }
 
-/*
-=========================================================
+/* =========================================================
 NORMALIZE ADMIN PATH
-=========================================================
-*/
+========================================================= */
 
 function normalizeAdminPath(
     path
@@ -650,7 +693,7 @@ function normalizeAdminPath(
             path
         );
 
-    if (
+    while (
         normalizedPath.length > 1
         && normalizedPath.endsWith(
             "/"
@@ -675,7 +718,8 @@ function normalizeAdminPath(
             );
 
         if (
-            normalizedPath === ""
+            normalizedPath ===
+            ""
         ) {
             normalizedPath =
                 "/";
@@ -685,11 +729,9 @@ function normalizeAdminPath(
     return normalizedPath;
 }
 
-/*
-=========================================================
+/* =========================================================
 DISABLED ADMIN NAVIGATION
-=========================================================
-*/
+========================================================= */
 
 function setupAdminDisabledNavigation() {
     const disabledItems =
@@ -701,6 +743,14 @@ function setupAdminDisabledNavigation() {
         function(
             item
         ) {
+            if (
+                item.dataset
+                    .adminDisabledInitialized ===
+                "true"
+            ) {
+                return;
+            }
+
             item.addEventListener(
                 "click",
                 function(
@@ -719,6 +769,9 @@ function setupAdminDisabledNavigation() {
                 "tabindex",
                 "-1"
             );
+
+            item.dataset.adminDisabledInitialized =
+                "true";
         }
     );
 }

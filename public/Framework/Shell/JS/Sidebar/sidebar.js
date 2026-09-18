@@ -1,15 +1,36 @@
-/*
-=========================================================
+"use strict";
+
+/* =========================================================
 BPD GAMING NETWORK
 SPA SIDEBAR MODULE
 
-Sidebar state is user-controlled at every viewport size.
-Mobile and tablet users may fully expand the sidebar.
-=========================================================
-*/
+File:
+    /Framework/Shell/JS/Sidebar/sidebar.js
+
+Purpose:
+    Coordinates shared sidebar initialization and behavior.
+
+Responsibilities:
+    - Applies stored sidebar/theme preferences.
+    - Handles sidebar expansion and collapse.
+    - Handles route visibility and active navigation.
+    - Handles disabled navigation items.
+    - Handles collapsed-sidebar tooltips.
+    - Handles resize behavior.
+    - Delegates Admin navigation authorization.
+    - Delegates submenu behavior.
+
+Important:
+    - Admin authorization belongs to admin_navigation.js.
+    - Submenu behavior belongs to submenu.js.
+    - This file should coordinate those modules rather than
+      duplicate their implementations.
+========================================================= */
+
 import {
     setupAdminNavigation
 } from "./admin_navigation.js";
+
 import {
     initializeSidebarSubmenus
 } from "./submenu.js";
@@ -17,26 +38,118 @@ import {
 let sidebarResizeInitialized =
     false;
 
-
-/*
-=========================================================
+/* =========================================================
 INITIALIZE SIDEBAR
-Call after sidebar HTML and hover HTML are loaded.
-=========================================================
-*/
+
+Initialization is split into priority phases:
+
+1. Critical
+   Runs immediately before yielding to the browser.
+
+2. Interactive
+   Runs on the next animation frame after initial paint.
+
+3. Deferred
+   Runs during browser idle time when possible.
+========================================================= */
 
 export function initializeSidebar() {
-    applyGlobalSettings();
-    setupSidebarToggle();
-    setupRouteVisibility();
-    setupActiveNavigation();
-    setupDisabledNavigation();
-    setupSidebarTooltips();
-    setupSidebarResize();
-    setupAdminNavigation();
-    initializeSidebarSubmenus();
+    initializeCriticalSidebar();
+
+    window.requestAnimationFrame(
+        () => {
+            initializeInteractiveSidebar();
+
+            scheduleSidebarIdleWork();
+        }
+    );
 }
 
+/* =========================================================
+CRITICAL INITIALIZATION
+
+Required for correct first-render behavior.
+Keep this phase lightweight and synchronous.
+========================================================= */
+
+function initializeCriticalSidebar() {
+    applyGlobalSettings();
+
+    setupSidebarToggle();
+
+    setupRouteVisibility();
+
+    setupActiveNavigation();
+
+    setupDisabledNavigation();
+}
+
+/* =========================================================
+INTERACTIVE INITIALIZATION
+
+Runs after the browser has had an opportunity to paint.
+
+These features should become available quickly but do not
+need to block the initial sidebar render.
+========================================================= */
+
+function initializeInteractiveSidebar() {
+    initializeSidebarSubmenus();
+
+    /*
+     * Authorization is asynchronous.
+     *
+     * Do not block sidebar initialization while waiting for
+     * the Admin access API.
+     */
+    void setupAdminNavigation();
+}
+
+/* =========================================================
+DEFERRED INITIALIZATION
+
+Non-critical enhancements are initialized when the browser
+has idle time available.
+========================================================= */
+
+function scheduleSidebarIdleWork() {
+    if (
+        typeof window.requestIdleCallback ===
+        "function"
+    ) {
+        window.requestIdleCallback(
+            () => {
+                initializeDeferredSidebar();
+            },
+            {
+                timeout:
+                    1000
+            }
+        );
+
+        return;
+    }
+
+    /*
+     * Fallback for browsers without requestIdleCallback.
+     */
+    window.setTimeout(
+        () => {
+            initializeDeferredSidebar();
+        },
+        100
+    );
+}
+
+/* =========================================================
+DEFERRED SIDEBAR FEATURES
+========================================================= */
+
+function initializeDeferredSidebar() {
+    setupSidebarTooltips();
+
+    setupSidebarResize();
+}
 
 /*
 =========================================================

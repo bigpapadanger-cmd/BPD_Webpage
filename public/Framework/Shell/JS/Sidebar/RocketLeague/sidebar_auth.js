@@ -5,11 +5,11 @@ BPD GAMING NETWORK
 ROCKET LEAGUE SIDEBAR AUTH VIEW
 
 File:
-    /Tabs/RocketLeague/Index/JS/sidebar_auth.js
+    /Framework/Shell/JS/Sidebar/RocketLeague/sidebar_auth.js
 
 Purpose:
-    Applies Rocket League authentication and access state to
-    sidebar elements.
+    Applies normalized Rocket League authentication and
+    access state to Rocket League sidebar elements.
 
 Description:
     - Consumes normalized Rocket League auth/profile state.
@@ -26,8 +26,88 @@ Security:
       access and provider requirements.
 ========================================================= */
 
+/* =========================================================
+AUTHENTICATION VISIBILITY
+========================================================= */
+
+function applyAuthenticationVisibility(
+    sidebar,
+    authenticated
+) {
+    sidebar
+        .querySelectorAll(
+            "[data-auth]"
+        )
+        .forEach(
+            function(
+                element
+            ) {
+                const requiredState =
+                    element.dataset.auth;
+
+                if (
+                    requiredState ===
+                    "authenticated"
+                ) {
+                    element.hidden =
+                        !authenticated;
+                }
+                else if (
+                    requiredState ===
+                    "guest"
+                ) {
+                    element.hidden =
+                        authenticated;
+                }
+            }
+        );
+}
+
+/* =========================================================
+ROCKET LEAGUE ACCESS VISIBILITY
+========================================================= */
+
+function applyRocketLeagueAccessVisibility(
+    sidebar,
+    rocketLeagueAccess
+) {
+    sidebar
+        .querySelectorAll(
+            "[data-rl-access]"
+        )
+        .forEach(
+            function(
+                element
+            ) {
+                const requiredState =
+                    element.dataset.rlAccess;
+
+                if (
+                    requiredState ===
+                        "required"
+                    || requiredState ===
+                        "unlocked"
+                ) {
+                    element.hidden =
+                        !rocketLeagueAccess;
+                }
+                else if (
+                    requiredState ===
+                    "locked"
+                ) {
+                    element.hidden =
+                        rocketLeagueAccess;
+                }
+            }
+        );
+}
+
+/* =========================================================
+APPLY SIDEBAR AUTH STATE
+========================================================= */
+
 export function applySidebarAuthState(
-    authSession
+    authSession = null
 ) {
     const sidebar =
         document.getElementById(
@@ -48,59 +128,15 @@ export function applySidebarAuthState(
         authSession?.rocketLeagueAccess ===
         true;
 
-    sidebar
-        .querySelectorAll(
-            "[data-auth]"
-        )
-        .forEach(
-            function(element) {
-                const requiredState =
-                    element.dataset.auth;
+    applyAuthenticationVisibility(
+        sidebar,
+        authenticated
+    );
 
-                if (
-                    requiredState ===
-                    "authenticated"
-                ) {
-                    element.hidden =
-                        !authenticated;
-                }
-                else if (
-                    requiredState ===
-                    "guest"
-                ) {
-                    element.hidden =
-                        authenticated;
-                }
-            }
-        );
-
-    sidebar
-        .querySelectorAll(
-            "[data-rl-access]"
-        )
-        .forEach(
-            function(element) {
-                const requiredState =
-                    element.dataset.rlAccess;
-
-                if (
-                    requiredState ===
-                    "required"
-                    || requiredState ===
-                    "unlocked"
-                ) {
-                    element.hidden =
-                        !rocketLeagueAccess;
-                }
-                else if (
-                    requiredState ===
-                    "locked"
-                ) {
-                    element.hidden =
-                        rocketLeagueAccess;
-                }
-            }
-        );
+    applyRocketLeagueAccessVisibility(
+        sidebar,
+        rocketLeagueAccess
+    );
 
     sidebar.dataset.authenticated =
         String(

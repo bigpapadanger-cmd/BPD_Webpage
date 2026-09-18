@@ -1,16 +1,46 @@
-/*
-=========================================================
+"use strict";
+
+/* =========================================================
 BPD GAMING NETWORK
 ADMIN SIDEBAR NAVIGATION
 
 File:
-    Framework/Shell/JS/Sidebar/admin_navigation.js
+    /Framework/Shell/JS/Sidebar/admin_navigation.js
 
 Purpose:
-    Shows the Admin navigation item only when the current
-    authenticated account has authorized Admin/staff access.
-=========================================================
-*/
+    Controls visibility of the Admin sidebar navigation item.
+
+Responsibilities:
+    - Starts the Admin navigation item hidden.
+    - Verifies Admin/staff access server-side.
+    - Shows the Admin item only for authorized accounts.
+    - Fails closed when authorization cannot be verified.
+========================================================= */
+
+const ADMIN_ACCESS_URL =
+    "/api/auth/admin/access";
+
+/* =========================================================
+SET VISIBILITY
+========================================================= */
+
+function setAdminNavigationVisible(
+    adminNavItem,
+    visible
+) {
+    if (
+        !adminNavItem
+    ) {
+        return;
+    }
+
+    adminNavItem.hidden =
+        visible !== true;
+}
+
+/* =========================================================
+INITIALIZE ADMIN NAVIGATION
+========================================================= */
 
 export async function setupAdminNavigation() {
     const adminNavItem =
@@ -24,13 +54,21 @@ export async function setupAdminNavigation() {
         return;
     }
 
-    adminNavItem.hidden =
-        true;
+    /*
+     * Fail closed.
+     *
+     * The Admin item remains hidden until the server explicitly
+     * confirms that the current account is authorized.
+     */
+    setAdminNavigationVisible(
+        adminNavItem,
+        false
+    );
 
     try {
         const response =
             await fetch(
-                "/api/auth/admin/access",
+                ADMIN_ACCESS_URL,
                 {
                     method:
                         "GET",
@@ -55,15 +93,25 @@ export async function setupAdminNavigation() {
         }
 
         const result =
-            await response.json();
+            await response
+                .json()
+                .catch(
+                    () => null
+                );
 
         if (
-            result?.success === true
-            && result?.authorized === true
+            result?.success !==
+                true
+            || result?.authorized !==
+                true
         ) {
-            adminNavItem.hidden =
-                false;
+            return;
         }
+
+        setAdminNavigationVisible(
+            adminNavItem,
+            true
+        );
     }
     catch (
         error

@@ -3,15 +3,37 @@
 /* =========================================================
 BPD GAMING NETWORK
 SPA ROUTER
-//sync files
+
 File:
-    Framework/Shell/JS/router.js
+    /Framework/Shell/JS/router.js
 
 Purpose:
     Controls global SPA navigation, shell fragment loading,
     route authorization, route CSS, route modules, sidebar
     initialization, OCR runtime state, and persistent shell
     components.
+
+Initialization Priority:
+
+    CRITICAL
+    - Resolve route.
+    - Enforce route authorization.
+    - Apply master CSS.
+    - Load and inject shell/page fragments.
+    - Activate required classic route scripts.
+    - Initialize the route module.
+    - Complete navigation.
+
+    INTERACTIVE / POST-PAINT
+    - Load sidebar hover UI.
+    - Initialize sidebar behavior.
+    - Check Admin navigation eligibility.
+    - Initialize submenu behavior.
+
+    BACKGROUND
+    - API connection monitor.
+    - Persistent account banner.
+    - OCR runtime maintenance.
 
 Description:
     - Resolves routes from /routes.js.
@@ -26,9 +48,10 @@ Description:
       /Login?returnTo=...
     - Does not redirect protected routes merely because
       authentication status is unavailable.
-    - Initializes the persistent account banner outside the
+    - Initializes persistent shell services outside the
       route-rendering lifecycle.
     - Protects asynchronous navigation from race conditions.
+    - Does not block page readiness on sidebar enhancements.
 
 Security:
     - Client route authorization is navigation/UX only.
@@ -140,6 +163,62 @@ function applyInitialSidebarLayoutState() {
 }
 
 /* =========================================================
+POST-PAINT SCHEDULING
+========================================================= */
+
+function scheduleAfterPaint(
+    callback
+) {
+    if (
+        typeof window.requestAnimationFrame ===
+        "function"
+    ) {
+        window.requestAnimationFrame(
+            () => {
+                callback();
+            }
+        );
+
+        return;
+    }
+
+    window.setTimeout(
+        callback,
+        0
+    );
+}
+
+/* =========================================================
+IDLE SCHEDULING
+========================================================= */
+
+function scheduleIdleTask(
+    callback,
+    timeout = 1000
+) {
+    if (
+        typeof window.requestIdleCallback ===
+        "function"
+    ) {
+        window.requestIdleCallback(
+            () => {
+                callback();
+            },
+            {
+                timeout
+            }
+        );
+
+        return;
+    }
+
+    window.setTimeout(
+        callback,
+        100
+    );
+}
+
+/* =========================================================
 OCR RUNTIME
 ========================================================= */
 
@@ -237,8 +316,10 @@ function normalizePath(
         return "/";
     }
 
-    return pathname
-        || "/";
+    return (
+        pathname
+        || "/"
+    );
 }
 
 function normalizeDestination(
@@ -294,12 +375,15 @@ function resolveRoute(
     ) {
         return {
             requestedPath,
+
             routePath:
                 requestedPath,
+
             config:
                 ROUTES[
                     requestedPath
                 ],
+
             found:
                 true
         };
@@ -312,12 +396,15 @@ function resolveRoute(
     ) {
         return {
             requestedPath,
+
             routePath:
                 ERROR_ROUTE,
+
             config:
                 ROUTES[
                     ERROR_ROUTE
                 ],
+
             found:
                 false
         };
@@ -325,12 +412,15 @@ function resolveRoute(
 
     return {
         requestedPath,
+
         routePath:
             DEFAULT_ROUTE,
+
         config:
             ROUTES[
                 DEFAULT_ROUTE
             ],
+
         found:
             false
     };
@@ -790,7 +880,9 @@ async function handleRoutingButtonPressed(
             {
                 detail: {
                     control,
+
                     destination,
+
                     route:
                         routeTest
                 }
@@ -821,7 +913,7 @@ function getRouteAuthRequirements(
         return {
             required:
                 routeConfig.auth.required ===
-                true,
+                    true,
 
             provider:
                 typeof routeConfig.auth.provider ===
@@ -842,15 +934,13 @@ function getRouteAuthRequirements(
     }
 
     /*
-     * Temporary compatibility with routes that still use:
+     * Compatibility with routes that still use:
      *
      *     requiresAuth: true
-     *
-     * These can be migrated to auth:{} one at a time.
      */
     if (
         routeConfig?.requiresAuth ===
-        true
+            true
     ) {
         return {
             required:
@@ -1055,7 +1145,9 @@ function loadRouteScript(
                 !src
             ) {
                 placeholder.remove();
+
                 resolve();
+
                 return;
             }
 
@@ -1065,7 +1157,9 @@ function loadRouteScript(
                 )
             ) {
                 placeholder.remove();
+
                 resolve();
+
                 return;
             }
 
@@ -1087,6 +1181,7 @@ function loadRouteScript(
                 "load",
                 function() {
                     placeholder.remove();
+
                     resolve();
                 },
                 {
@@ -1099,6 +1194,7 @@ function loadRouteScript(
                 "error",
                 function() {
                     script.remove();
+
                     placeholder.remove();
 
                     reject(
@@ -1220,11 +1316,6 @@ async function enforceRouteAuthentication(
 
     /* -----------------------------------------------------
     AUTH SERVICE UNAVAILABLE
-
-    An unavailable auth API is not a confirmed logout.
-
-    Keep the requested route loaded. Protected API requests
-    will still independently enforce server authorization.
     ----------------------------------------------------- */
 
     if (
@@ -1272,7 +1363,7 @@ async function enforceRouteAuthentication(
 
     if (
         evaluation.allowed ===
-        true
+            true
     ) {
         return {
             route,
@@ -1353,11 +1444,6 @@ async function enforceRouteAuthentication(
 
     /* -----------------------------------------------------
     ACCOUNT INVALID / INACTIVE
-
-    Do not convert this into a fake logout.
-
-    Keep the requested route loaded so the UI can show the
-    appropriate account state. Server APIs remain protected.
     ----------------------------------------------------- */
 
     if (
@@ -1398,11 +1484,6 @@ async function enforceRouteAuthentication(
 
     /* -----------------------------------------------------
     PROVIDER REQUIRED
-
-    This is navigation/UX only.
-
-    Protected server APIs independently verify the provider
-    identity against Supabase.
     ----------------------------------------------------- */
 
     if (
@@ -1490,9 +1571,6 @@ async function enforceRouteAuthentication(
 
     /* -----------------------------------------------------
     UNKNOWN AUTH RESULT
-
-    Do not redirect because we do not have affirmative proof
-    that the user is signed out.
     ----------------------------------------------------- */
 
     console.error(
@@ -1585,18 +1663,76 @@ function setPageLoading(
 }
 
 /* =========================================================
-SIDEBAR
+NAVIGATION VALIDITY
 ========================================================= */
 
-async function initializeLoadedSidebar() {
+function isCurrentNavigation(
+    currentNavigationId
+) {
+    return (
+        currentNavigationId ===
+        navigationId
+    );
+}
+
+/* =========================================================
+SIDEBAR INITIALIZATION
+
+The sidebar is deliberately outside the critical route path.
+
+The route HTML is already present before this runs.
+
+Hover HTML and sidebar enhancement setup happen after the
+browser receives an opportunity to paint the page.
+========================================================= */
+
+async function initializeLoadedSidebar(
+    currentNavigationId
+) {
+    if (
+        !isCurrentNavigation(
+            currentNavigationId
+        )
+    ) {
+        return;
+    }
+
     try {
         await loadSidebarHover();
 
+        if (
+            !isCurrentNavigation(
+                currentNavigationId
+            )
+        ) {
+            return;
+        }
+
         initializeSidebar();
+
+        document.dispatchEvent(
+            new CustomEvent(
+                "bpd:sidebar-ready",
+                {
+                    detail: {
+                        navigationId:
+                            currentNavigationId
+                    }
+                }
+            )
+        );
     }
     catch (
         error
     ) {
+        if (
+            !isCurrentNavigation(
+                currentNavigationId
+            )
+        ) {
+            return;
+        }
+
         console.error(
             "ROUTER: Sidebar initialization failed.",
             error
@@ -1604,16 +1740,105 @@ async function initializeLoadedSidebar() {
     }
 }
 
+function scheduleLoadedSidebar(
+    currentNavigationId
+) {
+    scheduleAfterPaint(
+        () => {
+            if (
+                !isCurrentNavigation(
+                    currentNavigationId
+                )
+            ) {
+                return;
+            }
+
+            void initializeLoadedSidebar(
+                currentNavigationId
+            );
+        }
+    );
+}
+
 /* =========================================================
 ROUTE MODULE
 ========================================================= */
 
-async function initializeLoadedRouteModule(
+function isJavaScriptModulePath(
     moduleFile
 ) {
     if (
         !moduleFile
     ) {
+        return false;
+    }
+
+    let pathname;
+
+    try {
+        pathname =
+            new URL(
+                moduleFile,
+                window.location.origin
+            ).pathname;
+    }
+    catch {
+        pathname =
+            String(
+                moduleFile
+            );
+    }
+
+    return (
+        pathname.endsWith(
+            ".js"
+        )
+        || pathname.endsWith(
+            ".mjs"
+        )
+    );
+}
+
+async function initializeLoadedRouteModule(
+    moduleFile,
+    currentNavigationId
+) {
+    if (
+        !moduleFile
+    ) {
+        return;
+    }
+
+    if (
+        !isJavaScriptModulePath(
+            moduleFile
+        )
+    ) {
+        const error =
+            new Error(
+                "Route module must reference a JavaScript module: "
+                + moduleFile
+            );
+
+        console.error(
+            "ROUTER: Invalid route module configuration.",
+            error
+        );
+
+        document.dispatchEvent(
+            new CustomEvent(
+                "bpd:route-module-error",
+                {
+                    detail: {
+                        module:
+                            moduleFile,
+
+                        error
+                    }
+                }
+            )
+        );
+
         return;
     }
 
@@ -1636,7 +1861,7 @@ async function initializeLoadedRouteModule(
         moduleUrl.searchParams.set(
             "routeLoad",
             String(
-                navigationId
+                currentNavigationId
             )
         );
 
@@ -1666,17 +1891,6 @@ async function initializeLoadedRouteModule(
             )
         );
     }
-}
-
-/* =========================================================
-NAVIGATION VALIDITY
-========================================================= */
-
-function isCurrentNavigation(
-    currentNavigationId
-) {
-    return currentNavigationId ===
-        navigationId;
 }
 
 /* =========================================================
@@ -1811,16 +2025,42 @@ function renderRouteLoadError() {
             <h1>
                 Unable to load this page
             </h1>
+
             <p>
                 Please refresh the page or return to the main menu.
             </p>
+
             <a
                 href="/"
-                data-router-link>
+                data-router-link
+            >
                 Main Menu
             </a>
         </section>
     `;
+}
+
+/* =========================================================
+POST-NAVIGATION BACKGROUND WORK
+========================================================= */
+
+function schedulePostNavigationWork(
+    currentNavigationId
+) {
+    scheduleIdleTask(
+        () => {
+            if (
+                !isCurrentNavigation(
+                    currentNavigationId
+                )
+            ) {
+                return;
+            }
+
+            resumeGlobalOcr();
+        },
+        500
+    );
 }
 
 /* =========================================================
@@ -1842,7 +2082,7 @@ async function loadShell() {
 
     try {
         /* -------------------------------------------------
-        AUTHORIZATION
+        1. AUTHORIZATION
         ------------------------------------------------- */
 
         const authCheck =
@@ -1875,7 +2115,7 @@ async function loadShell() {
         document.body.dataset.authUnavailable =
             String(
                 authCheck.authUnavailable ===
-                true
+                    true
             );
 
         document.body.dataset.authStatus =
@@ -1884,7 +2124,7 @@ async function loadShell() {
             || "not_required";
 
         /* -------------------------------------------------
-        MASTER CSS
+        2. MASTER CSS
         ------------------------------------------------- */
 
         await applyMasterCss(
@@ -1901,7 +2141,7 @@ async function loadShell() {
         }
 
         /* -------------------------------------------------
-        SHELL CONFIGURATION
+        3. SHELL CONFIGURATION
         ------------------------------------------------- */
 
         const showHeader =
@@ -1933,7 +2173,7 @@ async function loadShell() {
             || "BPD Gaming Network";
 
         /* -------------------------------------------------
-        LOAD FRAGMENTS
+        4. LOAD ROUTE FRAGMENTS IN PARALLEL
         ------------------------------------------------- */
 
         const fragments =
@@ -1951,7 +2191,7 @@ async function loadShell() {
         }
 
         /* -------------------------------------------------
-        INJECT FRAGMENTS
+        5. INJECT ROUTE FRAGMENTS
         ------------------------------------------------- */
 
         injectRouteFragments(
@@ -1968,8 +2208,19 @@ async function loadShell() {
                 route.found
             );
 
+        /*
+         * Sidebar enhancement loading is intentionally
+         * scheduled now instead of awaited.
+         *
+         * The sidebar HTML already exists, but hover/tooltips
+         * should not delay page initialization.
+         */
+        scheduleLoadedSidebar(
+            currentNavigationId
+        );
+
         /* -------------------------------------------------
-        CLASSIC ROUTE SCRIPTS
+        6. REQUIRED CLASSIC ROUTE SCRIPTS
         ------------------------------------------------- */
 
         await activateRouteScripts(
@@ -1985,25 +2236,15 @@ async function loadShell() {
         }
 
         /* -------------------------------------------------
-        SIDEBAR
-        ------------------------------------------------- */
+        7. ROUTE MODULE
 
-        await initializeLoadedSidebar();
-
-        if (
-            !isCurrentNavigation(
-                currentNavigationId
-            )
-        ) {
-            return;
-        }
-
-        /* -------------------------------------------------
-        ROUTE MODULE
+        This is part of the critical path because the page may
+        require initializePage() before it is usable.
         ------------------------------------------------- */
 
         await initializeLoadedRouteModule(
-            routeConfig.module
+            routeConfig.module,
+            currentNavigationId
         );
 
         if (
@@ -2015,19 +2256,18 @@ async function loadShell() {
         }
 
         /* -------------------------------------------------
-        OCR RESUME
+        8. FINISH CRITICAL NAVIGATION
         ------------------------------------------------- */
 
-        resumeGlobalOcr();
-
-        /* -------------------------------------------------
-        FINISH NAVIGATION
-        ------------------------------------------------- */
-
-        elements.content.focus({
-            preventScroll:
-                true
-        });
+        if (
+            typeof elements.content.focus ===
+            "function"
+        ) {
+            elements.content.focus({
+                preventScroll:
+                    true
+            });
+        }
 
         window.scrollTo({
             top:
@@ -2072,6 +2312,14 @@ async function loadShell() {
                     }
                 }
             )
+        );
+
+        /* -------------------------------------------------
+        9. BACKGROUND WORK
+        ------------------------------------------------- */
+
+        schedulePostNavigationWork(
+            currentNavigationId
         );
     }
     catch (
@@ -2137,7 +2385,7 @@ async function navigate(
     ) {
         if (
             options.replace ===
-            true
+                true
         ) {
             window.history.replaceState(
                 {},
@@ -2180,7 +2428,9 @@ PUBLIC ROUTER API
 window.BPDRouter =
     Object.freeze({
         testRoute,
+
         testRouteNavigation,
+
         navigate,
 
         reload:
@@ -2188,23 +2438,52 @@ window.BPDRouter =
     });
 
 /* =========================================================
-STARTUP
+STARTUP — CRITICAL
 ========================================================= */
 
+/*
+ * Establish the sidebar width/collapse state before the
+ * initial route render to reduce layout movement.
+ */
 applyInitialSidebarLayoutState();
 
-void initializeApiConnectionMonitor();
-
+/*
+ * OCR runtime initialization establishes persistent runtime
+ * state once. Per-navigation OCR resume is deferred.
+ */
 initializeGlobalOcr();
+
+/* =========================================================
+STARTUP — BACKGROUND SERVICES
+========================================================= */
+
+/*
+ * API connection monitoring is useful globally but does not
+ * need to block the first route.
+ */
+scheduleIdleTask(
+    () => {
+        void initializeApiConnectionMonitor();
+    },
+    1000
+);
 
 /*
  * Persistent account banner.
  *
- * The banner initializes once outside the route-rendering
+ * The banner initializes outside the route-rendering
  * lifecycle. Route navigation may replace the header,
  * sidebar, content, and footer without replacing the banner.
  */
-void initializeAccountBanner();
+scheduleAfterPaint(
+    () => {
+        void initializeAccountBanner();
+    }
+);
+
+/* =========================================================
+INITIAL ROUTE
+========================================================= */
 
 if (
     !window.location.pathname.startsWith(
