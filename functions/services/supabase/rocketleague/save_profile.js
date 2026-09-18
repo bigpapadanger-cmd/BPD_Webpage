@@ -11,10 +11,14 @@ Purpose:
     Calls the Rocket League profile save RPC in Supabase.
 
 Description:
-    - Saves Rocket League registration/profile data.
+    - Saves initial Rocket League profile/setup data.
     - Uses identity.accounts.id as the ownership key.
-    - Sends only normalized registration fields expected by
+    - Sends only normalized fields expected by
       api.save_rocketleague_profile.
+    - Email and phone are optional.
+    - Does not save a player-entered rank.
+    - Uses notificationMethod instead of contactMethod.
+    - Supports optional coarse region/time-zone storage.
     - Returns the authoritative RPC result.
     - Never accepts Epic account ID as ownership proof.
 
@@ -26,9 +30,9 @@ Identity:
         = identity.accounts.id
 
 Important:
-    - accountId must come from the authenticated BPD session.
-    - Browser-submitted account IDs must never be passed here.
-    - Epic account ID is not used to determine ownership.
+    - accountId must come from authenticated server context.
+    - Browser-submitted account IDs are never passed here.
+    - Browser-submitted Epic IDs are never passed here.
 ========================================================= */
 
 /* =========================================================
@@ -38,13 +42,10 @@ NORMALIZATION
 function normalizeString(
     value
 ) {
-    if (
-        typeof value !== "string"
-    ) {
-        return "";
-    }
-
-    return value.trim();
+    return typeof value ===
+        "string"
+        ? value.trim()
+        : "";
 }
 
 function normalizeNullableString(
@@ -57,6 +58,18 @@ function normalizeNullableString(
 
     return normalized
         || null;
+}
+
+function normalizeObject(
+    value
+) {
+    return (
+        value
+        && typeof value === "object"
+        && !Array.isArray(value)
+    )
+        ? value
+        : null;
 }
 
 /* =========================================================
@@ -85,9 +98,7 @@ function getSupabaseConfiguration(
 
     return {
         url:
-            url.endsWith(
-                "/"
-            )
+            url.endsWith("/")
                 ? url
                 : `${url}/`,
 
@@ -176,14 +187,17 @@ export async function saveRocketLeagueProfile(
     if (
         !registration
         || typeof registration !== "object"
-        || Array.isArray(
-            registration
-        )
+        || Array.isArray(registration)
     ) {
         throw new Error(
             "Rocket League registration data is invalid."
         );
     }
+
+    const location =
+        normalizeObject(
+            registration.location
+        );
 
     const response =
         await fetch(
@@ -195,6 +209,9 @@ export async function saveRocketLeagueProfile(
                 headers: {
                     "apikey":
                         configuration.apiKey,
+
+                    "Authorization":
+                        `Bearer ${configuration.apiKey}`,
 
                     "Content-Profile":
                         "api",
@@ -214,15 +231,29 @@ export async function saveRocketLeagueProfile(
                         s_age_consent:
                             registration.ageConsent === true,
 
-                        s_current_rank:
+                        s_policy_consent:
+                            registration.policyConsent === true,
+
+                        s_auto_detect_region:
+                            registration.autoDetectRegion === true,
+
+                        s_region:
                             normalizeNullableString(
-                                registration.currentRank
+                                location?.region
                             ),
 
-                        s_contact_method:
+                        s_country_code:
                             normalizeNullableString(
-                                registration.contactMethod
+                                location?.countryCode
                             ),
+
+                        s_display_timezone:
+                            normalizeNullableString(
+                                registration.timezone
+                            ),
+
+                        s_show_online_status:
+                            registration.showOnlineStatus === true,
 
                         s_email_address:
                             normalizeNullableString(
@@ -244,11 +275,6 @@ export async function saveRocketLeagueProfile(
                                 registration.otherMode
                             ),
 
-                        s_display_timezone:
-                            normalizeNullableString(
-                                registration.timezone
-                            ),
-
                         s_availability:
                             Array.isArray(
                                 registration.availability
@@ -256,11 +282,13 @@ export async function saveRocketLeagueProfile(
                                 ? registration.availability
                                 : [],
 
-                        s_show_online_status:
-                            registration.showOnlineStatus === true,
-
                         s_notifications_enabled:
                             registration.notificationsEnabled === true,
+
+                        s_notification_method:
+                            normalizeNullableString(
+                                registration.notificationMethod
+                            ),
 
                         s_reminder_mode:
                             normalizeNullableString(
@@ -293,9 +321,7 @@ export async function saveRocketLeagueProfile(
     if (
         !result
         || typeof result !== "object"
-        || Array.isArray(
-            result
-        )
+        || Array.isArray(result)
     ) {
         throw new Error(
             "Rocket League profile save returned no result."

@@ -4,17 +4,40 @@
 BPD GAMING NETWORK
 ROCKET LEAGUE REGISTRATION CLIENT
 
-Purpose:
-    Handles Rocket League registration UI, profile loading,
-    validation, draft persistence, and profile submission.
+File:
+    /Tabs/RocketLeague/Profile/JS/index.js
 
-Description:
-    - Loads authenticated Rocket League profile information.
-    - Displays Epic identity as read-only provider metadata.
-    - Does not submit global account ownership information.
-    - Does not maintain a separate Rocket League display name.
-    - Collects only Rocket League-specific registration data.
-    - Preserves unsaved registration data locally.
+Purpose:
+    Handles initial Rocket League profile setup.
+
+Responsibilities:
+    - Loads authenticated Epic identity.
+    - Loads existing Rocket League profile state.
+    - Handles eligibility and policy acknowledgements.
+    - Handles optional region/time-zone detection.
+    - Handles Player Profile preferences.
+    - Allows optional email and phone information.
+    - Warns when no direct contact information is supplied.
+    - Handles Email, Phone, and Discord notifications.
+    - Verifies Discord notification eligibility server-side.
+    - Provides MatchBot installation when required.
+    - Handles weekly availability.
+    - Preserves incomplete registration drafts locally.
+    - Submits Rocket League profile setup to the server.
+
+Discord Requirements:
+    Discord notifications require:
+        1. A linked Discord identity.
+        2. At least one mutual Discord server with MatchBot.
+
+    MatchBot install URL is supplied by the server from:
+        DISCORD_MATCHBOT_INSTALL_URL
+
+Security:
+    - The browser does not determine Discord eligibility.
+    - The browser does not supply canonical account IDs.
+    - Epic identity is display-only on the client.
+    - Server APIs remain authoritative.
 ========================================================= */
 
 import {
@@ -22,12 +45,19 @@ import {
 } from "./timezone.js";
 
 import {
-    ROCKET_LEAGUE_PROFILE_URL
+    ROCKET_LEAGUE_PROFILE_URL, DISCORD_NOTIFICATION_STATUS_URL
 } from "../../../../scripts/apiRoutes.js";
 
 import {
     apiFetch
 } from "../../../../scripts/apiConnection.js";
+
+import {
+    getAuthState,
+    hasActiveAccount,
+    hasLinkedProvider,
+    getProvider
+} from "/Framework/Auth/auth.js";
 
 /* =========================================================
 CONFIGURATION
@@ -36,209 +66,105 @@ CONFIGURATION
 const REGISTRATION_DRAFT_KEY =
     "bpdRocketLeagueRegistrationDraft";
 
-const REGISTRATION_CONFIG = {
-    copy: {
-        eyebrow:
-            "BPD GAMING NETWORK",
 
-        title:
-            "Complete Your Rocket League Profile",
+const REGISTRATION_CONFIG =
+    Object.freeze({
+        availability: {
+            start:
+                "17:00",
 
-        intro:
-            "Confirm your Epic account details and tell us how and when you prefer to play.",
+            end:
+                "23:00",
 
-        backendWarningTitle:
-            "Profile service temporarily unavailable",
+            incrementMinutes:
+                30
+        }
+    });
 
-        backendWarningBody:
-            "Your Epic sign-in is still active. You can continue filling out this form. If profile storage is unavailable, your entries will be preserved in this browser so you can retry later.",
+const DAYS =
+    Object.freeze([
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
+        "Sunday"
+    ]);
 
-        epicLegend:
-            "Epic account",
-
-        epicDescription:
-            "These fields come from your authenticated Epic Games account.",
-
-        epicUserLabel:
-            "Epic user",
-
-        platformLabel:
-            "Platform",
-
-        locationLabel:
-            "Approximate location",
-
-        locationHelp:
-            "Estimated from your connection location.",
-
-        timezoneLabel:
-            "Time zone",
-
-        eligibilityLegend:
-            "Eligibility",
-
-        eligibilityText:
-            "I confirm that I am 18 or older, meet the applicable league age in my place of residence, or have permission from my parent or legal guardian.",
-
-        playerProfileLegend:
-            "Player profile",
-
-        rankLabel:
-            "Current rank",
-
-        rankPlaceholder:
-            "Select your current rank",
-
-        rankHelp:
-            "Self-reported during registration. You can update it later.",
-
-        onlineStatusLabel:
-            "Online status",
-
-        onlineStatusText:
-            "Allow other players to see when I am online",
-
-        onlineStatusHelp:
-            "Disabled by default.",
-
-        contactLegend:
-            "Contact information",
-
-        contactDescription:
-            "Enter the contact methods you want available, then choose your preferred method.",
-
-        emailLabel:
-            "Email address",
-
-        phoneLabel:
-            "Phone number",
-
-        contactMethodLabel:
-            "Preferred contact method",
-
-        contactEmail:
-            "Email",
-
-        contactPhone:
-            "Phone",
-
-        contactBoth:
-            "Both",
-
-        modeLegend:
-            "Preferred mode",
-
-        modeLabel:
-            "Choose a preferred mode",
-
-        modeCustoms:
-            "Customs",
-
-        modeOther:
-            "Other",
-
-        otherModeLabel:
-            "Describe your preferred mode",
-
-        availabilityLegend:
-            "Weekly availability",
-
-        availabilityDescription:
-            "Select at least one day and a normal play window. Times are available in 30-minute increments from 5:00 PM through 11:00 PM in your local time zone.",
-
-        notificationsLegend:
-            "Match notifications & reminders",
-
-        notificationsLabel:
-            "Match notifications",
-
-        notificationsOn:
-            "Opt in",
-
-        notificationsOff:
-            "Opt out",
-
-        notificationOptOutTitle:
-            "Notifications are disabled",
-
-        notificationOptOutBody:
-            "WARNING: By opting out of match notifications, you are still responsible for joined matches and may be removed from joined matches after missing too many scheduled matches.",
-
-        reminderModeLabel:
-            "Reminder preference",
-
-        reminder24:
-            "24 hours before",
-
-        reminder1:
-            "1 hour before",
-
-        reminderBoth:
-            "Both",
-
-        reminderNoteTitle:
-            "Scheduling note",
-
-        reminderNoteBody:
-            "Automatic reminders normally run the day before a scheduled match. For Monday matches, the reminder may run earlier to account for weekend scheduling.",
-
-        moreSettingsTitle:
-            "More settings are available after registration.",
-
-        moreSettingsBody:
-            "Once your profile is created, open your Player Profile to configure additional matchmaking, privacy, contact, notification, reminder, and profile options.",
-
-        submitButton:
-            "Complete Registration",
-
-        requiredFooter:
-            "* Required information must be completed before registration can finish.",
-
-        notificationModalTitle:
-            "Turn off match notifications?",
-
-        notificationModalBody:
-            "WARNING: If you opt out, you remain responsible for joined matches. Missing too many scheduled matches may result in removal from joined matches.",
-
-        keepNotificationsButton:
-            "Keep notifications on",
-
-        confirmNotificationsOffButton:
-            "Turn notifications off"
-    },
-
-    availability: {
-        start:
-            "17:00",
-
-        end:
-            "23:00",
-
-        incrementMinutes:
-            30
-    }
-};
-
-const DAYS = [
-    "Monday",
-    "Tuesday",
-    "Wednesday",
-    "Thursday",
-    "Friday",
-    "Saturday",
-    "Sunday"
-];
+/* =========================================================
+STATE
+========================================================= */
 
 let currentLocation = {
-    city: "",
-    region: "",
-    country: "",
-    countryCode: "",
-    timezone: ""
+    city:
+        "",
+
+    region:
+        "",
+
+    country:
+        "",
+
+    countryCode:
+        "",
+
+    timezone:
+        ""
+};
+
+let discordNotificationState = {
+    checked:
+        false,
+
+    discordLinked:
+        false,
+
+    matchBotAvailable:
+        false,
+
+    eligible:
+        false,
+
+    installUrl:
+        null,
+
+    reason:
+        null
 };
 
 let notificationsOptOutConfirmed =
     false;
+
+/* =========================================================
+NORMALIZATION
+========================================================= */
+
+function normalizeString(
+    value
+) {
+    return typeof value ===
+        "string"
+        ? value.trim()
+        : "";
+}
+
+function normalizeObject(
+    value
+) {
+    if (
+        !value
+        || typeof value !==
+            "object"
+        || Array.isArray(
+            value
+        )
+    ) {
+        return {};
+    }
+
+    return value;
+}
 
 /* =========================================================
 TIMEZONE DISPLAY
@@ -248,10 +174,9 @@ function getTimezoneDisplayName(
     timezone
 ) {
     const value =
-        String(
+        normalizeString(
             timezone
-            || ""
-        ).trim();
+        );
 
     if (
         !value
@@ -265,60 +190,6 @@ function getTimezoneDisplayName(
         ]
         || value
     );
-}
-
-/* =========================================================
-DYNAMIC COPY
-========================================================= */
-
-function applyDynamicCopy() {
-    document
-        .querySelectorAll(
-            "[data-copy]"
-        )
-        .forEach(
-            element => {
-                const key =
-                    element.dataset.copy;
-
-                if (
-                    key
-                    && Object.prototype.hasOwnProperty.call(
-                        REGISTRATION_CONFIG.copy,
-                        key
-                    )
-                ) {
-                    element.textContent =
-                        REGISTRATION_CONFIG.copy[
-                            key
-                        ];
-                }
-            }
-        );
-
-    document
-        .querySelectorAll(
-            "[data-copy-option]"
-        )
-        .forEach(
-            element => {
-                const key =
-                    element.dataset.copyOption;
-
-                if (
-                    key
-                    && Object.prototype.hasOwnProperty.call(
-                        REGISTRATION_CONFIG.copy,
-                        key
-                    )
-                ) {
-                    element.textContent =
-                        REGISTRATION_CONFIG.copy[
-                            key
-                        ];
-                }
-            }
-        );
 }
 
 /* =========================================================
@@ -688,12 +559,9 @@ function populateAvailability(
     availability.forEach(
         item => {
             const day =
-                String(
+                normalizeString(
                     item?.day
-                    || ""
-                )
-                    .trim()
-                    .toLowerCase();
+                ).toLowerCase();
 
             if (
                 !day
@@ -741,15 +609,13 @@ function populateAvailability(
             }
 
             const savedStart =
-                String(
+                normalizeString(
                     item?.start
-                    || ""
                 );
 
             const savedEnd =
-                String(
+                normalizeString(
                     item?.end
-                    || ""
                 );
 
             if (
@@ -776,210 +642,64 @@ function populateAvailability(
 }
 
 /* =========================================================
-CONTACT METHOD
+GENERIC INPUT HELPERS
 ========================================================= */
 
-function updateContactFields() {
-    const method =
-        document.querySelector(
-            'input[name="contactMethod"]:checked'
-        )?.value
-        || "email";
-
-    const email =
-        document.getElementById(
-            "email"
-        );
-
-    const phone =
-        document.getElementById(
-            "phone"
-        );
-
-    const emailMark =
-        document.getElementById(
-            "emailRequiredMark"
-        );
-
-    const phoneMark =
-        document.getElementById(
-            "phoneRequiredMark"
-        );
-
-    const emailRequired =
-        method === "email"
-        || method === "both";
-
-    const phoneRequired =
-        method === "phone"
-        || method === "both";
-
-    if (
-        email
-    ) {
-        email.required =
-            emailRequired;
-    }
-
-    if (
-        phone
-    ) {
-        phone.required =
-            phoneRequired;
-    }
-
-    if (
-        emailMark
-    ) {
-        emailMark.hidden =
-            !emailRequired;
-    }
-
-    if (
-        phoneMark
-    ) {
-        phoneMark.hidden =
-            !phoneRequired;
-    }
-
-    document
-        .querySelectorAll(
-            ".contact-method-row .choice-card"
-        )
-        .forEach(
-            card => {
-                card.classList.remove(
-                    "related-selected"
-                );
-            }
-        );
-
-    if (
-        method === "both"
-    ) {
-        document
-            .querySelectorAll(
-                ".contact-method-row .choice-card"
-            )
-            .forEach(
-                card => {
-                    card.classList.add(
-                        "related-selected"
-                    );
-                }
-            );
-    }
-}
-
-/* =========================================================
-MODE
-========================================================= */
-
-function updateModeField() {
-    const mode =
-        document.querySelector(
-            'input[name="preferredMode"]:checked'
-        )?.value;
-
-    const field =
-        document.getElementById(
-            "otherModeField"
-        );
-
-    const input =
-        document.getElementById(
-            "otherMode"
-        );
-
-    const isOther =
-        mode === "other";
-
-    if (
-        field
-    ) {
-        field.hidden =
-            !isOther;
-    }
-
-    if (
-        input
-    ) {
-        input.required =
-            isOther;
-
-        if (
-            !isOther
-        ) {
-            input.value =
-                "";
-        }
-    }
-}
-
-/* =========================================================
-NOTIFICATIONS
-========================================================= */
-
-function getNotificationsEnabled() {
-    return (
-        document.querySelector(
-            'input[name="notificationsEnabled"]:checked'
-        )?.value !==
-        "false"
-    );
-}
-
-function openNotificationOptOutModal() {
-    const modal =
-        document.getElementById(
-            "notificationOptOutModal"
-        );
-
-    if (
-        !modal
-    ) {
-        return;
-    }
-
-    modal.hidden =
-        false;
-
-    document.body.classList.add(
-        "registration-modal-open"
-    );
-}
-
-function closeNotificationOptOutModal() {
-    const modal =
-        document.getElementById(
-            "notificationOptOutModal"
-        );
-
-    if (
-        !modal
-    ) {
-        return;
-    }
-
-    modal.hidden =
-        true;
-
-    document.body.classList.remove(
-        "registration-modal-open"
-    );
-}
-
-function setNotificationsEnabled(
-    enabled
+function setInputValue(
+    id,
+    value
 ) {
-    const value =
-        enabled
-            ? "true"
-            : "false";
+    const element =
+        document.getElementById(
+            id
+        );
+
+    if (
+        element
+    ) {
+        element.value =
+            value
+            ?? "";
+    }
+}
+
+function setCheckboxValue(
+    id,
+    value
+) {
+    const element =
+        document.getElementById(
+            id
+        );
+
+    if (
+        element
+    ) {
+        element.checked =
+            value === true;
+    }
+}
+
+function setRadioValue(
+    name,
+    value
+) {
+    const normalizedValue =
+        normalizeString(
+            value
+        );
+
+    if (
+        !normalizedValue
+    ) {
+        return;
+    }
 
     const input =
         document.querySelector(
-            `input[name="notificationsEnabled"][value="${value}"]`
+            `input[name="${name}"][value="${CSS.escape(
+                normalizedValue
+            )}"]`
         );
 
     if (
@@ -988,77 +708,10 @@ function setNotificationsEnabled(
         input.checked =
             true;
     }
-
-    updateNotificationState();
-}
-
-function updateNotificationState() {
-    const enabled =
-        getNotificationsEnabled();
-
-    const warning =
-        document.getElementById(
-            "notificationOptOutWarning"
-        );
-
-    const reminderOptions =
-        document.getElementById(
-            "reminderOptions"
-        );
-
-    if (
-        warning
-    ) {
-        warning.hidden =
-            enabled;
-    }
-
-    if (
-        reminderOptions
-    ) {
-        reminderOptions.classList.toggle(
-            "notifications-disabled",
-            !enabled
-        );
-
-        reminderOptions
-            .querySelectorAll(
-                "input"
-            )
-            .forEach(
-                input => {
-                    input.disabled =
-                        !enabled;
-                }
-            );
-    }
-}
-
-function handleNotificationChoiceChange(
-    event
-) {
-    const input =
-        event.currentTarget;
-
-    if (
-        input.value === "false"
-        && input.checked
-        && !notificationsOptOutConfirmed
-    ) {
-        setNotificationsEnabled(
-            true
-        );
-
-        openNotificationOptOutModal();
-
-        return;
-    }
-
-    updateNotificationState();
 }
 
 /* =========================================================
-UI HELPERS
+UI MESSAGE
 ========================================================= */
 
 function showMessage(
@@ -1135,114 +788,133 @@ function setBackendWarning(
         !visible;
 
     if (
-        visible
-        && message
-    ) {
-        const messageElement =
-            element.querySelector(
-                "span"
-            );
-
-        if (
-            messageElement
-        ) {
-            messageElement.textContent =
-                message;
-        }
-    }
-}
-
-function setInputValue(
-    id,
-    value
-) {
-    const element =
-        document.getElementById(
-            id
-        );
-
-    if (
-        element
-    ) {
-        element.value =
-            value
-            ?? "";
-    }
-}
-
-function setSelectValue(
-    id,
-    value
-) {
-    const element =
-        document.getElementById(
-            id
-        );
-
-    if (
-        !element
-        || value === null
-        || value === undefined
-        || value === ""
+        !visible
+        || !message
     ) {
         return;
     }
 
-    element.value =
-        String(
-            value
-        );
-}
-
-function setCheckboxValue(
-    id,
-    value
-) {
-    const element =
-        document.getElementById(
-            id
+    const messageElement =
+        element.querySelector(
+            "span"
         );
 
     if (
-        element
+        messageElement
     ) {
-        element.checked =
-            value === true;
-    }
-}
-
-function setRadioValue(
-    name,
-    value
-) {
-    if (
-        value === null
-        || value === undefined
-        || value === ""
-    ) {
-        return;
-    }
-
-    const input =
-        document.querySelector(
-            `input[name="${name}"][value="${CSS.escape(
-                String(
-                    value
-                )
-            )}"]`
-        );
-
-    if (
-        input
-    ) {
-        input.checked =
-            true;
+        messageElement.textContent =
+            message;
     }
 }
 
 /* =========================================================
-LOCATION + PROFILE NORMALIZATION
+PREFERRED MODE
 ========================================================= */
+
+function updateModeField() {
+    const mode =
+        document.querySelector(
+            'input[name="preferredMode"]:checked'
+        )?.value;
+
+    const field =
+        document.getElementById(
+            "otherModeField"
+        );
+
+    const input =
+        document.getElementById(
+            "otherMode"
+        );
+
+    const isOther =
+        mode ===
+        "other";
+
+    if (
+        field
+    ) {
+        field.hidden =
+            !isOther;
+    }
+
+    if (
+        input
+    ) {
+        input.required =
+            isOther;
+
+        if (
+            !isOther
+        ) {
+            input.value =
+                "";
+        }
+    }
+}
+
+/* =========================================================
+DIRECT CONTACT WARNING
+========================================================= */
+
+function updateDirectContactWarning() {
+    const email =
+        normalizeString(
+            document.getElementById(
+                "email"
+            )?.value
+        );
+
+    const phone =
+        normalizeString(
+            document.getElementById(
+                "phone"
+            )?.value
+        );
+
+    const warning =
+        document.getElementById(
+            "noDirectContactWarning"
+        );
+
+    if (
+        warning
+    ) {
+        warning.hidden =
+            Boolean(
+                email
+                || phone
+            );
+    }
+}
+
+/* =========================================================
+REGION + TIMEZONE
+========================================================= */
+
+function getAutoDetectRegionEnabled() {
+    return (
+        document.getElementById(
+            "autoDetectRegion"
+        )?.checked ===
+        true
+    );
+}
+
+function getBrowserTimezone() {
+    try {
+        return (
+            Intl
+                .DateTimeFormat()
+                .resolvedOptions()
+                .timeZone
+            || ""
+        );
+    }
+    catch {
+        return "";
+    }
+}
 
 function normalizeLocation(
     result,
@@ -1256,50 +928,817 @@ function normalizeLocation(
 
     return {
         city:
-            source.city
-            || result?.city
-            || "",
+            normalizeString(
+                source.city
+                || result?.city
+            ),
 
         region:
-            source.region
-            || source.regionName
-            || result?.region
-            || "",
+            normalizeString(
+                source.region
+                || source.regionName
+                || result?.region
+            ),
 
         country:
-            source.country
-            || source.countryName
-            || result?.country
-            || "",
+            normalizeString(
+                source.country
+                || source.countryName
+                || result?.country
+            ),
 
         countryCode:
-            source.countryCode
-            || source.country_code
-            || result?.countryCode
-            || "",
+            normalizeString(
+                source.countryCode
+                || source.country_code
+                || result?.countryCode
+            ),
 
         timezone:
-            source.timezone
-            || result?.timezone
-            || ""
+            normalizeString(
+                source.timezone
+                || result?.timezone
+            )
     };
 }
+
+function formatLocation(
+    location
+) {
+    const values =
+        [
+            location?.region,
+
+            location?.country
+            || location?.countryCode
+        ]
+            .map(
+                normalizeString
+            )
+            .filter(
+                Boolean
+            );
+
+    return values.length > 0
+        ? values.join(
+            ", "
+        )
+        : "Location unavailable";
+}
+
+function applyLocation(
+    location
+) {
+    currentLocation = {
+        city:
+            normalizeString(
+                location?.city
+            ),
+
+        region:
+            normalizeString(
+                location?.region
+            ),
+
+        country:
+            normalizeString(
+                location?.country
+            ),
+
+        countryCode:
+            normalizeString(
+                location?.countryCode
+            ),
+
+        timezone:
+            normalizeString(
+                location?.timezone
+            )
+    };
+
+    setInputValue(
+        "detectedLocation",
+        formatLocation(
+            currentLocation
+        )
+    );
+}
+
+function applyTimezone(
+    timezone
+) {
+    const resolvedTimezone =
+        normalizeString(
+            timezone
+        )
+        || currentLocation.timezone
+        || getBrowserTimezone();
+
+    setInputValue(
+        "timezone",
+        resolvedTimezone
+    );
+
+    setInputValue(
+        "timezoneDisplay",
+        resolvedTimezone
+            ? getTimezoneDisplayName(
+                resolvedTimezone
+            )
+            : "Time zone unavailable"
+    );
+}
+
+function clearDetectedRegion() {
+    currentLocation = {
+        city:
+            "",
+
+        region:
+            "",
+
+        country:
+            "",
+
+        countryCode:
+            "",
+
+        timezone:
+            ""
+    };
+
+    setInputValue(
+        "detectedLocation",
+        "Detection disabled"
+    );
+
+    setInputValue(
+        "timezoneDisplay",
+        "Detection disabled"
+    );
+
+    setInputValue(
+        "timezone",
+        ""
+    );
+}
+
+function updateRegionDetectionState() {
+    const enabled =
+        getAutoDetectRegionEnabled();
+
+    const fields =
+        document.getElementById(
+            "detectedRegionFields"
+        );
+
+    if (
+        fields
+    ) {
+        fields.classList.toggle(
+            "detection-disabled",
+            !enabled
+        );
+    }
+
+    if (
+        !enabled
+    ) {
+        clearDetectedRegion();
+
+        return;
+    }
+
+    if (
+        currentLocation.region
+        || currentLocation.country
+    ) {
+        applyLocation(
+            currentLocation
+        );
+
+        applyTimezone(
+            currentLocation.timezone
+        );
+
+        return;
+    }
+
+    setInputValue(
+        "detectedLocation",
+        "Detecting…"
+    );
+
+    applyTimezone(
+        ""
+    );
+}
+
+/* =========================================================
+NOTIFICATION STATE
+========================================================= */
+
+function getNotificationsEnabled() {
+    return (
+        document.querySelector(
+            'input[name="notificationsEnabled"]:checked'
+        )?.value !==
+        "false"
+    );
+}
+
+function getNotificationMethod() {
+    return normalizeString(
+        document.querySelector(
+            'input[name="notificationMethod"]:checked'
+        )?.value
+    );
+}
+
+function openNotificationOptOutModal() {
+    const modal =
+        document.getElementById(
+            "notificationOptOutModal"
+        );
+
+    if (
+        !modal
+    ) {
+        return;
+    }
+
+    modal.hidden =
+        false;
+
+    document.body.classList.add(
+        "registration-modal-open"
+    );
+}
+
+function closeNotificationOptOutModal() {
+    const modal =
+        document.getElementById(
+            "notificationOptOutModal"
+        );
+
+    if (
+        !modal
+    ) {
+        return;
+    }
+
+    modal.hidden =
+        true;
+
+    document.body.classList.remove(
+        "registration-modal-open"
+    );
+}
+
+function setNotificationsEnabled(
+    enabled
+) {
+    const value =
+        enabled
+            ? "true"
+            : "false";
+
+    const input =
+        document.querySelector(
+            `input[name="notificationsEnabled"][value="${value}"]`
+        );
+
+    if (
+        input
+    ) {
+        input.checked =
+            true;
+    }
+
+    updateNotificationState();
+}
+
+function updateNotificationFieldRequirements() {
+    const enabled =
+        getNotificationsEnabled();
+
+    const method =
+        getNotificationMethod();
+
+    const email =
+        document.getElementById(
+            "email"
+        );
+
+    const phone =
+        document.getElementById(
+            "phone"
+        );
+
+    if (
+        email
+    ) {
+        email.required =
+            enabled
+            && method ===
+                "email";
+    }
+
+    if (
+        phone
+    ) {
+        phone.required =
+            enabled
+            && method ===
+                "phone";
+    }
+}
+
+function updateNotificationState() {
+    const enabled =
+        getNotificationsEnabled();
+
+    const warning =
+        document.getElementById(
+            "notificationOptOutWarning"
+        );
+
+    const deliveryOptions =
+        document.getElementById(
+            "notificationDeliveryOptions"
+        );
+
+    const reminderOptions =
+        document.getElementById(
+            "reminderOptions"
+        );
+
+    if (
+        warning
+    ) {
+        warning.hidden =
+            enabled;
+    }
+
+    if (
+        deliveryOptions
+    ) {
+        deliveryOptions.classList.toggle(
+            "notifications-disabled",
+            !enabled
+        );
+
+        deliveryOptions
+            .querySelectorAll(
+                'input[name="notificationMethod"]'
+            )
+            .forEach(
+                input => {
+                    if (
+                        input.value ===
+                        "discord"
+                    ) {
+                        input.disabled =
+                            !enabled
+                            || !discordNotificationState
+                                .eligible;
+                    }
+                    else {
+                        input.disabled =
+                            !enabled;
+                    }
+
+                    input.required =
+                        enabled;
+                }
+            );
+    }
+
+    if (
+        reminderOptions
+    ) {
+        reminderOptions.classList.toggle(
+            "notifications-disabled",
+            !enabled
+        );
+
+        reminderOptions
+            .querySelectorAll(
+                "input"
+            )
+            .forEach(
+                input => {
+                    input.disabled =
+                        !enabled;
+
+                    input.required =
+                        enabled
+                        && input.name ===
+                            "reminderMode";
+                }
+            );
+    }
+
+    updateNotificationFieldRequirements();
+    updateDirectContactWarning();
+}
+
+function handleNotificationChoiceChange(
+    event
+) {
+    const input =
+        event.currentTarget;
+
+    if (
+        input.value ===
+            "false"
+        && input.checked
+        && !notificationsOptOutConfirmed
+    ) {
+        setNotificationsEnabled(
+            true
+        );
+
+        openNotificationOptOutModal();
+
+        return;
+    }
+
+    updateNotificationState();
+}
+
+/* =========================================================
+DISCORD NOTIFICATION UI
+========================================================= */
+
+function resetDiscordNotificationUi() {
+    const discordInput =
+        document.getElementById(
+            "discordNotificationMethod"
+        );
+
+    const choice =
+        document.getElementById(
+            "discordNotificationChoice"
+        );
+
+    const status =
+        document.getElementById(
+            "discordNotificationStatusText"
+        );
+
+    const accountRequired =
+        document.getElementById(
+            "discordAccountRequired"
+        );
+
+    const botRequired =
+        document.getElementById(
+            "discordMatchBotRequired"
+        );
+
+    const ready =
+        document.getElementById(
+            "discordNotificationReady"
+        );
+
+    const installButton =
+        document.getElementById(
+            "installDiscordMatchBotButton"
+        );
+
+    if (
+        discordInput
+    ) {
+        discordInput.disabled =
+            true;
+    }
+
+    if (
+        choice
+    ) {
+        choice.dataset.discordEligible =
+            "false";
+    }
+
+    if (
+        status
+    ) {
+        status.textContent =
+            "Checking Discord notification availability...";
+    }
+
+    if (
+        accountRequired
+    ) {
+        accountRequired.hidden =
+            true;
+    }
+
+    if (
+        botRequired
+    ) {
+        botRequired.hidden =
+            true;
+    }
+
+    if (
+        ready
+    ) {
+        ready.hidden =
+            true;
+    }
+
+    if (
+        installButton
+    ) {
+        installButton.hidden =
+            true;
+    }
+}
+
+function applyDiscordNotificationState() {
+    const state =
+        discordNotificationState;
+
+    const discordInput =
+        document.getElementById(
+            "discordNotificationMethod"
+        );
+
+    const choice =
+        document.getElementById(
+            "discordNotificationChoice"
+        );
+
+    const status =
+        document.getElementById(
+            "discordNotificationStatusText"
+        );
+
+    const accountRequired =
+        document.getElementById(
+            "discordAccountRequired"
+        );
+
+    const botRequired =
+        document.getElementById(
+            "discordMatchBotRequired"
+        );
+
+    const ready =
+        document.getElementById(
+            "discordNotificationReady"
+        );
+
+    const installButton =
+        document.getElementById(
+            "installDiscordMatchBotButton"
+        );
+
+    if (
+        choice
+    ) {
+        choice.dataset.discordEligible =
+            String(
+                state.eligible
+            );
+    }
+
+    if (
+        discordInput
+    ) {
+        discordInput.disabled =
+            !getNotificationsEnabled()
+            || !state.eligible;
+    }
+
+    if (
+        accountRequired
+    ) {
+        accountRequired.hidden =
+            state.discordLinked
+            || !state.checked;
+    }
+
+    if (
+        botRequired
+    ) {
+        botRequired.hidden =
+            !state.checked
+            || !state.discordLinked
+            || state.matchBotAvailable;
+    }
+
+    if (
+        ready
+    ) {
+        ready.hidden =
+            !state.eligible;
+    }
+
+    if (
+        installButton
+    ) {
+        installButton.hidden =
+            !(
+                state.checked
+                && state.discordLinked
+                && !state.matchBotAvailable
+                && state.installUrl
+            );
+    }
+
+    if (
+        status
+    ) {
+        if (
+            !state.checked
+        ) {
+            status.textContent =
+                "Checking Discord notification availability...";
+        }
+        else if (
+            !state.discordLinked
+        ) {
+            status.textContent =
+                "Discord is not linked to this BPD account.";
+        }
+        else if (
+            !state.matchBotAvailable
+        ) {
+            status.textContent =
+                "Your Discord account does not currently share a server with BPD MatchBot.";
+        }
+        else if (
+            state.eligible
+        ) {
+            status.textContent =
+                "Discord notifications are available.";
+        }
+        else {
+            status.textContent =
+                "Discord notifications are currently unavailable.";
+        }
+    }
+
+    if (
+        getNotificationMethod() ===
+            "discord"
+        && !state.eligible
+    ) {
+        const emailInput =
+            document.getElementById(
+                "notificationMethodEmail"
+            );
+
+        if (
+            emailInput
+            && !emailInput.disabled
+        ) {
+            emailInput.checked =
+                true;
+        }
+    }
+
+    updateNotificationState();
+}
+
+async function checkDiscordNotificationEligibility() {
+    resetDiscordNotificationUi();
+
+    try {
+        const response =
+            await apiFetch(
+                DISCORD_NOTIFICATION_STATUS_URL,
+                {
+                    method:
+                        "GET",
+
+                    credentials:
+                        "same-origin",
+
+                    cache:
+                        "no-store",
+
+                    headers: {
+                        "Accept":
+                            "application/json"
+                    }
+                }
+            );
+
+        const result =
+            await response
+                .json()
+                .catch(
+                    () => ({})
+                );
+
+        discordNotificationState = {
+            checked:
+                true,
+
+            discordLinked:
+                result?.discordLinked ===
+                true,
+
+            matchBotAvailable:
+                result?.matchBotAvailable ===
+                true,
+
+            eligible:
+                response.ok
+                && result?.success ===
+                    true
+                && result?.eligible ===
+                    true,
+
+            installUrl:
+                normalizeString(
+                    result?.installUrl
+                )
+                || null,
+
+            reason:
+                normalizeString(
+                    result?.reason
+                )
+                || null
+        };
+    }
+    catch (
+        error
+    ) {
+        console.error(
+            "ROCKET LEAGUE REGISTRATION: Discord notification check failed.",
+            {
+                message:
+                    error?.message
+                    || "Unknown error"
+            }
+        );
+
+        discordNotificationState = {
+            checked:
+                true,
+
+            discordLinked:
+                false,
+
+            matchBotAvailable:
+                false,
+
+            eligible:
+                false,
+
+            installUrl:
+                null,
+
+            reason:
+                "CHECK_FAILED"
+        };
+    }
+
+    applyDiscordNotificationState();
+}
+
+function openMatchBotInstall() {
+    const installUrl =
+        discordNotificationState
+            .installUrl;
+
+    if (
+        !installUrl
+    ) {
+        return;
+    }
+
+    window.open(
+        installUrl,
+        "_blank",
+        "noopener,noreferrer"
+    );
+}
+
+/* =========================================================
+PROFILE NORMALIZATION
+========================================================= */
 
 function normalizeProfile(
     result,
     authUser = null
 ) {
     const profile =
-        result?.profile
-        && typeof result.profile ===
-            "object"
-            ? result.profile
-            : {};
+        normalizeObject(
+            result?.profile
+        );
 
     const user =
-        result?.user
-        || authUser
-        || {};
+        normalizeObject(
+            result?.user
+            || authUser
+        );
 
     const location =
         normalizeLocation(
@@ -1308,11 +1747,6 @@ function normalizeProfile(
         );
 
     return {
-        bpdDisplayName:
-            profile.bpdDisplayName
-            || profile.bpd_display_name
-            || null,
-
         EpicUniqueId:
             profile.EpicUniqueId
             || profile.epicUniqueId
@@ -1335,41 +1769,47 @@ function normalizeProfile(
             || user.epicPreferredUsername
             || null,
 
-        currentRank:
-            profile.currentRank
-            || profile.current_rank
-            || profile.rank
-            || "",
-
-        contactMethod:
-            profile.contactMethod
-            || profile.contact_method
-            || "email",
-
         email:
-            profile.email
-            || "",
+            normalizeString(
+                profile.email
+            ),
 
         phone:
-            profile.phone
-            || "",
+            normalizeString(
+                profile.phone
+            ),
 
         preferredMode:
-            profile.preferredMode
-            || profile.preferred_mode
-            || "",
+            normalizeString(
+                profile.preferredMode
+                || profile.preferred_mode
+            ),
 
         otherMode:
-            profile.otherMode
-            || profile.other_mode
-            || "",
+            normalizeString(
+                profile.otherMode
+                || profile.other_mode
+            ),
+
+        autoDetectRegion:
+            profile.autoDetectRegion ===
+                true
+            || profile.auto_detect_region ===
+                true
+            || (
+                profile.autoDetectRegion ===
+                    undefined
+                && profile.auto_detect_region ===
+                    undefined
+            ),
 
         timezone:
-            profile.timezone
-            || profile.displayTimezone
-            || profile.display_timezone
-            || location.timezone
-            || "",
+            normalizeString(
+                profile.timezone
+                || profile.displayTimezone
+                || profile.display_timezone
+                || location.timezone
+            ),
 
         location,
 
@@ -1392,17 +1832,31 @@ function normalizeProfile(
             && profile.notifications_enabled !==
                 false,
 
+        notificationMethod:
+            normalizeString(
+                profile.notificationMethod
+                || profile.notification_method
+            ),
+
         reminderMode:
-            profile.reminderMode
-            || profile.reminder_mode
-            || profile.reminderTiming
-            || profile.reminder_timing
+            normalizeString(
+                profile.reminderMode
+                || profile.reminder_mode
+                || profile.reminderTiming
+                || profile.reminder_timing
+            )
             || "24-hours",
 
         ageConsent:
             profile.ageConsent ===
                 true
             || profile.age_consent ===
+                true,
+
+        policyConsent:
+            profile.policyConsent ===
+                true
+            || profile.policy_consent ===
                 true,
 
         profileComplete:
@@ -1415,94 +1869,9 @@ function normalizeProfile(
     };
 }
 
-function formatLocation(
-    location
-) {
-    const values =
-        [
-            location?.region,
-
-            location?.country
-            || location?.countryCode
-        ]
-            .map(
-                value =>
-                    String(
-                        value
-                        || ""
-                    ).trim()
-            )
-            .filter(
-                Boolean
-            );
-
-    return values.length > 0
-        ? values.join(
-            ", "
-        )
-        : "Location unavailable";
-}
-
-function applyLocation(
-    location
-) {
-    currentLocation = {
-        city:
-            location?.city
-            || "",
-
-        region:
-            location?.region
-            || "",
-
-        country:
-            location?.country
-            || "",
-
-        countryCode:
-            location?.countryCode
-            || "",
-
-        timezone:
-            location?.timezone
-            || ""
-    };
-
-    setInputValue(
-        "detectedLocation",
-        formatLocation(
-            currentLocation
-        )
-    );
-}
-
-function applyTimezone(
-    timezone
-) {
-    const browserTimezone =
-        Intl
-            .DateTimeFormat()
-            .resolvedOptions()
-            .timeZone
-        || "UTC";
-
-    const resolvedTimezone =
-        timezone
-        || currentLocation.timezone
-        || browserTimezone;
-
-    setInputValue(
-        "timezone",
-        resolvedTimezone
-    );
-
-    setInputValue(
-        "timezoneDisplay",
-        getTimezoneDisplayName(
-            resolvedTimezone
-        )
-    );
-}
+/* =========================================================
+POPULATE PROFILE
+========================================================= */
 
 function populateProfileForm(
     profile
@@ -1519,14 +1888,19 @@ function populateProfileForm(
         "Epic Games"
     );
 
-    setSelectValue(
-        "currentRank",
-        profile.currentRank
+    setCheckboxValue(
+        "ageConsent",
+        profile.ageConsent
     );
 
-    setRadioValue(
-        "contactMethod",
-        profile.contactMethod
+    setCheckboxValue(
+        "policyConsent",
+        profile.policyConsent
+    );
+
+    setCheckboxValue(
+        "autoDetectRegion",
+        profile.autoDetectRegion
     );
 
     setInputValue(
@@ -1569,40 +1943,47 @@ function populateProfileForm(
         profile.notificationsEnabled ===
         false;
 
+    if (
+        profile.notificationMethod
+    ) {
+        setRadioValue(
+            "notificationMethod",
+            profile.notificationMethod
+        );
+    }
+
     setRadioValue(
         "reminderMode",
         profile.reminderMode
     );
 
-    setCheckboxValue(
-        "ageConsent",
-        profile.ageConsent
-    );
+    if (
+        profile.autoDetectRegion
+    ) {
+        applyLocation(
+            profile.location
+        );
 
-    applyLocation(
-        profile.location
-    );
-
-    applyTimezone(
-        profile.timezone
-    );
+        applyTimezone(
+            profile.timezone
+        );
+    }
+    else {
+        clearDetectedRegion();
+    }
 
     populateAvailability(
         profile.availability
     );
 
-    updateContactFields();
+    updateRegionDetectionState();
     updateModeField();
+    updateDirectContactWarning();
     updateNotificationState();
 }
 
 /* =========================================================
 AUTHENTICATED EPIC USER
-
-Uses centralized client auth state only for displaying the
-currently linked Epic identity.
-
-Rocket League APIs remain authoritative for access.
 ========================================================= */
 
 async function getAuthenticatedEpicUser() {
@@ -1612,20 +1993,10 @@ async function getAuthenticatedEpicUser() {
     if (
         authState?.available !==
         true
-    ) {
-        return null;
-    }
-
-    if (
-        !hasActiveAccount(
+        || !hasActiveAccount(
             authState
         )
-    ) {
-        return null;
-    }
-
-    if (
-        !hasLinkedProvider(
+        || !hasLinkedProvider(
             "epic",
             authState
         )
@@ -1660,6 +2031,10 @@ async function getAuthenticatedEpicUser() {
     };
 }
 
+/* =========================================================
+LOAD PROFILE
+========================================================= */
+
 async function loadRocketLeagueProfile() {
     const authUser =
         await getAuthenticatedEpicUser();
@@ -1667,19 +2042,10 @@ async function loadRocketLeagueProfile() {
     if (
         authUser
     ) {
-        const authProfile =
-            normalizeProfile(
-                {
-                    user:
-                        authUser
-                },
-                authUser
-            );
-
         setInputValue(
             "epicDisplayName",
-            authProfile.EpicDisplayName
-            || authProfile.EpicPreferredUsername
+            authUser.EpicDisplayName
+            || authUser.EpicPreferredUsername
             || "Epic Player"
         );
     }
@@ -1701,7 +2067,7 @@ async function loadRocketLeagueProfile() {
                         "no-store",
 
                     headers: {
-                        "accept":
+                        "Accept":
                             "application/json"
                     }
                 }
@@ -1733,9 +2099,7 @@ async function loadRocketLeagueProfile() {
                 false,
 
             warning:
-                REGISTRATION_CONFIG
-                    .copy
-                    .backendWarningBody
+                "Your Epic sign-in is still active. Profile storage is currently unavailable, so your entries will be preserved locally."
         };
     }
 
@@ -1747,7 +2111,8 @@ async function loadRocketLeagueProfile() {
             );
 
     if (
-        response.status === 401
+        response.status ===
+        401
     ) {
         const loginUrl =
             new URL(
@@ -1768,8 +2133,10 @@ async function loadRocketLeagueProfile() {
     }
 
     if (
-        response.status === 403
-        || result.requiresEpicLogin === true
+        response.status ===
+            403
+        || result.requiresEpicLogin ===
+            true
     ) {
         window.location.replace(
             "/RocketLeague"
@@ -1798,9 +2165,7 @@ async function loadRocketLeagueProfile() {
 
             warning:
                 result.message
-                || REGISTRATION_CONFIG
-                    .copy
-                    .backendWarningBody
+                || "Your Epic sign-in is still active. Profile storage is currently unavailable."
         };
     }
 
@@ -1840,24 +2205,16 @@ function readRegistrationDraft() {
                 raw
             );
 
-        return (
+        return normalizeObject(
             parsed
-            && typeof parsed ===
-                "object"
-        )
-            ? parsed
-            : null;
+        );
     }
     catch (
         error
     ) {
         console.error(
             "ROCKET LEAGUE REGISTRATION: Draft read failed.",
-            {
-                message:
-                    error?.message
-                    || "Unknown error"
-            }
+            error
         );
 
         return null;
@@ -1880,11 +2237,7 @@ function saveRegistrationDraft(
     ) {
         console.error(
             "ROCKET LEAGUE REGISTRATION: Draft save failed.",
-            {
-                message:
-                    error?.message
-                    || "Unknown error"
-            }
+            error
         );
     }
 }
@@ -1900,11 +2253,7 @@ function clearRegistrationDraft() {
     ) {
         console.error(
             "ROCKET LEAGUE REGISTRATION: Draft clear failed.",
-            {
-                message:
-                    error?.message
-                    || "Unknown error"
-            }
+            error
         );
     }
 }
@@ -1914,20 +2263,23 @@ function populateDraft(
 ) {
     if (
         !draft
-        || typeof draft !==
-            "object"
     ) {
         return;
     }
 
-    setSelectValue(
-        "currentRank",
-        draft.currentRank
+    setCheckboxValue(
+        "ageConsent",
+        draft.ageConsent
     );
 
-    setRadioValue(
-        "contactMethod",
-        draft.contactMethod
+    setCheckboxValue(
+        "policyConsent",
+        draft.policyConsent
+    );
+
+    setCheckboxValue(
+        "autoDetectRegion",
+        draft.autoDetectRegion
     );
 
     setInputValue(
@@ -1955,11 +2307,6 @@ function populateDraft(
         draft.showOnlineStatus
     );
 
-    setCheckboxValue(
-        "ageConsent",
-        draft.ageConsent
-    );
-
     setRadioValue(
         "notificationsEnabled",
         draft.notificationsEnabled
@@ -1971,35 +2318,43 @@ function populateDraft(
         draft.notificationsEnabled ===
         false;
 
+    if (
+        draft.notificationMethod
+    ) {
+        setRadioValue(
+            "notificationMethod",
+            draft.notificationMethod
+        );
+    }
+
     setRadioValue(
         "reminderMode",
         draft.reminderMode
     );
 
     if (
-        draft.location
-        && typeof draft.location ===
-            "object"
+        draft.autoDetectRegion
+        && draft.location
     ) {
         applyLocation(
             draft.location
         );
-    }
 
-    if (
-        draft.timezone
-    ) {
         applyTimezone(
             draft.timezone
         );
+    }
+    else {
+        clearDetectedRegion();
     }
 
     populateAvailability(
         draft.availability
     );
 
-    updateContactFields();
+    updateRegionDetectionState();
     updateModeField();
+    updateDirectContactWarning();
     updateNotificationState();
 }
 
@@ -2018,6 +2373,9 @@ function buildRegistrationPayload(
     const notificationsEnabled =
         getNotificationsEnabled();
 
+    const autoDetectRegion =
+        getAutoDetectRegionEnabled();
+
     return {
         ageConsent:
             data.get(
@@ -2025,13 +2383,13 @@ function buildRegistrationPayload(
             ) ===
             "on",
 
-        currentRank:
-            String(
-                data.get(
-                    "currentRank"
-                )
-                || ""
-            ).trim(),
+        policyConsent:
+            data.get(
+                "policyConsent"
+            ) ===
+            "on",
+
+        autoDetectRegion,
 
         showOnlineStatus:
             data.get(
@@ -2039,62 +2397,67 @@ function buildRegistrationPayload(
             ) ===
             "on",
 
-        contactMethod:
-            data.get(
-                "contactMethod"
-            ),
-
         email:
-            String(
+            normalizeString(
                 data.get(
                     "email"
                 )
-                || ""
-            ).trim(),
+            ),
 
         phone:
-            String(
+            normalizeString(
                 data.get(
                     "phone"
                 )
-                || ""
-            ).trim(),
+            ),
 
         preferredMode:
-            data.get(
-                "preferredMode"
+            normalizeString(
+                data.get(
+                    "preferredMode"
+                )
             ),
 
         otherMode:
-            String(
+            normalizeString(
                 data.get(
                     "otherMode"
                 )
-                || ""
-            ).trim(),
+            ),
 
         timezone:
-            String(
-                data.get(
-                    "timezone"
+            autoDetectRegion
+                ? normalizeString(
+                    data.get(
+                        "timezone"
+                    )
                 )
-                || ""
-            ).trim(),
+                : "",
 
-        location: {
-            ...currentLocation
-        },
+        location:
+            autoDetectRegion
+                ? {
+                    ...currentLocation
+                }
+                : null,
 
         availability:
             getAvailability(),
 
         notificationsEnabled,
 
+        notificationMethod:
+            notificationsEnabled
+                ? getNotificationMethod()
+                : null,
+
         reminderMode:
             notificationsEnabled
                 ? (
-                    data.get(
-                        "reminderMode"
+                    normalizeString(
+                        data.get(
+                            "reminderMode"
+                        )
                     )
                     || "24-hours"
                 )
@@ -2109,6 +2472,42 @@ VALIDATION
 function validateRegistrationPayload(
     payload
 ) {
+    if (
+        payload.ageConsent !==
+        true
+    ) {
+        return (
+            "You must confirm the eligibility requirement before registration can finish."
+        );
+    }
+
+    if (
+        payload.policyConsent !==
+        true
+    ) {
+        return (
+            "You must acknowledge the Terms of Service and Privacy Policy before registration can finish."
+        );
+    }
+
+    if (
+        !payload.preferredMode
+    ) {
+        return (
+            "Select your preferred Rocket League mode."
+        );
+    }
+
+    if (
+        payload.preferredMode ===
+            "other"
+        && !payload.otherMode
+    ) {
+        return (
+            "Describe your preferred Rocket League mode."
+        );
+    }
+
     if (
         !Array.isArray(
             payload.availability
@@ -2133,7 +2532,7 @@ function validateRegistrationPayload(
 
     if (
         payload.availability.some(
-            ({ start, end }) =>
+            ({start, end}) =>
                 start < minimumTime
                 || start > maximumTime
                 || end < minimumTime
@@ -2147,13 +2546,56 @@ function validateRegistrationPayload(
 
     if (
         payload.availability.some(
-            ({ start, end }) =>
+            ({start, end}) =>
                 start >= end
         )
     ) {
         return (
             "Each availability end time must be later than its start time."
         );
+    }
+
+    if (
+        payload.notificationsEnabled
+    ) {
+        if (
+            !payload.notificationMethod
+        ) {
+            return (
+                "Choose a notification method or opt out of match notifications."
+            );
+        }
+
+        if (
+            payload.notificationMethod ===
+                "email"
+            && !payload.email
+        ) {
+            return (
+                "Enter an email address to use email notifications, choose another notification method, or opt out."
+            );
+        }
+
+        if (
+            payload.notificationMethod ===
+                "phone"
+            && !payload.phone
+        ) {
+            return (
+                "Enter a phone number to use phone notifications, choose another notification method, or opt out."
+            );
+        }
+
+        if (
+            payload.notificationMethod ===
+                "discord"
+            && !discordNotificationState
+                .eligible
+        ) {
+            return (
+                "Discord notifications are not available until your linked Discord account shares a server with BPD MatchBot."
+            );
+        }
     }
 
     return null;
@@ -2177,8 +2619,8 @@ async function submitRegistration(
         "validation-attempted"
     );
 
-    updateContactFields();
     updateModeField();
+    updateDirectContactWarning();
     updateNotificationState();
 
     if (
@@ -2241,7 +2683,7 @@ async function submitRegistration(
                         "Content-Type":
                             "application/json",
 
-                        "accept":
+                        "Accept":
                             "application/json"
                     },
 
@@ -2260,7 +2702,8 @@ async function submitRegistration(
                 );
 
         if (
-            response.status === 401
+            response.status ===
+                401
             || result.requiresEpicLogin ===
                 true
         ) {
@@ -2297,18 +2740,8 @@ async function submitRegistration(
             );
 
             showMessage(
-                "Registration received. Profile saving is not yet complete. Redirecting…",
+                "Registration received, but permanent profile saving is not yet complete.",
                 "warning"
-            );
-
-            setTimeout(
-                () => {
-                    window.location.replace(
-                        result.redirectTo
-                        || "/RocketLeague"
-                    );
-                },
-                1800
             );
 
             return;
@@ -2321,7 +2754,7 @@ async function submitRegistration(
         );
 
         showMessage(
-            "Profile saved. Redirecting…",
+            "Rocket League profile saved. Redirecting…",
             "success"
         );
 
@@ -2339,9 +2772,7 @@ async function submitRegistration(
 
         setBackendWarning(
             true,
-            REGISTRATION_CONFIG
-                .copy
-                .backendWarningBody
+            "Profile storage is currently unavailable. Your entries have been preserved in this browser."
         );
 
         showMessage(
@@ -2361,9 +2792,7 @@ async function submitRegistration(
                 false;
 
             submitButton.textContent =
-                REGISTRATION_CONFIG
-                    .copy
-                    .submitButton;
+                "Complete Registration";
         }
     }
 }
@@ -2398,7 +2827,6 @@ export async function initializePage() {
     form.dataset.initialized =
         "true";
 
-    applyDynamicCopy();
     renderAvailabilityRows();
 
     setInputValue(
@@ -2420,18 +2848,50 @@ export async function initializePage() {
         ""
     );
 
+    /* =====================================================
+    REGION DETECTION
+    ===================================================== */
+
     document
-        .querySelectorAll(
-            'input[name="contactMethod"]'
+        .getElementById(
+            "autoDetectRegion"
         )
-        .forEach(
-            input => {
-                input.addEventListener(
-                    "change",
-                    updateContactFields
-                );
+        ?.addEventListener(
+            "change",
+            updateRegionDetectionState
+        );
+
+    /* =====================================================
+    CONTACT INFORMATION
+    ===================================================== */
+
+    document
+        .getElementById(
+            "email"
+        )
+        ?.addEventListener(
+            "input",
+            () => {
+                updateDirectContactWarning();
+                updateNotificationFieldRequirements();
             }
         );
+
+    document
+        .getElementById(
+            "phone"
+        )
+        ?.addEventListener(
+            "input",
+            () => {
+                updateDirectContactWarning();
+                updateNotificationFieldRequirements();
+            }
+        );
+
+    /* =====================================================
+    PREFERRED MODE
+    ===================================================== */
 
     document
         .querySelectorAll(
@@ -2446,6 +2906,10 @@ export async function initializePage() {
             }
         );
 
+    /* =====================================================
+    NOTIFICATIONS
+    ===================================================== */
+
     document
         .querySelectorAll(
             'input[name="notificationsEnabled"]'
@@ -2458,6 +2922,57 @@ export async function initializePage() {
                 );
             }
         );
+
+    document
+        .querySelectorAll(
+            'input[name="notificationMethod"]'
+        )
+        .forEach(
+            input => {
+                input.addEventListener(
+                    "change",
+                    () => {
+                        updateNotificationState();
+
+                        if (
+                            input.value ===
+                                "discord"
+                            && input.checked
+                            && !discordNotificationState
+                                .eligible
+                        ) {
+                            applyDiscordNotificationState();
+                        }
+                    }
+                );
+            }
+        );
+
+    /* =====================================================
+    MATCHBOT
+    ===================================================== */
+
+    document
+        .getElementById(
+            "installDiscordMatchBotButton"
+        )
+        ?.addEventListener(
+            "click",
+            openMatchBotInstall
+        );
+
+    document
+        .getElementById(
+            "recheckDiscordMatchBotButton"
+        )
+        ?.addEventListener(
+            "click",
+            checkDiscordNotificationEligibility
+        );
+
+    /* =====================================================
+    OPT-OUT MODAL
+    ===================================================== */
 
     document
         .querySelectorAll(
@@ -2522,12 +3037,23 @@ export async function initializePage() {
         submitRegistration
     );
 
-    updateContactFields();
+    updateRegionDetectionState();
     updateModeField();
+    updateDirectContactWarning();
     updateNotificationState();
 
-    const profileResult =
-        await loadRocketLeagueProfile();
+    /* =====================================================
+    LOAD PROFILE + DISCORD STATUS
+    ===================================================== */
+
+    const [
+        profileResult
+    ] =
+        await Promise.all([
+            loadRocketLeagueProfile(),
+
+            checkDiscordNotificationEligibility()
+        ]);
 
     if (
         !profileResult
@@ -2569,4 +3095,8 @@ export async function initializePage() {
             false
         );
     }
+
+    applyDiscordNotificationState();
+    updateDirectContactWarning();
+    updateNotificationState();
 }

@@ -165,7 +165,7 @@ export const ROUTES = {
         header:
             "/Framework/Shell/HTML/Header/header.html",
         sidebar:
-            "/Framework/Shell/HTML/Sidebar/rl_AuthSidebar.html",
+            "/Framework/Shell/HTML/Sidebar/rl_menu.html",
         footer:
             "/Framework/Shell/HTML/Footer/footer.html",
         module:

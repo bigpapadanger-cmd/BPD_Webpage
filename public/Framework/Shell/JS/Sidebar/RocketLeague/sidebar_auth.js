@@ -5,7 +5,7 @@ BPD GAMING NETWORK
 ROCKET LEAGUE SIDEBAR AUTH VIEW
 
 File:
-    /Tabs/RocketLeague/JS/sidebar_auth.js
+    /Tabs/RocketLeague/Index/JS/sidebar_auth.js
 
 Purpose:
     Applies Rocket League authentication and access state to
@@ -14,7 +14,8 @@ Purpose:
 Description:
     - Consumes normalized Rocket League auth/profile state.
     - Shows or hides authenticated and guest sidebar items.
-    - Shows or hides Rocket League locked/unlocked items.
+    - Shows protected Rocket League navigation only when
+      rocketLeagueAccess is true.
     - Does not load authentication state itself.
     - Does not calculate Rocket League business rules.
     - Does not use localStorage as an authorization source.
@@ -23,11 +24,6 @@ Security:
     - This module controls UI visibility only.
     - Server APIs remain authoritative for Rocket League
       access and provider requirements.
-
-Important:
-    - Global authentication comes from Framework/Auth/auth.js.
-    - Rocket League-specific access comes from
-      /Tabs/RocketLeague/JS/auth.js.
 ========================================================= */
 
 export function applySidebarAuthState(
@@ -68,8 +64,7 @@ export function applySidebarAuthState(
                     element.hidden =
                         !authenticated;
                 }
-
-                if (
+                else if (
                     requiredState ===
                     "guest"
                 ) {
@@ -90,13 +85,14 @@ export function applySidebarAuthState(
 
                 if (
                     requiredState ===
+                    "required"
+                    || requiredState ===
                     "unlocked"
                 ) {
                     element.hidden =
                         !rocketLeagueAccess;
                 }
-
-                if (
+                else if (
                     requiredState ===
                     "locked"
                 ) {

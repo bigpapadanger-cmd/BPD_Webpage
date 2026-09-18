@@ -7,6 +7,12 @@ Sidebar state is user-controlled at every viewport size.
 Mobile and tablet users may fully expand the sidebar.
 =========================================================
 */
+import {
+    setupAdminNavigation
+} from "./admin_navigation.js";
+import {
+    initializeSidebarSubmenus
+} from "./submenu.js";
 
 let sidebarResizeInitialized =
     false;
@@ -22,11 +28,13 @@ Call after sidebar HTML and hover HTML are loaded.
 export function initializeSidebar() {
     applyGlobalSettings();
     setupSidebarToggle();
+    setupRouteVisibility();
     setupActiveNavigation();
     setupDisabledNavigation();
     setupSidebarTooltips();
     setupSidebarResize();
     setupAdminNavigation();
+    initializeSidebarSubmenus();
 }
 
 
@@ -632,7 +640,44 @@ function hideSidebarTooltip() {
         "true"
     );
 }
+/*
+=========================================================
+ROUTE VISIBILITY
 
+Hides navigation items configured to be hidden on an exact
+route.
+
+Example:
+    data-hide-on-route="/RocketLeague"
+=========================================================
+*/
+
+function setupRouteVisibility() {
+    const currentPath =
+        normalizePath(
+            window.location.pathname
+        );
+
+    const items =
+        document.querySelectorAll(
+            "[data-hide-on-route]"
+        );
+
+    items.forEach(
+        function(
+            item
+        ) {
+            const hiddenRoute =
+                normalizePath(
+                    item.dataset.hideOnRoute
+                );
+
+            item.hidden =
+                currentPath.toLowerCase() ===
+                hiddenRoute.toLowerCase();
+        }
+    );
+}
 
 /*
 =========================================================

@@ -3,14 +3,24 @@ BPD GAMING NETWORK
 ROCKET LEAGUE REGISTRATION
 
 Purpose:
-    Collects Rocket League-specific registration information
-    for an authenticated BPD account with a linked Epic account.
+    Collects the minimum Rocket League-specific information
+    required to create an initial player profile.
 
 Description:
-    - Epic identity information is read-only.
-    - Global BPD identity is not submitted by this form.
-    - No separate Rocket League display name is collected.
-    - Registration collects only Rocket League-specific data.
+    - Eligibility is confirmed before profile setup.
+    - Epic identity is read-only.
+    - No configurable Rocket League username is collected.
+    - Initial rank is not collected during registration.
+    - Location/time-zone detection is optional.
+    - Email and phone are optional.
+    - Discord may be used for match notifications when the
+      linked Discord account is eligible for BPD MatchBot.
+    - Detailed profile settings are configured after setup.
+
+Security:
+    - Discord eligibility must be verified server-side.
+    - MatchBot availability must be verified server-side.
+    - Client-side UI state is not authoritative.
 ========================================================= -->
 
 <section
@@ -21,6 +31,10 @@ Description:
         id="rlRegistrationForm"
         class="rl-registration-form"
     >
+        <!-- =================================================
+        INTRO
+        ================================================= -->
+
         <header class="registration-intro">
             <span
                 class="registration-eyebrow"
@@ -37,9 +51,13 @@ Description:
             </h1>
 
             <p data-copy="intro">
-                Confirm your Epic account details and tell us how and when you prefer to play.
+                Complete the required setup below to participate in BPD Gaming Network Rocket League seasons and matchmaking.
             </p>
         </header>
+
+        <!-- =================================================
+        GLOBAL MESSAGE
+        ================================================= -->
 
         <div
             id="registrationMessage"
@@ -56,25 +74,100 @@ Description:
             aria-live="polite"
             hidden
         >
-            <strong data-copy="backendWarningTitle">
+            <strong>
                 Profile service temporarily unavailable
             </strong>
 
-            <span data-copy="backendWarningBody">
+            <span>
                 Your Epic sign-in is still active. You can continue filling out this form.
             </span>
         </div>
 
+        <!-- =================================================
+        ELIGIBILITY
+        ================================================= -->
+
+        <fieldset class="form-section eligibility-section">
+            <legend>
+                Eligibility
+            </legend>
+
+            <p class="section-description">
+                Before creating a Rocket League profile, confirm that you meet the participation requirements and have reviewed the network policies.
+            </p>
+
+            <div class="policy-links">
+                <a
+                    href="/Privacy"
+                    data-router-link
+                    target="_blank"
+                    rel="noopener"
+                >
+                    Read Privacy Policy
+                </a>
+
+                <a
+                    href="/TOS"
+                    data-router-link
+                    target="_blank"
+                    rel="noopener"
+                >
+                    Read Terms of Service
+                </a>
+            </div>
+
+            <label class="confirmation-row">
+                <input
+                    id="ageConsent"
+                    name="ageConsent"
+                    type="checkbox"
+                    required
+                >
+
+                <span>
+                    I confirm that I am 18 or older, meet the applicable league age in my place of residence, or have permission from my parent or legal guardian.
+
+                    <span
+                        class="required-mark"
+                        aria-hidden="true"
+                    >
+                        *
+                    </span>
+                </span>
+            </label>
+
+            <label class="confirmation-row">
+                <input
+                    id="policyConsent"
+                    name="policyConsent"
+                    type="checkbox"
+                    required
+                >
+
+                <span>
+                    I have reviewed and agree to the BPD Gaming Network Terms of Service and acknowledge the Privacy Policy.
+
+                    <span
+                        class="required-mark"
+                        aria-hidden="true"
+                    >
+                        *
+                    </span>
+                </span>
+            </label>
+        </fieldset>
+
+        <!-- =================================================
+        EPIC ACCOUNT
+        ================================================= -->
+
         <fieldset class="form-section epic-section">
-            <legend data-copy="epicLegend">
+            <legend>
                 Epic account
             </legend>
 
-            <p
-                class="section-description"
-                data-copy="epicDescription"
-            >
-                These fields come from your authenticated Epic Games account.
+            <p class="section-description">
+                Your Rocket League profile is connected to your authenticated Epic Games identity. These values cannot be changed here.
             </p>
 
             <div class="field-grid two-columns">
@@ -82,7 +175,7 @@ Description:
                     class="form-field"
                     for="epicDisplayName"
                 >
-                    <span data-copy="epicUserLabel">
+                    <span>
                         Epic user
                     </span>
 
@@ -99,7 +192,7 @@ Description:
                     class="form-field"
                     for="epicPlatform"
                 >
-                    <span data-copy="platformLabel">
+                    <span>
                         Platform
                     </span>
 
@@ -111,13 +204,63 @@ Description:
                         readonly
                     >
                 </label>
+            </div>
+        </fieldset>
 
+        <!-- =================================================
+        REGION & TIME ZONE
+        ================================================= -->
+
+        <fieldset class="form-section region-section">
+            <legend>
+                Region & time zone
+            </legend>
+
+            <p class="section-description">
+                Region and time-zone information can help improve regional matchmaking and ensure match times are displayed correctly.
+            </p>
+
+            <div class="form-field toggle-field">
+                <span>
+                    Automatic detection
+                </span>
+
+                <label
+                    class="toggle-row"
+                    for="autoDetectRegion"
+                >
+                    <input
+                        id="autoDetectRegion"
+                        name="autoDetectRegion"
+                        type="checkbox"
+                        checked
+                    >
+
+                    <span
+                        class="toggle-control"
+                        aria-hidden="true"
+                    ></span>
+
+                    <span>
+                        Allow automatic location and time-zone detection
+                    </span>
+                </label>
+
+                <small>
+                    You can disable this if you do not want your approximate region detected.
+                </small>
+            </div>
+
+            <div
+                id="detectedRegionFields"
+                class="field-grid two-columns"
+            >
                 <label
                     class="form-field"
                     for="detectedLocation"
                 >
-                    <span data-copy="locationLabel">
-                        Approximate location
+                    <span>
+                        Approximate region
                     </span>
 
                     <input
@@ -125,15 +268,11 @@ Description:
                         name="detectedLocation"
                         type="text"
                         value="Detecting..."
-                        aria-describedby="locationHelp"
                         readonly
                     >
 
-                    <small
-                        id="locationHelp"
-                        data-copy="locationHelp"
-                    >
-                        Estimated from your connection location.
+                    <small>
+                        Used only to improve regional matchmaking and scheduling.
                     </small>
                 </label>
 
@@ -141,7 +280,7 @@ Description:
                     class="form-field"
                     for="timezoneDisplay"
                 >
-                    <span data-copy="timezoneLabel">
+                    <span>
                         Time zone
                     </span>
 
@@ -157,177 +296,38 @@ Description:
                         name="timezone"
                         type="hidden"
                     >
+
+                    <small>
+                        Used to display match schedules in your local time.
+                    </small>
                 </label>
             </div>
         </fieldset>
 
-        <fieldset class="form-section eligibility-section">
-            <legend data-copy="eligibilityLegend">
-                Eligibility
+        <!-- =================================================
+        PLAYER PROFILE FAMILY
+        ================================================= -->
+
+        <fieldset class="form-section player-profile-section">
+            <legend>
+                Player Profile
             </legend>
 
-            <label class="confirmation-row">
-                <input
-                    id="ageConsent"
-                    name="ageConsent"
-                    type="checkbox"
-                    required
-                >
+            <p class="section-description">
+                Configure your basic Rocket League matchmaking, availability, visibility, and notification preferences.
+            </p>
 
-                <span>
-                    <span data-copy="eligibilityText">
-                        I confirm that I am 18 or older, meet the applicable league age in my place of residence, or have permission from my parent or legal guardian.
-                    </span>
+            <!-- =============================================
+            ONLINE STATUS
+            ============================================== -->
 
-                    <span
-                        class="required-mark"
-                        aria-hidden="true"
-                    >
-                        *
-                    </span>
-                </span>
-            </label>
-        </fieldset>
-
-        <fieldset class="form-section">
-            <legend data-copy="playerProfileLegend">
-                Player profile
-            </legend>
-
-            <div class="field-grid two-columns">
-                <label
-                    class="form-field"
-                    for="currentRank"
-                >
-                    <span>
-                        <span data-copy="rankLabel">
-                            Current rank
-                        </span>
-
-                        <span
-                            class="required-mark"
-                            aria-hidden="true"
-                        >
-                            *
-                        </span>
-                    </span>
-
-                    <select
-                        id="currentRank"
-                        name="currentRank"
-                        aria-describedby="rankHelp"
-                        required
-                    >
-                        <option
-                            value=""
-                            data-copy-option="rankPlaceholder"
-                        >
-                            Select your current rank
-                        </option>
-
-                        <option value="unranked">
-                            Unranked
-                        </option>
-
-                        <option value="bronze-1">
-                            Bronze I
-                        </option>
-
-                        <option value="bronze-2">
-                            Bronze II
-                        </option>
-
-                        <option value="bronze-3">
-                            Bronze III
-                        </option>
-
-                        <option value="silver-1">
-                            Silver I
-                        </option>
-
-                        <option value="silver-2">
-                            Silver II
-                        </option>
-
-                        <option value="silver-3">
-                            Silver III
-                        </option>
-
-                        <option value="gold-1">
-                            Gold I
-                        </option>
-
-                        <option value="gold-2">
-                            Gold II
-                        </option>
-
-                        <option value="gold-3">
-                            Gold III
-                        </option>
-
-                        <option value="platinum-1">
-                            Platinum I
-                        </option>
-
-                        <option value="platinum-2">
-                            Platinum II
-                        </option>
-
-                        <option value="platinum-3">
-                            Platinum III
-                        </option>
-
-                        <option value="diamond-1">
-                            Diamond I
-                        </option>
-
-                        <option value="diamond-2">
-                            Diamond II
-                        </option>
-
-                        <option value="diamond-3">
-                            Diamond III
-                        </option>
-
-                        <option value="champion-1">
-                            Champion I
-                        </option>
-
-                        <option value="champion-2">
-                            Champion II
-                        </option>
-
-                        <option value="champion-3">
-                            Champion III
-                        </option>
-
-                        <option value="grand-champion-1">
-                            Grand Champion I
-                        </option>
-
-                        <option value="grand-champion-2">
-                            Grand Champion II
-                        </option>
-
-                        <option value="grand-champion-3">
-                            Grand Champion III
-                        </option>
-
-                        <option value="supersonic-legend">
-                            Supersonic Legend
-                        </option>
-                    </select>
-
-                    <small
-                        id="rankHelp"
-                        data-copy="rankHelp"
-                    >
-                        Self-reported during registration. You can update it later.
-                    </small>
-                </label>
+            <div class="profile-subsection">
+                <h2>
+                    Profile visibility
+                </h2>
 
                 <div class="form-field toggle-field">
-                    <span data-copy="onlineStatusLabel">
+                    <span>
                         Online status
                     </span>
 
@@ -346,240 +346,207 @@ Description:
                             aria-hidden="true"
                         ></span>
 
-                        <span data-copy="onlineStatusText">
+                        <span>
                             Allow other players to see when I am online
                         </span>
                     </label>
 
-                    <small data-copy="onlineStatusHelp">
+                    <small>
                         Disabled by default.
                     </small>
                 </div>
             </div>
-        </fieldset>
 
-        <fieldset class="form-section">
-            <legend data-copy="contactLegend">
-                Contact information
-            </legend>
+            <!-- =============================================
+            CONTACT INFORMATION
+            ============================================== -->
 
-            <p
-                class="section-description"
-                data-copy="contactDescription"
-            >
-                Enter the contact methods you want available, then choose your preferred method.
-            </p>
+            <div class="profile-subsection">
+                <h2>
+                    Contact information
+                </h2>
 
-            <div class="field-grid two-columns">
-                <label
-                    class="form-field"
-                    for="email"
-                >
-                    <span>
-                        <span data-copy="emailLabel">
+                <p class="section-description">
+                    Email and phone are optional. Providing at least one contact method can make it easier to receive match and scheduling information.
+                </p>
+
+                <div class="field-grid two-columns">
+                    <label
+                        class="form-field"
+                        for="email"
+                    >
+                        <span>
                             Email address
                         </span>
 
-                        <span
-                            id="emailRequiredMark"
-                            class="required-mark"
-                            aria-hidden="true"
+                        <input
+                            id="email"
+                            name="email"
+                            type="email"
+                            maxlength="254"
+                            autocomplete="email"
                         >
-                            *
-                        </span>
-                    </span>
+                    </label>
 
-                    <input
-                        id="email"
-                        name="email"
-                        type="email"
-                        maxlength="254"
-                        autocomplete="email"
-                        required
+                    <label
+                        class="form-field"
+                        for="phone"
                     >
-                </label>
-
-                <label
-                    class="form-field"
-                    for="phone"
-                >
-                    <span>
-                        <span data-copy="phoneLabel">
+                        <span>
                             Phone number
                         </span>
 
+                        <input
+                            id="phone"
+                            name="phone"
+                            type="tel"
+                            maxlength="24"
+                            autocomplete="tel"
+                            inputmode="tel"
+                        >
+                    </label>
+                </div>
+
+                <div
+                    id="noDirectContactWarning"
+                    class="inline-warning"
+                    role="alert"
+                    hidden
+                >
+                    <strong>
+                        No email or phone provided
+                    </strong>
+
+                    <span>
+                        You may continue without an email address or phone number. You are still responsible for all matches you join. Missing too many scheduled matches may result in your Rocket League profile losing eligibility to join seasons.
+                    </span>
+                </div>
+            </div>
+
+            <!-- =============================================
+            PREFERRED MODE
+            ============================================== -->
+
+            <div class="profile-subsection">
+                <h2>
+                    Preferred mode
+                </h2>
+
+                <span class="field-label inline-required">
+                    Choose your preferred Rocket League mode
+
+                    <span
+                        class="required-mark"
+                        aria-hidden="true"
+                    >
+                        *
+                    </span>
+                </span>
+
+                <div
+                    class="choice-grid"
+                    role="radiogroup"
+                    aria-label="Preferred Rocket League mode"
+                >
+                    <label class="choice-card">
+                        <input
+                            name="preferredMode"
+                            type="radio"
+                            value="1s"
+                            required
+                        >
+
+                        <span>
+                            1s
+                        </span>
+                    </label>
+
+                    <label class="choice-card">
+                        <input
+                            name="preferredMode"
+                            type="radio"
+                            value="2s"
+                        >
+
+                        <span>
+                            2s
+                        </span>
+                    </label>
+
+                    <label class="choice-card">
+                        <input
+                            name="preferredMode"
+                            type="radio"
+                            value="3s"
+                        >
+
+                        <span>
+                            3s
+                        </span>
+                    </label>
+
+                    <label class="choice-card">
+                        <input
+                            name="preferredMode"
+                            type="radio"
+                            value="customs"
+                        >
+
+                        <span>
+                            Customs
+                        </span>
+                    </label>
+
+                    <label class="choice-card">
+                        <input
+                            name="preferredMode"
+                            type="radio"
+                            value="other"
+                        >
+
+                        <span>
+                            Other
+                        </span>
+                    </label>
+                </div>
+
+                <label
+                    id="otherModeField"
+                    class="form-field other-mode-field"
+                    for="otherMode"
+                    hidden
+                >
+                    <span>
+                        Describe your preferred mode
+
                         <span
-                            id="phoneRequiredMark"
                             class="required-mark"
                             aria-hidden="true"
-                            hidden
                         >
                             *
                         </span>
                     </span>
 
                     <input
-                        id="phone"
-                        name="phone"
-                        type="tel"
-                        maxlength="24"
-                        autocomplete="tel"
-                        inputmode="tel"
+                        id="otherMode"
+                        name="otherMode"
+                        type="text"
+                        maxlength="50"
                     >
                 </label>
             </div>
 
-            <span class="field-label">
-                <span data-copy="contactMethodLabel">
-                    Preferred contact method
-                </span>
+            <!-- =============================================
+            WEEKLY AVAILABILITY
+            ============================================== -->
 
-                <span
-                    class="required-mark"
-                    aria-hidden="true"
-                >
-                    *
-                </span>
-            </span>
+            <div class="profile-subsection">
+                <h2>
+                    Weekly availability
+                </h2>
 
-            <div
-                class="choice-row contact-method-row"
-                role="radiogroup"
-                aria-label="Preferred contact method"
-            >
-                <label
-                    class="choice-card"
-                    data-choice-value="email"
-                >
-                    <input
-                        name="contactMethod"
-                        type="radio"
-                        value="email"
-                        checked
-                        required
-                    >
-
-                    <span data-copy="contactEmail">
-                        Email
-                    </span>
-                </label>
-
-                <label
-                    class="choice-card"
-                    data-choice-value="phone"
-                >
-                    <input
-                        name="contactMethod"
-                        type="radio"
-                        value="phone"
-                    >
-
-                    <span data-copy="contactPhone">
-                        Phone
-                    </span>
-                </label>
-
-                <label
-                    class="choice-card"
-                    data-choice-value="both"
-                >
-                    <input
-                        name="contactMethod"
-                        type="radio"
-                        value="both"
-                    >
-
-                    <span data-copy="contactBoth">
-                        Both
-                    </span>
-                </label>
-            </div>
-        </fieldset>
-
-        <fieldset class="form-section">
-            <legend data-copy="modeLegend">
-                Preferred mode
-            </legend>
-
-            <span class="field-label inline-required">
-                <span data-copy="modeLabel">
-                    Choose a preferred mode
-                </span>
-
-                <span
-                    class="required-mark"
-                    aria-hidden="true"
-                >
-                    *
-                </span>
-            </span>
-
-            <div
-                class="choice-grid"
-                role="radiogroup"
-                aria-label="Preferred Rocket League mode"
-            >
-                <label class="choice-card">
-                    <input
-                        name="preferredMode"
-                        type="radio"
-                        value="1s"
-                        required
-                    >
-                    <span>1s</span>
-                </label>
-
-                <label class="choice-card">
-                    <input
-                        name="preferredMode"
-                        type="radio"
-                        value="2s"
-                    >
-                    <span>2s</span>
-                </label>
-
-                <label class="choice-card">
-                    <input
-                        name="preferredMode"
-                        type="radio"
-                        value="3s"
-                    >
-                    <span>3s</span>
-                </label>
-
-                <label class="choice-card">
-                    <input
-                        name="preferredMode"
-                        type="radio"
-                        value="customs"
-                    >
-                    <span data-copy="modeCustoms">
-                        Customs
-                    </span>
-                </label>
-
-                <label class="choice-card">
-                    <input
-                        name="preferredMode"
-                        type="radio"
-                        value="other"
-                    >
-                    <span data-copy="modeOther">
-                        Other
-                    </span>
-                </label>
-            </div>
-
-            <label
-                id="otherModeField"
-                class="form-field other-mode-field"
-                for="otherMode"
-                hidden
-            >
-                <span>
-                    <span data-copy="otherModeLabel">
-                        Describe your preferred mode
-                    </span>
+                <p class="section-description">
+                    Select at least one day and a normal play window. Times are available in 30-minute increments from 5:00 PM through 11:00 PM.
 
                     <span
                         class="required-mark"
@@ -587,206 +554,363 @@ Description:
                     >
                         *
                     </span>
-                </span>
+                </p>
 
-                <input
-                    id="otherMode"
-                    name="otherMode"
-                    type="text"
-                    maxlength="50"
-                >
-            </label>
-        </fieldset>
+                <div
+                    id="availabilityRows"
+                    class="availability-list"
+                ></div>
+            </div>
 
-        <fieldset class="form-section">
-            <legend data-copy="availabilityLegend">
-                Weekly availability
-            </legend>
+            <!-- =============================================
+            MATCH NOTIFICATIONS
+            ============================================== -->
 
-            <p class="section-description">
-                <span data-copy="availabilityDescription">
-                    Select at least one day and a normal play window. Times are available in 30-minute increments from 5:00 PM through 11:00 PM in your local time zone.
-                </span>
+            <div class="profile-subsection">
+                <h2>
+                    Match notifications & reminders
+                </h2>
 
-                <span
-                    class="required-mark"
-                    aria-hidden="true"
-                >
-                    *
-                </span>
-            </p>
-
-            <div
-                id="availabilityRows"
-                class="availability-list"
-            ></div>
-        </fieldset>
-
-        <fieldset class="form-section">
-            <legend data-copy="notificationsLegend">
-                Match notifications & reminders
-            </legend>
-
-            <div class="notification-setting">
-                <span class="field-label">
-                    <span data-copy="notificationsLabel">
+                <div class="notification-setting">
+                    <span class="field-label">
                         Match notifications
+
+                        <span
+                            class="required-mark"
+                            aria-hidden="true"
+                        >
+                            *
+                        </span>
                     </span>
 
-                    <span
-                        class="required-mark"
-                        aria-hidden="true"
+                    <div
+                        class="choice-row notification-choice-row"
+                        role="radiogroup"
+                        aria-label="Match notifications"
                     >
-                        *
-                    </span>
-                </span>
+                        <label class="choice-card">
+                            <input
+                                name="notificationsEnabled"
+                                type="radio"
+                                value="true"
+                                checked
+                                required
+                            >
 
-                <div
-                    class="choice-row notification-choice-row"
-                    role="radiogroup"
-                    aria-label="Match notifications"
-                >
-                    <label class="choice-card">
-                        <input
-                            name="notificationsEnabled"
-                            type="radio"
-                            value="true"
-                            checked
-                            required
-                        >
+                            <span>
+                                Opt in
+                            </span>
+                        </label>
 
-                        <span data-copy="notificationsOn">
-                            Opt in
-                        </span>
-                    </label>
+                        <label class="choice-card warning-choice">
+                            <input
+                                name="notificationsEnabled"
+                                type="radio"
+                                value="false"
+                            >
 
-                    <label class="choice-card warning-choice">
-                        <input
-                            name="notificationsEnabled"
-                            type="radio"
-                            value="false"
-                        >
-
-                        <span data-copy="notificationsOff">
-                            Opt out
-                        </span>
-                    </label>
-                </div>
-            </div>
-
-            <div
-                id="notificationOptOutWarning"
-                class="inline-warning"
-                role="alert"
-                hidden
-            >
-                <strong data-copy="notificationOptOutTitle">
-                    Notifications are disabled
-                </strong>
-
-                <span data-copy="notificationOptOutBody">
-                    WARNING: By opting out of match notifications, you are still responsible for joined matches and may be removed from joined matches after missing too many scheduled matches.
-                </span>
-            </div>
-
-            <div
-                id="reminderOptions"
-                class="reminder-options"
-            >
-                <span class="field-label">
-                    <span data-copy="reminderModeLabel">
-                        Reminder preference
-                    </span>
-
-                    <span
-                        class="required-mark"
-                        aria-hidden="true"
-                    >
-                        *
-                    </span>
-                </span>
-
-                <div
-                    class="choice-row reminder-mode-row"
-                    role="radiogroup"
-                    aria-label="Reminder timing"
-                >
-                    <label class="choice-card">
-                        <input
-                            name="reminderMode"
-                            type="radio"
-                            value="24-hours"
-                            checked
-                            required
-                        >
-
-                        <span data-copy="reminder24">
-                            24 hours before
-                        </span>
-                    </label>
-
-                    <label class="choice-card">
-                        <input
-                            name="reminderMode"
-                            type="radio"
-                            value="1-hour"
-                        >
-
-                        <span data-copy="reminder1">
-                            1 hour before
-                        </span>
-                    </label>
-
-                    <label class="choice-card">
-                        <input
-                            name="reminderMode"
-                            type="radio"
-                            value="both"
-                        >
-
-                        <span data-copy="reminderBoth">
-                            Both
-                        </span>
-                    </label>
+                            <span>
+                                Opt out
+                            </span>
+                        </label>
+                    </div>
                 </div>
 
-                <div class="reminder-note">
-                    <strong data-copy="reminderNoteTitle">
-                        Scheduling note
+                <div
+                    id="notificationOptOutWarning"
+                    class="inline-warning"
+                    role="alert"
+                    hidden
+                >
+                    <strong>
+                        Notifications are disabled
                     </strong>
 
-                    <span data-copy="reminderNoteBody">
-                        Automatic reminders normally run the day before a scheduled match. For Monday matches, the reminder may run earlier to account for weekend scheduling.
+                    <span>
+                        You remain responsible for every match you join. Missing too many scheduled matches may result in removal from matches or loss of eligibility to join Rocket League seasons.
                     </span>
+                </div>
+
+                <!-- =========================================
+                NOTIFICATION METHOD
+                ========================================== -->
+
+                <div
+                    id="notificationDeliveryOptions"
+                    class="notification-delivery-options"
+                >
+                    <span class="field-label">
+                        Notification method
+
+                        <span
+                            class="required-mark"
+                            aria-hidden="true"
+                        >
+                            *
+                        </span>
+                    </span>
+
+                    <p class="section-description">
+                        Choose how you want to receive Rocket League match notifications.
+                    </p>
+
+                    <div
+                        class="choice-row notification-method-row"
+                        role="radiogroup"
+                        aria-label="Notification method"
+                    >
+                        <label
+                            class="choice-card"
+                            data-notification-method="email"
+                        >
+                            <input
+                                id="notificationMethodEmail"
+                                name="notificationMethod"
+                                type="radio"
+                                value="email"
+                                required
+                            >
+
+                            <span>
+                                Email
+                            </span>
+                        </label>
+
+                        <label
+                            class="choice-card"
+                            data-notification-method="phone"
+                        >
+                            <input
+                                id="notificationMethodPhone"
+                                name="notificationMethod"
+                                type="radio"
+                                value="phone"
+                            >
+
+                            <span>
+                                Phone
+                            </span>
+                        </label>
+
+                        <label
+                            id="discordNotificationChoice"
+                            class="choice-card"
+                            data-notification-method="discord"
+                            data-discord-eligible="false"
+                        >
+                            <input
+                                id="discordNotificationMethod"
+                                name="notificationMethod"
+                                type="radio"
+                                value="discord"
+                                aria-describedby="discordNotificationStatus"
+                                disabled
+                            >
+
+                            <span>
+                                Discord
+                            </span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- =========================================
+                DISCORD STATUS
+                ========================================== -->
+
+                <div
+                    id="discordNotificationStatus"
+                    class="discord-notification-status"
+                    role="status"
+                    aria-live="polite"
+                >
+                    <strong>
+                        Discord notifications
+                    </strong>
+
+                    <span
+                        id="discordNotificationStatusText"
+                    >
+                        Checking Discord notification availability...
+                    </span>
+                </div>
+
+                <div
+                    id="discordAccountRequired"
+                    class="inline-warning discord-account-warning"
+                    role="alert"
+                    hidden
+                >
+                    <strong>
+                        Discord account required
+                    </strong>
+
+                    <span>
+                        Link your Discord account to your BPD Gaming Network account before using Discord match notifications.
+                    </span>
+                </div>
+
+                <div
+                    id="discordMatchBotRequired"
+                    class="inline-warning discord-matchbot-warning"
+                    role="alert"
+                    hidden
+                >
+                    <strong>
+                        BPD MatchBot is required
+                    </strong>
+
+                    <span>
+                        Your linked Discord account must share at least one Discord server with BPD MatchBot before Discord notifications can be selected.
+                    </span>
+
+                    <div class="inline-warning-actions">
+                        <button
+                            id="installDiscordMatchBotButton"
+                            class="secondary-button"
+                            type="button"
+                            hidden
+                        >
+                            Add MatchBot to Discord
+                        </button>
+
+                        <button
+                            id="recheckDiscordMatchBotButton"
+                            class="secondary-button"
+                            type="button"
+                        >
+                            Check Again
+                        </button>
+                    </div>
+                </div>
+
+                <div
+                    id="discordNotificationReady"
+                    class="registration-success"
+                    role="status"
+                    hidden
+                >
+                    <strong>
+                        Discord notifications available
+                    </strong>
+
+                    <span>
+                        Your linked Discord account shares a server with BPD MatchBot. Discord may be selected as your notification method.
+                    </span>
+                </div>
+
+                <!-- =========================================
+                REMINDER TIMING
+                ========================================== -->
+
+                <div
+                    id="reminderOptions"
+                    class="reminder-options"
+                >
+                    <span class="field-label">
+                        Reminder preference
+
+                        <span
+                            class="required-mark"
+                            aria-hidden="true"
+                        >
+                            *
+                        </span>
+                    </span>
+
+                    <div
+                        class="choice-row reminder-mode-row"
+                        role="radiogroup"
+                        aria-label="Reminder timing"
+                    >
+                        <label class="choice-card">
+                            <input
+                                name="reminderMode"
+                                type="radio"
+                                value="24-hours"
+                                checked
+                                required
+                            >
+
+                            <span>
+                                24 hours before
+                            </span>
+                        </label>
+
+                        <label class="choice-card">
+                            <input
+                                name="reminderMode"
+                                type="radio"
+                                value="1-hour"
+                            >
+
+                            <span>
+                                1 hour before
+                            </span>
+                        </label>
+
+                        <label class="choice-card">
+                            <input
+                                name="reminderMode"
+                                type="radio"
+                                value="both"
+                            >
+
+                            <span>
+                                Both
+                            </span>
+                        </label>
+                    </div>
+
+                    <div class="reminder-note">
+                        <strong>
+                            Scheduling note
+                        </strong>
+
+                        <span>
+                            Automatic reminders normally run the day before a scheduled match. For Monday matches, the reminder may run earlier to account for weekend scheduling.
+                        </span>
+                    </div>
                 </div>
             </div>
         </fieldset>
 
+        <!-- =================================================
+        DETAILED PROFILE
+        ================================================= -->
+
         <aside class="post-registration-note">
-            <strong data-copy="moreSettingsTitle">
-                More settings are available after registration.
+            <strong>
+                Additional Player Profile settings are available after registration.
             </strong>
 
-            <span data-copy="moreSettingsBody">
-                Once your profile is created, open your Player Profile to configure additional matchmaking, privacy, contact, notification, reminder, and profile options.
+            <span>
+                After setup, your detailed Player Profile can be used to manage matchmaking preferences, privacy, contact information, notification settings, region preferences, and competitive statistics.
             </span>
         </aside>
+
+        <!-- =================================================
+        SUBMIT
+        ================================================= -->
 
         <div class="form-actions">
             <button
                 id="registrationSubmit"
                 class="primary-button"
                 type="submit"
-                data-copy="submitButton"
             >
                 Complete Registration
             </button>
 
-            <p data-copy="requiredFooter">
+            <p>
                 * Required information must be completed before registration can finish.
             </p>
         </div>
     </form>
+
+    <!-- =====================================================
+    NOTIFICATION OPT-OUT MODAL
+    ====================================================== -->
 
     <div
         id="notificationOptOutModal"
@@ -804,13 +928,12 @@ Description:
         <div class="registration-modal-card">
             <strong
                 id="notificationOptOutModalTitle"
-                data-copy="notificationModalTitle"
             >
                 Turn off match notifications?
             </strong>
 
-            <p data-copy="notificationModalBody">
-                WARNING: If you opt out, you remain responsible for joined matches. Missing too many scheduled matches may result in removal from joined matches.
+            <p>
+                If you opt out, you remain responsible for joined matches. Missing too many scheduled matches may result in removal from matches or loss of eligibility to join Rocket League seasons.
             </p>
 
             <div class="registration-modal-actions">
@@ -818,7 +941,6 @@ Description:
                     id="keepNotificationsButton"
                     class="secondary-button"
                     type="button"
-                    data-copy="keepNotificationsButton"
                 >
                     Keep notifications on
                 </button>
@@ -827,7 +949,6 @@ Description:
                     id="confirmNotificationsOffButton"
                     class="danger-button"
                     type="button"
-                    data-copy="confirmNotificationsOffButton"
                 >
                     Turn notifications off
                 </button>

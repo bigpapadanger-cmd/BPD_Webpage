@@ -2,6 +2,15 @@
 =========================================================
 BPD GAMING NETWORK
 ROCKET LEAGUE HOME
+
+File:
+    /Tabs/RocketLeague/Index/CSS/index.css
+
+Purpose:
+    Styles the public Rocket League landing page,
+    Epic-access CTA, player rank header, network
+    statistics, informational content, and public
+    Rocket League navigation.
 =========================================================
 */
 
@@ -9,7 +18,7 @@ ROCKET LEAGUE HOME
     --rl-background: #070812;
     --rl-panel: rgba(13, 15, 27, 0.9);
     --rl-card: rgba(18, 20, 34, 0.88);
-    --rl-card-hover: rgba(25, 27, 45, 0.94);
+    --rl-card-hover: rgba(25, 27, 45, 0.96);
     --rl-border: rgba(255, 255, 255, 0.09);
     --rl-border-bright: rgba(124, 92, 255, 0.48);
     --rl-text: #f5f7ff;
@@ -19,7 +28,6 @@ ROCKET LEAGUE HOME
     --rl-accent-secondary: #58b6ff;
     --rl-accent-soft: rgba(124, 92, 255, 0.14);
     --rl-accent-glow: rgba(124, 92, 255, 0.32);
-
     position: relative;
     display: flex;
     align-items: stretch;
@@ -70,9 +78,7 @@ BACKGROUND
     position: absolute;
     width: 55vw;
     height: 55vw;
-    border:
-        1px solid
-        rgba(124, 92, 255, 0.12);
+    border: 1px solid rgba(124, 92, 255, 0.12);
     border-radius: 45%;
     content: "";
     filter: blur(2px);
@@ -113,10 +119,8 @@ PAGE PANEL
             rgba(9, 11, 21, 0.88)
         );
     box-shadow:
-        0 22px 60px
-        rgba(0, 0, 0, 0.42),
-        0 0 28px
-        rgba(124, 92, 255, 0.08);
+        0 22px 60px rgba(0, 0, 0, 0.42),
+        0 0 28px rgba(124, 92, 255, 0.08);
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
 }
@@ -138,16 +142,16 @@ HERO
     display: flex;
     align-items: center;
     justify-content: center;
-    min-height: 280px;
-    padding: 48px 28px;
+    min-height: 390px;
+    padding: 58px 28px 48px;
     overflow: hidden;
     border-bottom: 1px solid var(--rl-border);
     text-align: center;
     background:
         linear-gradient(
             135deg,
-            rgba(124, 92, 255, 0.14),
-            rgba(88, 182, 255, 0.06),
+            rgba(124, 92, 255, 0.16),
+            rgba(88, 182, 255, 0.07),
             transparent
         );
 }
@@ -166,15 +170,13 @@ HERO
     pointer-events: none;
 }
 
-.rocket-league-page
-.hero-content {
+.rocket-league-page .hero-content {
     position: relative;
     z-index: 1;
     width: min(100%, 1000px);
 }
 
-.rocket-league-page
-.hero-eyebrow {
+.rocket-league-page .hero-eyebrow {
     margin: 0;
     color: var(--rl-accent-light);
     font-size: 0.72rem;
@@ -184,309 +186,71 @@ HERO
 
 .rocket-league-hero h1 {
     margin: 10px 0 0;
-    font-size:
-        clamp(
-            2.5rem,
-            7vw,
-            5.4rem
-        );
+    font-size: clamp(2.7rem, 7vw, 5.4rem);
     line-height: 0.95;
     letter-spacing: -0.055em;
-    text-shadow:
-        0 0 28px
-        rgba(124, 92, 255, 0.22);
+    text-shadow: 0 0 28px rgba(124, 92, 255, 0.22);
 }
 
-.rocket-league-page
-.hero-subtitle {
+.rocket-league-page .hero-subtitle {
     margin: 18px 0 0;
-    color: var(--rl-text-muted);
-    font-size:
-        clamp(
-            0.95rem,
-            2vw,
-            1.15rem
-        );
-    font-weight: 600;
-    letter-spacing: 0.08em;
-}
-
-/*
-=========================================================
-PLAYER PROFILE
-=========================================================
-*/
-
-.rocket-league-page
-.hero-player-profile {
-    width: min(100%, 820px);
-    margin: 28px auto 0;
-}
-
-.rocket-league-page
-.hero-player-identity {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 5px;
-}
-
-.rocket-league-page
-.hero-player-kicker {
-    color: var(--rl-text-muted);
-    font-size: 0.66rem;
+    color: #dce1ee;
+    font-size: clamp(1rem, 2vw, 1.2rem);
     font-weight: 800;
-    letter-spacing: 0.18em;
+    letter-spacing: 0.09em;
 }
 
-.rocket-league-page
-#rocketLeaguePlayerName {
-    color: #ffffff;
-    font-size:
-        clamp(
-            1.2rem,
-            3vw,
-            1.8rem
-        );
-}
-
-.rocket-league-page
-.rank-row {
-    display: grid;
-    grid-template-columns:
-        repeat(
-            3,
-            minmax(0, 1fr)
-        );
-    gap: 10px;
-    margin-top: 18px;
-}
-
-.rocket-league-page
-.rank-badge {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-    padding: 14px;
-    border:
-        1px solid
-        var(--rank-color, var(--rl-border));
-    border-radius: 12px;
-    background:
-        rgba(8, 10, 20, 0.62);
-    box-shadow:
-        inset 0 0 20px
-        color-mix(
-            in srgb,
-            var(--rank-color, #7c5cff) 9%,
-            transparent
-        );
-}
-
-.rocket-league-page
-.rank-playlist {
+.rocket-league-page .hero-description {
+    max-width: 720px;
+    margin: 16px auto 0;
     color: var(--rl-text-muted);
-    font-size: 0.66rem;
-    font-weight: 800;
-    letter-spacing: 0.12em;
-}
-
-.rocket-league-page
-.rank-name {
-    color:
-        var(
-            --rank-color,
-            var(--rl-text)
-        );
-    font-size: 0.9rem;
-}
-
-.rocket-league-page
-.rank-mmr {
-    color: var(--rl-text-muted);
-    font-size: 0.75rem;
-}
-
-.rocket-league-page
-.rank-status {
-    margin: 12px 0 0;
-    color: var(--rl-text-muted);
-    font-size: 0.76rem;
-}
-
-.rocket-league-page
-.rank-status[data-state="error"] {
-    color: #ff9ba8;
-}
-
-.rocket-league-page
-.rank-loading,
-.rocket-league-page
-.rank-unranked {
-    --rank-color: #7f8799;
-}
-
-.rocket-league-page
-.rank-bronze {
-    --rank-color: #c58b9b;
-}
-
-.rocket-league-page
-.rank-silver {
-    --rank-color: #c4cad8;
-}
-
-.rocket-league-page
-.rank-gold {
-    --rank-color: #f1d784;
-}
-
-.rocket-league-page
-.rank-platinum {
-    --rank-color: #75d9e8;
-}
-
-.rocket-league-page
-.rank-diamond {
-    --rank-color: #58b6ff;
-}
-
-.rocket-league-page
-.rank-champion {
-    --rank-color: #a998ff;
-}
-
-.rocket-league-page
-.rank-grand-champion {
-    --rank-color: #ff8ebd;
-}
-
-.rocket-league-page
-.rank-supersonic {
-    --rank-color: #e8ecff;
-}
-
-/*
-=========================================================
-CONTENT
-=========================================================
-*/
-
-.rocket-league-content {
-    width: min(1200px, calc(100% - 40px));
-    margin-inline: auto;
-    padding: 42px 0 70px;
-}
-
-.rocket-league-page
-.content-card,
-.rocket-league-dashboard {
-    position: relative;
-    padding:
-        clamp(
-            22px,
-            4vw,
-            38px
-        );
-    overflow: hidden;
-    border: 1px solid var(--rl-border);
-    border-radius: 18px;
-    background:
-        linear-gradient(
-            135deg,
-            rgba(20, 22, 37, 0.92),
-            rgba(11, 13, 24, 0.88)
-        );
-    box-shadow:
-        0 20px 60px
-        rgba(0, 0, 0, 0.28);
-}
-
-.rocket-league-page
-.content-card::before,
-.rocket-league-dashboard::before {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: 0;
-    width: 4px;
-    background:
-        linear-gradient(
-            180deg,
-            var(--rl-accent),
-            var(--rl-accent-secondary)
-        );
-    content: "";
-}
-
-.rocket-league-page
-.card-label {
-    color: var(--rl-accent-light);
-    font-size: 0.65rem;
-    font-weight: 800;
-    letter-spacing: 0.2em;
-}
-
-.rocket-league-page
-.content-card h2,
-.rocket-league-dashboard h2 {
-    margin: 10px 0 0;
-    font-size:
-        clamp(
-            1.55rem,
-            4vw,
-            2rem
-        );
-}
-
-.rocket-league-page
-.content-card p,
-.rocket-league-dashboard p {
-    max-width: 760px;
-    margin: 12px 0 0;
-    color: var(--rl-text-muted);
+    font-size: 0.95rem;
     line-height: 1.7;
 }
 
 /*
 =========================================================
-LOGIN
+HERO ACCESS CTA
 =========================================================
 */
 
-.rocket-league-page
-.auth-login-card {
-    margin-top: 20px;
-}
-
-.rocket-league-page
-.guest-action-row {
+.rocket-league-page .hero-action-row {
     display: flex;
-    flex-wrap: wrap;
+    flex-direction: column;
     align-items: center;
     gap: 12px;
-    margin-top: 22px;
+    margin-top: 28px;
 }
 
-.rocket-league-page
-.auth-login-button {
+.rocket-league-page .hero-access-note {
+    max-width: 620px;
+    color: var(--rl-text-muted);
+    font-size: 0.76rem;
+    line-height: 1.5;
+}
+
+/*
+=========================================================
+EPIC ACCESS BUTTON
+=========================================================
+*/
+
+.rocket-league-page .auth-login-button {
     position: relative;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 10px;
-    min-height: 48px;
-    padding: 0 24px;
+    min-height: 50px;
+    padding: 0 26px;
     overflow: hidden;
-    border:
-        1px solid
-        var(--rl-border-bright);
+    border: 1px solid var(--rl-border-bright);
     border-radius: 11px;
     background:
         linear-gradient(
             135deg,
-            rgba(124, 92, 255, 0.2),
-            rgba(88, 182, 255, 0.12)
+            rgba(124, 92, 255, 0.22),
+            rgba(88, 182, 255, 0.14)
         );
     color: var(--rl-accent-light);
     font: inherit;
@@ -496,25 +260,18 @@ LOGIN
     appearance: none;
     cursor: pointer;
     box-shadow:
-        0 8px 24px
-        rgba(0, 0, 0, 0.24),
-        0 0 16px
-        rgba(124, 92, 255, 0.14);
+        0 8px 24px rgba(0, 0, 0, 0.24),
+        0 0 16px rgba(124, 92, 255, 0.14);
     transition:
         color 0.2s ease,
         transform 0.2s ease,
         border-color 0.2s ease,
         background 0.2s ease,
         box-shadow 0.2s ease;
-    animation:
-        pageLoginPulse
-        2.4s
-        ease-in-out
-        infinite;
+    animation: pageLoginPulse 2.4s ease-in-out infinite;
 }
 
-.rocket-league-page
-.auth-login-button::before {
+.rocket-league-page .auth-login-button::before {
     position: absolute;
     top: -50%;
     bottom: -50%;
@@ -529,68 +286,512 @@ LOGIN
         );
     content: "";
     pointer-events: none;
-    transform:
-        rotate(18deg)
-        translateX(-200%);
-    transition:
-        transform 0.55s ease;
+    transform: rotate(18deg) translateX(-200%);
+    transition: transform 0.55s ease;
 }
 
-.rocket-league-page
-.auth-login-button:hover::before,
-.rocket-league-page
-.auth-login-button:focus-visible::before {
-    transform:
-        rotate(18deg)
-        translateX(650%);
+.rocket-league-page .auth-login-button:hover::before,
+.rocket-league-page .auth-login-button:focus-visible::before {
+    transform: rotate(18deg) translateX(650%);
 }
 
-.rocket-league-page
-.auth-login-button:hover,
-.rocket-league-page
-.auth-login-button:focus-visible {
-    border-color:
-        var(--rl-accent-light);
+.rocket-league-page .auth-login-button:hover,
+.rocket-league-page .auth-login-button:focus-visible {
+    border-color: var(--rl-accent-light);
     background:
         linear-gradient(
             135deg,
-            rgba(124, 92, 255, 0.32),
-            rgba(88, 182, 255, 0.2)
+            rgba(124, 92, 255, 0.34),
+            rgba(88, 182, 255, 0.22)
         );
     color: #ffffff;
     box-shadow:
-        0 12px 30px
-        rgba(0, 0, 0, 0.3),
-        0 0 24px
-        var(--rl-accent-glow);
+        0 12px 30px rgba(0, 0, 0, 0.3),
+        0 0 24px var(--rl-accent-glow);
     outline: none;
-    transform:
-        translateY(-2px)
-        scale(1.02);
+    transform: translateY(-2px) scale(1.02);
     animation-play-state: paused;
 }
 
-.rocket-league-page
-.auth-login-button:focus-visible {
-    outline:
-        2px solid
-        var(--rl-accent-light);
+.rocket-league-page .auth-login-button:focus-visible {
+    outline: 2px solid var(--rl-accent-light);
     outline-offset: 3px;
 }
 
-.rocket-league-page
-.auth-login-button:active {
-    transform:
-        translateY(0)
-        scale(0.98);
+.rocket-league-page .auth-login-button:active {
+    transform: translateY(0) scale(0.98);
 }
 
-.rocket-league-page
-.auth-login-button-icon {
+.rocket-league-page .auth-login-button-icon {
     font-size: 1.1rem;
-    text-shadow:
-        0 0 10px
-        var(--rl-accent-glow);
+    text-shadow: 0 0 10px var(--rl-accent-glow);
+}
+
+/*
+=========================================================
+PLAYER PROFILE
+=========================================================
+*/
+
+.rocket-league-page .hero-player-profile {
+    width: min(100%, 820px);
+    margin: 30px auto 0;
+    padding: 20px;
+    border: 1px solid var(--rl-border);
+    border-radius: 16px;
+    background: rgba(7, 8, 18, 0.44);
+    box-shadow: inset 0 0 30px rgba(124, 92, 255, 0.05);
+}
+
+.rocket-league-page .hero-player-identity {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+}
+
+.rocket-league-page .hero-player-kicker {
+    color: var(--rl-text-muted);
+    font-size: 0.66rem;
+    font-weight: 800;
+    letter-spacing: 0.18em;
+}
+
+.rocket-league-page #rocketLeaguePlayerName {
+    color: #ffffff;
+    font-size: clamp(1.2rem, 3vw, 1.8rem);
+}
+
+.rocket-league-page .rank-row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 18px;
+}
+
+.rocket-league-page .rank-badge {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding: 14px;
+    border: 1px solid var(--rank-color, var(--rl-border));
+    border-radius: 12px;
+    background: rgba(8, 10, 20, 0.62);
+    box-shadow:
+        inset 0 0 20px
+        color-mix(
+            in srgb,
+            var(--rank-color, #7c5cff) 9%,
+            transparent
+        );
+}
+
+.rocket-league-page .rank-playlist {
+    color: var(--rl-text-muted);
+    font-size: 0.66rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+}
+
+.rocket-league-page .rank-name {
+    color: var(--rank-color, var(--rl-text));
+    font-size: 0.9rem;
+}
+
+.rocket-league-page .rank-mmr {
+    color: var(--rl-text-muted);
+    font-size: 0.75rem;
+}
+
+.rocket-league-page .rank-status {
+    margin: 12px 0 0;
+    color: var(--rl-text-muted);
+    font-size: 0.76rem;
+}
+
+.rocket-league-page .rank-status[data-state="error"] {
+    color: #ff9ba8;
+}
+
+.rocket-league-page .rank-loading,
+.rocket-league-page .rank-unranked {
+    --rank-color: #7f8799;
+}
+
+.rocket-league-page .rank-bronze {
+    --rank-color: #c58b9b;
+}
+
+.rocket-league-page .rank-silver {
+    --rank-color: #c4cad8;
+}
+
+.rocket-league-page .rank-gold {
+    --rank-color: #f1d784;
+}
+
+.rocket-league-page .rank-platinum {
+    --rank-color: #75d9e8;
+}
+
+.rocket-league-page .rank-diamond {
+    --rank-color: #58b6ff;
+}
+
+.rocket-league-page .rank-champion {
+    --rank-color: #a998ff;
+}
+
+.rocket-league-page .rank-grand-champion {
+    --rank-color: #ff8ebd;
+}
+
+.rocket-league-page .rank-supersonic {
+    --rank-color: #e8ecff;
+}
+
+/*
+=========================================================
+PROFILE WARNING
+=========================================================
+*/
+
+.rocket-league-page .profile-warning {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 14px 0;
+    padding: 11px 13px;
+    border: 1px solid rgba(245, 158, 11, 0.34);
+    border-radius: 10px;
+    background: rgba(245, 158, 11, 0.08);
+    color: #fde68a;
+}
+
+.rocket-league-page .profile-warning strong {
+    color: #fbbf24;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+.rocket-league-page .profile-warning span {
+    color: #cbd5e1;
+    font-size: 13px;
+    line-height: 1.45;
+}
+
+/*
+=========================================================
+TOP STAT STRIP
+=========================================================
+*/
+
+.rocket-league-stat-strip {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    border-bottom: 1px solid var(--rl-border);
+    background: rgba(7, 8, 18, 0.5);
+}
+
+.stat-strip-item {
+    position: relative;
+    display: flex;
+    min-height: 104px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 18px;
+    text-align: center;
+}
+
+.stat-strip-item:not(:last-child) {
+    border-right: 1px solid var(--rl-border);
+}
+
+.stat-strip-label {
+    color: var(--rl-text-muted);
+    font-size: 0.66rem;
+    font-weight: 800;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+}
+
+.stat-strip-value {
+    color: #ffffff;
+    font-size: clamp(1.5rem, 3vw, 2.15rem);
+    line-height: 1;
+    text-shadow: 0 0 18px rgba(124, 92, 255, 0.2);
+}
+
+/*
+=========================================================
+CONTENT
+=========================================================
+*/
+
+.rocket-league-content {
+    display: flex;
+    width: min(1200px, calc(100% - 40px));
+    margin-inline: auto;
+    padding: 42px 0 70px;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.rocket-league-page .content-card {
+    position: relative;
+    padding: clamp(22px, 4vw, 38px);
+    overflow: hidden;
+    border: 1px solid var(--rl-border);
+    border-radius: 18px;
+    background:
+        linear-gradient(
+            135deg,
+            rgba(20, 22, 37, 0.92),
+            rgba(11, 13, 24, 0.88)
+        );
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.28);
+}
+
+.rocket-league-page .content-card::before {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 4px;
+    background:
+        linear-gradient(
+            180deg,
+            var(--rl-accent),
+            var(--rl-accent-secondary)
+        );
+    content: "";
+}
+
+.rocket-league-page .card-label {
+    color: var(--rl-accent-light);
+    font-size: 0.65rem;
+    font-weight: 800;
+    letter-spacing: 0.2em;
+}
+
+.rocket-league-page .content-card h2 {
+    margin: 10px 0 0;
+    font-size: clamp(1.55rem, 4vw, 2rem);
+}
+
+.rocket-league-page .content-card > p {
+    max-width: 840px;
+    margin: 12px 0 0;
+    color: var(--rl-text-muted);
+    line-height: 1.7;
+}
+
+/*
+=========================================================
+GOALS
+=========================================================
+*/
+
+.rocket-league-goals-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+    margin-top: 26px;
+}
+
+.goal-item {
+    padding: 20px;
+    border: 1px solid var(--rl-border);
+    border-radius: 13px;
+    background: rgba(7, 8, 18, 0.38);
+    transition:
+        transform 0.2s ease,
+        border-color 0.2s ease,
+        background 0.2s ease;
+}
+
+.goal-item:hover {
+    border-color: rgba(124, 92, 255, 0.28);
+    background: rgba(124, 92, 255, 0.06);
+    transform: translateY(-2px);
+}
+
+.goal-item h3 {
+    margin: 0;
+    color: #ffffff;
+    font-size: 1rem;
+}
+
+.goal-item p {
+    margin: 9px 0 0;
+    color: var(--rl-text-muted);
+    font-size: 0.84rem;
+    line-height: 1.6;
+}
+
+/*
+=========================================================
+PUBLIC FEATURE LINKS
+=========================================================
+*/
+
+.rocket-league-link-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+    margin-top: 26px;
+}
+
+.rocket-league-feature-link {
+    position: relative;
+    display: flex;
+    min-width: 0;
+    min-height: 170px;
+    flex-direction: column;
+    gap: 8px;
+    padding: 22px;
+    overflow: hidden;
+    border: 1px solid var(--rl-border);
+    border-radius: 14px;
+    background: rgba(7, 8, 18, 0.42);
+    color: inherit;
+    text-decoration: none;
+    transition:
+        transform 0.2s ease,
+        border-color 0.2s ease,
+        background 0.2s ease,
+        box-shadow 0.2s ease;
+}
+
+.rocket-league-feature-link::after {
+    position: absolute;
+    right: 18px;
+    bottom: 15px;
+    color: rgba(169, 152, 255, 0.55);
+    font-size: 1.3rem;
+    content: "›";
+    transition: transform 0.2s ease;
+}
+
+.rocket-league-feature-link:hover,
+.rocket-league-feature-link:focus-visible {
+    border-color: var(--rl-border-bright);
+    background:
+        linear-gradient(
+            135deg,
+            rgba(124, 92, 255, 0.12),
+            rgba(88, 182, 255, 0.05)
+        );
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.22);
+    outline: none;
+    transform: translateY(-3px);
+}
+
+.rocket-league-feature-link:hover::after,
+.rocket-league-feature-link:focus-visible::after {
+    transform: translateX(3px);
+}
+
+.feature-link-label {
+    color: var(--rl-accent-light);
+    font-size: 0.64rem;
+    font-weight: 800;
+    letter-spacing: 0.15em;
+}
+
+.rocket-league-feature-link strong {
+    color: #ffffff;
+    font-size: 1.05rem;
+}
+
+.rocket-league-feature-link > span:last-child {
+    padding-right: 14px;
+    color: var(--rl-text-muted);
+    font-size: 0.82rem;
+    line-height: 1.55;
+}
+
+/*
+=========================================================
+NETWORK STATISTICS
+=========================================================
+*/
+
+.rocket-league-statistics-card {
+    overflow: visible;
+}
+
+.rocket-league-stat-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+    margin-top: 26px;
+}
+
+.network-stat {
+    position: relative;
+    display: flex;
+    min-height: 135px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    padding: 20px;
+    overflow: hidden;
+    border: 1px solid var(--rl-border);
+    border-radius: 14px;
+    background:
+        linear-gradient(
+            145deg,
+            rgba(10, 12, 23, 0.74),
+            rgba(17, 19, 34, 0.74)
+        );
+    text-align: center;
+    transition:
+        transform 0.2s ease,
+        border-color 0.2s ease,
+        box-shadow 0.2s ease;
+}
+
+.network-stat::before {
+    position: absolute;
+    inset: auto 15% 0;
+    height: 1px;
+    background:
+        linear-gradient(
+            90deg,
+            transparent,
+            var(--rl-accent),
+            transparent
+        );
+    content: "";
+    opacity: 0.6;
+}
+
+.network-stat:hover {
+    border-color: rgba(124, 92, 255, 0.3);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.2);
+    transform: translateY(-2px);
+}
+
+.network-stat-label {
+    color: var(--rl-text-muted);
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.09em;
+    line-height: 1.4;
+    text-transform: uppercase;
+}
+
+.network-stat-value {
+    color: #ffffff;
+    font-size: clamp(1.8rem, 4vw, 2.7rem);
+    line-height: 1;
+    text-shadow: 0 0 22px rgba(124, 92, 255, 0.2);
 }
 
 /*
@@ -599,183 +800,13 @@ ADVERTISEMENT SLOTS
 =========================================================
 */
 
-.rocket-league-page
-.ad-slot {
+.rocket-league-page .ad-slot {
     width: 100%;
     min-height: 0;
 }
 
-.rocket-league-page
-.ad-slot:not(:empty) {
-    margin-top: 20px;
-}
-
-/*
-=========================================================
-DASHBOARD
-=========================================================
-*/
-
-.rocket-league-dashboard {
-    margin-top: 20px;
-}
-
-.dashboard-heading {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 24px;
-}
-
-.dashboard-history-link,
-.dashboard-primary-link {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 40px;
-    padding: 0 16px;
-    border:
-        1px solid
-        var(--rl-border-bright);
-    border-radius: 9px;
-    background: var(--rl-accent-soft);
-    color: var(--rl-accent-light);
-    font-size: 0.8rem;
-    font-weight: 700;
-    text-decoration: none;
-    white-space: nowrap;
-    transition:
-        color 0.2s ease,
-        transform 0.2s ease,
-        border-color 0.2s ease,
-        background 0.2s ease,
-        box-shadow 0.2s ease;
-}
-
-.dashboard-history-link:hover,
-.dashboard-history-link:focus-visible,
-.dashboard-primary-link:hover,
-.dashboard-primary-link:focus-visible {
-    color: #ffffff;
-    border-color: var(--rl-accent-light);
-    background:
-        rgba(124, 92, 255, 0.24);
-    box-shadow:
-        0 0 18px
-        var(--rl-accent-glow);
-    outline: none;
-    transform: translateY(-1px);
-}
-
-/*
-=========================================================
-MATCH TABLE
-=========================================================
-*/
-
-.matches-table-wrapper {
-    width: 100%;
-    margin-top: 26px;
-    overflow-x: auto;
-    border: 1px solid var(--rl-border);
-    border-radius: 13px;
-    background:
-        rgba(7, 8, 18, 0.48);
-}
-
-.matches-table {
-    width: 100%;
-    min-width: 900px;
-    border-collapse: collapse;
-}
-
-.matches-table th,
-.matches-table td {
-    padding: 14px 16px;
-    border-bottom:
-        1px solid
-        rgba(255, 255, 255, 0.07);
-    text-align: left;
-    vertical-align: middle;
-}
-
-.matches-table th {
-    background:
-        rgba(124, 92, 255, 0.09);
-    color: #c8cee0;
-    font-size: 0.68rem;
-    font-weight: 800;
-    letter-spacing: 0.09em;
-    text-transform: uppercase;
-}
-
-.matches-table td {
-    color: #dce1ee;
-    font-size: 0.82rem;
-}
-
-.matches-table tbody tr:last-child td {
-    border-bottom: 0;
-}
-
-.matches-table tbody tr {
-    transition:
-        background 0.2s ease;
-}
-
-.matches-table tbody tr:hover {
-    background:
-        rgba(124, 92, 255, 0.07);
-}
-
-/*
-=========================================================
-EMPTY DASHBOARD
-=========================================================
-*/
-
-.dashboard-empty-state {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    min-height: 230px;
-    padding: 32px 20px;
-    text-align: center;
-}
-
-.dashboard-empty-state[hidden] {
-    display: none;
-}
-
-.empty-state-icon {
-    display: grid;
-    place-items: center;
-    width: 52px;
-    height: 52px;
-    border:
-        1px solid
-        var(--rl-border-bright);
-    border-radius: 50%;
-    background: var(--rl-accent-soft);
-    color: var(--rl-accent-light);
-    font-size: 1.4rem;
-    box-shadow:
-        0 0 18px
-        rgba(124, 92, 255, 0.18);
-}
-
-.dashboard-empty-state h3 {
-    margin: 16px 0 0;
-    font-size: 1.2rem;
-}
-
-.dashboard-empty-state p {
-    margin-top: 8px;
-}
-
-.dashboard-primary-link {
-    margin-top: 18px;
+.rocket-league-page .ad-slot:not(:empty) {
+    margin-block: 4px;
 }
 
 /*
@@ -784,8 +815,7 @@ VISIBILITY
 =========================================================
 */
 
-.rocket-league-page
-[hidden] {
+.rocket-league-page [hidden] {
     display: none !important;
 }
 
@@ -799,18 +829,14 @@ ANIMATIONS
     0%,
     100% {
         box-shadow:
-            0 8px 24px
-            rgba(0, 0, 0, 0.24),
-            0 0 10px
-            rgba(124, 92, 255, 0.14);
+            0 8px 24px rgba(0, 0, 0, 0.24),
+            0 0 10px rgba(124, 92, 255, 0.14);
     }
 
     50% {
         box-shadow:
-            0 10px 28px
-            rgba(0, 0, 0, 0.28),
-            0 0 22px
-            rgba(124, 92, 255, 0.4);
+            0 10px 28px rgba(0, 0, 0, 0.28),
+            0 0 22px rgba(124, 92, 255, 0.4);
     }
 }
 
@@ -820,14 +846,39 @@ RESPONSIVE
 =========================================================
 */
 
-@media (max-width: 900px) {
-    .rocket-league-page
-    .rank-row {
+@media (max-width: 1000px) {
+    .rocket-league-link-grid {
         grid-template-columns: 1fr;
     }
 
-    .dashboard-heading {
-        flex-direction: column;
+    .rocket-league-feature-link {
+        min-height: 140px;
+    }
+
+    .rocket-league-stat-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 900px) {
+    .rocket-league-page .rank-row {
+        grid-template-columns: 1fr;
+    }
+
+    .rocket-league-stat-strip {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .stat-strip-item:nth-child(2) {
+        border-right: 0;
+    }
+
+    .stat-strip-item:nth-child(-n + 2) {
+        border-bottom: 1px solid var(--rl-border);
+    }
+
+    .rocket-league-goals-grid {
+        grid-template-columns: 1fr;
     }
 }
 
@@ -842,33 +893,65 @@ RESPONSIVE
     }
 
     .rocket-league-hero {
-        min-height: 230px;
-        padding: 36px 18px;
+        min-height: 300px;
+        padding: 38px 18px 34px;
     }
 
-    .rocket-league-content {
-        width:
-            calc(
-                100%
-                - 24px
-            );
-        padding: 24px 0 42px;
+    .rocket-league-page .hero-description {
+        font-size: 0.86rem;
     }
 
-    .rocket-league-page
-    .content-card,
-    .rocket-league-dashboard {
-        border-radius: 14px;
-    }
-
-    .rocket-league-page
-    .auth-login-button {
+    .rocket-league-page .auth-login-button {
         width: 100%;
+        max-width: 420px;
         padding: 0 16px;
     }
 
-    .dashboard-history-link {
-        width: 100%;
+    .rocket-league-page .hero-player-profile {
+        padding: 16px;
+    }
+
+    .rocket-league-content {
+        width: calc(100% - 24px);
+        padding: 26px 0 44px;
+    }
+
+    .rocket-league-page .content-card {
+        border-radius: 14px;
+    }
+
+    .rocket-league-stat-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 520px) {
+    .rocket-league-stat-strip {
+        grid-template-columns: 1fr;
+    }
+
+    .stat-strip-item {
+        min-height: 82px;
+        border-right: 0 !important;
+        border-bottom: 1px solid var(--rl-border);
+    }
+
+    .stat-strip-item:last-child {
+        border-bottom: 0;
+    }
+
+    .rocket-league-page .content-card {
+        padding: 22px 18px;
+    }
+
+    .goal-item,
+    .rocket-league-feature-link,
+    .network-stat {
+        padding: 18px;
+    }
+
+    .rocket-league-page .profile-warning span {
+        font-size: 12px;
     }
 }
 
@@ -879,13 +962,11 @@ REDUCED MOTION
 */
 
 @media (prefers-reduced-motion: reduce) {
-    .rocket-league-page
-    .auth-login-button {
+    .rocket-league-page .auth-login-button {
         animation: none;
     }
 
-    .rocket-league-page
-    .auth-login-button::before {
+    .rocket-league-page .auth-login-button::before {
         display: none;
     }
 
@@ -901,71 +982,4 @@ body[data-animations="off"]
 .rocket-league-page
 .auth-login-button {
     animation: none;
-}
-.profile-warning {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-
-    margin: 12px 0 14px;
-    padding: 11px 13px;
-
-    border:
-        1px solid
-        rgba(
-            245,
-            158,
-            11,
-            0.34
-        );
-
-    border-radius: 10px;
-
-    background:
-        rgba(
-            245,
-            158,
-            11,
-            0.08
-        );
-
-    color: #fde68a;
-}
-
-.profile-warning[hidden] {
-    display: none;
-}
-
-.profile-warning strong {
-    color: #fbbf24;
-
-    font-size: 12px;
-    font-weight: 800;
-
-    letter-spacing: 0.5px;
-
-    text-transform: uppercase;
-}
-
-.profile-warning span {
-    color: #cbd5e1;
-
-    font-size: 13px;
-
-    line-height: 1.45;
-}
-@media (
-    max-width: 640px
-) {
-    .profile-warning {
-        margin:
-            10px 0 12px;
-
-        padding:
-            10px 11px;
-    }
-
-    .profile-warning span {
-        font-size: 12px;
-    }
 }

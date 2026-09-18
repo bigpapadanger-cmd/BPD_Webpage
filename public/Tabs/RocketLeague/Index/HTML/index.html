@@ -9,6 +9,7 @@
 
     <div class="rocket-league-panel">
         <div class="rocket-league-page-content">
+
             <!-- Hero -->
             <header class="rocket-league-hero">
                 <div class="hero-content">
@@ -20,7 +21,46 @@
                         Rocket League
                     </h1>
 
-                    <!-- Authenticated player profile -->
+                    <p class="hero-subtitle">
+                        Compete. Connect. Climb.
+                    </p>
+
+                    <p class="hero-description">
+                        Community-driven Rocket League seasons,
+                        scheduled matches, competitive statistics,
+                        leaderboards, events, and player discovery.
+                    </p>
+
+                    <!-- Guest / incomplete access CTA -->
+                    <div
+                        class="hero-action-row"
+                        id="rocketLeagueAccessCallout"
+                    >
+                        <button
+                            class="auth-login-button"
+                            id="mainRLLoginButton"
+                            type="button"
+                            aria-label="Login with Epic Games for full Rocket League access"
+                        >
+                            <span
+                                class="auth-login-button-icon"
+                                aria-hidden="true"
+                            >
+                                ⇥
+                            </span>
+
+                            <span>
+                                Login with Epic for Full Access
+                            </span>
+                        </button>
+
+                        <span class="hero-access-note">
+                            Leaderboards, match results, and player
+                            discovery are available without logging in.
+                        </span>
+                    </div>
+
+                    <!-- Connected player -->
                     <section
                         class="hero-player-profile"
                         id="rocketLeaguePlayerProfile"
@@ -30,7 +70,7 @@
                     >
                         <div class="hero-player-identity">
                             <span class="hero-player-kicker">
-                                EPIC PLAYER
+                                CONNECTED PLAYER
                             </span>
 
                             <strong id="rocketLeaguePlayerName">
@@ -50,7 +90,9 @@
                             </strong>
 
                             <span>
-                                Successfully Signed In with Epic Games... but your player profile could not be loaded. Some profile features may be unavailable!
+                                Your Epic account is connected, but
+                                some Rocket League profile information
+                                could not be loaded.
                             </span>
                         </div>
 
@@ -118,12 +160,66 @@
                             Loading competitive ranks...
                         </p>
                     </section>
-
-                    <p class="hero-subtitle">
-                        Compete. Climb. Dominate.
-                    </p>
                 </div>
             </header>
+
+            <!-- Network stats header -->
+            <section
+                class="rocket-league-stat-strip"
+                aria-label="Rocket League network statistics"
+            >
+                <article class="stat-strip-item">
+                    <span class="stat-strip-label">
+                        Registered Players
+                    </span>
+
+                    <strong
+                        class="stat-strip-value"
+                        id="rocketLeagueRegisteredPlayers"
+                    >
+                        —
+                    </strong>
+                </article>
+
+                <article class="stat-strip-item">
+                    <span class="stat-strip-label">
+                        Active Seasons
+                    </span>
+
+                    <strong
+                        class="stat-strip-value"
+                        id="rocketLeagueActiveSeasons"
+                    >
+                        —
+                    </strong>
+                </article>
+
+                <article class="stat-strip-item">
+                    <span class="stat-strip-label">
+                        Upcoming Events
+                    </span>
+
+                    <strong
+                        class="stat-strip-value"
+                        id="rocketLeagueUpcomingEvents"
+                    >
+                        —
+                    </strong>
+                </article>
+
+                <article class="stat-strip-item">
+                    <span class="stat-strip-label">
+                        Matches Recorded
+                    </span>
+
+                    <strong
+                        class="stat-strip-value"
+                        id="rocketLeagueMatchesRecorded"
+                    >
+                        —
+                    </strong>
+                </article>
+            </section>
 
             <!-- Top advertisement -->
             <div
@@ -132,65 +228,170 @@
             ></div>
 
             <main class="rocket-league-content">
-                <!-- Introduction -->
+
+                <!-- About -->
                 <section
                     class="content-card welcome-card"
                     aria-labelledby="rocketLeagueWelcomeTitle"
                 >
                     <span class="card-label">
-                        ROCKET LEAGUE
+                        BPD ROCKET LEAGUE
                     </span>
 
                     <h2 id="rocketLeagueWelcomeTitle">
-                        Welcome to Rocket League
+                        Competitive Rocket League Built Around Players
                     </h2>
 
                     <p>
-                        Your central hub for scheduled matches,
-                        competitive leagues, player connections,
-                        private matches, and submitted results.
+                        The BPD Gaming Network Rocket League hub brings
+                        organized competition, player statistics,
+                        scheduled matches, community events, and
+                        competitive history into one place.
+                    </p>
+
+                    <p>
+                        Anyone can explore public leaderboards, review
+                        match results, and discover players. Connecting
+                        an Epic Games account unlocks participation in
+                        seasons, weekly matchmaking, private matches,
+                        profile tracking, and scoreboard submission.
                     </p>
                 </section>
 
-                <!-- Guest-only login -->
+                <!-- Goals -->
                 <section
-                    class="content-card auth-login-card"
-                    id="rocketLeagueLoggedOut"
-                    aria-labelledby="rocketLeagueLoginTitle"
+                    class="content-card"
+                    aria-labelledby="rocketLeagueGoalsTitle"
                 >
                     <span class="card-label">
-                        ACCOUNT REQUIRED
+                        OUR GOALS
                     </span>
 
-                    <h2 id="rocketLeagueLoginTitle">
-                        Login to participate
+                    <h2 id="rocketLeagueGoalsTitle">
+                        More Than Just a Match Queue
                     </h2>
 
-                    <p>
-                        Login or register with Epic Games to join
-                        matches, find players, enter private matches,
-                        and submit scoreboard results.
-                    </p>
+                    <div class="rocket-league-goals-grid">
+                        <article class="goal-item">
+                            <h3>
+                                Organized Competition
+                            </h3>
 
-                    <div class="guest-action-row">
-                        <button
-                            class="auth-login-button"
-                            id="mainRLLoginButton"
-                            type="button"
-                            data-api-action="epic-login"
-                            aria-label="Login Here"
+                            <p>
+                                Create structured seasons and recurring
+                                matches without requiring players to
+                                organize everything themselves.
+                            </p>
+                        </article>
+
+                        <article class="goal-item">
+                            <h3>
+                                Meaningful Statistics
+                            </h3>
+
+                            <p>
+                                Build long-term player, match, and season
+                                histories from submitted competitive
+                                results.
+                            </p>
+                        </article>
+
+                        <article class="goal-item">
+                            <h3>
+                                Player Discovery
+                            </h3>
+
+                            <p>
+                                Make it easier to find competitors,
+                                teammates, and active players across the
+                                network.
+                            </p>
+                        </article>
+
+                        <article class="goal-item">
+                            <h3>
+                                Community Events
+                            </h3>
+
+                            <p>
+                                Support leagues, tournaments, private
+                                events, and new competitive formats as
+                                the network grows.
+                            </p>
+                        </article>
+                    </div>
+                </section>
+
+                <!-- Public destinations -->
+                <section
+                    class="content-card"
+                    aria-labelledby="rocketLeagueExploreTitle"
+                >
+                    <span class="card-label">
+                        EXPLORE
+                    </span>
+
+                    <h2 id="rocketLeagueExploreTitle">
+                        Explore Rocket League
+                    </h2>
+
+                    <div class="rocket-league-link-grid">
+                        <a
+                            class="rocket-league-feature-link"
+                            href="/RocketLeague/Leaderboards"
+                            data-router-link
                         >
-                            <span
-                                class="auth-login-button-icon"
-                                aria-hidden="true"
-                            >
-                                ⇥
+                            <span class="feature-link-label">
+                                LEADERBOARDS
                             </span>
+
+                            <strong>
+                                Rankings & Statistics
+                            </strong>
 
                             <span>
-                                Login / Register with Epic Games
+                                Explore player rankings, standings,
+                                performance statistics, and season data.
                             </span>
-                        </button>
+                        </a>
+
+                        <a
+                            class="rocket-league-feature-link"
+                            href="/RocketLeague/Leaderboards/MatchResults"
+                            data-router-link
+                        >
+                            <span class="feature-link-label">
+                                MATCH RESULTS
+                            </span>
+
+                            <strong>
+                                Competitive History
+                            </strong>
+
+                            <span>
+                                Browse completed matches and recorded
+                                game statistics.
+                            </span>
+                        </a>
+
+                        <a
+                            class="rocket-league-feature-link"
+                            href="/RocketLeague/FindPlayers"
+                            data-router-link
+                        >
+                            <span class="feature-link-label">
+                                PLAYERS
+                            </span>
+
+                            <strong>
+                                Find Players
+                            </strong>
+
+                            <span>
+                                Browse Rocket League players participating
+                                across the BPD Gaming Network.
+                            </span>
+                        </a>
                     </div>
                 </section>
 
@@ -200,109 +401,97 @@
                     data-ad-location="rocket-league-middle"
                 ></div>
 
-                <!-- Authenticated dashboard -->
+                <!-- Community statistics -->
                 <section
-                    class="rocket-league-dashboard"
-                    id="rocketLeagueAuthenticatedContent"
-                    aria-labelledby="upcomingMatchesTitle"
-                    hidden
+                    class="content-card rocket-league-statistics-card"
+                    aria-labelledby="rocketLeagueStatisticsTitle"
                 >
-                    <div class="dashboard-heading">
-                        <div>
-                            <span class="card-label">
-                                PLAYER DASHBOARD
+                    <span class="card-label">
+                        NETWORK STATISTICS
+                    </span>
+
+                    <h2 id="rocketLeagueStatisticsTitle">
+                        Rocket League by the Numbers
+                    </h2>
+
+                    <div class="rocket-league-stat-grid">
+                        <article class="network-stat">
+                            <span class="network-stat-label">
+                                Players Registered for Seasons
                             </span>
 
-                            <h2 id="upcomingMatchesTitle">
-                                Upcoming Matches
-                            </h2>
+                            <strong
+                                class="network-stat-value"
+                                id="rocketLeagueSeasonRegistrations"
+                            >
+                                —
+                            </strong>
+                        </article>
 
-                            <p>
-                                Your next scheduled league and
-                                private matches.
-                            </p>
-                        </div>
+                        <article class="network-stat">
+                            <span class="network-stat-label">
+                                Active Seasons
+                            </span>
 
-                        <a
-                            class="dashboard-history-link"
-                            href="/RocketLeague/MyMatches"
-                            data-router-link
-                        >
-                            View My Matches
-                        </a>
-                    </div>
+                            <strong
+                                class="network-stat-value"
+                                id="rocketLeagueSeasonCount"
+                            >
+                                —
+                            </strong>
+                        </article>
 
-                    <div class="matches-table-wrapper">
-                        <table class="matches-table">
-                            <thead>
-                                <tr>
-                                    <th scope="col">
-                                        Match
-                                    </th>
+                        <article class="network-stat">
+                            <span class="network-stat-label">
+                                Upcoming Seasons & Events
+                            </span>
 
-                                    <th scope="col">
-                                        Opponent
-                                    </th>
+                            <strong
+                                class="network-stat-value"
+                                id="rocketLeagueUpcomingCount"
+                            >
+                                —
+                            </strong>
+                        </article>
 
-                                    <th scope="col">
-                                        Time
-                                    </th>
+                        <article class="network-stat">
+                            <span class="network-stat-label">
+                                Matches Played
+                            </span>
 
-                                    <th scope="col">
-                                        Date
-                                    </th>
+                            <strong
+                                class="network-stat-value"
+                                id="rocketLeagueMatchesPlayed"
+                            >
+                                —
+                            </strong>
+                        </article>
 
-                                    <th scope="col">
-                                        League
-                                    </th>
+                        <article class="network-stat">
+                            <span class="network-stat-label">
+                                Scoreboards Submitted
+                            </span>
 
-                                    <th scope="col">
-                                        Format
-                                    </th>
+                            <strong
+                                class="network-stat-value"
+                                id="rocketLeagueScoreboardsSubmitted"
+                            >
+                                —
+                            </strong>
+                        </article>
 
-                                    <th scope="col">
-                                        Status
-                                    </th>
+                        <article class="network-stat">
+                            <span class="network-stat-label">
+                                Goals Recorded
+                            </span>
 
-                                    <th scope="col">
-                                        Action
-                                    </th>
-                                </tr>
-                            </thead>
-
-                            <tbody id="upcomingMatchesBody">
-                                <!-- Match rows load here -->
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <div
-                        class="dashboard-empty-state"
-                        id="upcomingMatchesEmpty"
-                        role="status"
-                    >
-                        <span
-                            class="empty-state-icon"
-                            aria-hidden="true"
-                        >
-                            ◇
-                        </span>
-
-                        <h3>
-                            No upcoming matches
-                        </h3>
-
-                        <p>
-                            Your scheduled matches will appear here.
-                        </p>
-
-                        <a
-                            class="dashboard-primary-link"
-                            href="/RocketLeague/WeeklyMatches"
-                            data-router-link
-                        >
-                            Find a Match
-                        </a>
+                            <strong
+                                class="network-stat-value"
+                                id="rocketLeagueGoalsRecorded"
+                            >
+                                —
+                            </strong>
+                        </article>
                     </div>
                 </section>
 

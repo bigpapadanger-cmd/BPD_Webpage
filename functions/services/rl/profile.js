@@ -16,7 +16,7 @@ API Route:
 
 Purpose:
     Handles authenticated Rocket League profile retrieval
-    and registration/profile updates.
+    and initial Rocket League profile setup.
 
 Description:
     - Uses the global BPD session for account ownership.
@@ -26,9 +26,29 @@ Description:
     - Ensures the Rocket League player exists during POST.
     - Loads Rocket League data by core.rl_players.account_id.
     - Saves Rocket League data by account_id.
-    - Keeps BPD and Epic display names separate.
-    - Returns only coarse Cloudflare request location.
+    - Does not collect a configurable Rocket League username.
+    - Email and phone are optional.
+    - Supports Email, Phone, and Discord notifications.
+    - Verifies Discord notification eligibility server-side.
+    - Uses Cloudflare request metadata for optional coarse
+      region/time-zone detection.
     - Never accepts browser-submitted identity ownership.
+    - Wakes the Rocket League presence monitor only for
+      completed, active, opted-in Rocket League profiles.
+
+Initial Registration Model:
+    ageConsent
+    policyConsent
+    autoDetectRegion
+    showOnlineStatus
+    email
+    phone
+    preferredMode
+    otherMode
+    availability
+    notificationsEnabled
+    notificationMethod
+    reminderMode
 
 Identity Model:
     session.userId
@@ -40,26 +60,23 @@ Identity Model:
     providers.epic.accountId
         = Epic account ID
 
-Display Name Model:
-    bpdDisplayName
-        = identity.accounts.display_name
-
-    EpicDisplayName
-        = linked Epic provider display name
-
 Important:
-    - Global BPD authentication is authoritative.
-    - Epic is required for Rocket League functionality but
-      is NOT the global ownership key.
-    - Epic display names are never used for ownership.
-    - BPD display names belong to identity.accounts.
-    - There is no separate Rocket League display name.
-    - Browser-submitted account IDs are ignored.
-    - Browser-submitted Epic IDs are ignored.
-    - Browser-submitted display names are ignored.
-    - Browser-submitted location is ignored for authority.
-    - Supabase global identity creation does not occur here.
+    - Current rank is NOT collected during initial setup.
+    - Contact method is replaced by notificationMethod.
+    - Email and phone may both be empty.
+    - Location submitted by the browser is ignored.
+    - When automatic region detection is enabled, coarse
+      Cloudflare request data is used.
+    - Discord notification eligibility is enforced on POST.
 ========================================================= */
+
+import {
+    fetchRocketLeaguePresence
+} from "./presence/fetch_presence.js";
+
+import {
+    wakeRocketLeaguePresenceMonitor
+} from "./presence/wake_monitor.js";
 
 import {
     json
@@ -82,14 +99,18 @@ import {
     saveRocketLeagueProfile
 } from "../supabase/rocketleague/save_profile.js";
 
+import {
+    getDiscordMatchBotEligibility
+} from "../auth/providers/discord_matchbot/eligibility.js";
+
 /* =========================================================
 CONSTANTS
 ========================================================= */
 
-const ALLOWED_CONTACT_METHODS = [
+const ALLOWED_NOTIFICATION_METHODS = [
     "email",
     "phone",
-    "both"
+    "discord"
 ];
 
 const ALLOWED_MODES = [
@@ -169,6 +190,18 @@ function normalizeBoolean(
     return fallback;
 }
 
+function normalizeObject(
+    value
+) {
+    return (
+        value
+        && typeof value === "object"
+        && !Array.isArray(value)
+    )
+        ? value
+        : {};
+}
+
 /* =========================================================
 COARSE CLOUDFLARE LOCATION
 ========================================================= */
@@ -186,12 +219,24 @@ function getRequestLocation(
             : {};
 
     return {
+        city:
+            normalizeString(
+                cf.city,
+                100
+            ),
+
         region:
             normalizeString(
                 headers.get(
                     "cf-region"
                 )
                 || cf.region,
+                100
+            ),
+
+        country:
+            normalizeString(
+                cf.country,
                 100
             ),
 
@@ -217,14 +262,6 @@ function getRequestLocation(
 
 /* =========================================================
 EPIC PROVIDER
-
-Important:
-    - Epic ownership comes from the database-verified
-      authorization provider.
-    - Session provider data may supply non-authoritative
-      display metadata only.
-    - Epic account ownership is never taken from the browser
-      or trusted solely from Cloudflare KV.
 ========================================================= */
 
 function buildEpicUser(
@@ -268,6 +305,44 @@ function buildEpicUser(
 }
 
 /* =========================================================
+RANK DATA
+
+Initial registration no longer collects rank information.
+
+These fields remain read-only compatibility for the future
+current-MMR/rank system.
+========================================================= */
+
+function normalizeRanks(
+    databaseProfile
+) {
+    const ranks =
+        normalizeObject(
+            databaseProfile?.ranks
+        );
+
+    const input =
+        normalizeObject(
+            ranks.input
+            || databaseProfile?.inputRanked
+            || databaseProfile?.input_ranked
+        );
+
+    const current =
+        normalizeObject(
+            ranks.current
+            || databaseProfile?.currentRanked
+            || databaseProfile?.current_ranked
+            || databaseProfile?.ranked
+        );
+
+    return {
+        input,
+        current
+    };
+}
+
+/* =========================================================
 DATABASE PROFILE NORMALIZATION
 ========================================================= */
 
@@ -294,54 +369,37 @@ function normalizeDatabaseProfile(
         || sessionContext.userId
         || null;
 
-    const rlPlayerId =
-        databaseProfile.rlPlayerId
-        || databaseProfile.rl_player_id
-        || null;
-
-    const bpdDisplayName =
-        normalizeNullableString(
-            databaseProfile.bpdDisplayName
-            || databaseProfile.bpd_display_name
+    const ranks =
+        normalizeRanks(
+            databaseProfile
         );
-
-    const epicDisplayName =
-        normalizeNullableString(
-            databaseProfile.epicDisplayName
-            || databaseProfile.epic_display_name
-            || epicUser.EpicDisplayName
-        );
-
-    const ranked =
-        databaseProfile.ranked
-        && typeof databaseProfile.ranked === "object"
-        && !Array.isArray(
-            databaseProfile.ranked
-        )
-            ? databaseProfile.ranked
-            : {};
 
     return {
         accountId,
 
-        /*
-         * Temporary compatibility alias.
-         *
-         * userId and accountId both represent:
-         * identity.accounts.id
-         */
         userId:
             accountId,
 
-        rlPlayerId,
+        rlPlayerId:
+            databaseProfile.rlPlayerId
+            || databaseProfile.rl_player_id
+            || null,
 
-        bpdDisplayName,
+        bpdDisplayName:
+            normalizeNullableString(
+                databaseProfile.bpdDisplayName
+                || databaseProfile.bpd_display_name
+            ),
 
         EpicUniqueId:
             epicUser.EpicUniqueId,
 
         EpicDisplayName:
-            epicDisplayName,
+            normalizeNullableString(
+                databaseProfile.epicDisplayName
+                || databaseProfile.epic_display_name
+                || epicUser.EpicDisplayName
+            ),
 
         EpicPreferredUsername:
             epicUser.EpicPreferredUsername,
@@ -354,39 +412,59 @@ function normalizeDatabaseProfile(
         active:
             databaseProfile.active === true,
 
-        currentRank:
-            databaseProfile.currentRank
-            || databaseProfile.current_rank
-            || "",
+        ageConsent:
+            databaseProfile.ageConsent === true
+            || databaseProfile.age_consent === true,
 
-        contactMethod:
-            databaseProfile.contactMethod
-            || databaseProfile.contact_method
-            || "email",
+        policyConsent:
+            databaseProfile.policyConsent === true
+            || databaseProfile.policy_consent === true,
 
-        email:
-            databaseProfile.email
-            || "",
+        autoDetectRegion:
+            databaseProfile.autoDetectRegion === true
+            || databaseProfile.auto_detect_region === true,
 
-        phone:
-            databaseProfile.phone
-            || "",
-
-        preferredMode:
-            databaseProfile.preferredMode
-            || databaseProfile.preferred_mode
-            || "",
-
-        otherMode:
-            databaseProfile.otherMode
-            || databaseProfile.other_mode
-            || "",
+        location:
+            normalizeObject(
+                databaseProfile.location
+            ),
 
         timezone:
-            databaseProfile.displayTimezone
-            || databaseProfile.display_timezone
-            || databaseProfile.timezone
-            || "",
+            normalizeString(
+                databaseProfile.displayTimezone
+                || databaseProfile.display_timezone
+                || databaseProfile.timezone
+            ),
+
+        showOnlineStatus:
+            databaseProfile.showOnlineStatus === true
+            || databaseProfile.show_online_status === true,
+
+        email:
+            normalizeString(
+                databaseProfile.email,
+                254
+            ),
+
+        phone:
+            normalizeString(
+                databaseProfile.phone,
+                24
+            ),
+
+        preferredMode:
+            normalizeString(
+                databaseProfile.preferredMode
+                || databaseProfile.preferred_mode,
+                20
+            ),
+
+        otherMode:
+            normalizeString(
+                databaseProfile.otherMode
+                || databaseProfile.other_mode,
+                50
+            ),
 
         availability:
             Array.isArray(
@@ -395,22 +473,23 @@ function normalizeDatabaseProfile(
                 ? databaseProfile.availability
                 : [],
 
-        showOnlineStatus:
-            databaseProfile.showOnlineStatus === true
-            || databaseProfile.show_online_status === true,
-
         notificationsEnabled:
             databaseProfile.notificationsEnabled === true
             || databaseProfile.notifications_enabled === true,
 
-        reminderMode:
-            databaseProfile.reminderMode
-            || databaseProfile.reminder_mode
-            || "24-hours",
+        notificationMethod:
+            normalizeNullableString(
+                databaseProfile.notificationMethod
+                || databaseProfile.notification_method,
+                20
+            ),
 
-        ageConsent:
-            databaseProfile.ageConsent === true
-            || databaseProfile.age_consent === true,
+        reminderMode:
+            normalizeNullableString(
+                databaseProfile.reminderMode
+                || databaseProfile.reminder_mode,
+                30
+            ),
 
         registrationStatus:
             databaseProfile.registrationStatus
@@ -425,10 +504,14 @@ function normalizeDatabaseProfile(
             databaseProfile.rocketLeagueAccess === true
             || databaseProfile.rocket_league_access === true,
 
-        ranked,
+        ranks,
+
+        ranked:
+            ranks.current,
 
         stats: {
-            ranked
+            ranked:
+                ranks.current
         }
     };
 }
@@ -448,9 +531,6 @@ function buildFallbackProfile(
     return {
         accountId,
 
-        /*
-         * Temporary compatibility alias.
-         */
         userId:
             accountId,
 
@@ -478,11 +558,23 @@ function buildFallbackProfile(
         active:
             sessionContext.active === true,
 
-        currentRank:
+        ageConsent:
+            false,
+
+        policyConsent:
+            false,
+
+        autoDetectRegion:
+            true,
+
+        location:
+            {},
+
+        timezone:
             "",
 
-        contactMethod:
-            "email",
+        showOnlineStatus:
+            false,
 
         email:
             "",
@@ -496,23 +588,17 @@ function buildFallbackProfile(
         otherMode:
             "",
 
-        timezone:
-            "",
-
         availability:
             [],
-
-        showOnlineStatus:
-            false,
 
         notificationsEnabled:
             true,
 
+        notificationMethod:
+            null,
+
         reminderMode:
             "24-hours",
-
-        ageConsent:
-            false,
 
         registrationStatus:
             "incomplete",
@@ -522,6 +608,14 @@ function buildFallbackProfile(
 
         rocketLeagueAccess:
             false,
+
+        ranks: {
+            input:
+                {},
+
+            current:
+                {}
+        },
 
         ranked:
             {},
@@ -555,8 +649,7 @@ function normalizeAvailability(
                     normalizeString(
                         item?.day,
                         12
-                    )
-                        .toLowerCase(),
+                    ).toLowerCase(),
 
                 start:
                     normalizeString(
@@ -588,21 +681,24 @@ REGISTRATION PAYLOAD
 ========================================================= */
 
 function normalizeRegistrationPayload(
-    body
+    body,
+    request
 ) {
     /*
      * Explicit allow-list.
      *
-     * Anything not listed here is discarded.
+     * These browser values are deliberately ignored:
      *
-     * In particular:
-     *     body.accountId is ignored.
-     *     body.userId is ignored.
-     *     body.EpicUniqueId is ignored.
-     *     body.displayName is ignored.
-     *     body.role is ignored.
-     *     body.active is ignored.
-     *     body.location is ignored.
+     * body.accountId
+     * body.userId
+     * body.EpicUniqueId
+     * body.displayName
+     * body.role
+     * body.active
+     * body.currentRank
+     * body.location
+     *
+     * Location is derived server-side when enabled.
      */
 
     const notificationsEnabled =
@@ -611,29 +707,36 @@ function normalizeRegistrationPayload(
             true
         );
 
+    const autoDetectRegion =
+        normalizeBoolean(
+            body?.autoDetectRegion,
+            true
+        );
+
+    const detectedLocation =
+        autoDetectRegion
+            ? getRequestLocation(
+                request
+            )
+            : null;
+
     return {
         ageConsent:
             normalizeBoolean(
                 body?.ageConsent
             ),
 
-        currentRank:
-            normalizeString(
-                body?.currentRank,
-                50
+        policyConsent:
+            normalizeBoolean(
+                body?.policyConsent
             ),
+
+        autoDetectRegion,
 
         showOnlineStatus:
             normalizeBoolean(
                 body?.showOnlineStatus
             ),
-
-        contactMethod:
-            normalizeString(
-                body?.contactMethod,
-                10
-            )
-                .toLowerCase(),
 
         email:
             normalizeString(
@@ -651,8 +754,7 @@ function normalizeRegistrationPayload(
             normalizeString(
                 body?.preferredMode,
                 20
-            )
-                .toLowerCase(),
+            ).toLowerCase(),
 
         otherMode:
             normalizeString(
@@ -661,10 +763,15 @@ function normalizeRegistrationPayload(
             ),
 
         timezone:
-            normalizeString(
-                body?.timezone,
-                100
-            ),
+            autoDetectRegion
+                ? normalizeNullableString(
+                    detectedLocation?.timezone,
+                    100
+                )
+                : null,
+
+        location:
+            detectedLocation,
 
         availability:
             normalizeAvailability(
@@ -673,14 +780,21 @@ function normalizeRegistrationPayload(
 
         notificationsEnabled,
 
+        notificationMethod:
+            notificationsEnabled
+                ? normalizeString(
+                    body?.notificationMethod,
+                    20
+                ).toLowerCase()
+                : null,
+
         reminderMode:
             notificationsEnabled
                 ? normalizeString(
                     body?.reminderMode
                     || "24-hours",
                     30
-                )
-                    .toLowerCase()
+                ).toLowerCase()
                 : null
     };
 }
@@ -701,44 +815,10 @@ function validateRegistrationPayload(
     }
 
     if (
-        !profile.currentRank
+        profile.policyConsent !== true
     ) {
         return (
-            "Current rank is required."
-        );
-    }
-
-    if (
-        !ALLOWED_CONTACT_METHODS.includes(
-            profile.contactMethod
-        )
-    ) {
-        return (
-            "Select a valid contact method."
-        );
-    }
-
-    if (
-        (
-            profile.contactMethod === "email"
-            || profile.contactMethod === "both"
-        )
-        && !profile.email
-    ) {
-        return (
-            "Email address is required."
-        );
-    }
-
-    if (
-        (
-            profile.contactMethod === "phone"
-            || profile.contactMethod === "both"
-        )
-        && !profile.phone
-    ) {
-        return (
-            "Phone number is required."
+            "Terms of Service and Privacy Policy acknowledgement is required."
         );
     }
 
@@ -790,8 +870,41 @@ function validateRegistrationPayload(
     }
 
     if (
-        profile.notificationsEnabled
-        && !ALLOWED_REMINDER_MODES.includes(
+        profile.notificationsEnabled !== true
+    ) {
+        return null;
+    }
+
+    if (
+        !ALLOWED_NOTIFICATION_METHODS.includes(
+            profile.notificationMethod
+        )
+    ) {
+        return (
+            "Select a valid notification method."
+        );
+    }
+
+    if (
+        profile.notificationMethod === "email"
+        && !profile.email
+    ) {
+        return (
+            "An email address is required when email notifications are selected."
+        );
+    }
+
+    if (
+        profile.notificationMethod === "phone"
+        && !profile.phone
+    ) {
+        return (
+            "A phone number is required when phone notifications are selected."
+        );
+    }
+
+    if (
+        !ALLOWED_REMINDER_MODES.includes(
             profile.reminderMode
         )
     ) {
@@ -804,23 +917,142 @@ function validateRegistrationPayload(
 }
 
 /* =========================================================
+DISCORD NOTIFICATION VERIFICATION
+========================================================= */
+
+async function verifyDiscordNotificationAccess(
+    request,
+    env,
+    registration
+) {
+    if (
+        registration.notificationsEnabled !== true
+        || registration.notificationMethod !== "discord"
+    ) {
+        return {
+            valid:
+                true
+        };
+    }
+
+    let discordAuthorization;
+
+    try {
+        discordAuthorization =
+            await authorizeRequest(
+                request,
+                env,
+                {
+                    account:
+                        true,
+
+                    provider:
+                        "discord"
+                }
+            );
+    }
+    catch (
+        error
+    ) {
+        if (
+            isAuthorizationError(
+                error
+            )
+            && error.code ===
+                "PROVIDER_REQUIRED"
+        ) {
+            return {
+                valid:
+                    false,
+
+                code:
+                    "DISCORD_ACCOUNT_REQUIRED",
+
+                message:
+                    "A linked Discord account is required for Discord notifications."
+            };
+        }
+
+        if (
+            isAuthorizationError(
+                error
+            )
+        ) {
+            return {
+                valid:
+                    false,
+
+                code:
+                    error.code
+                    || "DISCORD_AUTHORIZATION_FAILED",
+
+                message:
+                    "Discord notification authorization could not be verified."
+            };
+        }
+
+        throw error;
+    }
+
+    const discordUserId =
+        normalizeNullableString(
+            discordAuthorization
+                ?.provider
+                ?.subject
+        );
+
+    if (
+        !discordUserId
+    ) {
+        return {
+            valid:
+                false,
+
+            code:
+                "DISCORD_IDENTITY_MISSING",
+
+            message:
+                "Your verified Discord identity could not be resolved."
+        };
+    }
+
+    const eligibility =
+        await getDiscordMatchBotEligibility(
+            env,
+            discordUserId
+        );
+
+    if (
+        eligibility?.eligible !==
+        true
+    ) {
+        return {
+            valid:
+                false,
+
+            code:
+                eligibility?.reason
+                || "MATCHBOT_REQUIRED",
+
+            message:
+                "Your Discord account must share a server with BPD MatchBot before Discord notifications can be enabled."
+        };
+    }
+
+    return {
+        valid:
+            true,
+
+        discordUserId,
+
+        mutualGuild:
+            eligibility.mutualGuild
+            || null
+    };
+}
+
+/* =========================================================
 AUTHENTICATED ROCKET LEAGUE CONTEXT
-
-Security:
-    Rocket League requires:
-        - Valid BPD browser session.
-        - Canonical identity.accounts.id.
-        - Active BPD account.
-        - Active Epic identity verified against Supabase.
-
-    Epic provider ownership is verified by:
-        authorization.js
-            ↓
-        provider_identity.js
-            ↓
-        api.verify_account_provider_identity
-            ↓
-        identity.account_identities
 ========================================================= */
 
 async function getAuthenticatedContext(
@@ -940,7 +1172,7 @@ async function getAuthenticatedContext(
 
         if (
             error.code ===
-            "PROVIDER_REQUIRED"
+                "PROVIDER_REQUIRED"
             && error?.details?.provider ===
                 "epic"
         ) {
@@ -1030,13 +1262,6 @@ async function getAuthenticatedContext(
             authorization.accountId
         );
 
-    /*
-     * Defense in depth.
-     *
-     * authorizeRequest({ account: true }) already guarantees
-     * this value, but Rocket League should never proceed
-     * without an explicit canonical account ID.
-     */
     if (
         !accountId
     ) {
@@ -1069,13 +1294,6 @@ async function getAuthenticatedContext(
             authorization
         );
 
-    /*
-     * Defense in depth.
-     *
-     * requireProvider("epic") has already verified the
-     * identity against Supabase. If no provider subject is
-     * present here, fail closed.
-     */
     if (
         epicUser.linked !==
             true
@@ -1162,7 +1380,8 @@ async function handleProfileGet(
 
             if (
                 returnedAccountId
-                && returnedAccountId !== accountId
+                && returnedAccountId !==
+                    accountId
             ) {
                 throw new Error(
                     "Rocket League profile returned an unexpected global account."
@@ -1216,6 +1435,97 @@ async function handleProfileGet(
                 epicUser
             );
 
+    /* =====================================================
+    ROCKET LEAGUE PRESENCE MONITOR
+    ===================================================== */
+
+    const presenceEligible =
+        profileLoaded ===
+            true
+        && profile.active ===
+            true
+        && profile.profileComplete ===
+            true
+        && profile.rocketLeagueAccess ===
+            true
+        && profile.showOnlineStatus ===
+            true
+        && Boolean(
+            profile.rlPlayerId
+        )
+        && Boolean(
+            epicUser.EpicUniqueId
+        );
+
+    if (
+        presenceEligible
+    ) {
+        try {
+            await wakeRocketLeaguePresenceMonitor(
+                env,
+                accountId
+            );
+        }
+        catch (
+            error
+        ) {
+            console.error(
+                "ROCKET LEAGUE PROFILE: Presence monitor wake failed.",
+                {
+                    name:
+                        error?.name
+                        || "Error",
+
+                    code:
+                        error?.code
+                        || null,
+
+                    message:
+                        error?.message
+                        || "Unknown error"
+                }
+            );
+        }
+    }
+
+    /* =====================================================
+    CURRENT PLAYER PRESENCE
+    ===================================================== */
+
+    let presence =
+        null;
+
+    if (
+        presenceEligible
+    ) {
+        try {
+            presence =
+                await fetchRocketLeaguePresence(
+                    env,
+                    epicUser.EpicUniqueId
+                );
+        }
+        catch (
+            error
+        ) {
+            console.error(
+                "ROCKET LEAGUE PROFILE: Presence load failed.",
+                {
+                    name:
+                        error?.name
+                        || "Error",
+
+                    message:
+                        error?.message
+                        || "Unknown error"
+                }
+            );
+
+            presence =
+                null;
+        }
+    }
+
     return json(
         {
             success:
@@ -1229,25 +1539,25 @@ async function handleProfileGet(
 
             accountId,
 
-            /*
-             * Temporary compatibility alias.
-             */
             userId:
                 accountId,
 
             profileLoaded,
 
             profileComplete:
-                profile.profileComplete === true,
+                profile.profileComplete ===
+                true,
 
             rocketLeagueAccess:
-                profile.rocketLeagueAccess === true,
+                profile.rocketLeagueAccess ===
+                true,
 
             role:
                 profile.role,
 
             active:
-                profile.active === true,
+                profile.active ===
+                true,
 
             warning,
 
@@ -1280,6 +1590,8 @@ async function handleProfileGet(
             },
 
             location,
+
+            presence,
 
             profile
         },
@@ -1352,7 +1664,8 @@ async function handleProfilePost(
 
     const registration =
         normalizeRegistrationPayload(
-            body
+            body,
+            request
         );
 
     const validationError =
@@ -1394,12 +1707,107 @@ async function handleProfilePost(
     }
 
     /* =====================================================
+    DISCORD NOTIFICATION VERIFICATION
+    ===================================================== */
+
+    let discordNotificationAccess;
+
+    try {
+        discordNotificationAccess =
+            await verifyDiscordNotificationAccess(
+                request,
+                env,
+                registration
+            );
+    }
+    catch (
+        error
+    ) {
+        console.error(
+            "ROCKET LEAGUE PROFILE: Discord notification verification failed.",
+            {
+                name:
+                    error?.name
+                    || "Error",
+
+                code:
+                    error?.code
+                    || null,
+
+                message:
+                    error?.message
+                    || "Unknown error"
+            }
+        );
+
+        return json(
+            {
+                success:
+                    false,
+
+                authenticated:
+                    true,
+
+                requiresEpicLogin:
+                    false,
+
+                profileSaved:
+                    false,
+
+                profileComplete:
+                    false,
+
+                rocketLeagueAccess:
+                    false,
+
+                code:
+                    "DISCORD_NOTIFICATION_VERIFICATION_FAILED",
+
+                message:
+                    "Discord notification eligibility could not be verified."
+            },
+            503
+        );
+    }
+
+    if (
+        discordNotificationAccess.valid !==
+        true
+    ) {
+        return json(
+            {
+                success:
+                    false,
+
+                authenticated:
+                    true,
+
+                requiresEpicLogin:
+                    false,
+
+                profileSaved:
+                    false,
+
+                profileComplete:
+                    false,
+
+                rocketLeagueAccess:
+                    false,
+
+                code:
+                    discordNotificationAccess.code
+                    || "DISCORD_NOTIFICATION_NOT_AVAILABLE",
+
+                message:
+                    discordNotificationAccess.message
+                    || "Discord notifications are not currently available."
+            },
+            400
+        );
+    }
+
+    /* =====================================================
     ENSURE ROCKET LEAGUE PLAYER
-
-    This is deliberately a POST-side effect.
-
-    GET profile/session requests remain read-only and never
-    create core.rl_players records.
     ===================================================== */
 
     let ensuredPlayer;
@@ -1437,8 +1845,10 @@ async function handleProfilePost(
         );
 
         if (
-            error?.code === "EPIC_ACCOUNT_REQUIRED"
-            || error?.message === "EPIC_IDENTITY_NOT_LINKED"
+            error?.code ===
+                "EPIC_ACCOUNT_REQUIRED"
+            || error?.message ===
+                "EPIC_IDENTITY_NOT_LINKED"
         ) {
             return json(
                 {
@@ -1613,7 +2023,8 @@ async function handleProfilePost(
 
     if (
         returnedAccountId
-        && returnedAccountId !== accountId
+        && returnedAccountId !==
+            accountId
     ) {
         console.error(
             "ROCKET LEAGUE PROFILE: Save returned unexpected account."
@@ -1650,16 +2061,22 @@ async function handleProfilePost(
     }
 
     const profileSaved =
-        result?.profile_saved === true
-        || result?.profileSaved === true;
+        result?.profile_saved ===
+            true
+        || result?.profileSaved ===
+            true;
 
     const profileComplete =
-        result?.profile_complete === true
-        || result?.profileComplete === true;
+        result?.profile_complete ===
+            true
+        || result?.profileComplete ===
+            true;
 
     const rocketLeagueAccess =
-        result?.rocket_league_access === true
-        || result?.rocketLeagueAccess === true;
+        result?.rocket_league_access ===
+            true
+        || result?.rocketLeagueAccess ===
+            true;
 
     const rlPlayerId =
         result?.rl_player_id
@@ -1689,19 +2106,18 @@ async function handleProfilePost(
 
             accountId,
 
-            /*
-             * Temporary compatibility alias.
-             */
             userId:
                 accountId,
 
             rlPlayerId,
 
             playerCreated:
-                ensuredPlayer.createdPlayer === true,
+                ensuredPlayer.createdPlayer ===
+                true,
 
             playerAdopted:
-                ensuredPlayer.adoptedPlayer === true,
+                ensuredPlayer.adoptedPlayer ===
+                true,
 
             role:
                 result?.role
@@ -1709,7 +2125,8 @@ async function handleProfilePost(
                 || null,
 
             active:
-                result?.active === true,
+                result?.active ===
+                true,
 
             user: {
                 accountId,
@@ -1725,7 +2142,8 @@ async function handleProfilePost(
                     || null,
 
                 active:
-                    result?.active === true,
+                    result?.active ===
+                    true,
 
                 EpicUniqueId:
                     epicUser.EpicUniqueId,
@@ -1739,8 +2157,8 @@ async function handleProfilePost(
 
             message:
                 profileSaved
-                    ? "Your Rocket League registration was saved."
-                    : "Your Rocket League registration could not be confirmed as saved.",
+                    ? "Your Rocket League profile was saved."
+                    : "Your Rocket League profile could not be confirmed as saved.",
 
             redirectTo:
                 profileSaved
@@ -1785,7 +2203,8 @@ export async function handleRocketLeagueProfile(
             authenticated;
 
         if (
-            request.method === "GET"
+            request.method ===
+            "GET"
         ) {
             return handleProfileGet(
                 request,
@@ -1797,7 +2216,8 @@ export async function handleRocketLeagueProfile(
         }
 
         if (
-            request.method === "POST"
+            request.method ===
+            "POST"
         ) {
             return handleProfilePost(
                 request,
@@ -1845,6 +2265,10 @@ export async function handleRocketLeagueProfile(
                 name:
                     error?.name
                     || "Error",
+
+                code:
+                    error?.code
+                    || null,
 
                 message:
                     error?.message

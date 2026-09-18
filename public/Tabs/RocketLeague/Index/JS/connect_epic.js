@@ -5,7 +5,7 @@ BPD GAMING NETWORK
 ROCKET LEAGUE AUTH BUTTONS
 
 File:
-    /Tabs/RocketLeague/JS/login_logout.js
+    /Tabs/RocketLeague/JS/connect_epic.js
 
 Purpose:
     Controls Rocket League login and logout buttons.

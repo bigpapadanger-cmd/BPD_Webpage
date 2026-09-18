@@ -162,21 +162,6 @@ export async function onRequestGet(
             env
         } = context;
 
-        console.log(
-            "[ADMIN ACCESS ENV CHECK]",
-            {
-                hasGuildId:
-                    Boolean(
-                        env?.DISCORD_AUTHZ_GUILD_ID
-                    ),
-
-                hasBotToken:
-                    Boolean(
-                        env?.DISCORD_AUTHZ_BOT_TOKEN
-                    )
-            }
-        );
-
         await authorizeAdminContext(
             request,
             env

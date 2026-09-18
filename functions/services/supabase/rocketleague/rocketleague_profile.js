@@ -14,50 +14,12 @@ Purpose:
 Description:
     - Uses identity.accounts.id as the lookup key.
     - Calls api.get_rocketleague_profile.
-    - Keeps the global BPD display name separate from the
-      linked Epic provider display name.
-    - Normalizes Supabase snake_case fields into the
-      camelCase structure used by Rocket League services.
+    - Keeps BPD and Epic display names separate.
+    - Normalizes Supabase snake_case fields.
+    - Supports the revised initial profile model.
+    - Supports separate input/current rank collections.
     - Performs read-only profile retrieval.
     - Never determines authentication itself.
-
-Flow:
-    Cloudflare Rocket League profile/session service
-        ↓
-    getRocketLeagueProfileByAccountId()
-        ↓
-    Supabase RPC:
-        api.get_rocketleague_profile
-        ↓
-    Supabase returns authoritative Rocket League state
-        ↓
-    Normalize response for application services
-
-Identity Model:
-    accountId
-        = identity.accounts.id
-
-    core.rl_players.account_id
-        = identity.accounts.id
-
-Display Name Model:
-    bpdDisplayName
-        = identity.accounts.display_name
-
-    epicDisplayName
-        = identity.account_identities.display_username
-          where provider = 'epic'
-
-Important:
-    - The browser does NOT call Supabase directly.
-    - The Supabase secret remains server-side.
-    - accountId must come from the authenticated BPD session.
-    - Epic account ID is provider/domain metadata only.
-    - There is no separate user-selected Rocket League
-      display name.
-    - This function does NOT create or update profiles.
-    - Rocket League access is returned by Supabase and is not
-      independently recalculated here.
 
 Expected RPC Return Fields:
     account_id
@@ -72,20 +34,23 @@ Expected RPC Return Fields:
     active
     rl_platform
     display_timezone
-    current_rank
-    contact_method
+    region
+    country_code
+    auto_detect_region
     preferred_mode
     other_mode
     show_online_status
     age_consent
+    policy_consent
     registration_status
     profile_complete
     rocket_league_access
     notifications_enabled
+    notification_method
     reminder_mode
-    specific_reminder_times
     availability
-    ranked
+    input_ranked
+    current_ranked
 ========================================================= */
 
 /* =========================================================
@@ -95,13 +60,10 @@ NORMALIZATION
 function normalizeString(
     value
 ) {
-    if (
-        typeof value !== "string"
-    ) {
-        return "";
-    }
-
-    return value.trim();
+    return typeof value ===
+        "string"
+        ? value.trim()
+        : "";
 }
 
 function normalizeNullableString(
@@ -116,8 +78,20 @@ function normalizeNullableString(
         || null;
 }
 
+function normalizeObject(
+    value
+) {
+    return (
+        value
+        && typeof value === "object"
+        && !Array.isArray(value)
+    )
+        ? value
+        : {};
+}
+
 /* =========================================================
-DEFAULT RANKED STATE
+DEFAULT RANK STATE
 ========================================================= */
 
 function createDefaultRankedState() {
@@ -198,9 +172,7 @@ export async function getRocketLeagueProfileByAccountId(
     }
 
     const baseUrl =
-        supabaseUrl.endsWith(
-            "/"
-        )
+        supabaseUrl.endsWith("/")
             ? supabaseUrl
             : `${supabaseUrl}/`;
 
@@ -276,9 +248,7 @@ export async function getRocketLeagueProfileByAccountId(
             (
                 responseData
                 && typeof responseData === "object"
-                && !Array.isArray(
-                    responseData
-                )
+                && !Array.isArray(responseData)
             )
                 ? (
                     normalizeString(
@@ -303,9 +273,7 @@ export async function getRocketLeagueProfileByAccountId(
             (
                 responseData
                 && typeof responseData === "object"
-                && !Array.isArray(
-                    responseData
-                )
+                && !Array.isArray(responseData)
             )
                 ? normalizeNullableString(
                     responseData.code
@@ -318,9 +286,7 @@ export async function getRocketLeagueProfileByAccountId(
     if (
         !responseData
         || typeof responseData !== "object"
-        || Array.isArray(
-            responseData
-        )
+        || Array.isArray(responseData)
     ) {
         return null;
     }
@@ -341,23 +307,43 @@ export async function getRocketLeagueProfileByAccountId(
         );
     }
 
-    /*
-     * Normalize Supabase snake_case fields into the
-     * camelCase structure expected by Rocket League
-     * session/profile services and registration UI.
-     */
+    const inputRanked =
+        Object.keys(
+            normalizeObject(
+                responseData.input_ranked
+            )
+        ).length > 0
+            ? normalizeObject(
+                responseData.input_ranked
+            )
+            : {};
+
+    const currentRanked =
+        Object.keys(
+            normalizeObject(
+                responseData.current_ranked
+            )
+        ).length > 0
+            ? normalizeObject(
+                responseData.current_ranked
+            )
+            : (
+                Object.keys(
+                    normalizeObject(
+                        responseData.ranked
+                    )
+                ).length > 0
+                    ? normalizeObject(
+                        responseData.ranked
+                    )
+                    : createDefaultRankedState()
+            );
 
     return {
         accountId:
             returnedAccountId
             || normalizedAccountId,
 
-        /*
-         * Temporary compatibility alias.
-         *
-         * userId and accountId both represent:
-         * identity.accounts.id
-         */
         userId:
             returnedAccountId
             || normalizedAccountId,
@@ -366,18 +352,6 @@ export async function getRocketLeagueProfileByAccountId(
             normalizeNullableString(
                 responseData.rl_player_id
             ),
-
-        /* -------------------------------------------------
-        DISPLAY NAMES
-
-        bpdDisplayName:
-            Global BPD account name.
-
-        epicDisplayName:
-            Current Epic provider name.
-
-        There is intentionally no generic RL displayName.
-        ------------------------------------------------- */
 
         bpdDisplayName:
             normalizeNullableString(
@@ -411,28 +385,39 @@ export async function getRocketLeagueProfileByAccountId(
             || "user",
 
         active:
-            responseData.active === true,
+            responseData.active ===
+            true,
 
         rlPlatform:
             normalizeNullableString(
                 responseData.rl_platform
             ),
 
+        autoDetectRegion:
+            responseData.auto_detect_region ===
+            true,
+
+        location: {
+            region:
+                normalizeString(
+                    responseData.region
+                ),
+
+            countryCode:
+                normalizeString(
+                    responseData.country_code
+                ),
+
+            timezone:
+                normalizeString(
+                    responseData.display_timezone
+                )
+        },
+
         displayTimezone:
             normalizeNullableString(
                 responseData.display_timezone
             ),
-
-        currentRank:
-            normalizeString(
-                responseData.current_rank
-            ),
-
-        contactMethod:
-            normalizeString(
-                responseData.contact_method
-            )
-            || "email",
 
         preferredMode:
             normalizeNullableString(
@@ -445,10 +430,16 @@ export async function getRocketLeagueProfileByAccountId(
             ),
 
         showOnlineStatus:
-            responseData.show_online_status === true,
+            responseData.show_online_status ===
+            true,
 
         ageConsent:
-            responseData.age_consent === true,
+            responseData.age_consent ===
+            true,
+
+        policyConsent:
+            responseData.policy_consent ===
+            true,
 
         registrationStatus:
             normalizeString(
@@ -457,26 +448,26 @@ export async function getRocketLeagueProfileByAccountId(
             || "incomplete",
 
         profileComplete:
-            responseData.profile_complete === true,
+            responseData.profile_complete ===
+            true,
 
         rocketLeagueAccess:
-            responseData.rocket_league_access === true,
+            responseData.rocket_league_access ===
+            true,
 
         notificationsEnabled:
-            responseData.notifications_enabled === true,
+            responseData.notifications_enabled ===
+            true,
+
+        notificationMethod:
+            normalizeNullableString(
+                responseData.notification_method
+            ),
 
         reminderMode:
-            normalizeString(
+            normalizeNullableString(
                 responseData.reminder_mode
-            )
-            || "24-hours",
-
-        specificReminderTimes:
-            Array.isArray(
-                responseData.specific_reminder_times
-            )
-                ? responseData.specific_reminder_times
-                : [],
+            ),
 
         availability:
             Array.isArray(
@@ -485,15 +476,24 @@ export async function getRocketLeagueProfileByAccountId(
                 ? responseData.availability
                 : [],
 
+        ranks: {
+            input:
+                inputRanked,
+
+            current:
+                currentRanked
+        },
+
+        /*
+         * Compatibility aliases while older UI components
+         * still consume ranked/stats.ranked.
+         */
         ranked:
-            (
-                responseData.ranked
-                && typeof responseData.ranked === "object"
-                && !Array.isArray(
-                    responseData.ranked
-                )
-            )
-                ? responseData.ranked
-                : createDefaultRankedState()
+            currentRanked,
+
+        stats: {
+            ranked:
+                currentRanked
+        }
     };
 }

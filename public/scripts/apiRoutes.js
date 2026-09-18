@@ -84,6 +84,8 @@ export const BPD_AUTH_EPIC_LOGIN_URL =
 /* =========================================================
 ROCKET LEAGUE AUTH / PROFILE
 ========================================================= */
+export const DISCORD_NOTIFICATION_STATUS_URL =
+    "/api/auth/rocketleague/discord-notifications";
 
 export const ROCKET_LEAGUE_SESSION_URL =
     "/api/auth/rocketleague/session";

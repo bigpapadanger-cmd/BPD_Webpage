@@ -24,7 +24,9 @@
         "TURNSTILE_SITE_KEY": "0x4AAAAAAExY7tl-k005rJaK",
         "SB_PUB_KEY":"sb_publishable_pC27tz0RVXuqe4Zfna3lpA_m7ZWc_pb",
         "DISCORD_MATCHBOT_INSTALL_URL":"https://discord.com/oauth2/authorize?client_id=1549606323249877034",
-        "DISCORD_MATCHBOT_PUBLIC_KEY":"6a1a6c317812b984de29ed9dc09c3dc9d5e83c81accd5e710a7d68737f666097"
+        "DISCORD_MATCHBOT_PUBLIC_KEY":"6a1a6c317812b984de29ed9dc09c3dc9d5e83c81accd5e710a7d68737f666097",
+        "MMR_API_URL":"https://mmr.bpd-gaming-network.com",
+        "RL_PRESENCE_MONITOR_URL":"https://status.bpd-gaming-network.com"
     },
 
     "r2_buckets": [

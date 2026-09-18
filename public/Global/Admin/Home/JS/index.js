@@ -5,7 +5,7 @@ BPD GAMING NETWORK
 ADMIN MANAGEMENT CLIENT
 
 File:
-    public/admin/admin.js
+    public/Admin/admin.js
 
 Purpose:
     Initializes the Admin Management area.

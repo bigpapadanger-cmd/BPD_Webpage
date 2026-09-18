@@ -13,16 +13,26 @@ Purpose:
 
 Responsibilities:
     - Opens and closes sidebar submenus.
-    - Closes other open sidebar submenus.
-    - Closes submenus when clicking outside.
-    - Positions submenus beside a collapsed sidebar.
-    - Repositions open submenus during resize and scroll.
-    - Prevents duplicate event listener initialization.
+    - Closes other open submenus.
+    - Closes submenus when clicking outside the sidebar.
+    - Repositions submenus when the sidebar is collapsed.
+    - Repositions open submenus on resize and scroll.
+    - Prevents duplicate event-listener initialization.
+
+Usage:
+    Call initializeSidebarSubmenus() after sidebar HTML
+    has been loaded into the DOM.
 =========================================================
 */
 
 let globalListenersInitialized =
     false;
+
+/*
+=========================================================
+CLOSE SUBMENU
+=========================================================
+*/
 
 function closeSubmenu(
     button
@@ -56,6 +66,12 @@ function closeSubmenu(
     }
 }
 
+/*
+=========================================================
+CLOSE OTHER SUBMENUS
+=========================================================
+*/
+
 function closeOtherSubmenus(
     currentButton
 ) {
@@ -78,6 +94,12 @@ function closeOtherSubmenus(
             }
         );
 }
+
+/*
+=========================================================
+POSITION COLLAPSED SUBMENU
+=========================================================
+*/
 
 function positionCollapsedSubmenu(
     button,
@@ -160,6 +182,12 @@ function positionCollapsedSubmenu(
         `${top}px`;
 }
 
+/*
+=========================================================
+TOGGLE SUBMENU
+=========================================================
+*/
+
 function toggleSubmenu(
     button
 ) {
@@ -214,6 +242,12 @@ function toggleSubmenu(
     }
 }
 
+/*
+=========================================================
+CLOSE ALL SUBMENUS
+=========================================================
+*/
+
 function closeAllSubmenus() {
     document
         .querySelectorAll(
@@ -229,6 +263,12 @@ function closeAllSubmenus() {
             }
         );
 }
+
+/*
+=========================================================
+OUTSIDE CLICK
+=========================================================
+*/
 
 function handleOutsideClick(
     event
@@ -254,6 +294,12 @@ function handleOutsideClick(
 
     closeAllSubmenus();
 }
+
+/*
+=========================================================
+VIEWPORT CHANGE
+=========================================================
+*/
 
 function handleViewportChange() {
     document
@@ -287,6 +333,12 @@ function handleViewportChange() {
             }
         );
 }
+
+/*
+=========================================================
+INITIALIZE SIDEBAR SUBMENUS
+=========================================================
+*/
 
 export function initializeSidebarSubmenus() {
     const sidebar =

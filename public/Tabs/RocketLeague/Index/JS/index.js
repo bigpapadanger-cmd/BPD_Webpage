@@ -1,17 +1,28 @@
 "use strict";
+
+/*
+=========================================================
+BPD GAMING NETWORK
+ROCKET LEAGUE PAGE INITIALIZER
+
+Purpose:
+    Initializes Rocket League homepage-specific behavior.
+=========================================================
+*/
+
 import {
-    initializeButtons
-} from "./login_logout.js";
+    initializeEpicConnection
+} from "./connect_epic.js";
+
 import {
     initializeRocketLeagueAuthView
 } from "./auth.js";
-import {
-    initializeSidebarSubmenus
-} from "./submenu.js";
+
 export async function initializePage() {
     document.body.dataset.page =
         "rocket-league";
-    initializeButtons();
-    initializeSidebarSubmenus();
+
+    initializeEpicConnection();
+
     await initializeRocketLeagueAuthView();
 }
