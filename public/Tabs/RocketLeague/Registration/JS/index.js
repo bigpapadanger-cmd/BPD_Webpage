@@ -5,7 +5,7 @@ BPD GAMING NETWORK
 ROCKET LEAGUE REGISTRATION CLIENT
 
 File:
-    /Tabs/RocketLeague/Profile/JS/index.js
+    /Tabs/RocketLeague/Registration/JS/index.js
 
 Purpose:
     Handles initial Rocket League profile setup.
@@ -57,7 +57,7 @@ import {
     hasActiveAccount,
     hasLinkedProvider,
     getProvider
-} from "/Framework/Auth/auth.js";
+} from "../../../../Framework/Auth/auth.js";
 
 /* =========================================================
 CONFIGURATION
