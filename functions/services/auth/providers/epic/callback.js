@@ -73,9 +73,8 @@ import {
     OAUTH_MODE_COOKIE,
     OAUTH_ACCOUNT_COOKIE
 } from "../../../config/api_vars.js";
-import {
-    linkRocketLeagueAccount
-} from "../../../rl/link_account.js";
+
+
 import {
     getCookie,
     clearCookie,
@@ -424,13 +423,7 @@ async function resolveEpicIdentity(
         );
     }
 
-    await linkRocketLeagueAccount(
-        env,
-        {
-            accountId,
-            epicAccountId
-        }
-    );
+
 
     return {
         accountId,
@@ -514,16 +507,7 @@ async function linkEpicIdentity(
         throw error;
     }
 
-    await linkRocketLeagueAccount(
-        env,
-        {
-            accountId:
-                resolvedAccountId,
 
-            epicAccountId:
-                epicProfile.epicAccountId
-        }
-    );
 
     return {
         accountId:
