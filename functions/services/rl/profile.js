@@ -1484,7 +1484,8 @@ async function handleProfileGet(
     ===================================================== */
 
     const presenceEligible =
-        rocketLeagueAccess ===
+        profileExists
+        && epicUser.linked ===
             true
         && profile.active ===
             true
