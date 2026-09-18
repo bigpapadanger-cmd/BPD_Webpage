@@ -2,14 +2,18 @@
 
 /* =========================================================
 BPD GAMING NETWORK
-ACCOUNT PROVIDER LINK SERVICE
+ACCOUNT PROVIDER AUTHORIZATION SERVICE
 
 File:
     functions/services/auth/account/link_provider.js
 
 Purpose:
-    Starts an explicit provider-linking flow for an already
-    authenticated global BPD account.
+    Starts an explicit provider authentication flow for an
+    already authenticated global BPD account.
+
+Supported Operations:
+    - Link a provider that is not currently linked.
+    - Reauthorize a provider that is already linked.
 
 Supported Providers:
     - Google
@@ -35,38 +39,40 @@ Flow:
         ↓
     Validate provider
         ↓
-    Verify provider is not already linked
+    Check authoritative provider linkage in Supabase
         ↓
-    Start provider-specific OAuth flow
+    Missing provider
+        -> mode = link
+        ↓
+    Existing provider
+        -> mode = reauthorize
+        ↓
+    Start provider-specific authentication flow
         ↓
     Provider callback
         ↓
-    Link provider identity to existing BPD account
+    Complete link or reauthorization
 
 Security:
     - Requires an authenticated active canonical BPD account.
     - identity.accounts.id comes only from trusted session
       authorization.
     - Browser input never determines the target account ID.
-    - Google/Discord link mode stores trusted account context
-      in short-lived HttpOnly cookies.
+    - Provider linkage state is verified against Supabase.
+    - Google/Discord OAuth stores trusted account context in
+      short-lived HttpOnly cookies.
     - Epic receives the trusted account ID through its
       server-created OAuth context.
-    - Provider ownership is finalized only after successful
-      provider authentication in the callback.
+    - Provider ownership must be proven again during
+      reauthorization.
     - SUPABASE_AUTH is never exposed to the browser.
-
-Supabase OAuth:
-    - Supabase origin comes from env.SUPABASE_URL.
-    - Public authorize API key comes from env.SB_PUB_KEY.
-    - Callback URL is derived from the current request.
-    - No static callback/authorize URL configuration is
-      required.
 
 Important:
     - This service NEVER creates identity.accounts.
     - Email is never used to determine account ownership.
     - OAuth verifier/state values must never be logged.
+    - An existing provider is NOT an error.
+    - Existing providers enter reauthorize mode.
 ========================================================= */
 
 import {
@@ -92,6 +98,11 @@ import {
 } from "../providers/epic/login.js";
 
 import {
+    OAUTH_MODE_LINK,
+    OAUTH_MODE_REAUTHORIZE
+} from "../oauth/state.js";
+
+import {
     OAUTH_MODE_COOKIE,
     OAUTH_PROVIDER_COOKIE,
     OAUTH_ACCOUNT_COOKIE,
@@ -103,9 +114,6 @@ import {
 /* =========================================================
 CONSTANTS
 ========================================================= */
-
-const OAUTH_MODE_LINK =
-    "link";
 
 const DEFAULT_RETURN_TO =
     "/Account";
@@ -392,6 +400,18 @@ function getProviderConfig(
 }
 
 /* =========================================================
+OAUTH MODE
+========================================================= */
+
+function resolveProviderAuthorizationMode(
+    existingProviderIdentity
+) {
+    return existingProviderIdentity
+        ? OAUTH_MODE_REAUTHORIZE
+        : OAUTH_MODE_LINK;
+}
+
+/* =========================================================
 SUPABASE CALLBACK URL
 ========================================================= */
 
@@ -413,8 +433,18 @@ function createSupabaseOAuthContextCookies(
     provider,
     accountId,
     verifier,
-    returnTo
+    returnTo,
+    mode
 ) {
+    if (
+        mode !== OAUTH_MODE_LINK
+        && mode !== OAUTH_MODE_REAUTHORIZE
+    ) {
+        throw new Error(
+            "OAUTH_MODE_INVALID"
+        );
+    }
+
     const pkceCookie =
         createCookie(
             request,
@@ -435,7 +465,7 @@ function createSupabaseOAuthContextCookies(
         createCookie(
             request,
             OAUTH_MODE_COOKIE,
-            OAUTH_MODE_LINK,
+            mode,
             OAUTH_COOKIE_MAX_AGE_SECONDS
         );
 
@@ -539,15 +569,16 @@ function buildSupabaseAuthorizeUrl(
 }
 
 /* =========================================================
-SUPABASE PROVIDER LINK FLOW
+SUPABASE PROVIDER AUTHORIZATION FLOW
 ========================================================= */
 
-async function startSupabaseProviderLink(
+async function startSupabaseProviderAuthorization(
     request,
     env,
     accountId,
     provider,
-    returnTo
+    returnTo,
+    mode
 ) {
     const providerConfig =
         getProviderConfig(
@@ -561,6 +592,15 @@ async function startSupabaseProviderLink(
     ) {
         throw new Error(
             "SUPABASE_PROVIDER_CONFIG_INVALID"
+        );
+    }
+
+    if (
+        mode !== OAUTH_MODE_LINK
+        && mode !== OAUTH_MODE_REAUTHORIZE
+    ) {
+        throw new Error(
+            "OAUTH_MODE_INVALID"
         );
     }
 
@@ -595,14 +635,15 @@ async function startSupabaseProviderLink(
             providerConfig.provider,
             accountId,
             verifier,
-            returnTo
+            returnTo,
+            mode
         );
 
     if (
         !cookies
     ) {
         throw new Error(
-            "OAUTH_LINK_COOKIE_CREATION_FAILED"
+            "OAUTH_CONTEXT_COOKIE_CREATION_FAILED"
         );
     }
 
@@ -613,14 +654,15 @@ async function startSupabaseProviderLink(
 }
 
 /* =========================================================
-EPIC PROVIDER LINK FLOW
+EPIC PROVIDER AUTHORIZATION FLOW
 ========================================================= */
 
-function startEpicProviderLink(
+function startEpicProviderAuthorization(
     request,
     env,
     accountId,
-    returnTo
+    returnTo,
+    mode
 ) {
     /*
      * accountId originates from authorizeRequest().
@@ -628,13 +670,21 @@ function startEpicProviderLink(
      * It is never accepted from the browser.
      */
 
+    if (
+        mode !== OAUTH_MODE_LINK
+        && mode !== OAUTH_MODE_REAUTHORIZE
+    ) {
+        throw new Error(
+            "OAUTH_MODE_INVALID"
+        );
+    }
+
     const authorization =
         startEpicAuthorization(
             request,
             env,
             {
-                mode:
-                    OAUTH_MODE_LINK,
+                mode,
 
                 accountId,
 
@@ -649,15 +699,16 @@ function startEpicProviderLink(
 }
 
 /* =========================================================
-START PROVIDER LINK
+START PROVIDER AUTHORIZATION
 ========================================================= */
 
-async function startProviderLink(
+async function startProviderAuthorization(
     request,
     env,
     accountId,
     provider,
-    returnTo
+    returnTo,
+    mode
 ) {
     const providerConfig =
         getProviderConfig(
@@ -676,12 +727,13 @@ async function startProviderLink(
         providerConfig.authEngine ===
         "supabase"
     ) {
-        return startSupabaseProviderLink(
+        return startSupabaseProviderAuthorization(
             request,
             env,
             accountId,
             provider,
-            returnTo
+            returnTo,
+            mode
         );
     }
 
@@ -689,11 +741,12 @@ async function startProviderLink(
         providerConfig.authEngine ===
         "epic"
     ) {
-        return startEpicProviderLink(
+        return startEpicProviderAuthorization(
             request,
             env,
             accountId,
-            returnTo
+            returnTo,
+            mode
         );
     }
 
@@ -723,7 +776,7 @@ function getAuthorizationErrorResponse(
                     "AUTH_REQUIRED",
 
                 message:
-                    "You must be signed in to link an account provider.",
+                    "You must be signed in to manage an account provider.",
 
                 debugId
             },
@@ -783,7 +836,7 @@ function getAuthorizationErrorResponse(
                 || "AUTHORIZATION_FAILED",
 
             message:
-                "Your BPD account could not be authorized for provider linking.",
+                "Your BPD account could not be authorized for provider authentication.",
 
             debugId
         },
@@ -890,7 +943,7 @@ export async function handleLinkProvider(
                         "UNSUPPORTED_PROVIDER",
 
                     message:
-                        "The requested account provider cannot be linked.",
+                        "The requested account provider cannot be authenticated.",
 
                     debugId
                 },
@@ -924,12 +977,16 @@ export async function handleLinkProvider(
         }
 
         /* =================================================
-        AUTHORITATIVE EXISTING PROVIDER CHECK
+        AUTHORITATIVE PROVIDER STATE
 
-        Supabase is authoritative for linked identities.
+        Supabase decides whether this provider is currently
+        linked to the canonical BPD account.
 
-        Session provider state is intentionally not trusted
-        as the final linkage decision.
+        Missing identity:
+            -> link
+
+        Existing identity:
+            -> reauthorize
         ================================================= */
 
         let existingProviderIdentity =
@@ -947,7 +1004,7 @@ export async function handleLinkProvider(
             error
         ) {
             console.error(
-                "LINK PROVIDER: Existing provider verification failed.",
+                "PROVIDER AUTH: Existing provider verification failed.",
                 {
                     debugId,
 
@@ -984,25 +1041,10 @@ export async function handleLinkProvider(
             );
         }
 
-        if (
-            existingProviderIdentity
-        ) {
-            return json(
-                {
-                    success:
-                        false,
-
-                    code:
-                        "PROVIDER_ALREADY_LINKED",
-
-                    message:
-                        `${providerConfig.label} is already linked to your BPD account.`,
-
-                    debugId
-                },
-                409
+        const mode =
+            resolveProviderAuthorizationMode(
+                existingProviderIdentity
             );
-        }
 
         /* =================================================
         RETURN DESTINATION
@@ -1014,18 +1056,25 @@ export async function handleLinkProvider(
             );
 
         /* =================================================
-        START LINK
+        START PROVIDER AUTHENTICATION
         ================================================= */
 
         console.info(
-            "LINK PROVIDER: Link flow started.",
+            "PROVIDER AUTH: Authentication flow started.",
             {
                 debugId,
 
                 provider,
 
+                mode,
+
                 authEngine:
                     providerConfig.authEngine,
+
+                alreadyLinked:
+                    Boolean(
+                        existingProviderIdentity
+                    ),
 
                 hasAccountId:
                     true,
@@ -1034,19 +1083,20 @@ export async function handleLinkProvider(
             }
         );
 
-        return await startProviderLink(
+        return await startProviderAuthorization(
             request,
             env,
             accountId,
             provider,
-            returnTo
+            returnTo,
+            mode
         );
     }
     catch (
         error
     ) {
         console.error(
-            "LINK PROVIDER: Unexpected failure.",
+            "PROVIDER AUTH: Unexpected failure.",
             {
                 debugId,
 
@@ -1065,7 +1115,7 @@ export async function handleLinkProvider(
         );
 
         let code =
-            "LINK_PROVIDER_FAILED";
+            "PROVIDER_AUTH_START_FAILED";
 
         if (
             error?.message ===
@@ -1088,6 +1138,13 @@ export async function handleLinkProvider(
             code =
                 "SUPABASE_URL_INVALID";
         }
+        else if (
+            error?.message ===
+            "OAUTH_MODE_INVALID"
+        ) {
+            code =
+                "OAUTH_MODE_INVALID";
+        }
 
         return json(
             {
@@ -1097,7 +1154,7 @@ export async function handleLinkProvider(
                 code,
 
                 message:
-                    "Account provider linking could not be started.",
+                    "Account provider authentication could not be started.",
 
                 debugId
             },

@@ -14,15 +14,31 @@ Purpose:
 Description:
     - Reads OAuth provider context.
     - Reads OAuth operation mode.
+    - Supports login, link, and reauthorize modes.
     - Reads PKCE verification data.
-    - Reads explicit account-link targets.
+    - Reads explicit account targets for link/reauthorize.
     - Reads and validates local return destinations.
     - Clears temporary OAuth cookies after completion.
+
+OAuth Modes:
+    login
+        Provider authentication establishes or refreshes the
+        user's BPD browser login.
+
+    link
+        Provider authentication proves ownership of a provider
+        that is not yet linked to the current BPD account.
+
+    reauthorize
+        Provider authentication proves ownership again for a
+        provider already linked to the current BPD account.
 
 Important:
     - Temporary OAuth cookies are HttpOnly.
     - Return destinations must remain local.
     - Missing mode defaults to login for compatibility.
+    - Link and reauthorize targets must come from trusted
+      server-created OAuth context.
 ========================================================= */
 
 import {
@@ -47,6 +63,9 @@ export const OAUTH_MODE_LOGIN =
 
 export const OAUTH_MODE_LINK =
     "link";
+
+export const OAUTH_MODE_REAUTHORIZE =
+    "reauthorize";
 
 const DEFAULT_RETURN_TO =
     "/Account";
@@ -79,6 +98,12 @@ export function getOAuthMode(
         )
             .toLowerCase();
 
+    /*
+     * Compatibility behavior:
+     *
+     * Older login flows may not have written an explicit
+     * mode cookie.
+     */
     if (
         !mode
     ) {
@@ -88,11 +113,63 @@ export function getOAuthMode(
     if (
         mode === OAUTH_MODE_LOGIN
         || mode === OAUTH_MODE_LINK
+        || mode === OAUTH_MODE_REAUTHORIZE
     ) {
         return mode;
     }
 
     return null;
+}
+
+/* =========================================================
+MODE HELPERS
+========================================================= */
+
+export function isOAuthLoginMode(
+    mode
+) {
+    return normalizeString(
+        mode
+    )
+        .toLowerCase() ===
+        OAUTH_MODE_LOGIN;
+}
+
+export function isOAuthLinkMode(
+    mode
+) {
+    return normalizeString(
+        mode
+    )
+        .toLowerCase() ===
+        OAUTH_MODE_LINK;
+}
+
+export function isOAuthReauthorizeMode(
+    mode
+) {
+    return normalizeString(
+        mode
+    )
+        .toLowerCase() ===
+        OAUTH_MODE_REAUTHORIZE;
+}
+
+export function isOAuthExistingAccountMode(
+    mode
+) {
+    const normalizedMode =
+        normalizeString(
+            mode
+        )
+            .toLowerCase();
+
+    return (
+        normalizedMode ===
+            OAUTH_MODE_LINK
+        || normalizedMode ===
+            OAUTH_MODE_REAUTHORIZE
+    );
 }
 
 /* =========================================================
@@ -127,7 +204,13 @@ export function getOAuthPkceVerifier(
 }
 
 /* =========================================================
-ACCOUNT LINK TARGET
+ACCOUNT TARGET
+
+Used by explicit provider link and reauthorization flows.
+
+The value originates from trusted server-created OAuth
+context and must never be accepted directly from arbitrary
+browser input as account ownership.
 ========================================================= */
 
 export function getOAuthAccountId(

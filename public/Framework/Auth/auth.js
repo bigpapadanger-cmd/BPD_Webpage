@@ -152,15 +152,65 @@ function normalizeRole(
 function normalizeTimestamp(
     value
 ) {
-    const timestamp =
-        Number(
+    if (
+        value === null
+        || value === undefined
+        || value === ""
+    ) {
+        return null;
+    }
+
+    if (
+        typeof value ===
+        "number"
+        && Number.isFinite(
             value
+        )
+    ) {
+        return value;
+    }
+
+    const stringValue =
+        normalizeString(
+            String(
+                value
+            )
+        );
+
+    if (
+        !stringValue
+    ) {
+        return null;
+    }
+
+    /*
+     * Preserve numeric timestamp strings.
+     */
+    const numericValue =
+        Number(
+            stringValue
+        );
+
+    if (
+        Number.isFinite(
+            numericValue
+        )
+    ) {
+        return numericValue;
+    }
+
+    /*
+     * Support ISO timestamps returned by provider auth state.
+     */
+    const parsedValue =
+        Date.parse(
+            stringValue
         );
 
     return Number.isFinite(
-        timestamp
+        parsedValue
     )
-        ? timestamp
+        ? parsedValue
         : null;
 }
 
@@ -375,18 +425,58 @@ function normalizeProvider(
         return null;
     }
 
+    const linked =
+        providerData?.linked ===
+        true;
+
+    const authenticated =
+        providerData?.authenticated ===
+        true;
+
+    const authorized =
+        providerData?.authorized ===
+        true;
+
+    const requiresReauthorization =
+        linked ===
+            true
+        && providerData
+            ?.requiresReauthorization ===
+            true;
+
     return {
         provider:
             name,
 
-        linked:
-            providerData?.linked ===
-            true,
+        /*
+         * Permanent linkage.
+         *
+         * Source:
+         * Supabase identity.account_identities
+         */
+        linked,
 
-        authenticated:
-            providerData?.authenticated ===
-            true,
+        /*
+         * Current temporary provider authentication state.
+         *
+         * Source:
+         * Cloudflare KV freshness policy.
+         */
+        authenticated,
 
+        authorized,
+
+        requiresReauthorization,
+
+        reauthorizationReason:
+            normalizeNullableString(
+                providerData
+                    ?.reauthorizationReason
+            ),
+
+        /*
+         * External provider subject / account identifier.
+         */
         accountId:
             normalizeNullableString(
                 providerData?.accountId
@@ -399,7 +489,8 @@ function normalizeProvider(
 
         preferredUsername:
             normalizeNullableString(
-                providerData?.preferredUsername
+                providerData
+                    ?.preferredUsername
             ),
 
         email:
@@ -407,14 +498,38 @@ function normalizeProvider(
                 providerData?.email
             ),
 
+        /*
+         * Successful provider authentication timestamp.
+         */
         authenticatedAt:
             normalizeTimestamp(
-                providerData?.authenticatedAt
+                providerData
+                    ?.authenticatedAt
             ),
 
+        /*
+         * Permanent provider-link timestamp.
+         */
         linkedAt:
             normalizeTimestamp(
                 providerData?.linkedAt
+            ),
+
+        /*
+         * Firm provider authentication expiration.
+         */
+        expiresAt:
+            normalizeTimestamp(
+                providerData?.expiresAt
+            ),
+
+        /*
+         * Account-wide login-gap cutoff.
+         */
+        providerReauthAfter:
+            normalizeTimestamp(
+                providerData
+                    ?.providerReauthAfter
             )
     };
 }
@@ -1183,6 +1298,64 @@ export function hasLinkedProvider(
             ?.includes(
                 providerName
             )
+    );
+}
+
+export function hasAuthorizedProvider(
+    provider,
+    state =
+        currentState
+) {
+    if (
+        !hasActiveAccount(
+            state
+        )
+    ) {
+        return false;
+    }
+
+    const providerContext =
+        getProvider(
+            provider,
+            state
+        );
+
+    return (
+        providerContext?.linked ===
+            true
+        && providerContext?.authorized ===
+            true
+        && providerContext
+            ?.requiresReauthorization !==
+            true
+    );
+}
+
+export function requiresProviderReauthorization(
+    provider,
+    state =
+        currentState
+) {
+    if (
+        !hasActiveAccount(
+            state
+        )
+    ) {
+        return false;
+    }
+
+    const providerContext =
+        getProvider(
+            provider,
+            state
+        );
+
+    return (
+        providerContext?.linked ===
+            true
+        && providerContext
+            ?.requiresReauthorization ===
+            true
     );
 }
 

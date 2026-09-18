@@ -12,16 +12,40 @@ Purpose:
     for the current browser session.
 
 Description:
-    - Reads the centralized BPD session context.
-    - Returns the canonical global account identity.
-    - Loads safe canonical account data through the exposed
-      api.get_account_session_identity Supabase RPC.
-    - Returns normalized provider authentication state.
-    - Returns safe session timing information.
+    - Reads the centralized BPD browser session.
+    - Loads the canonical global BPD account.
+    - Loads permanent provider linkage from Supabase.
+    - Loads temporary provider authentication freshness
+      from Cloudflare KV.
+    - Builds linkedProviders from permanent Supabase linkage.
+    - Builds authenticatedProviders from current KV
+      authorization freshness.
+    - Returns normalized safe provider state for the client.
     - Never exposes raw Cloudflare KV session data.
     - Never exposes provider access tokens or secrets.
     - Never queries the private identity schema directly
       through PostgREST.
+
+Provider State Model:
+
+    linked
+        Permanent provider ownership exists in Supabase.
+
+    authenticated
+        The linked provider currently satisfies the KV
+        authentication-freshness policy.
+
+    requiresReauthorization
+        The provider remains permanently linked, but the
+        user must authenticate it again.
+
+Authority:
+
+    Supabase
+        Permanent account/provider ownership.
+
+    Cloudflare KV
+        Temporary provider authentication freshness.
 
 Identity:
     user.userId
@@ -32,12 +56,11 @@ Identity:
 
 Important:
     - authenticated means a valid BPD browser session exists.
-    - Global account display name is separate from provider
-      usernames/display names.
+    - linkedProviders must not depend on the current session's
+      provider cache.
+    - Logout does not remove permanent provider linkage.
+    - A provider may be linked while not currently authorized.
     - Rocket League access is NOT determined here.
-    - Epic authentication is NOT required for global BPD auth.
-    - Google authentication is NOT required if another valid
-      provider established the BPD session.
 ========================================================= */
 
 import {
@@ -47,6 +70,26 @@ import {
 import {
     getSessionContext
 } from "../sessions/session_context.js";
+
+import {
+    verifyAccountProviderIdentity
+} from "../providers/provider_identity.js";
+
+import {
+    getProviderAuthorizationState
+} from "../providers/provider_auth_state.js";
+
+/* =========================================================
+SUPPORTED PROVIDERS
+========================================================= */
+
+const SUPPORTED_PROVIDERS =
+    Object.freeze([
+        "epic",
+        "google",
+        "discord",
+        "steam"
+    ]);
 
 /* =========================================================
 NORMALIZATION
@@ -77,6 +120,54 @@ function normalizeNullableString(
         || null;
 }
 
+function normalizeProviderName(
+    value
+) {
+    return normalizeString(
+        value
+    )
+        .toLowerCase();
+}
+
+function normalizeTimestamp(
+    value
+) {
+    if (
+        value === null
+        || value === undefined
+        || value === ""
+    ) {
+        return null;
+    }
+
+    const numeric =
+        Number(
+            value
+        );
+
+    if (
+        Number.isFinite(
+            numeric
+        )
+        && numeric > 0
+    ) {
+        return numeric;
+    }
+
+    const parsed =
+        Date.parse(
+            String(
+                value
+            )
+        );
+
+    return Number.isFinite(
+        parsed
+    )
+        ? parsed
+        : null;
+}
+
 /* =========================================================
 SAFE PROVIDER
 ========================================================= */
@@ -97,10 +188,10 @@ function sanitizeProvider(
 
     return {
         provider:
-            typeof provider.provider ===
-                "string"
-                ? provider.provider
-                : null,
+            normalizeProviderName(
+                provider.provider
+            )
+            || null,
 
         linked:
             provider.linked ===
@@ -110,51 +201,58 @@ function sanitizeProvider(
             provider.authenticated ===
             true,
 
+        authorized:
+            provider.authorized ===
+            true,
+
+        requiresReauthorization:
+            provider.requiresReauthorization ===
+            true,
+
+        reauthorizationReason:
+            normalizeNullableString(
+                provider.reauthorizationReason
+            ),
+
         accountId:
-            typeof provider.accountId ===
-                "string"
-                ? provider.accountId
-                : null,
+            normalizeNullableString(
+                provider.accountId
+            ),
 
         displayName:
-            typeof provider.displayName ===
-                "string"
-                ? provider.displayName
-                : null,
+            normalizeNullableString(
+                provider.displayName
+            ),
 
         preferredUsername:
-            typeof provider.preferredUsername ===
-                "string"
-                ? provider.preferredUsername
-                : null,
+            normalizeNullableString(
+                provider.preferredUsername
+            ),
 
         email:
-            typeof provider.email ===
-                "string"
-                ? provider.email
-                : null,
+            normalizeNullableString(
+                provider.email
+            ),
 
         authenticatedAt:
-            Number.isFinite(
-                Number(
-                    provider.authenticatedAt
-                )
-            )
-                ? Number(
-                    provider.authenticatedAt
-                )
-                : null,
+            normalizeTimestamp(
+                provider.authenticatedAt
+            ),
 
         linkedAt:
-            Number.isFinite(
-                Number(
-                    provider.linkedAt
-                )
+            normalizeTimestamp(
+                provider.linkedAt
+            ),
+
+        expiresAt:
+            normalizeTimestamp(
+                provider.expiresAt
+            ),
+
+        providerReauthAfter:
+            normalizeTimestamp(
+                provider.providerReauthAfter
             )
-                ? Number(
-                    provider.linkedAt
-                )
-                : null
     };
 }
 
@@ -199,8 +297,20 @@ function sanitizeProviders(
             continue;
         }
 
+        const normalizedProvider =
+            normalizeProviderName(
+                safeProvider.provider
+                || providerName
+            );
+
+        if (
+            !normalizedProvider
+        ) {
+            continue;
+        }
+
         safeProviders[
-            providerName
+            normalizedProvider
         ] =
             safeProvider;
     }
@@ -291,26 +401,6 @@ async function getCanonicalAccount(
             configuration.url
         );
 
-    /*
-     * Temporary diagnostic logging.
-     *
-     * Safe:
-     * - Does not log SUPABASE_AUTH.
-     * - Does not log provider tokens.
-     *
-     * Remove once the RPC integration has been verified.
-     
-    console.log(
-        "AUTH SESSION RPC REQUEST:",
-        {
-            url:
-                url.href,
-
-            accountId:
-                normalizedAccountId
-        }
-    );
-    */
     const startedAt =
         Date.now();
 
@@ -356,8 +446,8 @@ async function getCanonicalAccount(
                 response.status,
 
             elapsedMs:
-                Date.now() -
-                startedAt
+                Date.now()
+                - startedAt
         }
     );
 
@@ -466,6 +556,314 @@ async function getCanonicalAccount(
 }
 
 /* =========================================================
+SESSION PROVIDER METADATA
+
+The current browser session may contain richer provider
+display metadata from the latest OAuth callback.
+
+It is useful for presentation only.
+
+It does NOT determine whether the provider is permanently
+linked.
+========================================================= */
+
+function getSessionProvider(
+    session,
+    provider
+) {
+    const normalizedProvider =
+        normalizeProviderName(
+            provider
+        );
+
+    if (
+        !normalizedProvider
+    ) {
+        return null;
+    }
+
+    const providerData =
+        session
+            ?.providers
+            ?.[normalizedProvider];
+
+    if (
+        !providerData
+        || typeof providerData !==
+            "object"
+        || Array.isArray(
+            providerData
+        )
+    ) {
+        return null;
+    }
+
+    return providerData;
+}
+
+/* =========================================================
+LOAD PERMANENT PROVIDER IDENTITY
+
+Supabase is the permanent provider-link authority.
+
+A missing/inactive identity returns null.
+
+Operational verification errors propagate so the session
+endpoint does not incorrectly claim that the provider is
+unlinked.
+========================================================= */
+
+async function loadPermanentProvider(
+    env,
+    accountId,
+    provider
+) {
+    return verifyAccountProviderIdentity(
+        env,
+        accountId,
+        provider
+    );
+}
+
+/* =========================================================
+BUILD PROVIDER STATE
+========================================================= */
+
+async function buildProviderState(
+    env,
+    session,
+    accountId,
+    provider
+) {
+    const normalizedProvider =
+        normalizeProviderName(
+            provider
+        );
+
+    const permanentIdentity =
+        await loadPermanentProvider(
+            env,
+            accountId,
+            normalizedProvider
+        );
+
+    /*
+     * No permanent provider identity means the provider is
+     * not linked, regardless of anything remaining in the
+     * current session provider cache.
+     */
+    if (
+        !permanentIdentity
+    ) {
+        return null;
+    }
+
+    const authorizationState =
+        await getProviderAuthorizationState(
+            env,
+            accountId,
+            normalizedProvider
+        );
+
+    const sessionProvider =
+        getSessionProvider(
+            session,
+            normalizedProvider
+        );
+
+    const authenticated =
+        authorizationState
+            ?.authorized ===
+        true;
+
+    return {
+        provider:
+            normalizedProvider,
+
+        linked:
+            true,
+
+        authenticated,
+
+        authorized:
+            authenticated,
+
+        requiresReauthorization:
+            authorizationState
+                ?.requiresReauthorization ===
+            true,
+
+        reauthorizationReason:
+            normalizeNullableString(
+                authorizationState
+                    ?.reason
+            ),
+
+        /*
+         * External provider identity.
+         *
+         * This value comes from authoritative Supabase
+         * identity.account_identities data.
+         */
+        accountId:
+            normalizeNullableString(
+                permanentIdentity
+                    .providerSubject
+            ),
+
+        /*
+         * Prefer current-session presentation data when it
+         * exists, then fall back to permanent provider
+         * metadata from Supabase.
+         */
+        displayName:
+            normalizeNullableString(
+                sessionProvider
+                    ?.displayName
+            )
+            || normalizeNullableString(
+                permanentIdentity
+                    .displayUsername
+            ),
+
+        preferredUsername:
+            normalizeNullableString(
+                sessionProvider
+                    ?.preferredUsername
+            )
+            || normalizeNullableString(
+                permanentIdentity
+                    .displayUsername
+            ),
+
+        email:
+            normalizeNullableString(
+                sessionProvider
+                    ?.email
+            )
+            || normalizeNullableString(
+                permanentIdentity
+                    .providerEmail
+            ),
+
+        /*
+         * Provider freshness comes from KV.
+         */
+        authenticatedAt:
+            normalizeTimestamp(
+                authorizationState
+                    ?.connectedAt
+            ),
+
+        expiresAt:
+            normalizeTimestamp(
+                authorizationState
+                    ?.expiresAt
+            ),
+
+        providerReauthAfter:
+            normalizeTimestamp(
+                authorizationState
+                    ?.providerReauthAfter
+            ),
+
+        /*
+         * Permanent linkage timestamp comes from Supabase.
+         */
+        linkedAt:
+            normalizeTimestamp(
+                permanentIdentity
+                    .linkedAt
+            )
+    };
+}
+
+/* =========================================================
+LOAD ACCOUNT PROVIDERS
+
+All supported providers are independently verified against
+Supabase.
+
+This intentionally does NOT use session.linkedProviders as
+the ownership source.
+========================================================= */
+
+async function loadAccountProviders(
+    env,
+    session,
+    accountId
+) {
+    const results =
+        await Promise.all(
+            SUPPORTED_PROVIDERS.map(
+                async provider => ({
+                    provider,
+
+                    state:
+                        await buildProviderState(
+                            env,
+                            session,
+                            accountId,
+                            provider
+                        )
+                })
+            )
+        );
+
+    const providers =
+        {};
+
+    const linkedProviders =
+        [];
+
+    const authenticatedProviders =
+        [];
+
+    for (
+        const result
+        of results
+    ) {
+        const providerState =
+            result.state;
+
+        if (
+            !providerState
+        ) {
+            continue;
+        }
+
+        providers[
+            result.provider
+        ] =
+            providerState;
+
+        linkedProviders.push(
+            result.provider
+        );
+
+        if (
+            providerState.authenticated ===
+            true
+        ) {
+            authenticatedProviders.push(
+                result.provider
+            );
+        }
+    }
+
+    return {
+        providers:
+            sanitizeProviders(
+                providers
+            ),
+
+        linkedProviders,
+
+        authenticatedProviders
+    };
+}
+
+/* =========================================================
 UNAUTHENTICATED RESPONSE
 ========================================================= */
 
@@ -523,73 +921,112 @@ export async function handleAuthSession(
 
         /* =================================================
         CANONICAL ACCOUNT
-
-        A valid browser session can technically exist without
-        a canonical account ID during transitional OAuth
-        states.
-
-        In that case authenticated remains true, but userId
-        and displayName remain null. Client account policy
-        will classify that state as account_invalid.
         ================================================= */
 
-        let account =
-            null;
+        const sessionAccountId =
+            normalizeString(
+                session.userId
+            );
 
         if (
-            session.userId
+            !sessionAccountId
         ) {
-            account =
-                await getCanonicalAccount(
-                    env,
-                    session.userId
-                );
+            return json(
+                {
+                    success:
+                        false,
 
-            if (
-                !account
-            ) {
-                console.error(
-                    "AUTH SESSION SERVICE: Session references a missing canonical account.",
-                    {
-                        debugId
-                    }
-                );
+                    authenticated:
+                        false,
 
-                return json(
-                    {
-                        success:
-                            false,
+                    user:
+                        null,
 
-                        authenticated:
-                            false,
+                    providers:
+                        {},
 
-                        user:
-                            null,
+                    linkedProviders:
+                        [],
 
-                        providers:
-                            {},
+                    authenticatedProviders:
+                        [],
 
-                        linkedProviders:
-                            [],
+                    session:
+                        null,
 
-                        authenticatedProviders:
-                            [],
+                    code:
+                        "ACCOUNT_IDENTITY_MISSING",
 
-                        session:
-                            null,
+                    message:
+                        "The authenticated session has no canonical BPD account identity.",
 
-                        code:
-                            "ACCOUNT_NOT_FOUND",
-
-                        message:
-                            "The authenticated account could not be resolved.",
-
-                        debugId
-                    },
-                    500
-                );
-            }
+                    debugId
+                },
+                500
+            );
         }
+
+        const account =
+            await getCanonicalAccount(
+                env,
+                sessionAccountId
+            );
+
+        if (
+            !account
+        ) {
+            console.error(
+                "AUTH SESSION SERVICE: Session references a missing canonical account.",
+                {
+                    debugId
+                }
+            );
+
+            return json(
+                {
+                    success:
+                        false,
+
+                    authenticated:
+                        false,
+
+                    user:
+                        null,
+
+                    providers:
+                        {},
+
+                    linkedProviders:
+                        [],
+
+                    authenticatedProviders:
+                        [],
+
+                    session:
+                        null,
+
+                    code:
+                        "ACCOUNT_NOT_FOUND",
+
+                    message:
+                        "The authenticated account could not be resolved.",
+
+                    debugId
+                },
+                500
+            );
+        }
+
+        /* =================================================
+        PERMANENT PROVIDER LINKAGE + AUTH FRESHNESS
+        ================================================= */
+
+        const providerState =
+            await loadAccountProviders(
+                env,
+                session,
+                account.userId
+            );
 
         /* =================================================
         RESPONSE
@@ -604,65 +1041,48 @@ export async function handleAuthSession(
                     true,
 
                 user: {
-                    /*
-                     * Canonical global BPD account ID.
-                     *
-                     * identity.accounts.id
-                     */
                     userId:
-                        account?.userId
-                        || session.userId
-                        || null,
+                        account.userId,
 
-                    /*
-                     * Canonical user-editable BPD display
-                     * name.
-                     *
-                     * identity.accounts.display_name
-                     */
                     displayName:
-                        account?.displayName
-                        || null,
+                        account.displayName,
 
-                    /*
-                     * Use the canonical account row when it
-                     * was successfully resolved.
-                     */
                     role:
-                        account?.role
+                        account.role
                         || session.role
                         || "user",
 
                     active:
-                        account
-                            ? account.active ===
-                                true
-                            : session.active ===
-                                true
+                        account.active ===
+                        true
                 },
 
+                /*
+                 * Derived from:
+                 *
+                 * Supabase permanent identity linkage
+                 * +
+                 * KV authentication freshness
+                 */
                 providers:
-                    sanitizeProviders(
-                        session.providers
-                    ),
+                    providerState.providers,
 
+                /*
+                 * Permanent Supabase linkage.
+                 *
+                 * This is what the account banner uses.
+                 */
                 linkedProviders:
-                    Array.isArray(
-                        session.linkedProviders
-                    )
-                        ? [
-                            ...session.linkedProviders
-                        ]
-                        : [],
+                    providerState
+                        .linkedProviders,
 
+                /*
+                 * Linked providers whose KV authentication
+                 * freshness is currently authorized.
+                 */
                 authenticatedProviders:
-                    Array.isArray(
-                        session.authenticatedProviders
-                    )
-                        ? [
-                            ...session.authenticatedProviders
-                        ]
-                        : [],
+                    providerState
+                        .authenticatedProviders,
 
                 session: {
                     createdAt:
@@ -691,6 +1111,11 @@ export async function handleAuthSession(
 
                 status:
                     error?.status
+                    || null,
+
+                code:
+                    error?.code
+                    || error?.upstreamCode
                     || null,
 
                 message:

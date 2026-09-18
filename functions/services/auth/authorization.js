@@ -17,6 +17,8 @@ Description:
     - Resolves canonical identity.accounts.id ownership.
     - Requires active global BPD accounts.
     - Verifies linked provider identities against Supabase.
+    - Verifies provider authentication freshness against KV.
+    - Enforces provider reauthorization requirements.
     - Supports global BPD account-role requirements.
     - Returns trusted server-derived authorization context.
     - Provides verified provider identities to downstream
@@ -30,9 +32,21 @@ Security Model:
       context.
     - Provider identity ownership is verified against
       identity.account_identities through Supabase.
+    - Provider authentication freshness is verified using
+      trusted server-side KV state.
     - Provider subjects are never accepted from browsers.
     - Session provider state is convenience metadata only.
     - Verified provider identities come from Supabase.
+
+Provider Authorization Model:
+    - Supabase determines whether a provider is permanently
+      linked to the canonical BPD account.
+    - Cloudflare KV determines whether that provider must be
+      authenticated again.
+    - Provider authorization expires after the configured
+      firm authentication lifetime.
+    - A qualifying BPD login gap forces linked providers to
+      individually authenticate again.
 
 Role Model:
     - requirements.role refers ONLY to the global BPD account
@@ -46,6 +60,7 @@ Role Model:
 Dependency Direction:
     authorization.js
         -> provider_identity.js
+        -> provider_auth_state.js
 
     discord/authorization.js
         -> authorization.js
@@ -62,8 +77,10 @@ Important:
           + active account
     - Protected provider operations additionally require:
           active canonical provider identity in Supabase
+          + valid provider authentication state in KV
     - 401 means authentication is required.
-    - 403 means the authenticated account is not authorized.
+    - 403 means the authenticated account is not authorized
+      or provider reauthentication is required.
     - 503 means an authoritative dependency could not be
       verified and access must fail closed.
 ========================================================= */
@@ -76,6 +93,10 @@ import {
 import {
     verifyAccountProviderIdentity
 } from "./providers/provider_identity.js";
+
+import {
+    getProviderAuthorizationState
+} from "./providers/provider_auth_state.js";
 
 /* =========================================================
 NORMALIZATION
@@ -224,14 +245,15 @@ function createAuthorizationContext(
 
         /*
          * Provider identities that have been authoritatively
-         * verified against Supabase during this request.
+         * verified against Supabase AND confirmed as currently
+         * authorized through provider-auth KV state.
          */
         verifiedProviders:
             {},
 
         /*
-         * Convenience reference to the most recently
-         * required verified provider.
+         * Convenience reference to the most recently required
+         * verified and currently authorized provider.
          */
         provider:
             null,
@@ -376,6 +398,10 @@ VERIFIED PROVIDER LOOKUP
 Returns a provider identity only if it was authoritatively
 verified during this authorization request.
 
+A provider must be:
+    - Active in Supabase.
+    - Currently authorized under provider-auth KV policy.
+
 Session-provider metadata is intentionally ignored here.
 ========================================================= */
 
@@ -402,6 +428,11 @@ export function getVerifiedProvider(
     if (
         !verifiedProvider
         || verifiedProvider.active !==
+            true
+        || verifiedProvider.authorized !==
+            true
+        || verifiedProvider
+            .requiresReauthorization ===
             true
     ) {
         return null;
@@ -439,8 +470,9 @@ export async function requireProvider(
     }
 
     /*
-     * If this provider has already been verified during the
-     * current authorization chain, reuse the trusted result.
+     * If this provider has already been verified and its KV
+     * authorization state confirmed during the current
+     * authorization chain, reuse the trusted result.
      */
     const existingProvider =
         getVerifiedProvider(
@@ -459,6 +491,10 @@ export async function requireProvider(
         };
     }
 
+    /* =====================================================
+    VERIFY PERMANENT PROVIDER LINKAGE
+    ===================================================== */
+
     let providerIdentity;
 
     try {
@@ -473,7 +509,7 @@ export async function requireProvider(
         error
     ) {
         console.error(
-            "AUTHORIZATION: Provider verification failed.",
+            "AUTHORIZATION: Provider identity verification failed.",
             {
                 provider:
                     providerName,
@@ -503,6 +539,10 @@ export async function requireProvider(
         );
     }
 
+    /*
+     * No Supabase identity means the provider is genuinely
+     * not linked to this canonical BPD account.
+     */
     if (
         !providerIdentity
     ) {
@@ -512,10 +552,115 @@ export async function requireProvider(
             403,
             {
                 provider:
-                    providerName
+                    providerName,
+
+                linked:
+                    false,
+
+                requiresReauthorization:
+                    false
             }
         );
     }
+
+    /* =====================================================
+    VERIFY PROVIDER AUTHENTICATION FRESHNESS
+    ===================================================== */
+
+    let providerAuthState;
+
+    try {
+        providerAuthState =
+            await getProviderAuthorizationState(
+                env,
+                authorization.accountId,
+                providerName
+            );
+    }
+    catch (
+        error
+    ) {
+        console.error(
+            "AUTHORIZATION: Provider authentication state verification failed.",
+            {
+                provider:
+                    providerName,
+
+                message:
+                    error?.message
+                    || "Unknown error"
+            }
+        );
+
+        throw new AuthorizationError(
+            "PROVIDER_AUTH_STATE_UNAVAILABLE",
+            "The provider authentication state could not be verified.",
+            503,
+            {
+                provider:
+                    providerName,
+
+                linked:
+                    true
+            }
+        );
+    }
+
+    /*
+     * The permanent Supabase identity still exists, but the
+     * provider authentication proof has expired or was
+     * invalidated by the configured login-gap policy.
+     */
+    if (
+        providerAuthState
+            ?.authorized !==
+        true
+    ) {
+        throw new AuthorizationError(
+            "PROVIDER_REAUTHORIZATION_REQUIRED",
+            `Your ${providerName} account must be authenticated again.`,
+            403,
+            {
+                provider:
+                    providerName,
+
+                linked:
+                    true,
+
+                authorized:
+                    false,
+
+                requiresReauthorization:
+                    true,
+
+                reason:
+                    normalizeString(
+                        providerAuthState
+                            ?.reason
+                    )
+                    || "PROVIDER_REAUTHORIZATION_REQUIRED",
+
+                connectedAt:
+                    providerAuthState
+                        ?.connectedAt
+                    ?? null,
+
+                expiresAt:
+                    providerAuthState
+                        ?.expiresAt
+                    ?? null,
+
+                providerReauthAfter:
+                    providerAuthState
+                        ?.providerReauthAfter
+                    ?? null
+            }
+        );
+    }
+
+    /* =====================================================
+    BUILD VERIFIED PROVIDER
+    ===================================================== */
 
     const verifiedProvider = {
         name:
@@ -549,6 +694,9 @@ export async function requireProvider(
             providerIdentity.linkedAt
             ?? null,
 
+        /*
+         * Supabase's durable identity authentication metadata.
+         */
         lastAuthenticatedAt:
             providerIdentity
                 .lastAuthenticatedAt
@@ -562,16 +710,46 @@ export async function requireProvider(
             providerIdentity.active ===
             true,
 
+        /*
+         * Current provider authorization state.
+         */
+        authorized:
+            true,
+
+        requiresReauthorization:
+            false,
+
+        connectedAt:
+            providerAuthState
+                ?.connectedAt
+            ?? null,
+
+        expiresAt:
+            providerAuthState
+                ?.expiresAt
+            ?? null,
+
+        providerReauthAfter:
+            providerAuthState
+                ?.providerReauthAfter
+            ?? null,
+
+        /*
+         * Identity ownership comes from Supabase.
+         * Authorization freshness comes from KV.
+         */
         source:
-            "database"
+            "database+kv"
     };
 
     /*
      * Defense in depth.
      *
-     * The provider identity service already checks this, but
-     * authorization should not retain malformed provider
-     * context even if its dependency changes later.
+     * The provider identity service already checks the
+     * database identity, and provider_auth_state.js already
+     * checks freshness. Authorization still refuses to retain
+     * malformed provider context if either dependency changes
+     * later.
      */
     if (
         verifiedProvider.name !==
@@ -579,10 +757,15 @@ export async function requireProvider(
         || !verifiedProvider.subject
         || verifiedProvider.active !==
             true
+        || verifiedProvider.authorized !==
+            true
+        || verifiedProvider
+            .requiresReauthorization ===
+            true
     ) {
         throw new AuthorizationError(
             "PROVIDER_IDENTITY_INVALID",
-            "The required authentication provider returned invalid identity data.",
+            "The required authentication provider returned invalid authorization data.",
             503,
             {
                 provider:

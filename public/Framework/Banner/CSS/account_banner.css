@@ -1,33 +1,53 @@
 /* =========================================================
 BPD GAMING NETWORK
-ACCOUNT BANNER INTERACTIONS
+ACCOUNT BANNER
 
 File:
     Framework/Banner/CSS/account_banner.css
 
 Purpose:
-    Styles account-banner provider icons and account actions.
+    Styles the persistent global account banner.
 
 Description:
+    - Styles global account identity and actions.
     - Displays linked providers as compact icon badges.
-    - Provides consistent Profile, Logout, and Sign In controls.
-    - Gives Profile a stronger visual treatment.
-    - Adds hover, focus, active, and disabled states.
-    - Supports fallback provider images.
+    - Supports permanent provider linkage independently from
+      current provider authorization freshness.
+    - Makes providers requiring reauthorization visibly pulse.
+    - Makes reauthorization-required provider icons clickable.
+    - Provides a visible provider reauthorization notice.
+    - Supports keyboard focus and reduced-motion users.
+    - Supports provider image fallbacks.
+
+Provider States:
+    connected
+        Provider is permanently linked and currently valid.
+
+    reauthorization-required
+        Provider is permanently linked but must be verified
+        again before protected provider operations are
+        authorized.
 ========================================================= */
+
 /* =========================================================
-BPD GAMING NETWORK
 ACCOUNT BANNER BASE
 ========================================================= */
 
 .account-banner {
-    position: relative;
-    z-index: 1000;
+    position:
+        relative;
 
-    display: block;
+    z-index:
+        1000;
 
-    width: 100%;
-    min-width: 0;
+    display:
+        block;
+
+    width:
+        100%;
+
+    min-width:
+        0;
 
     background:
         rgba(
@@ -59,12 +79,22 @@ ACCOUNT BANNER BASE
         #ffffff;
 }
 
-.bpd-account-banner__inner {
-    display: flex;
-    align-items: center;
+/* =========================================================
+INNER LAYOUT
+========================================================= */
 
-    width: 100%;
-    min-width: 0;
+.bpd-account-banner__inner {
+    display:
+        flex;
+
+    align-items:
+        center;
+
+    width:
+        100%;
+
+    min-width:
+        0;
 
     min-height:
         var(
@@ -87,9 +117,16 @@ ACCOUNT BANNER BASE
         border-box;
 }
 
+/* =========================================================
+BRAND
+========================================================= */
+
 .bpd-account-banner__brand {
-    display: flex;
-    align-items: center;
+    display:
+        flex;
+
+    align-items:
+        center;
 
     flex:
         0 0 auto;
@@ -118,9 +155,16 @@ ACCOUNT BANNER BASE
         nowrap;
 }
 
+/* =========================================================
+STATUS AREA
+========================================================= */
+
 .bpd-account-banner__status {
-    display: flex;
-    align-items: center;
+    display:
+        flex;
+
+    align-items:
+        center;
 
     flex:
         1 1 auto;
@@ -135,9 +179,16 @@ ACCOUNT BANNER BASE
         #b9bfca;
 }
 
+/* =========================================================
+GENERAL STATUS MESSAGE
+========================================================= */
+
 .bpd-account-banner__message {
     overflow:
         hidden;
+
+    min-width:
+        0;
 
     color:
         #9299a6;
@@ -155,9 +206,22 @@ ACCOUNT BANNER BASE
         nowrap;
 }
 
+/* =========================================================
+USERNAME
+========================================================= */
+
 .bpd-account-banner__username {
     overflow:
         hidden;
+
+    min-width:
+        0;
+
+    max-width:
+        min(
+            240px,
+            28vw
+        );
 
     color:
         #e8e2ff;
@@ -167,6 +231,9 @@ ACCOUNT BANNER BASE
 
     font-weight:
         600;
+
+    line-height:
+        1.2;
 
     text-overflow:
         ellipsis;
@@ -195,51 +262,51 @@ BANNER STATES
         #c4a7a7;
 }
 
-/* =========================================================
-SMALL VIEWPORT BASE
-========================================================= */
-
-@media (max-width: 640px) {
-    .bpd-account-banner__inner {
-        min-height:
-            44px;
-
-        padding:
-            6px
-            10px;
-
-        gap:
-            8px;
-    }
-
-    .bpd-account-banner__network {
-        font-size:
-            0.74rem;
-    }
-
-    .bpd-account-banner__status {
-        gap:
-            5px;
-    }
-
-    .bpd-account-banner__message,
-    .bpd-account-banner__username {
-        font-size:
-            0.7rem;
-    }
+/*
+ * Keep the banner-wide warning subtle.
+ *
+ * The individual provider icon remains the primary visual
+ * reauthorization warning.
+ */
+.bpd-account-banner__inner[
+    data-account-banner-state="reauthorization-required"
+] {
+    border-bottom-color:
+        rgba(
+            245,
+            158,
+            11,
+            0.45
+        );
 }
+
 /* =========================================================
 LINKED PROVIDERS
 ========================================================= */
 
 .bpd-account-banner__providers {
-    display: flex;
-    align-items: center;
-    justify-content: flex-start;
+    display:
+        flex;
 
-    gap: 5px;
+    align-items:
+        center;
 
-    min-width: 0;
+    justify-content:
+        flex-start;
+
+    flex:
+        0 0 auto;
+
+    min-width:
+        0;
+
+    gap:
+        5px;
+}
+
+.bpd-account-banner__providers[hidden] {
+    display:
+        none;
 }
 
 /* =========================================================
@@ -247,16 +314,29 @@ PROVIDER ICON WRAPPER
 ========================================================= */
 
 .bpd-account-banner__provider-icon-wrap {
-    position: relative;
+    position:
+        relative;
 
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
+    display:
+        inline-flex;
 
-    flex: 0 0 auto;
+    align-items:
+        center;
 
-    width: 24px;
-    height: 24px;
+    justify-content:
+        center;
+
+    flex:
+        0 0 auto;
+
+    width:
+        24px;
+
+    height:
+        24px;
+
+    padding:
+        0;
 
     border:
         1px solid
@@ -278,6 +358,18 @@ PROVIDER ICON WRAPPER
             0.035
         );
 
+    color:
+        inherit;
+
+    font:
+        inherit;
+
+    line-height:
+        1;
+
+    box-sizing:
+        border-box;
+
     box-shadow:
         inset 0 0 0 1px
         rgba(
@@ -291,40 +383,30 @@ PROVIDER ICON WRAPPER
         border-color 0.2s ease,
         background 0.2s ease,
         box-shadow 0.2s ease,
-        transform 0.2s ease;
+        transform 0.2s ease,
+        opacity 0.2s ease;
 }
 
 /* =========================================================
-PROVIDER ICON IMAGE
+PASSIVE CONNECTED PROVIDER
 ========================================================= */
 
-.bpd-account-banner__provider-icon {
-    display: block;
-
-    width: 15px;
-    height: 15px;
-
-    max-width: 100%;
-    max-height: 100%;
-
-    object-fit: contain;
-
-    pointer-events: none;
-
-    user-select: none;
+.bpd-account-banner__provider-icon-wrap[
+    data-provider-state="connected"
+] {
+    cursor:
+        default;
 }
 
-/* =========================================================
-PROVIDER ICON HOVER
-========================================================= */
-
-.bpd-account-banner__provider-icon-wrap:hover {
+.bpd-account-banner__provider-icon-wrap[
+    data-provider-state="connected"
+]:hover {
     border-color:
         rgba(
             139,
             92,
             246,
-            0.75
+            0.48
         );
 
     background:
@@ -332,41 +414,422 @@ PROVIDER ICON HOVER
             139,
             92,
             246,
-            0.10
+            0.07
         );
 
     box-shadow:
+        0 0 6px
+        rgba(
+            139,
+            92,
+            246,
+            0.20
+        ),
+        inset 0 0 5px
+        rgba(
+            139,
+            92,
+            246,
+            0.05
+        );
+}
+
+/* =========================================================
+PROVIDER ICON IMAGE
+========================================================= */
+
+.bpd-account-banner__provider-icon {
+    display:
+        block;
+
+    width:
+        15px;
+
+    height:
+        15px;
+
+    max-width:
+        100%;
+
+    max-height:
+        100%;
+
+    object-fit:
+        contain;
+
+    pointer-events:
+        none;
+
+    user-select:
+        none;
+}
+
+/* =========================================================
+REAUTHORIZATION PROVIDER
+
+The JS changes the provider element from a passive span into
+a real button when reauthorization is required.
+========================================================= */
+
+.bpd-account-banner__provider-icon-wrap--reauthorize {
+    appearance:
+        none;
+
+    -webkit-appearance:
+        none;
+
+    border-color:
+        rgba(
+            245,
+            158,
+            11,
+            0.82
+        );
+
+    background:
+        rgba(
+            245,
+            158,
+            11,
+            0.11
+        );
+
+    cursor:
+        pointer;
+
+    box-shadow:
         0 0 8px
-            rgba(
-                139,
-                92,
-                246,
-                0.35
-            ),
+        rgba(
+            245,
+            158,
+            11,
+            0.38
+        ),
         inset 0 0 6px
-            rgba(
-                139,
-                92,
-                246,
-                0.08
-            );
+        rgba(
+            245,
+            158,
+            11,
+            0.08
+        );
+
+    animation:
+        bpd-provider-reauthorize-pulse
+        1.35s
+        ease-in-out
+        infinite;
+}
+
+/* =========================================================
+REAUTHORIZATION WARNING BADGE
+========================================================= */
+
+.bpd-account-banner__provider-icon-wrap--reauthorize::after {
+    content:
+        "!";
+
+    position:
+        absolute;
+
+    top:
+        -5px;
+
+    right:
+        -5px;
+
+    display:
+        flex;
+
+    align-items:
+        center;
+
+    justify-content:
+        center;
+
+    width:
+        12px;
+
+    height:
+        12px;
+
+    border:
+        1px solid
+        rgba(
+            15,
+            17,
+            24,
+            0.95
+        );
+
+    border-radius:
+        999px;
+
+    background:
+        #f59e0b;
+
+    color:
+        #111318;
+
+    font-size:
+        8px;
+
+    font-weight:
+        900;
+
+    line-height:
+        1;
+
+    box-sizing:
+        border-box;
+
+    pointer-events:
+        none;
+
+    box-shadow:
+        0 0 5px
+        rgba(
+            245,
+            158,
+            11,
+            0.75
+        );
+}
+
+/* =========================================================
+REAUTHORIZATION HOVER
+========================================================= */
+
+.bpd-account-banner__provider-icon-wrap--reauthorize:hover {
+    border-color:
+        #fbbf24;
+
+    background:
+        rgba(
+            245,
+            158,
+            11,
+            0.20
+        );
+
+    box-shadow:
+        0 0 10px
+        rgba(
+            245,
+            158,
+            11,
+            0.72
+        ),
+        0 0 20px
+        rgba(
+            245,
+            158,
+            11,
+            0.28
+        ),
+        inset 0 0 7px
+        rgba(
+            245,
+            158,
+            11,
+            0.12
+        );
 
     transform:
         translateY(
             -1px
+        )
+        scale(
+            1.04
         );
+}
+
+/* =========================================================
+REAUTHORIZATION KEYBOARD FOCUS
+========================================================= */
+
+.bpd-account-banner__provider-icon-wrap--reauthorize:focus-visible {
+    outline:
+        2px solid
+        #fbbf24;
+
+    outline-offset:
+        3px;
+
+    border-color:
+        #fbbf24;
+
+    box-shadow:
+        0 0 11px
+        rgba(
+            245,
+            158,
+            11,
+            0.80
+        ),
+        0 0 22px
+        rgba(
+            245,
+            158,
+            11,
+            0.30
+        );
+}
+
+/* =========================================================
+REAUTHORIZATION ACTIVE
+========================================================= */
+
+.bpd-account-banner__provider-icon-wrap--reauthorize:active {
+    transform:
+        translateY(
+            0
+        )
+        scale(
+            0.95
+        );
+}
+
+/* =========================================================
+REAUTHORIZATION ANIMATION
+========================================================= */
+
+@keyframes bpd-provider-reauthorize-pulse {
+    0%,
+    100% {
+        border-color:
+            rgba(
+                245,
+                158,
+                11,
+                0.58
+            );
+
+        background:
+            rgba(
+                245,
+                158,
+                11,
+                0.07
+            );
+
+        box-shadow:
+            0 0 4px
+            rgba(
+                245,
+                158,
+                11,
+                0.20
+            ),
+            inset 0 0 4px
+            rgba(
+                245,
+                158,
+                11,
+                0.05
+            );
+
+        opacity:
+            0.78;
+    }
+
+    50% {
+        border-color:
+            rgba(
+                251,
+                191,
+                36,
+                1
+            );
+
+        background:
+            rgba(
+                245,
+                158,
+                11,
+                0.20
+            );
+
+        box-shadow:
+            0 0 11px
+            rgba(
+                245,
+                158,
+                11,
+                0.78
+            ),
+            0 0 22px
+            rgba(
+                245,
+                158,
+                11,
+                0.28
+            ),
+            inset 0 0 7px
+            rgba(
+                245,
+                158,
+                11,
+                0.10
+            );
+
+        opacity:
+            1;
+    }
+}
+
+/* =========================================================
+PROVIDER REAUTHORIZATION MESSAGE
+========================================================= */
+
+.bpd-account-banner__provider-alert {
+    overflow:
+        hidden;
+
+    min-width:
+        0;
+
+    max-width:
+        min(
+            440px,
+            40vw
+        );
+
+    color:
+        #fbbf24;
+
+    font-size:
+        0.69rem;
+
+    font-weight:
+        600;
+
+    line-height:
+        1.2;
+
+    text-overflow:
+        ellipsis;
+
+    white-space:
+        nowrap;
+}
+
+.bpd-account-banner__provider-alert[hidden] {
+    display:
+        none;
 }
 
 /* =========================================================
 PROVIDER ICON FALLBACK
 ========================================================= */
 
-.bpd-account-banner__provider-icon-wrap--fallback {
+.bpd-account-banner__provider-icon-wrap--fallback
+.bpd-account-banner__provider-icon {
     opacity:
         0.55;
 }
 
-.bpd-account-banner__provider-icon-wrap--fallback:hover {
+.bpd-account-banner__provider-icon-wrap--fallback:hover
+.bpd-account-banner__provider-icon {
     opacity:
         0.8;
 }
@@ -376,13 +839,20 @@ ACCOUNT BANNER ACTIONS
 ========================================================= */
 
 .bpd-account-banner__actions {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
+    display:
+        flex;
 
-    flex: 0 0 auto;
+    align-items:
+        center;
 
-    gap: 6px;
+    justify-content:
+        flex-end;
+
+    flex:
+        0 0 auto;
+
+    gap:
+        6px;
 }
 
 /* =========================================================
@@ -391,15 +861,23 @@ BASE BUTTON / LINK
 
 .bpd-account-banner__button,
 .bpd-account-banner__link {
-    position: relative;
+    position:
+        relative;
 
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
+    display:
+        inline-flex;
 
-    flex: 0 0 auto;
+    align-items:
+        center;
 
-    min-height: 28px;
+    justify-content:
+        center;
+
+    flex:
+        0 0 auto;
+
+    min-height:
+        28px;
 
     padding:
         5px
@@ -449,6 +927,9 @@ BASE BUTTON / LINK
     cursor:
         pointer;
 
+    box-sizing:
+        border-box;
+
     box-shadow:
         inset 0 0 0 1px
         rgba(
@@ -494,19 +975,19 @@ BASE HOVER
 
     box-shadow:
         0 0 7px
-            rgba(
-                139,
-                92,
-                246,
-                0.32
-            ),
+        rgba(
+            139,
+            92,
+            246,
+            0.32
+        ),
         inset 0 0 7px
-            rgba(
-                139,
-                92,
-                246,
-                0.06
-            );
+        rgba(
+            139,
+            92,
+            246,
+            0.06
+        );
 
     transform:
         translateY(
@@ -549,19 +1030,19 @@ PROFILE BUTTON
 
     box-shadow:
         0 0 6px
-            rgba(
-                139,
-                92,
-                246,
-                0.10
-            ),
+        rgba(
+            139,
+            92,
+            246,
+            0.10
+        ),
         inset 0 0 6px
-            rgba(
-                139,
-                92,
-                246,
-                0.04
-            );
+        rgba(
+            139,
+            92,
+            246,
+            0.04
+        );
 }
 
 .bpd-account-banner__profile:hover,
@@ -591,26 +1072,26 @@ PROFILE BUTTON
 
     box-shadow:
         0 0 9px
-            rgba(
-                139,
-                92,
-                246,
-                0.55
-            ),
+        rgba(
+            139,
+            92,
+            246,
+            0.55
+        ),
         0 0 20px
-            rgba(
-                139,
-                92,
-                246,
-                0.24
-            ),
+        rgba(
+            139,
+            92,
+            246,
+            0.24
+        ),
         inset 0 0 8px
-            rgba(
-                139,
-                92,
-                246,
-                0.10
-            );
+        rgba(
+            139,
+            92,
+            246,
+            0.10
+        );
 
     transform:
         translateY(
@@ -619,7 +1100,7 @@ PROFILE BUTTON
 }
 
 /* =========================================================
-LOGOUT BUTTON
+GENERAL BUTTON
 ========================================================= */
 
 .bpd-account-banner__button {
@@ -655,12 +1136,12 @@ KEYBOARD FOCUS
 
     box-shadow:
         0 0 8px
-            rgba(
-                139,
-                92,
-                246,
-                0.42
-            );
+        rgba(
+            139,
+            92,
+            246,
+            0.42
+        );
 }
 
 /* =========================================================
@@ -721,10 +1202,43 @@ DISABLED / UNAVAILABLE
 }
 
 /* =========================================================
-SMALL VIEWPORTS
+SMALL VIEWPORT BASE
 ========================================================= */
 
 @media (max-width: 640px) {
+    .bpd-account-banner__inner {
+        min-height:
+            44px;
+
+        padding:
+            6px
+            10px;
+
+        gap:
+            8px;
+    }
+
+    .bpd-account-banner__network {
+        font-size:
+            0.74rem;
+    }
+
+    .bpd-account-banner__status {
+        gap:
+            5px;
+    }
+
+    .bpd-account-banner__message,
+    .bpd-account-banner__username {
+        font-size:
+            0.7rem;
+    }
+
+    .bpd-account-banner__username {
+        max-width:
+            24vw;
+    }
+
     .bpd-account-banner__providers {
         gap:
             4px;
@@ -744,6 +1258,35 @@ SMALL VIEWPORTS
 
         height:
             14px;
+    }
+
+    .bpd-account-banner__provider-icon-wrap--reauthorize::after {
+        top:
+            -4px;
+
+        right:
+            -4px;
+
+        width:
+            11px;
+
+        height:
+            11px;
+
+        font-size:
+            7px;
+    }
+
+    /*
+     * Keep the warning visible when space permits, but allow
+     * it to collapse before pushing account actions offscreen.
+     */
+    .bpd-account-banner__provider-alert {
+        max-width:
+            25vw;
+
+        font-size:
+            0.64rem;
     }
 
     .bpd-account-banner__actions {
@@ -766,6 +1309,79 @@ SMALL VIEWPORTS
 }
 
 /* =========================================================
+VERY SMALL VIEWPORTS
+========================================================= */
+
+@media (max-width: 460px) {
+    .bpd-account-banner__inner {
+        gap:
+            6px;
+    }
+
+    .bpd-account-banner__network {
+        max-width:
+            105px;
+
+        overflow:
+            hidden;
+
+        text-overflow:
+            ellipsis;
+    }
+
+    .bpd-account-banner__username {
+        max-width:
+            72px;
+    }
+
+    /*
+     * The flashing icon plus its ! badge remains the visible
+     * indication on very narrow screens. The text remains in
+     * the live region for assistive technology.
+     */
+    .bpd-account-banner__provider-alert {
+        position:
+            absolute;
+
+        width:
+            1px;
+
+        height:
+            1px;
+
+        padding:
+            0;
+
+        margin:
+            -1px;
+
+        overflow:
+            hidden;
+
+        clip:
+            rect(
+                0,
+                0,
+                0,
+                0
+            );
+
+        white-space:
+            nowrap;
+
+        border:
+            0;
+    }
+
+    .bpd-account-banner__button,
+    .bpd-account-banner__link {
+        padding:
+            5px
+            7px;
+    }
+}
+
+/* =========================================================
 REDUCED MOTION
 ========================================================= */
 
@@ -775,5 +1391,45 @@ REDUCED MOTION
     .bpd-account-banner__link {
         transition:
             none;
+    }
+
+    /*
+     * Do not flash for users requesting reduced motion.
+     * Keep the warning visually obvious through its static
+     * amber border, glow, and ! badge.
+     */
+    .bpd-account-banner__provider-icon-wrap--reauthorize {
+        animation:
+            none;
+
+        border-color:
+            #fbbf24;
+
+        background:
+            rgba(
+                245,
+                158,
+                11,
+                0.17
+            );
+
+        opacity:
+            1;
+
+        box-shadow:
+            0 0 9px
+            rgba(
+                245,
+                158,
+                11,
+                0.62
+            ),
+            inset 0 0 6px
+            rgba(
+                245,
+                158,
+                11,
+                0.10
+            );
     }
 }

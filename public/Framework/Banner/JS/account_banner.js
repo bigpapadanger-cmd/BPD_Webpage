@@ -440,8 +440,13 @@ function getDisplayName(
 PROVIDER ICON
 ========================================================= */
 
+/* =========================================================
+PROVIDER ICON
+========================================================= */
+
 function createProviderIcon(
-    providerName
+    providerName,
+    authState
 ) {
     const normalizedProvider =
         normalizeProviderName(
@@ -465,9 +470,32 @@ function createProviderIcon(
         return null;
     }
 
+    const providerState =
+        authState
+            ?.providers
+            ?.[normalizedProvider]
+        || null;
+
+    const requiresReauthorization =
+        providerState
+            ?.linked ===
+            true
+        && providerState
+            ?.requiresReauthorization ===
+            true;
+
+    /*
+     * Normal linked providers remain passive status icons.
+     *
+     * A provider requiring reauthorization becomes an
+     * interactive button so the user immediately has a
+     * recovery action available.
+     */
     const wrapper =
         document.createElement(
-            "span"
+            requiresReauthorization
+                ? "button"
+                : "span"
         );
 
     wrapper.className =
@@ -476,18 +504,52 @@ function createProviderIcon(
     wrapper.dataset.provider =
         normalizedProvider;
 
-    wrapper.title =
-        `${config.label} connected`;
+    wrapper.dataset.providerState =
+        requiresReauthorization
+            ? "reauthorization-required"
+            : "connected";
 
-    wrapper.setAttribute(
-        "role",
-        "img"
-    );
+    if (
+        requiresReauthorization
+    ) {
+        wrapper.type =
+            "button";
 
-    wrapper.setAttribute(
-        "aria-label",
-        `${config.label} connected`
-    );
+        wrapper.classList.add(
+            "bpd-account-banner__provider-icon-wrap--reauthorize"
+        );
+
+        wrapper.title =
+            `${config.label} needs reauthorization. Click to verify again.`;
+
+        wrapper.setAttribute(
+            "aria-label",
+            `${config.label} needs reauthorization. Click to verify again.`
+        );
+
+        wrapper.addEventListener(
+            "click",
+            function handleProviderReauthorizationClick() {
+                handleProviderReauthorization(
+                    normalizedProvider
+                );
+            }
+        );
+    }
+    else {
+        wrapper.title =
+            `${config.label} connected`;
+
+        wrapper.setAttribute(
+            "role",
+            "img"
+        );
+
+        wrapper.setAttribute(
+            "aria-label",
+            `${config.label} connected`
+        );
+    }
 
     const image =
         document.createElement(
@@ -529,6 +591,69 @@ function createProviderIcon(
 
     return wrapper;
 }
+
+/* =========================================================
+PROVIDER REAUTHORIZATION ACTION
+========================================================= */
+
+function handleProviderReauthorization(
+    providerName
+) {
+    const provider =
+        normalizeProviderName(
+            providerName
+        );
+
+    if (
+        !provider
+    ) {
+        return;
+    }
+
+    /*
+     * Reauthorization is managed from the Account page.
+     *
+     * The provider query value allows the Account page to
+     * identify which provider sent the user there once its
+     * provider-management UI is updated.
+     *
+     * Do not start OAuth directly from the banner until the
+     * server-side provider route supports reauthorization
+     * for already-linked identities.
+     */
+    const destination =
+        new URL(
+            PROFILE_URL,
+            window.location.origin
+        );
+
+    destination.searchParams.set(
+        "reauthorize",
+        provider
+    );
+
+    if (
+        window.BPDRouter
+        && typeof window.BPDRouter.navigate ===
+            "function"
+    ) {
+        window.BPDRouter.navigate(
+            destination.pathname
+            + destination.search
+        );
+
+        return;
+    }
+
+    window.location.assign(
+        destination.pathname
+        + destination.search
+    );
+}
+
+/* =========================================================
+PROVIDER ICON GROUP
+========================================================= */
 
 /* =========================================================
 PROVIDER ICON GROUP
@@ -579,7 +704,8 @@ function createProviderIcons(
 
         const icon =
             createProviderIcon(
-                normalizedProvider
+                normalizedProvider,
+                authState
             );
 
         if (

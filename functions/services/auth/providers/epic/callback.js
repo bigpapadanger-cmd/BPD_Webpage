@@ -11,20 +11,28 @@ Public Route:
     GET /api/auth/epic/callback
 
 Purpose:
-    Completes direct Epic Games OAuth authentication for
-    global BPD login and authenticated Epic account linking.
+    Completes direct Epic Games OAuth authentication for:
+    - global BPD login
+    - authenticated Epic account linking
+    - authenticated Epic reauthorization
 
 Description:
     - Validates Epic OAuth state.
-    - Determines whether the flow is login or link.
+    - Determines whether the flow is login, link, or
+      reauthorize.
     - Exchanges the Epic authorization code.
     - Loads the authenticated Epic identity.
     - Login mode resolves or creates the canonical BPD
       account through api.resolve_epic_identity.
     - Link mode attaches Epic to the already-authenticated
       canonical BPD account through api.link_epic_identity.
+    - Reauthorize mode verifies that the authenticated Epic
+      account exactly matches the permanent linked Epic
+      provider identity.
     - Synchronizes Epic provider state into the centralized
       Cloudflare KV session.
+    - Records provider-auth freshness through the central
+      authentication completion service.
     - Never stores Epic access tokens.
 
 Identity:
@@ -36,12 +44,15 @@ Identity:
 
 Security:
     - OAuth state must match the HttpOnly state cookie.
-    - Link mode requires an existing active BPD account.
-    - Link mode requires the stored target account ID to
-      exactly match the current authenticated session.
+    - Link and reauthorize modes require an existing active
+      BPD account.
+    - Existing-account modes require the stored target account
+      ID to exactly match the current authenticated session.
     - Link mode never creates identity.accounts.
-    - Epic provider_subject ownership is enforced by the
-      database RPC.
+    - Reauthorize mode never creates or relinks identities.
+    - Reauthorization requires the newly authenticated Epic
+      account ID to exactly match the permanent linked
+      provider_subject.
     - Browser-submitted account IDs are never trusted.
     - Epic access tokens are temporary and never persisted.
 
@@ -54,10 +65,14 @@ Modes:
         Epic is attached only to the currently authenticated
         BPD account.
 
+    reauthorize
+        The already-linked Epic account proves ownership
+        again without modifying permanent provider linkage.
+
 Important:
     - Rocket League player creation does not occur here.
-    - Linking Epic does not automatically create
-      core.rl_players.
+    - Linking or reauthorizing Epic does not automatically
+      create core.rl_players.
 ========================================================= */
 
 import {
@@ -74,14 +89,14 @@ import {
     OAUTH_ACCOUNT_COOKIE
 } from "../../../config/api_vars.js";
 
-
 import {
     getCookie,
     clearCookie,
     createSession,
     createSessionCookie,
     attachProviderToSession,
-    setSessionUser
+    setSessionUser,
+    deleteSession
 } from "../../sessions/session.js";
 
 import {
@@ -93,6 +108,21 @@ import {
     isAuthorizationError
 } from "../../authorization.js";
 
+import {
+    verifyAccountProviderIdentity
+} from "../provider_identity.js";
+
+import {
+    completeAuthentication,
+    isAuthenticationCompletionError
+} from "../../authentication.js";
+
+import {
+    OAUTH_MODE_LOGIN,
+    OAUTH_MODE_LINK,
+    OAUTH_MODE_REAUTHORIZE
+} from "../../oauth/state.js";
+
 /* =========================================================
 CONSTANTS
 ========================================================= */
@@ -102,12 +132,6 @@ const DEFAULT_RETURN_TO =
 
 const NEW_ACCOUNT_RETURN_TO =
     "/Account?setup=1";
-
-const OAUTH_MODE_LOGIN =
-    "login";
-
-const OAUTH_MODE_LINK =
-    "link";
 
 /* =========================================================
 NORMALIZATION
@@ -150,11 +174,60 @@ function normalizeMode(
     if (
         mode === OAUTH_MODE_LOGIN
         || mode === OAUTH_MODE_LINK
+        || mode === OAUTH_MODE_REAUTHORIZE
     ) {
         return mode;
     }
 
     return "";
+}
+
+function isExistingAccountMode(
+    mode
+) {
+    return (
+        mode === OAUTH_MODE_LINK
+        || mode === OAUTH_MODE_REAUTHORIZE
+    );
+}
+
+function normalizeTimestamp(
+    value
+) {
+    if (
+        value === null
+        || value === undefined
+        || value === ""
+    ) {
+        return null;
+    }
+
+    const numeric =
+        Number(
+            value
+        );
+
+    if (
+        Number.isFinite(
+            numeric
+        )
+        && numeric > 0
+    ) {
+        return numeric;
+    }
+
+    const parsed =
+        Date.parse(
+            String(
+                value
+            )
+        );
+
+    return Number.isFinite(
+        parsed
+    )
+        ? parsed
+        : null;
 }
 
 /* =========================================================
@@ -423,8 +496,6 @@ async function resolveEpicIdentity(
         );
     }
 
-
-
     return {
         accountId,
 
@@ -506,8 +577,6 @@ async function linkEpicIdentity(
 
         throw error;
     }
-
-
 
     return {
         accountId:
@@ -771,7 +840,10 @@ PROVIDER SESSION DATA
 ========================================================= */
 
 function buildEpicProviderData(
-    epicProfile
+    epicProfile,
+    {
+        linkedAt = null
+    } = {}
 ) {
     const now =
         Date.now();
@@ -796,7 +868,10 @@ function buildEpicProviderData(
             now,
 
         LinkedAt:
-            now
+            normalizeTimestamp(
+                linkedAt
+            )
+            ?? now
     };
 }
 
@@ -839,11 +914,6 @@ async function establishLoginSession(
         throw error;
     }
 
-    const providerData =
-        buildEpicProviderData(
-            epicProfile
-        );
-
     if (
         currentSession.authenticated ===
         true
@@ -855,6 +925,18 @@ async function establishLoginSession(
                 "Authenticated session has no session ID."
             );
         }
+
+        const providerData =
+            buildEpicProviderData(
+                epicProfile,
+                {
+                    linkedAt:
+                        currentSession
+                            ?.providers
+                            ?.epic
+                            ?.linkedAt
+                }
+            );
 
         await setSessionUser(
             env,
@@ -896,9 +978,17 @@ async function establishLoginSession(
             sessionId:
                 currentSession.sessionId,
 
-            cookie
+            cookie,
+
+            createdSession:
+                false
         };
     }
+
+    const providerData =
+        buildEpicProviderData(
+            epicProfile
+        );
 
     const created =
         await createSession(
@@ -920,33 +1010,57 @@ async function establishLoginSession(
             }
         );
 
-    const cookie =
-        createSessionCookie(
-            request,
+    try {
+        const cookie =
+            createSessionCookie(
+                request,
+                created.sessionId
+            );
+
+        if (
+            !cookie
+        ) {
+            throw new Error(
+                "Session cookie creation failed."
+            );
+        }
+
+        return {
+            sessionId:
+                created.sessionId,
+
+            cookie,
+
+            createdSession:
+                true
+        };
+    }
+    catch (
+        error
+    ) {
+        await deleteSession(
+            env,
             created.sessionId
         );
 
-    if (
-        !cookie
-    ) {
-        throw new Error(
-            "Session cookie creation failed."
-        );
+        throw error;
     }
-
-    return {
-        sessionId:
-            created.sessionId,
-
-        cookie
-    };
 }
 
 /* =========================================================
-LINK CONTEXT
+EXISTING ACCOUNT CONTEXT
+
+Used by:
+    link
+    reauthorize
+
+This deliberately requires only the canonical BPD account
+session. It does NOT require current Epic freshness because
+that would prevent an expired Epic identity from reaching
+the reauthorization callback.
 ========================================================= */
 
-async function getLinkContext(
+async function getExistingAccountContext(
     request,
     env
 ) {
@@ -966,7 +1080,7 @@ async function getLinkContext(
                 false,
 
             code:
-                "LINK_ACCOUNT_MISSING"
+                "OAUTH_ACCOUNT_MISSING"
         };
     }
 
@@ -1013,7 +1127,7 @@ async function getLinkContext(
                 false,
 
             code:
-                "LINK_ACCOUNT_MISMATCH"
+                "OAUTH_ACCOUNT_MISMATCH"
         };
     }
 
@@ -1049,13 +1163,13 @@ ESTABLISH LINKED SESSION
 
 async function establishLinkedSession(
     env,
-    linkContext,
+    accountContext,
     linkedAccount,
     epicProfile
 ) {
     if (
         linkedAccount.accountId !==
-        linkContext.accountId
+        accountContext.accountId
     ) {
         const error =
             new Error(
@@ -1070,7 +1184,7 @@ async function establishLinkedSession(
 
     await attachProviderToSession(
         env,
-        linkContext.sessionId,
+        accountContext.sessionId,
         "epic",
         buildEpicProviderData(
             epicProfile
@@ -1079,7 +1193,7 @@ async function establishLinkedSession(
 
     await setSessionUser(
         env,
-        linkContext.sessionId,
+        accountContext.sessionId,
         {
             userId:
                 linkedAccount.accountId,
@@ -1090,6 +1204,214 @@ async function establishLinkedSession(
             active:
                 linkedAccount.active
         }
+    );
+}
+
+/* =========================================================
+VERIFY EPIC REAUTHORIZATION
+
+Loads the permanent Epic identity from Supabase and requires
+the Epic account ID authenticated in this callback to exactly
+match the linked provider_subject.
+
+No link RPC is called here.
+========================================================= */
+
+async function verifyEpicReauthorization(
+    env,
+    accountId,
+    epicProfile
+) {
+    let linkedProvider;
+
+    try {
+        linkedProvider =
+            await verifyAccountProviderIdentity(
+                env,
+                accountId,
+                "epic"
+            );
+    }
+    catch (
+        error
+    ) {
+        const verificationError =
+            new Error(
+                "The linked Epic identity could not be verified."
+            );
+
+        verificationError.code =
+            "PROVIDER_VERIFICATION_UNAVAILABLE";
+
+        verificationError.status =
+            503;
+
+        verificationError.cause =
+            error;
+
+        throw verificationError;
+    }
+
+    if (
+        !linkedProvider
+    ) {
+        const error =
+            new Error(
+                "Epic is no longer linked to this BPD account."
+            );
+
+        error.code =
+            "PROVIDER_NOT_LINKED";
+
+        error.status =
+            409;
+
+        throw error;
+    }
+
+    const linkedProviderName =
+        normalizeString(
+            linkedProvider.provider
+        )
+            .toLowerCase();
+
+    const linkedEpicAccountId =
+        normalizeString(
+            linkedProvider.providerSubject
+        );
+
+    const authenticatedEpicAccountId =
+        normalizeString(
+            epicProfile.epicAccountId
+        );
+
+    if (
+        linkedProviderName !==
+            "epic"
+        || !linkedEpicAccountId
+        || !authenticatedEpicAccountId
+        || linkedEpicAccountId !==
+            authenticatedEpicAccountId
+    ) {
+        const error =
+            new Error(
+                "The authenticated Epic account does not match the linked Epic identity."
+            );
+
+        error.code =
+            "PROVIDER_REAUTHORIZATION_MISMATCH";
+
+        error.status =
+            409;
+
+        throw error;
+    }
+
+    return linkedProvider;
+}
+
+/* =========================================================
+ESTABLISH REAUTHORIZED SESSION
+========================================================= */
+
+async function establishReauthorizedSession(
+    env,
+    accountContext,
+    epicProfile,
+    linkedProvider
+) {
+    const existingLinkedAt =
+        accountContext
+            ?.authorization
+            ?.providers
+            ?.epic
+            ?.linkedAt;
+
+    await attachProviderToSession(
+        env,
+        accountContext.sessionId,
+        "epic",
+        buildEpicProviderData(
+            epicProfile,
+            {
+                linkedAt:
+                    existingLinkedAt
+                    ?? linkedProvider?.linkedAt
+                    ?? null
+            }
+        )
+    );
+}
+
+/* =========================================================
+COMPLETE CENTRAL AUTHENTICATION STATE
+========================================================= */
+
+async function recordCompletedAuthentication(
+    env,
+    {
+        accountId,
+        recordLogin
+    }
+) {
+    return completeAuthentication(
+        env,
+        {
+            accountId,
+            provider:
+                "epic",
+
+            recordLogin:
+                recordLogin ===
+                true
+        }
+    );
+}
+
+/* =========================================================
+AUTH STATE ERROR RESPONSE
+========================================================= */
+
+function getAuthenticationStateErrorResponse(
+    error,
+    debugId
+) {
+    console.error(
+        "EPIC CALLBACK: Authentication state completion failed.",
+        {
+            debugId,
+
+            code:
+                error?.code
+                || null,
+
+            message:
+                error?.message
+                || "Unknown error"
+        }
+    );
+
+    return json(
+        {
+            success:
+                false,
+
+            code:
+                isAuthenticationCompletionError(
+                    error
+                )
+                    ? (
+                        error.code
+                        || "AUTHENTICATION_STATE_WRITE_FAILED"
+                    )
+                    : "AUTHENTICATION_STATE_WRITE_FAILED",
+
+            message:
+                "Epic authentication succeeded, but the BPD authentication state could not be finalized.",
+
+            debugId
+        },
+        503
     );
 }
 
@@ -1277,33 +1599,39 @@ export async function handleEpicCallback(
         }
 
         /* =================================================
-        VALIDATE LINK SESSION BEFORE PROVIDER EXCHANGE
+        VALIDATE EXISTING ACCOUNT CONTEXT
+
+        Must happen before provider token exchange for link
+        and reauthorization requests.
         ================================================= */
 
-        let linkContext =
+        let accountContext =
             null;
 
         if (
-            mode ===
-            OAUTH_MODE_LINK
+            isExistingAccountMode(
+                mode
+            )
         ) {
-            linkContext =
-                await getLinkContext(
+            accountContext =
+                await getExistingAccountContext(
                     request,
                     env
                 );
 
             if (
-                linkContext.valid !==
+                accountContext.valid !==
                 true
             ) {
                 console.warn(
-                    "EPIC CALLBACK: Link context validation failed.",
+                    "EPIC CALLBACK: Existing account context validation failed.",
                     {
                         debugId,
 
+                        mode,
+
                         code:
-                            linkContext.code
+                            accountContext.code
                     }
                 );
 
@@ -1313,14 +1641,14 @@ export async function handleEpicCallback(
                             false,
 
                         code:
-                            linkContext.code,
+                            accountContext.code,
 
                         message:
-                            "The Epic account-link request is no longer valid.",
+                            "The Epic authentication request is no longer valid.",
 
                         debugId
                     },
-                    linkContext.code ===
+                    accountContext.code ===
                         "AUTH_REQUIRED"
                         ? 401
                         : 409
@@ -1363,7 +1691,7 @@ export async function handleEpicCallback(
                 linkedAccount =
                     await linkEpicIdentity(
                         env,
-                        linkContext.accountId,
+                        accountContext.accountId,
                         epicProfile
                     );
             }
@@ -1449,10 +1777,31 @@ export async function handleEpicCallback(
 
             await establishLinkedSession(
                 env,
-                linkContext,
+                accountContext,
                 linkedAccount,
                 epicProfile
             );
+
+            try {
+                await recordCompletedAuthentication(
+                    env,
+                    {
+                        accountId:
+                            linkedAccount.accountId,
+
+                        recordLogin:
+                            false
+                    }
+                );
+            }
+            catch (
+                error
+            ) {
+                return getAuthenticationStateErrorResponse(
+                    error,
+                    debugId
+                );
+            }
 
             console.info(
                 "EPIC CALLBACK: Epic provider link completed.",
@@ -1463,6 +1812,117 @@ export async function handleEpicCallback(
                         linkedAccount
                             .linkedIdentity ===
                         true
+                }
+            );
+
+            return redirect(
+                requestedReturnTo,
+                getOAuthClearCookies(
+                    request
+                )
+            );
+        }
+
+        /* =================================================
+        REAUTHORIZATION MODE
+        ================================================= */
+
+        if (
+            mode ===
+            OAUTH_MODE_REAUTHORIZE
+        ) {
+            let linkedProvider;
+
+            try {
+                linkedProvider =
+                    await verifyEpicReauthorization(
+                        env,
+                        accountContext.accountId,
+                        epicProfile
+                    );
+            }
+            catch (
+                error
+            ) {
+                console.error(
+                    "EPIC CALLBACK: Epic reauthorization verification failed.",
+                    {
+                        debugId,
+
+                        code:
+                            error?.code
+                            || null,
+
+                        status:
+                            error?.status
+                            || null,
+
+                        message:
+                            error?.message
+                            || "Unknown error"
+                    }
+                );
+
+                return json(
+                    {
+                        success:
+                            false,
+
+                        code:
+                            error?.code
+                            || "EPIC_REAUTHORIZATION_FAILED",
+
+                        message:
+                            error?.code ===
+                            "PROVIDER_REAUTHORIZATION_MISMATCH"
+                                ? "The authenticated Epic account does not match the Epic account linked to this BPD account."
+                                : "Epic Games could not be reauthorized.",
+
+                        debugId
+                    },
+                    Number.isInteger(
+                        error?.status
+                    )
+                        ? error.status
+                        : 409
+                );
+            }
+
+            await establishReauthorizedSession(
+                env,
+                accountContext,
+                epicProfile,
+                linkedProvider
+            );
+
+            try {
+                await recordCompletedAuthentication(
+                    env,
+                    {
+                        accountId:
+                            accountContext.accountId,
+
+                        recordLogin:
+                            false
+                    }
+                );
+            }
+            catch (
+                error
+            ) {
+                return getAuthenticationStateErrorResponse(
+                    error,
+                    debugId
+                );
+            }
+
+            console.info(
+                "EPIC CALLBACK: Epic provider reauthorization completed.",
+                {
+                    debugId,
+
+                    accountId:
+                        accountContext.accountId
                 }
             );
 
@@ -1516,6 +1976,66 @@ export async function handleEpicCallback(
                 epicProfile
             );
 
+        /*
+         * Only creation of a new BPD browser session counts
+         * as a new BPD login for the login-gap policy.
+         *
+         * Re-authenticating Epic while a valid BPD session
+         * already exists refreshes Epic provider auth only.
+         */
+        try {
+            await recordCompletedAuthentication(
+                env,
+                {
+                    accountId:
+                        identity.accountId,
+
+                    recordLogin:
+                        session.createdSession ===
+                        true
+                }
+            );
+        }
+        catch (
+            error
+        ) {
+            /*
+             * A newly created session must not survive if the
+             * central auth state failed to finalize.
+             */
+            if (
+                session.createdSession ===
+                    true
+                && session.sessionId
+            ) {
+                try {
+                    await deleteSession(
+                        env,
+                        session.sessionId
+                    );
+                }
+                catch (
+                    deleteError
+                ) {
+                    console.error(
+                        "EPIC CALLBACK: Failed to clean up session after auth-state failure.",
+                        {
+                            debugId,
+
+                            message:
+                                deleteError?.message
+                                || "Unknown error"
+                        }
+                    );
+                }
+            }
+
+            return getAuthenticationStateErrorResponse(
+                error,
+                debugId
+            );
+        }
+
         const successDestination =
             identity.createdAccount ===
                 true
@@ -1548,6 +2068,14 @@ export async function handleEpicCallback(
 
                 createdIdentity:
                     identity.createdIdentity ===
+                    true,
+
+                createdSession:
+                    session.createdSession ===
+                    true,
+
+                reusedSession:
+                    session.createdSession !==
                     true
             }
         );
@@ -1592,7 +2120,11 @@ export async function handleEpicCallback(
             error?.code ===
                 "ACCOUNT_LINK_CONFLICT"
             || error?.code ===
-                "LINK_ACCOUNT_MISMATCH";
+                "LINK_ACCOUNT_MISMATCH"
+            || error?.code ===
+                "OAUTH_ACCOUNT_MISMATCH"
+            || error?.code ===
+                "PROVIDER_REAUTHORIZATION_MISMATCH";
 
         return json(
             {
@@ -1606,7 +2138,7 @@ export async function handleEpicCallback(
 
                 message:
                     conflict
-                        ? "This Epic account cannot be linked to the current BPD account."
+                        ? "This Epic account cannot be used with the current BPD account."
                         : "Epic authentication could not be completed.",
 
                 debugId

@@ -11,10 +11,31 @@ Purpose:
 Description:
     - Displays the BPD Gaming Network brand.
     - Provides a mount point for global account status.
+    - Provides a dedicated provider-icon area.
     - Provides a mount point for dynamic account actions.
     - Provider icons and authentication actions are rendered
       dynamically by account_banner.js.
+    - Linked providers remain visible even when provider
+      reauthorization is required.
+    - Providers requiring reauthorization may become
+      interactive and visually alert the user.
     - Remains outside the route-rendered site header.
+
+Provider States:
+    connected
+        Provider is permanently linked and currently valid.
+
+    reauthorization-required
+        Provider remains permanently linked but must be
+        authenticated again before protected provider actions
+        are authorized.
+
+Accessibility:
+    - Account status changes are announced politely.
+    - Provider reauthorization state has a dedicated live
+      announcement region.
+    - Interactive provider icons are created as buttons by
+      account_banner.js when reauthorization is required.
 ========================================================= -->
 
 <div
@@ -33,10 +54,26 @@ Description:
         aria-live="polite"
     >
         <span
-            class="bpd-account-banner__loading"
+            class="bpd-account-banner__message"
             id="accountBannerLoading"
         >
             Checking account...
+        </span>
+
+        <div
+            class="bpd-account-banner__providers"
+            id="accountBannerProviders"
+            aria-label="Connected account providers"
+        >
+        </div>
+
+        <span
+            class="bpd-account-banner__provider-alert"
+            id="accountBannerProviderAlert"
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+        >
         </span>
     </div>
 

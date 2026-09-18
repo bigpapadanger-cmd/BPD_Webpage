@@ -20,18 +20,10 @@ Callback Service:
     functions/services/auth/providers/epic/callback.js
 
 Purpose:
-    Starts direct Epic Games OAuth authentication for both
-    global login and authenticated provider linking.
-
-Description:
-    - Starts direct Epic Games OAuth.
-    - Supports normal login mode.
-    - Supports authenticated account-link mode.
-    - Generates secure OAuth state.
-    - Stores OAuth context in short-lived HttpOnly cookies.
-    - Stores the target BPD account ID only for link mode.
-    - Returns the Epic authorization URL.
-    - Normal login requests remain Turnstile protected.
+    Starts direct Epic Games OAuth authentication for:
+    - global BPD login
+    - authenticated Epic linking
+    - authenticated Epic reauthorization
 
 Modes:
     login
@@ -40,14 +32,18 @@ Modes:
     link
         Existing authenticated BPD account is linking Epic.
 
+    reauthorize
+        Existing authenticated BPD account is proving
+        ownership of its already-linked Epic identity again.
+
 Security:
-    - Link mode accountId must come from trusted server-side
-      session authorization.
+    - link and reauthorize accountId values must originate
+      from trusted server-side session authorization.
     - Browser input must never determine the accountId used
-      for link mode.
+      for existing-account modes.
     - OAuth state must be verified by the callback.
-    - Link mode must later verify that the current BPD
-      session account matches the stored target account.
+    - Existing-account modes must later verify that the
+      current BPD session account matches the stored target.
     - Epic access tokens are never stored here.
 
 Important:
@@ -77,18 +73,18 @@ import {
     OAUTH_ACCOUNT_COOKIE
 } from "../../../config/api_vars.js";
 
+import {
+    OAUTH_MODE_LOGIN,
+    OAUTH_MODE_LINK,
+    OAUTH_MODE_REAUTHORIZE
+} from "../../oauth/state.js";
+
 /* =========================================================
 CONSTANTS
 ========================================================= */
 
 const DEFAULT_RETURN_TO =
     "/Account";
-
-const OAUTH_MODE_LOGIN =
-    "login";
-
-const OAUTH_MODE_LINK =
-    "link";
 
 /* =========================================================
 NORMALIZATION
@@ -116,10 +112,23 @@ function normalizeMode(
         )
             .toLowerCase();
 
+    if (
+        mode === OAUTH_MODE_LOGIN
+        || mode === OAUTH_MODE_LINK
+        || mode === OAUTH_MODE_REAUTHORIZE
+    ) {
+        return mode;
+    }
+
+    return "";
+}
+
+function isExistingAccountMode(
+    mode
+) {
     return (
         mode === OAUTH_MODE_LINK
-        ? OAUTH_MODE_LINK
-        : OAUTH_MODE_LOGIN
+        || mode === OAUTH_MODE_REAUTHORIZE
     );
 }
 
@@ -349,11 +358,12 @@ function buildEpicAuthorizeUrl(
 /* =========================================================
 START EPIC AUTHORIZATION
 
-This function is reusable by:
+Reusable by:
     - normal Epic login
     - authenticated Epic linking
+    - authenticated Epic reauthorization
 
-For link mode:
+For link and reauthorize modes:
     accountId MUST already have been derived from the
     authenticated server-side BPD session.
 ========================================================= */
@@ -372,6 +382,14 @@ export function startEpicAuthorization(
             mode
         );
 
+    if (
+        !normalizedMode
+    ) {
+        throw new Error(
+            "EPIC_OAUTH_MODE_INVALID"
+        );
+    }
+
     const normalizedAccountId =
         normalizeString(
             accountId
@@ -383,12 +401,13 @@ export function startEpicAuthorization(
         );
 
     if (
-        normalizedMode ===
-            OAUTH_MODE_LINK
+        isExistingAccountMode(
+            normalizedMode
+        )
         && !normalizedAccountId
     ) {
         throw new Error(
-            "EPIC_LINK_ACCOUNT_REQUIRED"
+            "EPIC_ACCOUNT_REQUIRED"
         );
     }
 
@@ -473,8 +492,9 @@ export function startEpicAuthorization(
     ];
 
     if (
-        normalizedMode ===
-        OAUTH_MODE_LINK
+        isExistingAccountMode(
+            normalizedMode
+        )
     ) {
         const accountCookie =
             createCookie(
@@ -573,7 +593,7 @@ export async function handleEpicLogin(
 
     Public Epic login is CAPTCHA protected.
 
-    Authenticated provider linking will call
+    Authenticated link/reauthorize flows call
     startEpicAuthorization() server-side instead.
     ===================================================== */
 
@@ -761,7 +781,8 @@ export async function handleEpicLogin(
                     false,
 
                 error:
-                    "EPIC_LOGIN_START_FAILED",
+                    error?.message
+                    || "EPIC_LOGIN_START_FAILED",
 
                 debugId
             },

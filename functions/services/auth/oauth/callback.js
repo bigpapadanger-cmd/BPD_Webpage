@@ -14,8 +14,8 @@ API Route:
     functions/api/auth/_oauth/callback.js
 
 Purpose:
-    Completes Supabase-managed OAuth authentication and
-    provider-linking flows.
+    Completes Supabase-managed OAuth authentication,
+    provider-linking, and provider-reauthorization flows.
 
 Supported Providers:
     - Google
@@ -24,6 +24,7 @@ Supported Providers:
 Supported OAuth Modes:
     - login
     - link
+    - reauthorize
 
 Login Flow:
     Provider authentication
@@ -37,6 +38,10 @@ Login Flow:
     Resolve or create identity.accounts
         ↓
     Establish centralized BPD session
+        ↓
+    Record BPD login when a new session was created
+        ↓
+    Record provider authentication freshness
         ↓
     Redirect to requested local destination
 
@@ -52,6 +57,23 @@ Link Flow:
     Attach provider identity to existing account
         ↓
     Update current BPD session provider state
+        ↓
+    Record provider authentication freshness
+
+Reauthorization Flow:
+    Existing authenticated BPD session
+        ↓
+    Provider authentication
+        ↓
+    Verify target identity.accounts.id
+        ↓
+    Load permanent provider identity from Supabase
+        ↓
+    Require returned provider subject to match linked subject
+        ↓
+    Update current BPD session provider state
+        ↓
+    Record provider authentication freshness
 
 Important:
     - Epic direct OAuth is handled by its own callback service.
@@ -60,6 +82,7 @@ Important:
     - Provider access tokens are never stored in BPD sessions.
     - Email never determines BPD account ownership.
     - Link mode never creates identity.accounts.
+    - Reauthorize mode never creates or relinks an identity.
     - Provider ownership is based on provider subject.
 ========================================================= */
 
@@ -74,12 +97,14 @@ import {
 
 import {
     OAUTH_MODE_LINK,
+    OAUTH_MODE_REAUTHORIZE,
     getOAuthMode,
     getOAuthProvider,
     getOAuthPkceVerifier,
     getOAuthAccountId,
     getOAuthReturnTo,
-    getOAuthClearCookies
+    getOAuthClearCookies,
+    isOAuthExistingAccountMode
 } from "./state.js";
 
 import {
@@ -98,6 +123,15 @@ import {
 import {
     getSessionContext
 } from "../sessions/session_context.js";
+
+import {
+    verifyAccountProviderIdentity
+} from "../providers/provider_identity.js";
+
+import {
+    completeAuthentication,
+    isAuthenticationCompletionError
+} from "../authentication.js";
 
 /* =========================================================
 CONSTANTS
@@ -603,15 +637,15 @@ async function resolveProviderIdentity(
 
         createdAccount:
             record.created_account ===
-                true
+            true
             || record.createdAccount ===
-                true,
+            true,
 
         createdIdentity:
             record.created_identity ===
-                true
+            true
             || record.createdIdentity ===
-                true
+            true
     };
 }
 
@@ -695,9 +729,9 @@ async function linkProviderIdentity(
 
         linkedIdentity:
             record.linked_identity ===
-                true
+            true
             || record.linkedIdentity ===
-                true
+            true
     };
 }
 
@@ -705,8 +739,50 @@ async function linkProviderIdentity(
 PROVIDER SESSION DATA
 ========================================================= */
 
+function normalizeTimestamp(
+    value
+) {
+    if (
+        value === null
+        || value === undefined
+        || value === ""
+    ) {
+        return null;
+    }
+
+    const numericValue =
+        Number(
+            value
+        );
+
+    if (
+        Number.isFinite(
+            numericValue
+        )
+        && numericValue > 0
+    ) {
+        return numericValue;
+    }
+
+    const parsed =
+        Date.parse(
+            String(
+                value
+            )
+        );
+
+    return Number.isFinite(
+        parsed
+    )
+        ? parsed
+        : null;
+}
+
 function buildProviderSessionData(
-    providerIdentity
+    providerIdentity,
+    {
+        linkedAt = null
+    } = {}
 ) {
     const now =
         Date.now();
@@ -734,7 +810,10 @@ function buildProviderSessionData(
             now,
 
         LinkedAt:
-            now
+            normalizeTimestamp(
+                linkedAt
+            )
+            ?? now
     };
 }
 
@@ -800,6 +879,9 @@ async function establishLoginSession(
                 conflict:
                     true,
 
+                createdSession:
+                    false,
+
                 sessionCookie:
                     null,
 
@@ -813,7 +895,14 @@ async function establishLoginSession(
             existingSession.sessionId,
             provider,
             buildProviderSessionData(
-                providerIdentity
+                providerIdentity,
+                {
+                    linkedAt:
+                        existingSession
+                            ?.providers
+                            ?.[provider]
+                            ?.linkedAt
+                }
             )
         );
 
@@ -834,6 +923,9 @@ async function establishLoginSession(
 
         return {
             conflict:
+                false,
+
+            createdSession:
                 false,
 
             sessionCookie:
@@ -885,6 +977,9 @@ async function establishLoginSession(
             conflict:
                 false,
 
+            createdSession:
+                true,
+
             sessionCookie,
 
             sessionId:
@@ -904,10 +999,14 @@ async function establishLoginSession(
 }
 
 /* =========================================================
-VALIDATE EXPLICIT LINK SESSION
+VALIDATE EXISTING ACCOUNT SESSION
+
+Used by both:
+    link
+    reauthorize
 ========================================================= */
 
-async function getLinkContext(
+async function getExistingAccountContext(
     request,
     env
 ) {
@@ -926,7 +1025,7 @@ async function getLinkContext(
                 false,
 
             code:
-                "LINK_ACCOUNT_MISSING",
+                "OAUTH_ACCOUNT_MISSING",
 
             session:
                 null,
@@ -1009,7 +1108,7 @@ async function getLinkContext(
                 false,
 
             code:
-                "LINK_ACCOUNT_MISMATCH",
+                "OAUTH_ACCOUNT_MISMATCH",
 
             session,
 
@@ -1038,7 +1137,7 @@ UPDATE EXISTING SESSION AFTER LINK
 
 async function establishLinkedSession(
     env,
-    linkContext,
+    accountContext,
     providerIdentity,
     linkedAccount
 ) {
@@ -1046,7 +1145,7 @@ async function establishLinkedSession(
         normalizeString(
             linkedAccount.accountId
         )
-        !== linkContext.accountId
+        !== accountContext.accountId
     ) {
         throw new Error(
             "Linked account did not match the authenticated BPD account."
@@ -1055,7 +1154,7 @@ async function establishLinkedSession(
 
     await attachProviderToSession(
         env,
-        linkContext.session.sessionId,
+        accountContext.session.sessionId,
         providerIdentity.provider,
         buildProviderSessionData(
             providerIdentity
@@ -1064,7 +1163,7 @@ async function establishLinkedSession(
 
     await setSessionUser(
         env,
-        linkContext.session.sessionId,
+        accountContext.session.sessionId,
         {
             userId:
                 linkedAccount.accountId,
@@ -1079,8 +1178,240 @@ async function establishLinkedSession(
 
     return {
         sessionId:
-            linkContext.session.sessionId
+            accountContext.session.sessionId
     };
+}
+
+/* =========================================================
+VERIFY REAUTHORIZATION IDENTITY
+
+The provider OAuth result must match the permanent provider
+subject already linked to the canonical BPD account.
+
+No linking RPC is called here.
+========================================================= */
+
+async function verifyReauthorizationIdentity(
+    env,
+    accountId,
+    providerIdentity
+) {
+    let linkedProvider;
+
+    try {
+        linkedProvider =
+            await verifyAccountProviderIdentity(
+                env,
+                accountId,
+                providerIdentity.provider
+            );
+    }
+    catch (
+        error
+    ) {
+        const verificationError =
+            new Error(
+                "The linked provider identity could not be verified."
+            );
+
+        verificationError.code =
+            "PROVIDER_VERIFICATION_UNAVAILABLE";
+
+        verificationError.status =
+            503;
+
+        verificationError.cause =
+            error;
+
+        throw verificationError;
+    }
+
+    if (
+        !linkedProvider
+    ) {
+        const error =
+            new Error(
+                "The provider is no longer linked to this BPD account."
+            );
+
+        error.code =
+            "PROVIDER_NOT_LINKED";
+
+        error.status =
+            409;
+
+        throw error;
+    }
+
+    const linkedProviderName =
+        normalizeString(
+            linkedProvider.provider
+        )
+            .toLowerCase();
+
+    const linkedProviderSubject =
+        normalizeString(
+            linkedProvider.providerSubject
+        );
+
+    const authenticatedProviderName =
+        normalizeString(
+            providerIdentity.provider
+        )
+            .toLowerCase();
+
+    const authenticatedProviderSubject =
+        normalizeString(
+            providerIdentity.providerSubject
+        );
+
+    if (
+        linkedProviderName !==
+            authenticatedProviderName
+        || !linkedProviderSubject
+        || !authenticatedProviderSubject
+        || linkedProviderSubject !==
+            authenticatedProviderSubject
+    ) {
+        const error =
+            new Error(
+                "The authenticated provider account does not match the linked provider identity."
+            );
+
+        error.code =
+            "PROVIDER_REAUTHORIZATION_MISMATCH";
+
+        error.status =
+            409;
+
+        throw error;
+    }
+
+    return linkedProvider;
+}
+
+/* =========================================================
+UPDATE SESSION AFTER REAUTHORIZATION
+========================================================= */
+
+async function establishReauthorizedSession(
+    env,
+    accountContext,
+    providerIdentity,
+    linkedProvider
+) {
+    const provider =
+        providerIdentity.provider;
+
+    const existingLinkedAt =
+        accountContext
+            ?.session
+            ?.providers
+            ?.[provider]
+            ?.linkedAt;
+
+    await attachProviderToSession(
+        env,
+        accountContext.session.sessionId,
+        provider,
+        buildProviderSessionData(
+            providerIdentity,
+            {
+                linkedAt:
+                    existingLinkedAt
+                    ?? linkedProvider?.linkedAt
+                    ?? null
+            }
+        )
+    );
+
+    return {
+        sessionId:
+            accountContext.session.sessionId
+    };
+}
+
+/* =========================================================
+COMPLETE AUTHENTICATION STATE
+========================================================= */
+
+async function recordCompletedAuthentication(
+    env,
+    {
+        accountId,
+        provider,
+        recordLogin
+    }
+) {
+    try {
+        return await completeAuthentication(
+            env,
+            {
+                accountId,
+                provider,
+                recordLogin:
+                    recordLogin ===
+                    true
+            }
+        );
+    }
+    catch (
+        error
+    ) {
+        if (
+            isAuthenticationCompletionError(
+                error
+            )
+        ) {
+            throw error;
+        }
+
+        throw error;
+    }
+}
+
+/* =========================================================
+AUTHENTICATION STATE ERROR RESPONSE
+========================================================= */
+
+function getAuthenticationStateErrorResponse(
+    error,
+    debugId,
+    provider
+) {
+    console.error(
+        "OAUTH CALLBACK: Authentication state completion failed.",
+        {
+            debugId,
+
+            provider,
+
+            code:
+                error?.code
+                || null,
+
+            message:
+                error?.message
+                || "Unknown error"
+        }
+    );
+
+    return json(
+        {
+            success:
+                false,
+
+            code:
+                error?.code
+                || "AUTHENTICATION_STATE_WRITE_FAILED",
+
+            message:
+                "Authentication succeeded, but the BPD authentication state could not be finalized.",
+
+            debugId
+        },
+        503
+    );
 }
 
 /* =========================================================
@@ -1129,7 +1460,7 @@ export async function handleOAuthCallback(
         );
 
     /*
-     * Read this before clearing the one-time OAuth cookies.
+     * Read before clearing one-time OAuth cookies.
      */
     const returnTo =
         getOAuthReturnTo(
@@ -1292,32 +1623,39 @@ export async function handleOAuthCallback(
         }
 
         /* =================================================
-        VALIDATE LINK SESSION
+        VALIDATE EXISTING ACCOUNT SESSION
+
+        Both link and reauthorize require an existing,
+        authenticated BPD account.
         ================================================= */
 
-        let linkContext =
+        let accountContext =
             null;
 
         if (
-            mode === OAUTH_MODE_LINK
+            isOAuthExistingAccountMode(
+                mode
+            )
         ) {
-            linkContext =
-                await getLinkContext(
+            accountContext =
+                await getExistingAccountContext(
                     request,
                     env
                 );
 
             if (
-                linkContext.valid !==
+                accountContext.valid !==
                 true
             ) {
                 console.warn(
-                    "OAUTH CALLBACK: Link context validation failed.",
+                    "OAUTH CALLBACK: Existing account context validation failed.",
                     {
                         debugId,
                         provider,
+                        mode,
+
                         code:
-                            linkContext.code
+                            accountContext.code
                     }
                 );
 
@@ -1327,10 +1665,10 @@ export async function handleOAuthCallback(
                             false,
 
                         code:
-                            linkContext.code,
+                            accountContext.code,
 
                         message:
-                            "The account-link request is no longer valid.",
+                            "The provider authentication request is no longer valid.",
 
                         debugId
                     },
@@ -1504,7 +1842,8 @@ export async function handleOAuthCallback(
         ================================================= */
 
         if (
-            mode === OAUTH_MODE_LINK
+            mode ===
+            OAUTH_MODE_LINK
         ) {
             let linkedAccount;
 
@@ -1512,7 +1851,7 @@ export async function handleOAuthCallback(
                 linkedAccount =
                     await linkProviderIdentity(
                         env,
-                        linkContext.accountId,
+                        accountContext.accountId,
                         providerIdentity
                     );
             }
@@ -1557,12 +1896,57 @@ export async function handleOAuthCallback(
                 );
             }
 
+            if (
+                linkedAccount.active !==
+                true
+            ) {
+                return json(
+                    {
+                        success:
+                            false,
+
+                        code:
+                            "ACCOUNT_INACTIVE",
+
+                        message:
+                            "This BPD account is not active.",
+
+                        debugId
+                    },
+                    403
+                );
+            }
+
             await establishLinkedSession(
                 env,
-                linkContext,
+                accountContext,
                 providerIdentity,
                 linkedAccount
             );
+
+            try {
+                await recordCompletedAuthentication(
+                    env,
+                    {
+                        accountId:
+                            linkedAccount.accountId,
+
+                        provider,
+
+                        recordLogin:
+                            false
+                    }
+                );
+            }
+            catch (
+                error
+            ) {
+                return getAuthenticationStateErrorResponse(
+                    error,
+                    debugId,
+                    provider
+                );
+            }
 
             console.info(
                 "OAUTH CALLBACK: Provider link completed.",
@@ -1577,7 +1961,122 @@ export async function handleOAuthCallback(
             );
 
             return redirect(
-                "/Account",
+                returnTo,
+                getOAuthClearCookies(
+                    request
+                )
+            );
+        }
+
+        /* =================================================
+        REAUTHORIZATION FLOW
+        ================================================= */
+
+        if (
+            mode ===
+            OAUTH_MODE_REAUTHORIZE
+        ) {
+            let linkedProvider;
+
+            try {
+                linkedProvider =
+                    await verifyReauthorizationIdentity(
+                        env,
+                        accountContext.accountId,
+                        providerIdentity
+                    );
+            }
+            catch (
+                error
+            ) {
+                console.error(
+                    "OAUTH CALLBACK: Provider reauthorization verification failed.",
+                    {
+                        debugId,
+                        provider,
+
+                        code:
+                            error?.code
+                            || null,
+
+                        status:
+                            error?.status
+                            || null,
+
+                        message:
+                            error?.message
+                            || "Unknown error"
+                    }
+                );
+
+                return json(
+                    {
+                        success:
+                            false,
+
+                        code:
+                            error?.code
+                            || "PROVIDER_REAUTHORIZATION_FAILED",
+
+                        message:
+                            error?.code ===
+                            "PROVIDER_REAUTHORIZATION_MISMATCH"
+                                ? `The authenticated ${providerConfig.label} account does not match the account currently linked to this BPD account.`
+                                : `${providerConfig.label} could not be reauthorized.`,
+
+                        debugId
+                    },
+                    Number.isInteger(
+                        error?.status
+                    )
+                        ? error.status
+                        : 409
+                );
+            }
+
+            await establishReauthorizedSession(
+                env,
+                accountContext,
+                providerIdentity,
+                linkedProvider
+            );
+
+            try {
+                await recordCompletedAuthentication(
+                    env,
+                    {
+                        accountId:
+                            accountContext.accountId,
+
+                        provider,
+
+                        recordLogin:
+                            false
+                    }
+                );
+            }
+            catch (
+                error
+            ) {
+                return getAuthenticationStateErrorResponse(
+                    error,
+                    debugId,
+                    provider
+                );
+            }
+
+            console.info(
+                "OAUTH CALLBACK: Provider reauthorization completed.",
+                {
+                    debugId,
+                    provider,
+                    accountId:
+                        accountContext.accountId
+                }
+            );
+
+            return redirect(
+                returnTo,
                 getOAuthClearCookies(
                     request
                 )
@@ -1688,6 +2187,71 @@ export async function handleOAuthCallback(
             );
         }
 
+        /*
+         * Only a newly created BPD browser session counts as
+         * a successful BPD login for the 10-day login-gap
+         * policy.
+         *
+         * Reusing an already authenticated BPD session does
+         * not advance account_login_status.lastLoginAt.
+         */
+        try {
+            await recordCompletedAuthentication(
+                env,
+                {
+                    accountId:
+                        resolvedAccount.accountId,
+
+                    provider,
+
+                    recordLogin:
+                        sessionResult.createdSession ===
+                        true
+                }
+            );
+        }
+        catch (
+            error
+        ) {
+            /*
+             * If this callback created a brand-new session but
+             * auth-state persistence fails, do not leave that
+             * newly created session active.
+             */
+            if (
+                sessionResult.createdSession ===
+                true
+                && sessionResult.sessionId
+            ) {
+                try {
+                    await deleteSession(
+                        env,
+                        sessionResult.sessionId
+                    );
+                }
+                catch (
+                    deleteError
+                ) {
+                    console.error(
+                        "OAUTH CALLBACK: Failed to clean up session after auth-state failure.",
+                        {
+                            debugId,
+
+                            message:
+                                deleteError?.message
+                                || "Unknown error"
+                        }
+                    );
+                }
+            }
+
+            return getAuthenticationStateErrorResponse(
+                error,
+                debugId,
+                provider
+            );
+        }
+
         const cookies =
             getOAuthClearCookies(
                 request
@@ -1703,7 +2267,7 @@ export async function handleOAuthCallback(
 
         const destination =
             resolvedAccount.createdAccount ===
-                true
+            true
                 ? NEW_ACCOUNT_RETURN_TO
                 : returnTo;
 
@@ -1722,8 +2286,13 @@ export async function handleOAuthCallback(
                     resolvedAccount.createdIdentity ===
                     true,
 
+                createdSession:
+                    sessionResult.createdSession ===
+                    true,
+
                 reusedSession:
-                    !sessionResult.sessionCookie
+                    sessionResult.createdSession !==
+                    true
             }
         );
 
@@ -1752,6 +2321,10 @@ export async function handleOAuthCallback(
                     error?.name
                     || "Error",
 
+                code:
+                    error?.code
+                    || null,
+
                 message:
                     error?.message
                     || "Unknown error"
@@ -1764,7 +2337,8 @@ export async function handleOAuthCallback(
                     false,
 
                 code:
-                    "OAUTH_CALLBACK_FAILED",
+                    error?.code
+                    || "OAUTH_CALLBACK_FAILED",
 
                 message:
                     "OAuth callback failed unexpectedly.",
