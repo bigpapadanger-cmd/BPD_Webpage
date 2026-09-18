@@ -1,7 +1,6 @@
 "use strict";
 
-/*
-=========================================================
+/* =========================================================
 BPD GAMING NETWORK
 ROCKET LEAGUE DISCORD NOTIFICATION ELIGIBILITY
 
@@ -17,30 +16,40 @@ Purpose:
 
 Security:
     - Requires an authenticated active BPD account.
-    - Requires a verified linked Discord identity.
+    - Discord identity is resolved through server-side
+      authorization.
     - MatchBot eligibility is checked server-side.
     - Bot tokens are never exposed.
-=========================================================
-*/
+    - A missing Discord link is returned as normal eligibility
+      state rather than an API authorization failure.
+========================================================= */
 
 import {
-    authorizeRequest
+    authorizeRequest,
+    isAuthorizationError
 } from "../../../services/auth/authorization.js";
 
 import {
-    requireLinkedDiscordIdentity
-} from "../../../services/auth/providers/discord/authorization.js";
-
-import {
-    getDiscordMatchBotEligibility,
-    DiscordMatchBotEligibilityError
+    getDiscordMatchBotEligibility
 } from "../../../services/auth/providers/discord_matchbot/eligibility.js";
 
-/*
-=========================================================
+/* =========================================================
+NORMALIZATION
+========================================================= */
+
+function normalizeString(
+    value
+) {
+    return String(
+        value
+        ?? ""
+    )
+        .trim();
+}
+
+/* =========================================================
 JSON RESPONSE
-=========================================================
-*/
+========================================================= */
 
 function jsonResponse(
     body,
@@ -64,11 +73,63 @@ function jsonResponse(
     );
 }
 
-/*
-=========================================================
+/* =========================================================
+INSTALL URL
+========================================================= */
+
+function getMatchBotInstallUrl(
+    env,
+    eligibility = null
+) {
+    return (
+        normalizeString(
+            eligibility?.installUrl
+        )
+        || normalizeString(
+            env?.DISCORD_MATCHBOT_INSTALL_URL
+        )
+        || null
+    );
+}
+
+/* =========================================================
+UNLINKED DISCORD RESPONSE
+========================================================= */
+
+function discordNotLinkedResponse(
+    env
+) {
+    return jsonResponse(
+        {
+            success:
+                true,
+
+            discordLinked:
+                false,
+
+            matchBotAvailable:
+                false,
+
+            eligible:
+                false,
+
+            reason:
+                "DISCORD_NOT_LINKED",
+
+            installUrl:
+                getMatchBotInstallUrl(
+                    env
+                ),
+
+            mutualGuild:
+                null
+        }
+    );
+}
+
+/* =========================================================
 GET
-=========================================================
-*/
+========================================================= */
 
 export async function onRequestGet(
     context
@@ -80,104 +141,89 @@ export async function onRequestGet(
         context;
 
     try {
-        /*
-         * Require authenticated + active canonical account.
-         *
-         * We intentionally do not require Discord here yet,
-         * because an unlinked Discord account should return
-         * a normal eligibility response rather than a generic
-         * authorization failure.
-         */
+        /* =====================================================
+        AUTHORIZE ACCOUNT + DISCORD PROVIDER
+        ===================================================== */
 
-        const authorization =
-            await authorizeRequest(
-                request,
-                env,
-                {
-                    account:
-                        true
-                }
-            );
-
-        const accountId =
-            authorization?.accountId
-            || authorization?.userId
-            || authorization?.account?.id
-            || null;
-
-        if (
-            !accountId
-        ) {
-            return jsonResponse(
-                {
-                    success:
-                        false,
-
-                    code:
-                        "ACCOUNT_CONTEXT_MISSING",
-
-                    message:
-                        "Authenticated account context is unavailable."
-                },
-                500
-            );
-        }
-
-        /*
-         * A missing linked Discord identity is not a route
-         * failure. It simply means Discord notifications
-         * cannot currently be selected.
-         */
-
-        let discordIdentity =
-            null;
+        let authorization;
 
         try {
-            discordIdentity =
-                await requireLinkedDiscordIdentity(
-                    accountId,
-                    env
+            authorization =
+                await authorizeRequest(
+                    request,
+                    env,
+                    {
+                        account:
+                            true,
+
+                        provider:
+                            "discord"
+                    }
                 );
         }
         catch (
             error
         ) {
-            return jsonResponse(
-                {
-                    success:
-                        true,
+            /*
+             * No linked Discord identity is an expected
+             * eligibility result rather than a route failure.
+             */
+            if (
+                isAuthorizationError(
+                    error
+                )
+                && (
+                    error.code ===
+                        "PROVIDER_REQUIRED"
+                    || error.code ===
+                        "ACCOUNT_IDENTITY_MISSING"
+                )
+            ) {
+                return discordNotLinkedResponse(
+                    env
+                );
+            }
 
-                    discordLinked:
-                        false,
+            throw error;
+        }
 
-                    matchBotAvailable:
-                        false,
+        /* =====================================================
+        VERIFIED DISCORD IDENTITY
+        ===================================================== */
 
-                    eligible:
-                        false,
+        const discordUserId =
+            normalizeString(
+                authorization
+                    ?.provider
+                    ?.subject
+            );
 
-                    reason:
-                        "DISCORD_NOT_LINKED",
-
-                    installUrl:
-                        String(
-                            env?.DISCORD_MATCHBOT_INSTALL_URL
-                            || ""
-                        ).trim()
-                        || null
-                }
+        if (
+            !discordUserId
+        ) {
+            return discordNotLinkedResponse(
+                env
             );
         }
 
-        const discordUserId =
-            discordIdentity?.discordUserId
-            || null;
+        /* =====================================================
+        MATCHBOT ELIGIBILITY
+        ===================================================== */
 
         const eligibility =
             await getDiscordMatchBotEligibility(
                 env,
                 discordUserId
             );
+
+        const eligible =
+            eligibility?.eligible ===
+            true;
+
+        const matchBotAvailable =
+            eligibility?.matchBotAvailable ===
+            true
+            || eligible;
 
         return jsonResponse(
             {
@@ -187,25 +233,29 @@ export async function onRequestGet(
                 discordLinked:
                     true,
 
-                matchBotAvailable:
-                    eligibility
-                        .matchBotAvailable,
+                matchBotAvailable,
 
-                eligible:
-                    eligibility
-                        .eligible,
+                eligible,
 
                 reason:
-                    eligibility
-                        .reason,
+                    normalizeString(
+                        eligibility?.reason
+                    )
+                    || (
+                        eligible
+                            ? null
+                            : "MATCHBOT_REQUIRED"
+                    ),
 
                 installUrl:
-                    eligibility
-                        .installUrl,
+                    getMatchBotInstallUrl(
+                        env,
+                        eligibility
+                    ),
 
                 mutualGuild:
-                    eligibility
-                        .mutualGuild
+                    eligibility?.mutualGuild
+                    || null
             }
         );
     }
@@ -233,31 +283,57 @@ export async function onRequestGet(
             }
         );
 
+        /* =====================================================
+        AUTHORIZATION FAILURE
+        ===================================================== */
+
         if (
-            error instanceof
-            DiscordMatchBotEligibilityError
+            isAuthorizationError(
+                error
+            )
         ) {
+            const status =
+                Number.isInteger(
+                    error?.status
+                )
+                    ? error.status
+                    : (
+                        error.code ===
+                            "AUTH_REQUIRED"
+                            ? 401
+                            : 403
+                    );
+
             return jsonResponse(
                 {
                     success:
                         false,
 
                     code:
-                        error.code,
+                        error.code
+                        || "AUTHORIZATION_FAILED",
 
                     message:
-                        error.message
+                        status === 401
+                            ? "Authentication is required."
+                            : "Account access is not authorized."
                 },
-                error.status
+                status
             );
         }
+
+        /* =====================================================
+        SERVICE FAILURE
+        ===================================================== */
 
         const status =
             Number.isInteger(
                 error?.status
             )
-                ? error.status
-                : 500;
+                && error.status >= 400
+                && error.status <= 599
+                    ? error.status
+                    : 500;
 
         return jsonResponse(
             {
@@ -269,11 +345,7 @@ export async function onRequestGet(
                     || "DISCORD_NOTIFICATION_CHECK_FAILED",
 
                 message:
-                    status === 401
-                        ? "Authentication is required."
-                        : status === 403
-                            ? "Account access is not authorized."
-                            : "Discord notification availability could not be checked."
+                    "Discord notification availability could not be checked."
             },
             status
         );
