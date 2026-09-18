@@ -51,7 +51,7 @@ import {
 import {
     loadSidebarHover,
     initializeSidebar
-} from "./sidebar.js";
+} from "../JS/Sidebar/sidebar.js";
 
 import {
     initializeRouteModule
