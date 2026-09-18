@@ -1,37 +1,27 @@
 "use strict";
 
-/*
-=========================================================
+/* =========================================================
 BPD GAMING NETWORK
 ROCKET LEAGUE PROFILE CONTROLLER
 
 File:
-    /Tabs/RocketLeague/JS/profile.js
+    /Tabs/RocketLeague/Index/JS/profile.js
 
 Purpose:
     Loads and renders the authenticated user's Rocket League
     profile, player-submitted starting ranks, and current
     authoritative competitive rank/MMR information.
 
-Rank Model:
-    input
-        Rank information entered by the player during
-        Rocket League registration/profile setup.
-
-    current
-        Current competitive rank/MMR collected by the
-        server-side Rocket League rank system and stored
-        in Supabase.
-
 Responsibilities:
     - Loads Rocket League profile data.
+    - Distinguishes missing profiles from service failures.
     - Resolves player display name.
     - Separates player-entered rank data from current
       authoritative rank/MMR data.
     - Passes both rank sources to ranks.js.
-    - Exposes normalized Rocket League profile/access state
+    - Returns normalized Rocket League profile/access state
       to auth.js.
-    - Does not calculate rank themes itself.
+    - Does not determine rank themes itself.
     - Does not trust browser input as current MMR.
 
 Security:
@@ -40,24 +30,7 @@ Security:
     - Player-entered ranks are informational only.
     - Client-side state controls UI visibility only.
     - Rocket League APIs remain authoritative.
-
-Recommended Server Shape:
-    profile: {
-        ranks: {
-            input: {
-                duel: {},
-                double: {},
-                standard: {}
-            },
-            current: {
-                duel: {},
-                double: {},
-                standard: {}
-            }
-        }
-    }
-=========================================================
-*/
+========================================================= */
 
 import {
     ROCKET_LEAGUE_PROFILE_URL
@@ -72,11 +45,9 @@ import {
     renderUnavailableRanks
 } from "./ranks.js";
 
-/*
-=========================================================
+/* =========================================================
 NORMALIZATION
-=========================================================
-*/
+========================================================= */
 
 function normalizeString(
     value
@@ -112,11 +83,9 @@ function normalizeRankCollection(
     );
 }
 
-/*
-=========================================================
+/* =========================================================
 PROFILE ERROR
-=========================================================
-*/
+========================================================= */
 
 function createProfileError(
     message,
@@ -142,11 +111,9 @@ function createProfileError(
     return error;
 }
 
-/*
-=========================================================
+/* =========================================================
 PROFILE WARNING
-=========================================================
-*/
+========================================================= */
 
 function setProfileWarning(
     visible,
@@ -186,11 +153,9 @@ function setProfileWarning(
     }
 }
 
-/*
-=========================================================
+/* =========================================================
 PLAYER NAME
-=========================================================
-*/
+========================================================= */
 
 function setPlayerName(
     value
@@ -213,11 +178,38 @@ function setPlayerName(
         || "Epic Player";
 }
 
-/*
-=========================================================
+/* =========================================================
+PROFILE EXISTENCE
+========================================================= */
+
+function profileExists(
+    result,
+    profile
+) {
+    if (
+        result?.profileExists ===
+        true
+    ) {
+        return true;
+    }
+
+    if (
+        result?.profileExists ===
+        false
+    ) {
+        return false;
+    }
+
+    return Object.keys(
+        normalizeObject(
+            profile
+        )
+    ).length > 0;
+}
+
+/* =========================================================
 PROFILE COMPLETE
-=========================================================
-*/
+========================================================= */
 
 function isProfileComplete(
     result,
@@ -239,11 +231,9 @@ function isProfileComplete(
     );
 }
 
-/*
-=========================================================
+/* =========================================================
 PROFILE DISPLAY NAME
-=========================================================
-*/
+========================================================= */
 
 function getProfileDisplayName(
     result,
@@ -279,19 +269,9 @@ function getProfileDisplayName(
     return "";
 }
 
-/*
-=========================================================
+/* =========================================================
 PLAYER-ENTERED RANKS
-
-Primary expected shape:
-    profile.ranks.input
-
-Transitional compatibility:
-    profile.inputRanked
-    profile.submittedRanks
-    profile.registration.ranked
-=========================================================
-*/
+========================================================= */
 
 function getInputRanked(
     profile
@@ -304,21 +284,9 @@ function getInputRanked(
     );
 }
 
-/*
-=========================================================
+/* =========================================================
 CURRENT AUTHORITATIVE RANKS
-
-Primary expected shape:
-    profile.ranks.current
-
-Transitional compatibility:
-    profile.currentRanked
-    profile.stats.ranked
-    profile.ranked
-
-This data must originate from the server/database.
-=========================================================
-*/
+========================================================= */
 
 function getCurrentRanked(
     profile
@@ -331,11 +299,9 @@ function getCurrentRanked(
     );
 }
 
-/*
-=========================================================
+/* =========================================================
 RANK DATA STATE
-=========================================================
-*/
+========================================================= */
 
 function hasRankData(
     ranked
@@ -387,11 +353,9 @@ function applyRankDatasets(
     });
 }
 
-/*
-=========================================================
+/* =========================================================
 RENDER ROCKET LEAGUE PROFILE
-=========================================================
-*/
+========================================================= */
 
 function renderRocketLeagueProfile(
     result,
@@ -427,11 +391,9 @@ function renderRocketLeagueProfile(
     };
 }
 
-/*
-=========================================================
+/* =========================================================
 READ RESPONSE BODY
-=========================================================
-*/
+========================================================= */
 
 async function readResponseBody(
     response
@@ -449,11 +411,9 @@ async function readResponseBody(
     }
 }
 
-/*
-=========================================================
+/* =========================================================
 RESET PROFILE DISPLAY
-=========================================================
-*/
+========================================================= */
 
 function resetProfileDisplay(
     message =
@@ -470,11 +430,113 @@ function resetProfileDisplay(
     );
 }
 
-/*
-=========================================================
+/* =========================================================
+PROFILE-NOT-FOUND DETECTION
+
+This must match the server response we verify next.
+
+For now it accepts common transitional codes and 404.
+========================================================= */
+
+function isProfileNotFoundResponse(
+    response,
+    result
+) {
+    const code =
+        normalizeString(
+            result?.code
+        )
+            .toUpperCase();
+
+    return (
+        response.status ===
+            404
+        || code ===
+            "ROCKET_LEAGUE_PROFILE_NOT_FOUND"
+        || code ===
+            "PROFILE_NOT_FOUND"
+        || code ===
+            "RL_PROFILE_NOT_FOUND"
+    );
+}
+
+/* =========================================================
+MISSING PROFILE STATE
+
+This is not an error.
+
+Epic may be linked successfully while the user has not yet
+created/completed a Rocket League profile.
+========================================================= */
+
+function createMissingProfileResult(
+    authUser
+) {
+    setProfileWarning(
+        false
+    );
+
+    setPlayerName(
+        authUser?.displayName
+        || ""
+    );
+
+    document.body.dataset.rlInputRankAvailable =
+        "false";
+
+    document.body.dataset.rlCurrentRankAvailable =
+        "false";
+
+    renderRocketLeagueRanks({
+        input:
+            {},
+        current:
+            {}
+    });
+
+    return {
+        profile:
+            {},
+
+        ranks: {
+            input:
+                {},
+
+            current:
+                {}
+        },
+
+        rankState: {
+            inputAvailable:
+                false,
+
+            currentAvailable:
+                false
+        },
+
+        profileExists:
+            false,
+
+        profileComplete:
+            false,
+
+        registrationAccepted:
+            false,
+
+        rocketLeagueAccess:
+            false,
+
+        profileSaved:
+            false,
+
+        profileLoaded:
+            true
+    };
+}
+
+/* =========================================================
 HANDLE PROFILE REQUEST FAILURE
-=========================================================
-*/
+========================================================= */
 
 function handleProfileRequestFailure(
     response,
@@ -521,11 +583,9 @@ function handleProfileRequestFailure(
     );
 }
 
-/*
-=========================================================
+/* =========================================================
 LOAD ROCKET LEAGUE PROFILE
-=========================================================
-*/
+========================================================= */
 
 export async function loadRocketLeagueProfile(
     authUser
@@ -599,6 +659,27 @@ export async function loadRocketLeagueProfile(
             response
         );
 
+    /* =====================================================
+    PROFILE DOES NOT EXIST YET
+
+    This is a valid setup state, not a service failure.
+    ===================================================== */
+
+    if (
+        isProfileNotFoundResponse(
+            response,
+            result
+        )
+    ) {
+        return createMissingProfileResult(
+            authUser
+        );
+    }
+
+    /* =====================================================
+    ACTUAL REQUEST FAILURE
+    ===================================================== */
+
     if (
         !response.ok
         || result.success !==
@@ -615,6 +696,24 @@ export async function loadRocketLeagueProfile(
             result.profile
         );
 
+    const exists =
+        profileExists(
+            result,
+            profile
+        );
+
+    /*
+     * A successful response may still explicitly indicate
+     * that no profile exists.
+     */
+    if (
+        !exists
+    ) {
+        return createMissingProfileResult(
+            authUser
+        );
+    }
+
     const {
         inputRanked,
         currentRanked
@@ -624,13 +723,6 @@ export async function loadRocketLeagueProfile(
             authUser,
             profile
         );
-
-    /*
-     * Access state remains server-derived.
-     *
-     * Do not reconstruct Rocket League access from profile
-     * completeness or rank availability on the client.
-     */
 
     const profileComplete =
         isProfileComplete(
@@ -668,6 +760,9 @@ export async function loadRocketLeagueProfile(
                     currentRanked
                 )
         },
+
+        profileExists:
+            true,
 
         profileComplete,
 

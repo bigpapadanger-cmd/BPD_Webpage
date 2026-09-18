@@ -1,81 +1,125 @@
 "use strict";
 
-/*
-=========================================================
+/* =========================================================
 BPD GAMING NETWORK
-ROCKET LEAGUE PROFILE CONTROLLER
+ROCKET LEAGUE RANK RENDERER
 
 File:
-    /Tabs/RocketLeague/JS/profile.js
+    /Tabs/RocketLeague/Index/JS/ranks.js
 
 Purpose:
-    Loads and renders the authenticated user's Rocket League
-    profile, player-submitted starting ranks, and current
-    authoritative competitive rank/MMR information.
+    Renders compact Rocket League competitive rank cards for
+    the authenticated player's 1v1, 2v2, and 3v3 playlists.
 
-Rank Model:
-    input
-        Rank information entered by the player during
-        Rocket League registration/profile setup.
-
-    current
-        Current competitive rank/MMR collected by the
-        server-side Rocket League rank system and stored
-        in Supabase.
+Display:
+    1V1
+    Diamond II
+    1048 MMR
 
 Responsibilities:
-    - Loads Rocket League profile data.
-    - Resolves the player's display name.
-    - Separates player-entered rank data from current
-      authoritative rank/MMR.
-    - Passes both rank sources to ranks.js.
-    - Returns normalized Rocket League profile/access state.
-    - Does not determine rank themes.
-    - Does not trust browser input as current MMR.
+    - Prefers current authoritative rank/MMR data.
+    - Falls back to player-submitted starting rank data.
+    - Reduces detailed rank names to their general rank.
+    - Applies rank-specific presentation classes.
+    - Displays unavailable state safely.
+    - Does not load profile data itself.
+    - Does not determine Rocket League access.
 
 Security:
-    - Current rank/MMR must originate from server-returned
-      profile data.
-    - Player-entered rank is informational only.
-    - Client-side state controls UI only.
-    - Server APIs remain authoritative.
+    - This module only renders data already returned to the
+      authenticated client.
+    - Server APIs remain authoritative for private MMR data.
+========================================================= */
 
-Recommended Server Shape:
-    profile: {
-        ranks: {
-            input: {
-                duel: {},
-                double: {},
-                standard: {}
-            },
-            current: {
-                duel: {},
-                double: {},
-                standard: {}
-            }
+/* =========================================================
+PLAYLIST CONFIGURATION
+========================================================= */
+
+const PLAYLISTS =
+    Object.freeze([
+        {
+            key:
+                "duel",
+
+            aliases:
+                [
+                    "duel",
+                    "ones",
+                    "one",
+                    "1v1",
+                    "1s"
+                ],
+
+            elementId:
+                "rocketLeagueRank1",
+
+            label:
+                "1V1"
+        },
+
+        {
+            key:
+                "double",
+
+            aliases:
+                [
+                    "double",
+                    "doubles",
+                    "twos",
+                    "two",
+                    "2v2",
+                    "2s"
+                ],
+
+            elementId:
+                "rocketLeagueRank2",
+
+            label:
+                "2V2"
+        },
+
+        {
+            key:
+                "standard",
+
+            aliases:
+                [
+                    "standard",
+                    "threes",
+                    "three",
+                    "3v3",
+                    "3s"
+                ],
+
+            elementId:
+                "rocketLeagueRank3",
+
+            label:
+                "3V3"
         }
-    }
-=========================================================
-*/
+    ]);
 
-import {
-    ROCKET_LEAGUE_PROFILE_URL
-} from "/scripts/apiRoutes.js";
+/* =========================================================
+RANK PRESENTATION CLASSES
+========================================================= */
 
-import {
-    apiFetch
-} from "../../../../scripts/apiConnection.js";
+const RANK_CLASSES =
+    Object.freeze([
+        "rank-unranked",
+        "rank-bronze",
+        "rank-silver",
+        "rank-gold",
+        "rank-platinum",
+        "rank-diamond",
+        "rank-champion",
+        "rank-grand-champion",
+        "rank-supersonic-legend",
+        "rank-unavailable"
+    ]);
 
-import {
-    renderRocketLeagueRanks,
-    renderUnavailableRanks
-} from "./ranks.js";
-
-/*
-=========================================================
+/* =========================================================
 NORMALIZATION
-=========================================================
-*/
+========================================================= */
 
 function normalizeString(
     value
@@ -103,161 +147,93 @@ function normalizeObject(
     return value;
 }
 
-function normalizeRankCollection(
+function normalizeNumber(
     value
 ) {
-    return normalizeObject(
-        value
-    );
-}
-
-/*
-=========================================================
-PROFILE ERROR
-=========================================================
-*/
-
-function createProfileError(
-    message,
-    {
-        code =
-            "ROCKET_LEAGUE_PROFILE_UNAVAILABLE",
-
-        status =
+    if (
+        value ===
             null
-    } = {}
-) {
-    const error =
-        new Error(
-            message
-        );
-
-    error.code =
-        code;
-
-    error.status =
-        status;
-
-    return error;
-}
-
-/*
-=========================================================
-PROFILE WARNING
-=========================================================
-*/
-
-function setProfileWarning(
-    visible,
-    message = ""
-) {
-    const warningElement =
-        document.getElementById(
-            "rocketLeagueProfileWarning"
-        );
-
-    if (
-        !warningElement
+        || value ===
+            undefined
+        || value ===
+            ""
     ) {
-        return;
+        return null;
     }
 
-    warningElement.hidden =
-        !visible;
-
-    if (
-        !visible
-    ) {
-        return;
-    }
-
-    const messageElement =
-        warningElement.querySelector(
-            "span"
-        );
-
-    if (
-        messageElement
-        && message
-    ) {
-        messageElement.textContent =
-            message;
-    }
-}
-
-/*
-=========================================================
-PLAYER NAME
-=========================================================
-*/
-
-function setPlayerName(
-    value
-) {
-    const playerNameElement =
-        document.getElementById(
-            "rocketLeaguePlayerName"
-        );
-
-    if (
-        !playerNameElement
-    ) {
-        return;
-    }
-
-    playerNameElement.textContent =
-        normalizeString(
+    const number =
+        Number(
             value
-        )
-        || "Epic Player";
+        );
+
+    return Number.isFinite(
+        number
+    )
+        ? number
+        : null;
 }
 
-/*
-=========================================================
-PROFILE COMPLETE
-=========================================================
-*/
+/* =========================================================
+PLAYLIST LOOKUP
+========================================================= */
 
-function isProfileComplete(
-    result,
-    profile
+function getPlaylistData(
+    collection,
+    playlist
 ) {
-    return (
-        result?.profileComplete ===
-            true
-        || result?.profileCompleted ===
-            true
-        || result?.registrationComplete ===
-            true
-        || profile?.profileComplete ===
-            true
-        || profile?.profileCompleted ===
-            true
-        || profile?.registrationComplete ===
-            true
-    );
+    const source =
+        normalizeObject(
+            collection
+        );
+
+    for (
+        const alias
+        of playlist.aliases
+    ) {
+        const value =
+            source[
+                alias
+            ];
+
+        if (
+            value !==
+                undefined
+            && value !==
+                null
+        ) {
+            return normalizeObject(
+                value
+            );
+        }
+    }
+
+    return {};
 }
 
-/*
-=========================================================
-PROFILE DISPLAY NAME
-=========================================================
-*/
+/* =========================================================
+RANK NAME EXTRACTION
+========================================================= */
 
-function getProfileDisplayName(
-    result,
-    profile,
-    authUser
+function getRankName(
+    rankData
 ) {
-    const candidates = [
-        profile?.username,
-        profile?.displayName,
-        result?.epicDisplayName,
-        result?.epicPreferredUsername,
-        authUser?.EpicDisplayName,
-        authUser?.EpicPreferredUsername,
-        authUser?.displayName
-    ];
+    const data =
+        normalizeObject(
+            rankData
+        );
+
+    const candidates =
+        [
+            data.rank,
+            data.rankName,
+            data.rank_name,
+            data.tier,
+            data.tierName,
+            data.tier_name,
+            data.name,
+            data.displayRank,
+            data.display_rank
+        ];
 
     for (
         const candidate
@@ -278,413 +254,621 @@ function getProfileDisplayName(
     return "";
 }
 
-/*
-=========================================================
-PLAYER-ENTERED RANKS
+/* =========================================================
+MMR EXTRACTION
+========================================================= */
 
-Primary:
-    profile.ranks.input
-
-Transitional compatibility:
-    profile.inputRanked
-    profile.submittedRanks
-    profile.registration.ranked
-=========================================================
-*/
-
-function getInputRanked(
-    profile
+function getMmr(
+    rankData
 ) {
-    return normalizeRankCollection(
-        profile?.ranks?.input
-        || profile?.inputRanked
-        || profile?.submittedRanks
-        || profile?.registration?.ranked
-    );
-}
-
-/*
-=========================================================
-CURRENT AUTHORITATIVE RANKS
-
-Primary:
-    profile.ranks.current
-
-Transitional compatibility:
-    profile.currentRanked
-    profile.stats.ranked
-    profile.ranked
-
-This data must originate from the server/database.
-=========================================================
-*/
-
-function getCurrentRanked(
-    profile
-) {
-    return normalizeRankCollection(
-        profile?.ranks?.current
-        || profile?.currentRanked
-        || profile?.stats?.ranked
-        || profile?.ranked
-    );
-}
-
-/*
-=========================================================
-RANK DATA STATE
-=========================================================
-*/
-
-function hasRankData(
-    ranked
-) {
-    return (
-        ranked
-        && typeof ranked ===
-            "object"
-        && !Array.isArray(
-            ranked
-        )
-        && Object.keys(
-            ranked
-        ).length >
-            0
-    );
-}
-
-/*
-=========================================================
-APPLY RANK STATE
-=========================================================
-*/
-
-function applyRankState(
-    inputRanked,
-    currentRanked
-) {
-    const inputAvailable =
-        hasRankData(
-            inputRanked
+    const data =
+        normalizeObject(
+            rankData
         );
 
-    const currentAvailable =
-        hasRankData(
-            currentRanked
-        );
+    const candidates =
+        [
+            data.mmr,
+            data.MMR,
+            data.rating,
+            data.skillRating,
+            data.skill_rating,
+            data.matchmakingRating,
+            data.matchmaking_rating
+        ];
 
-    document.body.dataset.rlInputRankAvailable =
-        String(
-            inputAvailable
-        );
-
-    document.body.dataset.rlCurrentRankAvailable =
-        String(
-            currentAvailable
-        );
-
-    renderRocketLeagueRanks({
-        input:
-            inputRanked,
-
-        current:
-            currentRanked
-    });
-}
-
-/*
-=========================================================
-RENDER ROCKET LEAGUE PROFILE
-=========================================================
-*/
-
-function renderRocketLeagueProfile(
-    result,
-    authUser,
-    profile
-) {
-    setPlayerName(
-        getProfileDisplayName(
-            result,
-            profile,
-            authUser
-        )
-    );
-
-    const inputRanked =
-        getInputRanked(
-            profile
-        );
-
-    const currentRanked =
-        getCurrentRanked(
-            profile
-        );
-
-    applyRankState(
-        inputRanked,
-        currentRanked
-    );
-
-    return {
-        inputRanked,
-        currentRanked
-    };
-}
-
-/*
-=========================================================
-READ RESPONSE BODY
-=========================================================
-*/
-
-async function readResponseBody(
-    response
-) {
-    try {
-        const body =
-            await response.json();
-
-        return normalizeObject(
-            body
-        );
-    }
-    catch {
-        return {};
-    }
-}
-
-/*
-=========================================================
-RESET PROFILE DISPLAY
-=========================================================
-*/
-
-function resetProfileDisplay(
-    message =
-        "Profile data unavailable"
-) {
-    document.body.dataset.rlInputRankAvailable =
-        "false";
-
-    document.body.dataset.rlCurrentRankAvailable =
-        "false";
-
-    renderUnavailableRanks(
-        message
-    );
-}
-
-/*
-=========================================================
-HANDLE PROFILE REQUEST FAILURE
-=========================================================
-*/
-
-function handleProfileRequestFailure(
-    response,
-    result
-) {
-    const message =
-        normalizeString(
-            result?.message
-            || result?.error
-        )
-        || (
-            response.status >=
-                500
-                ? "Rocket League profile services are currently unavailable."
-                : "Your Rocket League profile could not be loaded."
-        );
-
-    setProfileWarning(
-        true,
-        message
-    );
-
-    resetProfileDisplay(
-        message
-    );
-
-    throw createProfileError(
-        message,
-        {
-            code:
-                normalizeString(
-                    result?.code
-                )
-                || (
-                    response.status >=
-                        500
-                        ? "ROCKET_LEAGUE_PROFILE_UNAVAILABLE"
-                        : "ROCKET_LEAGUE_PROFILE_REQUEST_FAILED"
-                ),
-
-            status:
-                response.status
-        }
-    );
-}
-
-/*
-=========================================================
-LOAD ROCKET LEAGUE PROFILE
-=========================================================
-*/
-
-export async function loadRocketLeagueProfile(
-    authUser
-) {
-    setPlayerName(
-        ""
-    );
-
-    setProfileWarning(
-        false
-    );
-
-    document.body.dataset.rlInputRankAvailable =
-        "false";
-
-    document.body.dataset.rlCurrentRankAvailable =
-        "false";
-
-    let response;
-
-    try {
-        response =
-            await apiFetch(
-                ROCKET_LEAGUE_PROFILE_URL,
-                {
-                    method:
-                        "GET",
-
-                    credentials:
-                        "same-origin",
-
-                    cache:
-                        "no-store",
-
-                    headers: {
-                        "Accept":
-                            "application/json"
-                    }
-                }
-            );
-    }
-    catch (
-        error
+    for (
+        const candidate
+        of candidates
     ) {
-        const message =
-            navigator.onLine ===
-                false
-                ? "Rocket League profile data is unavailable while offline."
-                : "Rocket League profile services are currently unavailable.";
+        const value =
+            normalizeNumber(
+                candidate
+            );
 
-        setProfileWarning(
-            true,
-            message
-        );
-
-        resetProfileDisplay(
-            message
-        );
-
-        throw createProfileError(
-            message,
-            {
-                code:
-                    "ROCKET_LEAGUE_PROFILE_NETWORK_ERROR"
-            }
-        );
+        if (
+            value !==
+                null
+        ) {
+            return Math.round(
+                value
+            );
+        }
     }
 
-    const result =
-        await readResponseBody(
-            response
+    return null;
+}
+
+/* =========================================================
+GENERAL RANK
+
+Examples:
+
+    Diamond II Division III
+        -> Diamond II
+
+    Champion I Div 4
+        -> Champion I
+
+    Grand Champion II Division I
+        -> Grand Champion II
+
+    Supersonic Legend
+        -> Supersonic Legend
+========================================================= */
+
+function getGeneralRank(
+    value
+) {
+    let rank =
+        normalizeString(
+            value
         );
 
     if (
-        !response.ok
-        || result.success !==
-            true
+        !rank
     ) {
-        handleProfileRequestFailure(
-            response,
-            result
-        );
+        return "";
     }
 
-    const profile =
+    rank =
+        rank
+            .replace(
+                /\s+division\s+(?:i{1,3}|iv|[1-4])$/iu,
+                ""
+            )
+            .replace(
+                /\s+div\.?\s*(?:i{1,3}|iv|[1-4])$/iu,
+                ""
+            )
+            .trim();
+
+    return rank;
+}
+
+/* =========================================================
+RANK THEME
+========================================================= */
+
+function getRankClass(
+    rankName
+) {
+    const normalized =
+        normalizeString(
+            rankName
+        )
+            .toLowerCase();
+
+    if (
+        !normalized
+        || normalized.includes(
+            "unranked"
+        )
+    ) {
+        return "rank-unranked";
+    }
+
+    if (
+        normalized.includes(
+            "supersonic legend"
+        )
+        || normalized ===
+            "ssl"
+    ) {
+        return "rank-supersonic-legend";
+    }
+
+    if (
+        normalized.includes(
+            "grand champion"
+        )
+        || normalized.startsWith(
+            "gc "
+        )
+        || normalized ===
+            "gc"
+    ) {
+        return "rank-grand-champion";
+    }
+
+    if (
+        normalized.includes(
+            "champion"
+        )
+    ) {
+        return "rank-champion";
+    }
+
+    if (
+        normalized.includes(
+            "diamond"
+        )
+    ) {
+        return "rank-diamond";
+    }
+
+    if (
+        normalized.includes(
+            "platinum"
+        )
+    ) {
+        return "rank-platinum";
+    }
+
+    if (
+        normalized.includes(
+            "gold"
+        )
+    ) {
+        return "rank-gold";
+    }
+
+    if (
+        normalized.includes(
+            "silver"
+        )
+    ) {
+        return "rank-silver";
+    }
+
+    if (
+        normalized.includes(
+            "bronze"
+        )
+    ) {
+        return "rank-bronze";
+    }
+
+    return "rank-unranked";
+}
+
+/* =========================================================
+CLEAR RANK CLASSES
+========================================================= */
+
+function clearRankClasses(
+    element
+) {
+    if (
+        !element
+    ) {
+        return;
+    }
+
+    RANK_CLASSES.forEach(
+        function(
+            className
+        ) {
+            element.classList.remove(
+                className
+            );
+        }
+    );
+
+    element.classList.remove(
+        "rank-loading"
+    );
+}
+
+/* =========================================================
+RESOLVE DISPLAY DATA
+
+Current server-derived data is preferred.
+
+Input / registration data is only used when current data
+does not contain a usable rank or MMR.
+========================================================= */
+
+function resolveRankData(
+    currentRankData,
+    inputRankData
+) {
+    const current =
         normalizeObject(
-            result.profile
+            currentRankData
         );
 
-    const {
-        inputRanked,
-        currentRanked
-    } =
-        renderRocketLeagueProfile(
-            result,
-            authUser,
-            profile
+    const input =
+        normalizeObject(
+            inputRankData
         );
 
-    /*
-     * Access state remains server-derived.
-     *
-     * Do not reconstruct Rocket League access from rank
-     * availability or profile completeness on the client.
-     */
-
-    const profileComplete =
-        isProfileComplete(
-            result,
-            profile
+    const currentRank =
+        getGeneralRank(
+            getRankName(
+                current
+            )
         );
 
-    const registrationAccepted =
-        result?.registrationAccepted ===
-        true;
+    const currentMmr =
+        getMmr(
+            current
+        );
 
-    const rocketLeagueAccess =
-        result?.rocketLeagueAccess ===
-        true;
+    const inputRank =
+        getGeneralRank(
+            getRankName(
+                input
+            )
+        );
+
+    const inputMmr =
+        getMmr(
+            input
+        );
+
+    const hasCurrent =
+        Boolean(
+            currentRank
+        )
+        || currentMmr !==
+            null;
+
+    if (
+        hasCurrent
+    ) {
+        return {
+            rank:
+                currentRank
+                || "Unranked",
+
+            mmr:
+                currentMmr,
+
+            source:
+                "current"
+        };
+    }
+
+    const hasInput =
+        Boolean(
+            inputRank
+        )
+        || inputMmr !==
+            null;
+
+    if (
+        hasInput
+    ) {
+        return {
+            rank:
+                inputRank
+                || "Unranked",
+
+            mmr:
+                inputMmr,
+
+            source:
+                "input"
+        };
+    }
 
     return {
-        profile,
+        rank:
+            "Unranked",
 
-        ranks: {
-            input:
-                inputRanked,
+        mmr:
+            null,
 
-            current:
-                currentRanked
-        },
-
-        rankState: {
-            inputAvailable:
-                hasRankData(
-                    inputRanked
-                ),
-
-            currentAvailable:
-                hasRankData(
-                    currentRanked
-                )
-        },
-
-        profileComplete,
-
-        registrationAccepted,
-
-        rocketLeagueAccess,
-
-        profileSaved:
-            result?.profileSaved ===
-            true,
-
-        profileLoaded:
-            true
+        source:
+            "none"
     };
+}
+
+/* =========================================================
+RENDER SINGLE RANK
+========================================================= */
+
+function renderRankCard(
+    playlist,
+    rankData
+) {
+    const element =
+        document.getElementById(
+            playlist.elementId
+        );
+
+    if (
+        !element
+    ) {
+        return;
+    }
+
+    const playlistElement =
+        element.querySelector(
+            ".rank-playlist"
+        );
+
+    const rankElement =
+        element.querySelector(
+            ".rank-name"
+        );
+
+    const mmrElement =
+        element.querySelector(
+            ".rank-mmr"
+        );
+
+    clearRankClasses(
+        element
+    );
+
+    const rankName =
+        normalizeString(
+            rankData?.rank
+        )
+        || "Unranked";
+
+    const mmr =
+        normalizeNumber(
+            rankData?.mmr
+        );
+
+    if (
+        playlistElement
+    ) {
+        playlistElement.textContent =
+            playlist.label;
+    }
+
+    if (
+        rankElement
+    ) {
+        rankElement.textContent =
+            rankName;
+    }
+
+    if (
+        mmrElement
+    ) {
+        mmrElement.textContent =
+            mmr !==
+                null
+                ? `${Math.round(mmr)} MMR`
+                : "— MMR";
+    }
+
+    element.classList.add(
+        getRankClass(
+            rankName
+        )
+    );
+
+    element.dataset.rank =
+        rankName;
+
+    element.dataset.rankSource =
+        normalizeString(
+            rankData?.source
+        )
+        || "none";
+
+    element.dataset.mmr =
+        mmr !==
+            null
+            ? String(
+                Math.round(
+                    mmr
+                )
+            )
+            : "";
+}
+
+/* =========================================================
+RANK STATUS
+========================================================= */
+
+function setRankStatus(
+    message
+) {
+    const statusElement =
+        document.getElementById(
+            "rocketLeagueRankStatus"
+        );
+
+    if (
+        !statusElement
+    ) {
+        return;
+    }
+
+    statusElement.textContent =
+        message;
+}
+
+/* =========================================================
+RENDER ROCKET LEAGUE RANKS
+========================================================= */
+
+export function renderRocketLeagueRanks({
+    input = {},
+    current = {}
+} = {}) {
+    let currentCount =
+        0;
+
+    let fallbackCount =
+        0;
+
+    PLAYLISTS.forEach(
+        function(
+            playlist
+        ) {
+            const currentRankData =
+                getPlaylistData(
+                    current,
+                    playlist
+                );
+
+            const inputRankData =
+                getPlaylistData(
+                    input,
+                    playlist
+                );
+
+            const resolved =
+                resolveRankData(
+                    currentRankData,
+                    inputRankData
+                );
+
+            if (
+                resolved.source ===
+                "current"
+            ) {
+                currentCount +=
+                    1;
+            }
+            else if (
+                resolved.source ===
+                "input"
+            ) {
+                fallbackCount +=
+                    1;
+            }
+
+            renderRankCard(
+                playlist,
+                resolved
+            );
+        }
+    );
+
+    if (
+        currentCount ===
+        PLAYLISTS.length
+    ) {
+        setRankStatus(
+            "Current competitive ranks"
+        );
+
+        return;
+    }
+
+    if (
+        currentCount > 0
+    ) {
+        setRankStatus(
+            "Current ranks shown where available"
+        );
+
+        return;
+    }
+
+    if (
+        fallbackCount > 0
+    ) {
+        setRankStatus(
+            "Starting ranks shown until current MMR is available"
+        );
+
+        return;
+    }
+
+    setRankStatus(
+        "Competitive rank data is not available yet"
+    );
+}
+
+/* =========================================================
+UNAVAILABLE RANKS
+========================================================= */
+
+export function renderUnavailableRanks(
+    message =
+        "Competitive rank data is unavailable."
+) {
+    PLAYLISTS.forEach(
+        function(
+            playlist
+        ) {
+            const element =
+                document.getElementById(
+                    playlist.elementId
+                );
+
+            if (
+                !element
+            ) {
+                return;
+            }
+
+            const playlistElement =
+                element.querySelector(
+                    ".rank-playlist"
+                );
+
+            const rankElement =
+                element.querySelector(
+                    ".rank-name"
+                );
+
+            const mmrElement =
+                element.querySelector(
+                    ".rank-mmr"
+                );
+
+            clearRankClasses(
+                element
+            );
+
+            element.classList.add(
+                "rank-unavailable"
+            );
+
+            if (
+                playlistElement
+            ) {
+                playlistElement.textContent =
+                    playlist.label;
+            }
+
+            if (
+                rankElement
+            ) {
+                rankElement.textContent =
+                    "Unavailable";
+            }
+
+            if (
+                mmrElement
+            ) {
+                mmrElement.textContent =
+                    "— MMR";
+            }
+
+            element.dataset.rank =
+                "";
+
+            element.dataset.rankSource =
+                "unavailable";
+
+            element.dataset.mmr =
+                "";
+        }
+    );
+
+    setRankStatus(
+        message
+    );
 }

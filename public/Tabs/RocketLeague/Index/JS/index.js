@@ -1,14 +1,15 @@
 "use strict";
 
-/*
-=========================================================
+/* =========================================================
 BPD GAMING NETWORK
 ROCKET LEAGUE PAGE INITIALIZER
 
+File:
+    /Tabs/RocketLeague/Index/JS/index.js
+
 Purpose:
     Initializes Rocket League homepage-specific behavior.
-=========================================================
-*/
+========================================================= */
 
 import {
     initializeEpicConnection

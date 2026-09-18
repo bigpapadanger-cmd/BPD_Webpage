@@ -16,8 +16,10 @@ Description:
     - Calls api.get_rocketleague_profile.
     - Keeps BPD and Epic display names separate.
     - Normalizes Supabase snake_case fields.
-    - Supports the revised initial profile model.
+    - Exposes explicit profile existence and registration state.
     - Supports separate input/current rank collections.
+    - Keeps missing rank collections empty rather than creating
+      synthetic rank data.
     - Performs read-only profile retrieval.
     - Never determines authentication itself.
 
@@ -83,52 +85,28 @@ function normalizeObject(
 ) {
     return (
         value
-        && typeof value === "object"
-        && !Array.isArray(value)
+        && typeof value ===
+            "object"
+        && !Array.isArray(
+            value
+        )
     )
         ? value
         : {};
 }
 
 /* =========================================================
-DEFAULT RANK STATE
+OBJECT DATA CHECK
 ========================================================= */
 
-function createDefaultRankedState() {
-    return {
-        duel: {
-            tier:
-                "Unranked",
-
-            division:
-                "",
-
-            mmr:
-                null
-        },
-
-        double: {
-            tier:
-                "Unranked",
-
-            division:
-                "",
-
-            mmr:
-                null
-        },
-
-        standard: {
-            tier:
-                "Unranked",
-
-            division:
-                "",
-
-            mmr:
-                null
-        }
-    };
+function hasObjectData(
+    value
+) {
+    return Object.keys(
+        normalizeObject(
+            value
+        )
+    ).length > 0;
 }
 
 /* =========================================================
@@ -172,7 +150,9 @@ export async function getRocketLeagueProfileByAccountId(
     }
 
     const baseUrl =
-        supabaseUrl.endsWith("/")
+        supabaseUrl.endsWith(
+            "/"
+        )
             ? supabaseUrl
             : `${supabaseUrl}/`;
 
@@ -227,6 +207,10 @@ export async function getRocketLeagueProfileByAccountId(
             responseText;
     }
 
+    /* =====================================================
+    SUPABASE REQUEST FAILURE
+    ===================================================== */
+
     if (
         !response.ok
     ) {
@@ -247,8 +231,11 @@ export async function getRocketLeagueProfileByAccountId(
         const message =
             (
                 responseData
-                && typeof responseData === "object"
-                && !Array.isArray(responseData)
+                && typeof responseData ===
+                    "object"
+                && !Array.isArray(
+                    responseData
+                )
             )
                 ? (
                     normalizeString(
@@ -272,8 +259,11 @@ export async function getRocketLeagueProfileByAccountId(
         error.upstreamCode =
             (
                 responseData
-                && typeof responseData === "object"
-                && !Array.isArray(responseData)
+                && typeof responseData ===
+                    "object"
+                && !Array.isArray(
+                    responseData
+                )
             )
                 ? normalizeNullableString(
                     responseData.code
@@ -283,13 +273,27 @@ export async function getRocketLeagueProfileByAccountId(
         throw error;
     }
 
+    /* =====================================================
+    NO PROFILE RETURNED
+
+    The RPC may return null when no persisted Rocket League
+    profile exists for this BPD account.
+    ===================================================== */
+
     if (
         !responseData
-        || typeof responseData !== "object"
-        || Array.isArray(responseData)
+        || typeof responseData !==
+            "object"
+        || Array.isArray(
+            responseData
+        )
     ) {
         return null;
     }
+
+    /* =====================================================
+    ACCOUNT OWNERSHIP VALIDATION
+    ===================================================== */
 
     const returnedAccountId =
         normalizeNullableString(
@@ -307,37 +311,96 @@ export async function getRocketLeagueProfileByAccountId(
         );
     }
 
+    /* =====================================================
+    PROFILE IDENTITY
+    ===================================================== */
+
+    const rlPlayerId =
+        normalizeNullableString(
+            responseData.rl_player_id
+        );
+
+    const profileExists =
+        Boolean(
+            rlPlayerId
+        );
+
+    /* =====================================================
+    REGISTRATION STATE
+    ===================================================== */
+
+    const registrationStatus =
+        normalizeString(
+            responseData.registration_status
+        )
+            .toLowerCase()
+        || "incomplete";
+
+    const registrationAccepted =
+        registrationStatus ===
+        "complete";
+
+    const profileComplete =
+        responseData.profile_complete ===
+        true;
+
+    const rocketLeagueAccess =
+        responseData.rocket_league_access ===
+        true;
+
+    /* =====================================================
+    INPUT RANK DATA
+
+    Player-entered/start-of-registration data.
+
+    Missing data remains an empty object.
+    ===================================================== */
+
     const inputRanked =
-        Object.keys(
-            normalizeObject(
-                responseData.input_ranked
-            )
-        ).length > 0
+        hasObjectData(
+            responseData.input_ranked
+        )
             ? normalizeObject(
                 responseData.input_ranked
             )
             : {};
 
+    /* =====================================================
+    CURRENT AUTHORITATIVE RANK DATA
+
+    Preferred:
+        current_ranked
+
+    Transitional compatibility:
+        ranked
+
+    Missing rank data remains {}.
+
+    Do not synthesize "Unranked" objects here because that
+    would incorrectly make the UI believe authoritative rank
+    data exists.
+    ===================================================== */
+
     const currentRanked =
-        Object.keys(
-            normalizeObject(
-                responseData.current_ranked
-            )
-        ).length > 0
+        hasObjectData(
+            responseData.current_ranked
+        )
             ? normalizeObject(
                 responseData.current_ranked
             )
             : (
-                Object.keys(
-                    normalizeObject(
-                        responseData.ranked
-                    )
-                ).length > 0
+                hasObjectData(
+                    responseData.ranked
+                )
                     ? normalizeObject(
                         responseData.ranked
                     )
-                    : createDefaultRankedState()
+                    : {}
             );
+
+    /* =====================================================
+    NORMALIZED PROFILE
+    ===================================================== */
 
     return {
         accountId:
@@ -348,10 +411,9 @@ export async function getRocketLeagueProfileByAccountId(
             returnedAccountId
             || normalizedAccountId,
 
-        rlPlayerId:
-            normalizeNullableString(
-                responseData.rl_player_id
-            ),
+        rlPlayerId,
+
+        profileExists,
 
         bpdDisplayName:
             normalizeNullableString(
@@ -441,19 +503,13 @@ export async function getRocketLeagueProfileByAccountId(
             responseData.policy_consent ===
             true,
 
-        registrationStatus:
-            normalizeString(
-                responseData.registration_status
-            )
-            || "incomplete",
+        registrationStatus,
 
-        profileComplete:
-            responseData.profile_complete ===
-            true,
+        registrationAccepted,
 
-        rocketLeagueAccess:
-            responseData.rocket_league_access ===
-            true,
+        profileComplete,
+
+        rocketLeagueAccess,
 
         notificationsEnabled:
             responseData.notifications_enabled ===

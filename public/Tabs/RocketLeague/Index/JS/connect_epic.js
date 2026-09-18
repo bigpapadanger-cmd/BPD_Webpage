@@ -5,7 +5,7 @@ BPD GAMING NETWORK
 ROCKET LEAGUE AUTH BUTTONS
 
 File:
-    /Tabs/RocketLeague/JS/connect_epic.js
+    /Tabs/RocketLeague/Index/JS/connect_epic.js
 
 Purpose:
     Controls Rocket League login and logout buttons.
@@ -127,10 +127,6 @@ async function handleLogout() {
             );
         }
 
-        /*
-         * The server session is gone. Invalidate the shared
-         * client auth cache before leaving the current page.
-         */
         invalidateAuthState();
 
         window.location.assign(
@@ -162,7 +158,7 @@ async function handleLogout() {
 INITIALIZATION
 ========================================================= */
 
-export function initializeButtons() {
+export function initializeEpicConnection() {
     const loginButton =
         document.getElementById(
             "sidebarLoginButton"
@@ -186,7 +182,9 @@ export function initializeButtons() {
             Boolean
         )
         .forEach(
-            button => {
+            function(
+                button
+            ) {
                 if (
                     button.dataset.initialized ===
                     "true"

@@ -1357,6 +1357,9 @@ async function handleProfileGet(
     let profileLoaded =
         false;
 
+    let profileExists =
+        false;
+
     let warning =
         null;
 
@@ -1394,11 +1397,19 @@ async function handleProfileGet(
             || databaseProfile?.rl_player_id
             || null;
 
-        profileLoaded =
+        /*
+         * A Rocket League profile exists when Supabase returns
+         * a persisted RL player/profile associated with the
+         * authenticated BPD account.
+         */
+        profileExists =
             Boolean(
                 databaseProfile
                 && rlPlayerId
             );
+
+        profileLoaded =
+            profileExists;
     }
     catch (
         error
@@ -1424,7 +1435,7 @@ async function handleProfileGet(
     }
 
     const profile =
-        databaseProfile
+        profileExists
             ? normalizeDatabaseProfile(
                 databaseProfile,
                 sessionContext,
@@ -1435,18 +1446,47 @@ async function handleProfileGet(
                 epicUser
             );
 
+    /*
+     * Registration is considered accepted only when a real
+     * persisted profile exists and its registration state has
+     * completed.
+     *
+     * We will verify the exact Supabase fields next.
+     */
+    const registrationAccepted =
+        profileExists
+        && (
+            profile.registrationStatus ===
+                "complete"
+            || profile.profileComplete ===
+                true
+        );
+
+    /*
+     * Full Rocket League access fails closed.
+     *
+     * getAuthenticatedContext() has already verified the linked
+     * Epic identity before this function is reached.
+     */
+    const rocketLeagueAccess =
+        epicUser.linked ===
+            true
+        && profileExists
+        && profile.profileComplete ===
+            true
+        && registrationAccepted ===
+            true
+        && profile.rocketLeagueAccess ===
+            true;
+
     /* =====================================================
     ROCKET LEAGUE PRESENCE MONITOR
     ===================================================== */
 
     const presenceEligible =
-        profileLoaded ===
+        rocketLeagueAccess ===
             true
         && profile.active ===
-            true
-        && profile.profileComplete ===
-            true
-        && profile.rocketLeagueAccess ===
             true
         && profile.showOnlineStatus ===
             true
@@ -1534,6 +1574,10 @@ async function handleProfileGet(
             authenticated:
                 true,
 
+            epicLinked:
+                epicUser.linked ===
+                true,
+
             requiresEpicLogin:
                 false,
 
@@ -1542,15 +1586,18 @@ async function handleProfileGet(
             userId:
                 accountId,
 
+            profileExists,
+
             profileLoaded,
 
             profileComplete:
-                profile.profileComplete ===
-                true,
+                profileExists
+                && profile.profileComplete ===
+                    true,
 
-            rocketLeagueAccess:
-                profile.rocketLeagueAccess ===
-                true,
+            registrationAccepted,
+
+            rocketLeagueAccess,
 
             role:
                 profile.role,
@@ -1568,7 +1615,9 @@ async function handleProfileGet(
                     accountId,
 
                 rlPlayerId:
-                    profile.rlPlayerId,
+                    profileExists
+                        ? profile.rlPlayerId
+                        : null,
 
                 bpdDisplayName:
                     profile.bpdDisplayName,
