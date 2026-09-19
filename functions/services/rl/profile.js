@@ -79,8 +79,8 @@ Important:
 //profile becomes fully valid.
 
 import {
-    refreshStats
-} from "./stats/refresh.js";
+    refreshStatsWithGate
+} from "./stats/refresh_with_gate.js";
 
 import {
     fetchRocketLeaguePresence
@@ -2459,15 +2459,21 @@ async function handleProfilePost(
             true
         && storedRocketLeagueAccess ===
             true;
+
     /* =====================================================
-    INITIAL MMR REFRESH
+    INITIAL / GATED MMR REFRESH
 
-    Once registration is successfully completed and full
-    Rocket League access has been granted, request an MMR
-    refresh.
+    Successful Rocket League registration requests a stats
+    refresh through the KV gate.
 
-    refreshStats() owns the 24-hour throttle, so this is safe
-    for subsequent profile saves as well.
+    Flow:
+        KV gate active
+            -> skip refresh work
+
+        KV gate missing
+            -> refreshStats() performs authoritative checks
+
+    MMR failures do not undo successful registration.
     ===================================================== */
 
     let statsRefresh =
@@ -2485,18 +2491,32 @@ async function handleProfilePost(
     ) {
         try {
             statsRefresh =
-                await refreshStats(
+                await refreshStatsWithGate(
                     env,
                     accountId
                 );
+
+            console.info(
+                "ROCKET LEAGUE PROFILE: Background stats refresh completed.",
+                {
+                    accountId,
+
+                    result:
+                        statsRefresh
+                }
+            );
         }
         catch (
             error
         ) {
             console.error(
-                "ROCKET LEAGUE PROFILE: Initial MMR refresh failed.",
+                "ROCKET LEAGUE PROFILE: Background stats refresh failed.",
                 {
                     accountId,
+
+                    name:
+                        error?.name
+                        || "Error",
 
                     code:
                         error?.code
@@ -2506,18 +2526,25 @@ async function handleProfilePost(
                         error?.status
                         || null,
 
+                    upstreamCode:
+                        error?.upstreamCode
+                        || null,
+
+                    upstreamStatus:
+                        error?.upstreamStatus
+                        || null,
+
                     message:
                         error?.message
                         || "Unknown error"
                 }
             );
 
-            /*
-            * MMR availability must not undo a successfully
-            * completed Rocket League registration.
-            */
             statsRefresh = {
                 success:
+                    false,
+
+                refreshed:
                     false,
 
                 code:
@@ -2526,6 +2553,7 @@ async function handleProfilePost(
             };
         }
     }
+
     const rlPlayerId =
         result?.rl_player_id
         || result?.rlPlayerId
@@ -2578,7 +2606,7 @@ async function handleProfilePost(
                 true,
 
             statsRefresh,
-            
+
             user: {
                 accountId,
 

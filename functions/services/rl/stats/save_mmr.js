@@ -22,6 +22,7 @@ Important:
     - Writes through api.save_rl_player_mmr_snapshot.
     - Supports SUPABASE_URL configured either as the project
       root or as the /rest/v1/ endpoint.
+    - Never logs Supabase credentials.
 ========================================================= */
 
 const PLAYLIST_1V1 =
@@ -69,7 +70,8 @@ NORMALIZATION
 function normalizeString(
     value
 ) {
-    return typeof value === "string"
+    return typeof value ===
+        "string"
         ? value.trim()
         : "";
 }
@@ -192,15 +194,6 @@ function getSupabaseConfig(
         throw error;
     }
 
-    /*
-     * Allow either:
-     *
-     * https://project.supabase.co
-     *
-     * or:
-     *
-     * https://project.supabase.co/rest/v1/
-     */
     if (
         !/\/rest\/v1$/i.test(
             baseUrl
@@ -389,10 +382,40 @@ export async function saveMmrStats(
             "mmr-api-v2"
     };
 
-    /*
-     * At least one supported competitive playlist must have
-     * a valid MMR value before a snapshot is stored.
-     */
+    console.info(
+        "MMR SNAPSHOT SAVE: Payload prepared.",
+        {
+            accountId:
+                normalizedAccountId,
+
+            epicAccountId:
+                normalizedEpicAccountId,
+
+            capturedAt,
+
+            onesMmr:
+                payload.p_ones_mmr,
+
+            twosMmr:
+                payload.p_twos_mmr,
+
+            threesMmr:
+                payload.p_threes_mmr,
+
+            onesTier:
+                payload.p_ones_tier,
+
+            twosTier:
+                payload.p_twos_tier,
+
+            threesTier:
+                payload.p_threes_tier,
+
+            source:
+                payload.p_source
+        }
+    );
+
     if (
         payload.p_ones_mmr ===
             null
@@ -401,6 +424,17 @@ export async function saveMmrStats(
         && payload.p_threes_mmr ===
             null
     ) {
+        console.error(
+            "MMR SNAPSHOT SAVE: No supported competitive MMR found.",
+            {
+                accountId:
+                    normalizedAccountId,
+
+                epicAccountId:
+                    normalizedEpicAccountId
+            }
+        );
+
         const error =
             new Error(
                 "No supported competitive playlist MMR was returned."
@@ -428,6 +462,17 @@ export async function saveMmrStats(
             "rpc/save_rl_player_mmr_snapshot",
             baseUrl
         );
+
+    console.info(
+        "MMR SNAPSHOT SAVE: Supabase RPC starting.",
+        {
+            accountId:
+                normalizedAccountId,
+
+            endpoint:
+                url.href
+        }
+    );
 
     const controller =
         new AbortController();
@@ -486,6 +531,17 @@ export async function saveMmrStats(
             error?.name ===
             "AbortError"
         ) {
+            console.error(
+                "MMR SNAPSHOT SAVE: Supabase RPC timed out.",
+                {
+                    accountId:
+                        normalizedAccountId,
+
+                    timeoutMs:
+                        REQUEST_TIMEOUT_MS
+                }
+            );
+
             const timeoutError =
                 new Error(
                     "MMR snapshot save timed out."
@@ -499,6 +555,22 @@ export async function saveMmrStats(
 
             throw timeoutError;
         }
+
+        console.error(
+            "MMR SNAPSHOT SAVE: Supabase RPC unavailable.",
+            {
+                accountId:
+                    normalizedAccountId,
+
+                name:
+                    error?.name
+                    || "Error",
+
+                message:
+                    error?.message
+                    || "Unknown error"
+            }
+        );
 
         const networkError =
             new Error(
@@ -519,6 +591,20 @@ export async function saveMmrStats(
         );
     }
 
+    console.info(
+        "MMR SNAPSHOT SAVE: Supabase RPC response received.",
+        {
+            accountId:
+                normalizedAccountId,
+
+            status:
+                response.status,
+
+            ok:
+                response.ok
+        }
+    );
+
     const responseText =
         await response.text();
 
@@ -535,6 +621,28 @@ export async function saveMmrStats(
                 );
         }
         catch {
+            console.error(
+                "MMR SNAPSHOT SAVE: Supabase returned invalid JSON.",
+                {
+                    accountId:
+                        normalizedAccountId,
+
+                    status:
+                        response.status,
+
+                    response:
+                        responseText
+                            .replace(
+                                /\s+/g,
+                                " "
+                            )
+                            .slice(
+                                0,
+                                300
+                            )
+                }
+            );
+
             result =
                 null;
         }
@@ -546,6 +654,9 @@ export async function saveMmrStats(
         console.error(
             "MMR SNAPSHOT SAVE: Supabase RPC failed.",
             {
+                accountId:
+                    normalizedAccountId,
+
                 status:
                     response.status,
 
@@ -597,6 +708,27 @@ export async function saveMmrStats(
         || !row.id
         || !row.player_id
     ) {
+        console.error(
+            "MMR SNAPSHOT SAVE: Invalid RPC result.",
+            {
+                accountId:
+                    normalizedAccountId,
+
+                hasRow:
+                    Boolean(
+                        row
+                    ),
+
+                snapshotId:
+                    row?.id
+                    || null,
+
+                playerId:
+                    row?.player_id
+                    || null
+            }
+        );
+
         const error =
             new Error(
                 "MMR snapshot save returned an invalid response."
@@ -611,11 +743,7 @@ export async function saveMmrStats(
         throw error;
     }
 
-    /*
-     * The RPC resolves the canonical core.rl_players.id.
-     * This is the UUID used by downstream RL relationships.
-     */
-    return {
+    const saved = {
         refreshedAt:
             row.captured_at
             || capturedAt,
@@ -626,4 +754,23 @@ export async function saveMmrStats(
         playerId:
             row.player_id
     };
+
+    console.info(
+        "MMR SNAPSHOT SAVE: Snapshot saved successfully.",
+        {
+            accountId:
+                normalizedAccountId,
+
+            playerId:
+                saved.playerId,
+
+            snapshotId:
+                saved.snapshotId,
+
+            refreshedAt:
+                saved.refreshedAt
+        }
+    );
+
+    return saved;
 }

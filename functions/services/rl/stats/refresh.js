@@ -1,4 +1,3 @@
-import { verifyBackgroundEpicAccount } from "../authorization.js";
 "use strict";
 
 /* =========================================================
@@ -25,7 +24,19 @@ Policy:
     - Scheduled inactive-player refreshes are handled
       exclusively by the Cloudflare background Worker.
     - All eligibility decisions are server-side.
+
+Diagnostics:
+    - Logs refresh-state resolution.
+    - Logs refresh eligibility.
+    - Logs Epic authorization result.
+    - Logs MMR fetch start/completion.
+    - Logs snapshot save completion.
+    - Never logs secrets.
 ========================================================= */
+
+import {
+    verifyBackgroundEpicAccount
+} from "../authorization.js";
 
 import {
     getStatsRefreshState
@@ -56,7 +67,8 @@ NORMALIZATION
 function normalizeString(
     value
 ) {
-    return typeof value === "string"
+    return typeof value ===
+        "string"
         ? value.trim()
         : "";
 }
@@ -123,15 +135,6 @@ function getRefreshEligibility(
         ) >=
             INACTIVE_AFTER_MS;
 
-    /*
-     * Normal activity does not refresh an account whose
-     * stored activity timestamp is still more than seven
-     * days old.
-     *
-     * handleAccountLastLogin() updates last_seen_at before
-     * calling this service, so a genuinely returning user
-     * becomes active again before MMR eligibility is checked.
-     */
     if (
         inactive
     ) {
@@ -144,10 +147,6 @@ function getRefreshEligibility(
         };
     }
 
-    /*
-     * No account may be refreshed more than once within
-     * a rolling 24-hour period.
-     */
     if (
         lastRefreshAt !==
             null
@@ -208,19 +207,68 @@ export async function refreshStats(
         throw error;
     }
 
+    console.info(
+        "STATS REFRESH: Starting refresh evaluation.",
+        {
+            accountId:
+                normalizedAccountId
+        }
+    );
+
     const state =
         await getStatsRefreshState(
             env,
             normalizedAccountId
         );
 
-    /*
-     * The refresh-state RPC only returns completed Rocket
-     * League profiles eligible for refresh consideration.
-     */
+    console.info(
+        "STATS REFRESH: State loaded.",
+        {
+            accountId:
+                normalizedAccountId,
+
+            hasState:
+                Boolean(
+                    state
+                ),
+
+            rlPlayerId:
+                state?.rlPlayerId
+                || null,
+
+            active:
+                state?.active ===
+                true,
+
+            lastSeenAt:
+                state?.lastSeenAt
+                || null,
+
+            lastRefreshAt:
+                state?.lastRefreshAt
+                || null,
+
+            hasEpicAccountId:
+                Boolean(
+                    state?.epicAccountId
+                )
+        }
+    );
+
     if (
         !state
     ) {
+        console.info(
+            "STATS REFRESH: Profile not eligible.",
+            {
+                accountId:
+                    normalizedAccountId,
+
+                reason:
+                    "ROCKET_LEAGUE_PROFILE_NOT_ELIGIBLE"
+            }
+        );
+
         return {
             success:
                 true,
@@ -233,10 +281,6 @@ export async function refreshStats(
         };
     }
 
-    /*
-     * Verify the state belongs to the exact canonical BPD
-     * account that initiated the refresh.
-     */
     if (
         state.accountId
         && state.accountId !==
@@ -261,13 +305,20 @@ export async function refreshStats(
             state.rlPlayerId
         );
 
-    /*
-     * A canonical core.rl_players.id UUID must exist before
-     * any MMR request is permitted.
-     */
     if (
         !rlPlayerId
     ) {
+        console.info(
+            "STATS REFRESH: Rocket League player missing.",
+            {
+                accountId:
+                    normalizedAccountId,
+
+                reason:
+                    "ROCKET_LEAGUE_PLAYER_NOT_FOUND"
+            }
+        );
+
         return {
             success:
                 true,
@@ -284,6 +335,28 @@ export async function refreshStats(
         getRefreshEligibility(
             state
         );
+
+    console.info(
+        "STATS REFRESH: Eligibility evaluated.",
+        {
+            accountId:
+                normalizedAccountId,
+
+            rlPlayerId,
+
+            allowed:
+                eligibility.allowed ===
+                true,
+
+            reason:
+                eligibility.reason,
+
+            lastRefreshAt:
+                eligibility.lastRefreshAt
+                || state.lastRefreshAt
+                || null
+        }
+    );
 
     if (
         eligibility.allowed !==
@@ -316,6 +389,19 @@ export async function refreshStats(
     if (
         !epicAccountId
     ) {
+        console.info(
+            "STATS REFRESH: Epic account missing.",
+            {
+                accountId:
+                    normalizedAccountId,
+
+                rlPlayerId,
+
+                reason:
+                    "EPIC_ACCOUNT_NOT_LINKED"
+            }
+        );
+
         return {
             success:
                 true,
@@ -330,13 +416,90 @@ export async function refreshStats(
         };
     }
 
-    if (!await verifyBackgroundEpicAccount(env, normalizedAccountId, epicAccountId)) {
-        return { success: true, refreshed: false, reason: "EPIC_REAUTHORIZATION_REQUIRED" };
+    console.info(
+        "STATS REFRESH: Verifying Epic authorization.",
+        {
+            accountId:
+                normalizedAccountId,
+
+            rlPlayerId,
+
+            epicAccountId
+        }
+    );
+
+    const epicAuthorized =
+        await verifyBackgroundEpicAccount(
+            env,
+            normalizedAccountId,
+            epicAccountId
+        );
+
+    if (
+        epicAuthorized !==
+        true
+    ) {
+        console.info(
+            "STATS REFRESH: Epic reauthorization required.",
+            {
+                accountId:
+                    normalizedAccountId,
+
+                rlPlayerId,
+
+                reason:
+                    "EPIC_REAUTHORIZATION_REQUIRED"
+            }
+        );
+
+        return {
+            success:
+                true,
+
+            refreshed:
+                false,
+
+            reason:
+                "EPIC_REAUTHORIZATION_REQUIRED",
+
+            rlPlayerId
+        };
     }
-    const stats = await fetchMmrStats(
+
+    console.info(
+        "STATS REFRESH: MMR fetch starting.",
+        {
+            accountId:
+                normalizedAccountId,
+
+            rlPlayerId,
+
+            epicAccountId
+        }
+    );
+
+    const stats =
+        await fetchMmrStats(
             env,
             epicAccountId
         );
+
+    console.info(
+        "STATS REFRESH: MMR fetch completed.",
+        {
+            accountId:
+                normalizedAccountId,
+
+            rlPlayerId,
+
+            playlistCount:
+                Array.isArray(
+                    stats?.playlists
+                )
+                    ? stats.playlists.length
+                    : null
+        }
+    );
 
     const saved =
         await saveMmrStats(
@@ -350,6 +513,26 @@ export async function refreshStats(
                 stats
             }
         );
+
+    console.info(
+        "STATS REFRESH: Snapshot saved.",
+        {
+            accountId:
+                normalizedAccountId,
+
+            rlPlayerId:
+                saved?.playerId
+                || rlPlayerId,
+
+            snapshotId:
+                saved?.snapshotId
+                || null,
+
+            refreshedAt:
+                saved?.refreshedAt
+                || null
+        }
+    );
 
     return {
         success:
@@ -371,6 +554,7 @@ export async function refreshStats(
 
         refreshedAt:
             saved?.refreshedAt
-            || new Date().toISOString()
+            || new Date()
+                .toISOString()
     };
 }

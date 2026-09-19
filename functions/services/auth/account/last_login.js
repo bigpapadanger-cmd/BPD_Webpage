@@ -24,8 +24,8 @@ Important:
 ========================================================= */
 
 import {
-    refreshStats
-} from "../../rl/stats/refresh.js";
+    refreshStatsWithGate
+} from "../../rl/stats/refresh_with_gate.js";
 
 /* =========================================================
 NORMALIZATION
@@ -268,19 +268,34 @@ export async function handleAccountLastLogin(
 
     try {
         statsRefresh =
-            await refreshStats(
+            await refreshStatsWithGate(
                 env,
                 normalizedAccountId
             );
+
+        console.info(
+            "LAST LOGIN SERVICE: Background refresh completed.",
+            {
+                accountId:
+                    normalizedAccountId,
+
+                result:
+                    statsRefresh
+            }
+        );
     }
     catch (
         error
     ) {
         console.error(
-            "LAST LOGIN SERVICE: Stats refresh failed.",
+            "LAST LOGIN SERVICE: Background refresh failed.",
             {
                 accountId:
                     normalizedAccountId,
+
+                name:
+                    error?.name
+                    || "Error",
 
                 code:
                     error?.code
@@ -288,6 +303,14 @@ export async function handleAccountLastLogin(
 
                 status:
                     error?.status
+                    || null,
+
+                upstreamCode:
+                    error?.upstreamCode
+                    || null,
+
+                upstreamStatus:
+                    error?.upstreamStatus
                     || null,
 
                 message:

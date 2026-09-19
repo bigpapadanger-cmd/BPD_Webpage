@@ -8,27 +8,26 @@ File:
     /Tabs/RocketLeague/Index/JS/ranks.js
 
 Purpose:
-    Renders compact Rocket League competitive rank cards for
-    the authenticated player's 1v1, 2v2, and 3v3 playlists.
+    Renders the authenticated player's current competitive
+    Rocket League rank/MMR for:
 
-Display:
-    1V1
-    Diamond II
-    1048 MMR
+    - Competitive 1v1
+    - Competitive 2v2
+    - Competitive 3v3
 
 Responsibilities:
-    - Prefers current authoritative rank/MMR data.
-    - Falls back to player-submitted starting rank data.
+    - Uses current server-derived rank/MMR data only.
+    - Supports common playlist naming aliases.
     - Reduces detailed rank names to their general rank.
     - Applies rank-specific presentation classes.
     - Displays unavailable state safely.
-    - Does not load profile data itself.
+    - Does not fetch profile/MMR data itself.
     - Does not determine Rocket League access.
 
-Security:
-    - This module only renders data already returned to the
-      authenticated client.
-    - Server APIs remain authoritative for private MMR data.
+Important:
+    - Initial registration no longer collects rank data.
+    - There is no user-submitted rank fallback.
+    - Server APIs remain authoritative for MMR/rank data.
 ========================================================= */
 
 /* =========================================================
@@ -38,17 +37,13 @@ PLAYLIST CONFIGURATION
 const PLAYLISTS =
     Object.freeze([
         {
-            key:
+            aliases: [
                 "duel",
-
-            aliases:
-                [
-                    "duel",
-                    "ones",
-                    "one",
-                    "1v1",
-                    "1s"
-                ],
+                "ones",
+                "one",
+                "1v1",
+                "1s"
+            ],
 
             elementId:
                 "rocketLeagueRank1",
@@ -58,18 +53,14 @@ const PLAYLISTS =
         },
 
         {
-            key:
+            aliases: [
                 "double",
-
-            aliases:
-                [
-                    "double",
-                    "doubles",
-                    "twos",
-                    "two",
-                    "2v2",
-                    "2s"
-                ],
+                "doubles",
+                "twos",
+                "two",
+                "2v2",
+                "2s"
+            ],
 
             elementId:
                 "rocketLeagueRank2",
@@ -79,17 +70,13 @@ const PLAYLISTS =
         },
 
         {
-            key:
+            aliases: [
                 "standard",
-
-            aliases:
-                [
-                    "standard",
-                    "threes",
-                    "three",
-                    "3v3",
-                    "3s"
-                ],
+                "threes",
+                "three",
+                "3v3",
+                "3s"
+            ],
 
             elementId:
                 "rocketLeagueRank3",
@@ -151,12 +138,9 @@ function normalizeNumber(
     value
 ) {
     if (
-        value ===
-            null
-        || value ===
-            undefined
-        || value ===
-            ""
+        value === null
+        || value === undefined
+        || value === ""
     ) {
         return null;
     }
@@ -196,10 +180,8 @@ function getPlaylistData(
             ];
 
         if (
-            value !==
-                undefined
-            && value !==
-                null
+            value !== undefined
+            && value !== null
         ) {
             return normalizeObject(
                 value
@@ -211,7 +193,7 @@ function getPlaylistData(
 }
 
 /* =========================================================
-RANK NAME EXTRACTION
+RANK NAME
 ========================================================= */
 
 function getRankName(
@@ -222,18 +204,17 @@ function getRankName(
             rankData
         );
 
-    const candidates =
-        [
-            data.rank,
-            data.rankName,
-            data.rank_name,
-            data.tier,
-            data.tierName,
-            data.tier_name,
-            data.name,
-            data.displayRank,
-            data.display_rank
-        ];
+    const candidates = [
+        data.rank,
+        data.rankName,
+        data.rank_name,
+        data.tier,
+        data.tierName,
+        data.tier_name,
+        data.name,
+        data.displayRank,
+        data.display_rank
+    ];
 
     for (
         const candidate
@@ -255,7 +236,7 @@ function getRankName(
 }
 
 /* =========================================================
-MMR EXTRACTION
+MMR
 ========================================================= */
 
 function getMmr(
@@ -266,16 +247,15 @@ function getMmr(
             rankData
         );
 
-    const candidates =
-        [
-            data.mmr,
-            data.MMR,
-            data.rating,
-            data.skillRating,
-            data.skill_rating,
-            data.matchmakingRating,
-            data.matchmaking_rating
-        ];
+    const candidates = [
+        data.mmr,
+        data.MMR,
+        data.rating,
+        data.skillRating,
+        data.skill_rating,
+        data.matchmakingRating,
+        data.matchmaking_rating
+    ];
 
     for (
         const candidate
@@ -287,8 +267,7 @@ function getMmr(
             );
 
         if (
-            value !==
-                null
+            value !== null
         ) {
             return Math.round(
                 value
@@ -455,15 +434,14 @@ function clearRankClasses(
         return;
     }
 
-    RANK_CLASSES.forEach(
-        function(
+    for (
+        const className
+        of RANK_CLASSES
+    ) {
+        element.classList.remove(
             className
-        ) {
-            element.classList.remove(
-                className
-            );
-        }
-    );
+        );
+    }
 
     element.classList.remove(
         "rank-loading"
@@ -471,107 +449,54 @@ function clearRankClasses(
 }
 
 /* =========================================================
-RESOLVE DISPLAY DATA
-
-Current server-derived data is preferred.
-
-Input / registration data is only used when current data
-does not contain a usable rank or MMR.
+RESOLVE CURRENT RANK
 ========================================================= */
 
-function resolveRankData(
-    currentRankData,
-    inputRankData
+function resolveCurrentRank(
+    rankData
 ) {
-    const current =
+    const data =
         normalizeObject(
-            currentRankData
+            rankData
         );
 
-    const input =
-        normalizeObject(
-            inputRankData
-        );
-
-    const currentRank =
+    const rank =
         getGeneralRank(
             getRankName(
-                current
+                data
             )
         );
 
-    const currentMmr =
+    const mmr =
         getMmr(
-            current
+            data
         );
-
-    const inputRank =
-        getGeneralRank(
-            getRankName(
-                input
-            )
-        );
-
-    const inputMmr =
-        getMmr(
-            input
-        );
-
-    const hasCurrent =
-        Boolean(
-            currentRank
-        )
-        || currentMmr !==
-            null;
 
     if (
-        hasCurrent
+        !rank
+        && mmr === null
     ) {
         return {
+            available:
+                false,
+
             rank:
-                currentRank
-                || "Unranked",
+                "Unranked",
 
             mmr:
-                currentMmr,
-
-            source:
-                "current"
-        };
-    }
-
-    const hasInput =
-        Boolean(
-            inputRank
-        )
-        || inputMmr !==
-            null;
-
-    if (
-        hasInput
-    ) {
-        return {
-            rank:
-                inputRank
-                || "Unranked",
-
-            mmr:
-                inputMmr,
-
-            source:
-                "input"
+                null
         };
     }
 
     return {
+        available:
+            true,
+
         rank:
-            "Unranked",
+            rank
+            || "Unranked",
 
-        mmr:
-            null,
-
-        source:
-            "none"
+        mmr
     };
 }
 
@@ -591,7 +516,7 @@ function renderRankCard(
     if (
         !element
     ) {
-        return;
+        return false;
     }
 
     const playlistElement =
@@ -613,15 +538,9 @@ function renderRankCard(
         element
     );
 
-    const rankName =
-        normalizeString(
-            rankData?.rank
-        )
-        || "Unranked";
-
-    const mmr =
-        normalizeNumber(
-            rankData?.mmr
+    const resolved =
+        resolveCurrentRank(
+            rankData
         );
 
     if (
@@ -635,43 +554,42 @@ function renderRankCard(
         rankElement
     ) {
         rankElement.textContent =
-            rankName;
+            resolved.rank;
     }
 
     if (
         mmrElement
     ) {
         mmrElement.textContent =
-            mmr !==
+            resolved.mmr !==
                 null
-                ? `${Math.round(mmr)} MMR`
+                ? `${resolved.mmr} MMR`
                 : "— MMR";
     }
 
     element.classList.add(
         getRankClass(
-            rankName
+            resolved.rank
         )
     );
 
     element.dataset.rank =
-        rankName;
+        resolved.rank;
 
     element.dataset.rankSource =
-        normalizeString(
-            rankData?.source
-        )
-        || "none";
+        resolved.available
+            ? "current"
+            : "none";
 
     element.dataset.mmr =
-        mmr !==
+        resolved.mmr !==
             null
             ? String(
-                Math.round(
-                    mmr
-                )
+                resolved.mmr
             )
             : "";
+
+    return resolved.available;
 }
 
 /* =========================================================
@@ -687,13 +605,11 @@ function setRankStatus(
         );
 
     if (
-        !statusElement
+        statusElement
     ) {
-        return;
+        statusElement.textContent =
+            message;
     }
-
-    statusElement.textContent =
-        message;
 }
 
 /* =========================================================
@@ -701,61 +617,34 @@ RENDER ROCKET LEAGUE RANKS
 ========================================================= */
 
 export function renderRocketLeagueRanks({
-    input = {},
     current = {}
 } = {}) {
-    let currentCount =
+    let availableCount =
         0;
 
-    let fallbackCount =
-        0;
+    for (
+        const playlist
+        of PLAYLISTS
+    ) {
+        const rankData =
+            getPlaylistData(
+                current,
+                playlist
+            );
 
-    PLAYLISTS.forEach(
-        function(
-            playlist
-        ) {
-            const currentRankData =
-                getPlaylistData(
-                    current,
-                    playlist
-                );
-
-            const inputRankData =
-                getPlaylistData(
-                    input,
-                    playlist
-                );
-
-            const resolved =
-                resolveRankData(
-                    currentRankData,
-                    inputRankData
-                );
-
-            if (
-                resolved.source ===
-                "current"
-            ) {
-                currentCount +=
-                    1;
-            }
-            else if (
-                resolved.source ===
-                "input"
-            ) {
-                fallbackCount +=
-                    1;
-            }
-
+        if (
             renderRankCard(
                 playlist,
-                resolved
-            );
+                rankData
+            )
+        ) {
+            availableCount +=
+                1;
         }
-    );
+    }
 
     if (
-        currentCount ===
+        availableCount ===
         PLAYLISTS.length
     ) {
         setRankStatus(
@@ -766,20 +655,10 @@ export function renderRocketLeagueRanks({
     }
 
     if (
-        currentCount > 0
+        availableCount > 0
     ) {
         setRankStatus(
             "Current ranks shown where available"
-        );
-
-        return;
-    }
-
-    if (
-        fallbackCount > 0
-    ) {
-        setRankStatus(
-            "Starting ranks shown until current MMR is available"
         );
 
         return;
@@ -798,75 +677,74 @@ export function renderUnavailableRanks(
     message =
         "Competitive rank data is unavailable."
 ) {
-    PLAYLISTS.forEach(
-        function(
-            playlist
+    for (
+        const playlist
+        of PLAYLISTS
+    ) {
+        const element =
+            document.getElementById(
+                playlist.elementId
+            );
+
+        if (
+            !element
         ) {
-            const element =
-                document.getElementById(
-                    playlist.elementId
-                );
-
-            if (
-                !element
-            ) {
-                return;
-            }
-
-            const playlistElement =
-                element.querySelector(
-                    ".rank-playlist"
-                );
-
-            const rankElement =
-                element.querySelector(
-                    ".rank-name"
-                );
-
-            const mmrElement =
-                element.querySelector(
-                    ".rank-mmr"
-                );
-
-            clearRankClasses(
-                element
-            );
-
-            element.classList.add(
-                "rank-unavailable"
-            );
-
-            if (
-                playlistElement
-            ) {
-                playlistElement.textContent =
-                    playlist.label;
-            }
-
-            if (
-                rankElement
-            ) {
-                rankElement.textContent =
-                    "Unavailable";
-            }
-
-            if (
-                mmrElement
-            ) {
-                mmrElement.textContent =
-                    "— MMR";
-            }
-
-            element.dataset.rank =
-                "";
-
-            element.dataset.rankSource =
-                "unavailable";
-
-            element.dataset.mmr =
-                "";
+            continue;
         }
-    );
+
+        const playlistElement =
+            element.querySelector(
+                ".rank-playlist"
+            );
+
+        const rankElement =
+            element.querySelector(
+                ".rank-name"
+            );
+
+        const mmrElement =
+            element.querySelector(
+                ".rank-mmr"
+            );
+
+        clearRankClasses(
+            element
+        );
+
+        element.classList.add(
+            "rank-unavailable"
+        );
+
+        if (
+            playlistElement
+        ) {
+            playlistElement.textContent =
+                playlist.label;
+        }
+
+        if (
+            rankElement
+        ) {
+            rankElement.textContent =
+                "Unavailable";
+        }
+
+        if (
+            mmrElement
+        ) {
+            mmrElement.textContent =
+                "— MMR";
+        }
+
+        element.dataset.rank =
+            "";
+
+        element.dataset.rankSource =
+            "unavailable";
+
+        element.dataset.mmr =
+            "";
+    }
 
     setRankStatus(
         message
