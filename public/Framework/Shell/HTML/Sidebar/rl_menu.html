@@ -13,6 +13,7 @@ Purpose:
 Navigation:
     - Dashboard
     - Rocket League
+    - My Profile
     - Competition
     - Players
     - Tools
@@ -21,9 +22,9 @@ Navigation:
 Access:
     - Dashboard, Rocket League, Leaderboards, Match Results,
       and Find Players are public.
-    - Weekly matches, personal matches, private matches,
-      profile, and scoreboard submission require an
-      authenticated/connected Epic account.
+    - My Profile, Weekly Matches, My Matches, Private Matches,
+      and scoreboard submission require an authenticated/
+      connected Epic account.
 
 Notes:
     - rocketLeagueOverviewNav is intended to be hidden when
@@ -40,9 +41,9 @@ Notes:
             aria-label="Toggle navigation"
             aria-expanded="true"
         >
-            <span aria-hidden="true"></span>
-            <span aria-hidden="true"></span>
-            <span aria-hidden="true"></span>
+            <span aria-hidden="true">\</span>
+            <span aria-hidden="true">\</span>
+            <span aria-hidden="true">\</span>
         </button>
     </div>
 
@@ -59,7 +60,7 @@ Notes:
                 data-nav-route="/Dashboard"
                 data-tooltip="Dashboard"
             >
-                <span class="nav-icon" aria-hidden="true">▦</span>
+                <span class="nav-icon" aria-hidden="true">📊</span>
                 <span class="nav-text">
                     <span class="nav-label">Dashboard</span>
                 </span>
@@ -74,9 +75,24 @@ Notes:
                 data-hide-on-route="/RocketLeague"
                 data-tooltip="Rocket League"
             >
-                <span class="nav-icon" aria-hidden="true">⌂</span>
+                <span class="nav-icon" aria-hidden="true">⚽</span>
                 <span class="nav-text">
                     <span class="nav-label">Rocket League</span>
+                </span>
+            </a>
+
+            <a
+                href="/RocketLeague/Profile"
+                class="nav-item"
+                data-router-link
+                data-nav-route="/RocketLeague/Profile"
+                data-auth="authenticated"
+                data-tooltip="My Profile"
+                hidden
+            >
+                <span class="nav-icon" aria-hidden="true">👤</span>
+                <span class="nav-text">
+                    <span class="nav-label">My Profile</span>
                 </span>
             </a>
         </div>
@@ -99,7 +115,7 @@ Notes:
                 aria-controls="competitionSubmenu"
                 data-tooltip="Competition"
             >
-                <span class="nav-icon" aria-hidden="true">⚔</span>
+                <span class="nav-icon" aria-hidden="true">🏆</span>
                 <span class="nav-text">
                     <span class="nav-label">Competition</span>
                 </span>
@@ -182,7 +198,7 @@ Notes:
                 aria-controls="playersSubmenu"
                 data-tooltip="Players"
             >
-                <span class="nav-icon" aria-hidden="true">♙</span>
+                <span class="nav-icon" aria-hidden="true">👥</span>
                 <span class="nav-text">
                     <span class="nav-label">Players</span>
                 </span>
@@ -201,17 +217,6 @@ Notes:
                     data-nav-route="/RocketLeague/FindPlayers"
                 >
                     Find Players
-                </a>
-
-                <a
-                    href="/RocketLeague/Profile"
-                    class="submenu-item"
-                    data-router-link
-                    data-nav-route="/RocketLeague/Profile"
-                    data-auth="authenticated"
-                    hidden
-                >
-                    My Profile
                 </a>
             </div>
         </div>
@@ -236,7 +241,7 @@ Notes:
                 aria-controls="toolsSubmenu"
                 data-tooltip="Tools"
             >
-                <span class="nav-icon" aria-hidden="true">▣</span>
+                <span class="nav-icon" aria-hidden="true">🛠️</span>
                 <span class="nav-text">
                     <span class="nav-label">Tools</span>
                 </span>
@@ -278,7 +283,7 @@ Notes:
                 data-nav-route="/Settings"
                 data-tooltip="Settings"
             >
-                <span class="nav-icon" aria-hidden="true">⚙</span>
+                <span class="nav-icon" aria-hidden="true">⚙️</span>
                 <span class="nav-text">
                     <span class="nav-label">Settings</span>
                 </span>

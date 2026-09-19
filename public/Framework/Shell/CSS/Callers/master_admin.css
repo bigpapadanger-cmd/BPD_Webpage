@@ -23,8 +23,7 @@ Used for all valid /Admin routes.
 
 @import url("../Sidebar/sidebar.css");
 @import url("../Sidebar/hover.css");
-@import url("/Global/Admin/Sidebar/CSS/index.css");
-@import url("/Global/Admin/TaskBoard/CSS/index.css");
+
 /* =========================================================
    GLOBAL
    ========================================================= */
@@ -34,7 +33,7 @@ Used for all valid /Admin routes.
 /* =========================================================
    ADMIN
    ========================================================= */
-
 @import url("/Global/Admin/Home/CSS/index.css");
+@import url("/Global/Admin/TaskBoard/CSS/index.css");
 
 
