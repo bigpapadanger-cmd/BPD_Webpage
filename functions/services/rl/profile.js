@@ -2805,7 +2805,7 @@ export async function handleRocketLeagueProfile(
             request.method ===
             "GET"
         ) {
-            return handleProfileGet(
+            return await handleProfileGet(
                 request,
                 env,
                 sessionContext,
@@ -2818,7 +2818,7 @@ export async function handleRocketLeagueProfile(
             request.method ===
             "POST"
         ) {
-            return handleProfilePost(
+            return await handleProfilePost(
                 request,
                 env,
                 sessionContext,
@@ -2881,6 +2881,18 @@ export async function handleRocketLeagueProfile(
                     error?.code
                     || null,
 
+                status:
+                    error?.status
+                    || null,
+
+                upstreamCode:
+                    error?.upstreamCode
+                    || null,
+
+                upstreamStatus:
+                    error?.upstreamStatus
+                    || null,
+
                 message:
                     error?.message
                     || "Unknown error",
@@ -2890,6 +2902,8 @@ export async function handleRocketLeagueProfile(
             }
         );
 
-        return authorizationErrorResponse(error);
+        return authorizationErrorResponse(
+            error
+        );
     }
 }
