@@ -81,7 +81,9 @@ Important:
 import {
     refreshStatsWithGate
 } from "./stats/refresh_with_gate.js";
-
+import {
+    getLatestMmr
+} from "./stats/latest_mmr.js";
 import {
     fetchRocketLeaguePresence
 } from "./presence/fetch_presence.js";
@@ -1579,22 +1581,6 @@ async function handleProfileGet(
     accountId,
     epicUser
 ) {
-    /*
-     * Coarse location detection is explicit.
-     *
-     * A normal:
-     *
-     *     GET /api/auth/rocketleague/profile
-     *
-     * does not inspect Cloudflare request location metadata.
-     *
-     * Only:
-     *
-     *     GET /api/auth/rocketleague/profile?detectLocation=true
-     *
-     * performs a fresh coarse location lookup.
-     */
-
     const requestUrl =
         new URL(
             request.url
@@ -1637,14 +1623,10 @@ async function handleProfileGet(
         ) {
             const returnedAccountId =
                 normalizeNullableString(
-                    databaseProfile
-                        .accountId
-                    || databaseProfile
-                        .account_id
-                    || databaseProfile
-                        .userId
-                    || databaseProfile
-                        .user_id
+                    databaseProfile.accountId
+                    || databaseProfile.account_id
+                    || databaseProfile.userId
+                    || databaseProfile.user_id
                 );
 
             if (
@@ -1660,8 +1642,7 @@ async function handleProfileGet(
 
         const rlPlayerId =
             databaseProfile?.rlPlayerId
-            || databaseProfile
-                ?.rl_player_id
+            || databaseProfile?.rl_player_id
             || null;
 
         profileExists =
@@ -1739,17 +1720,6 @@ async function handleProfileGet(
 
     /* =====================================================
     MMR REFRESH GATE CHECK
-
-    Normal Rocket League page activity reaches this GET
-    endpoint.
-
-    Cloudflare KV prevents repeated Supabase refresh-state
-    checks while the refresh gate remains active.
-
-    When the gate is missing or expired, the authoritative
-    refresh service determines whether an MMR refresh is due.
-
-    MMR refresh failures never fail profile retrieval.
     ===================================================== */
 
     let statsRefresh =
@@ -1847,13 +1817,178 @@ async function handleProfileGet(
     }
 
     /* =====================================================
+    LATEST RECORDED MMR
+
+    Reads KV first.
+
+    Supabase is only checked when:
+        - KV is missing, or
+        - KV verification is due.
+
+    Existing KV data remains available as a stale fallback
+    if the authoritative Supabase read fails.
+    ===================================================== */
+
+    let latestMmr =
+        null;
+
+    if (
+        profileExists
+        && profile.active ===
+            true
+        && epicUser.linked ===
+            true
+    ) {
+        try {
+            latestMmr =
+                await getLatestMmr(
+                    env,
+                    accountId
+                );
+
+            console.info(
+                "ROCKET LEAGUE PROFILE: Latest MMR resolved.",
+                {
+                    accountId,
+
+                    available:
+                        latestMmr?.available ===
+                        true,
+
+                    stale:
+                        latestMmr?.stale ===
+                        true,
+
+                    verified:
+                        latestMmr?.verified ===
+                        true,
+
+                    source:
+                        latestMmr?.source
+                        || null,
+
+                    capturedAt:
+                        latestMmr?.capturedAt
+                        || null
+                }
+            );
+        }
+        catch (
+            error
+        ) {
+            console.error(
+                "ROCKET LEAGUE PROFILE: Latest MMR load failed.",
+                {
+                    accountId,
+
+                    name:
+                        error?.name
+                        || "Error",
+
+                    code:
+                        error?.code
+                        || null,
+
+                    status:
+                        error?.status
+                        || null,
+
+                    message:
+                        error?.message
+                        || "Unknown error"
+                }
+            );
+
+            latestMmr = {
+                available:
+                    false,
+
+                stale:
+                    false,
+
+                verified:
+                    false,
+
+                source:
+                    null,
+
+                capturedAt:
+                    null,
+
+                ones: {
+                    mmr:
+                        null,
+
+                    tier:
+                        null
+                },
+
+                twos: {
+                    mmr:
+                        null,
+
+                    tier:
+                        null
+                },
+
+                threes: {
+                    mmr:
+                        null,
+
+                    tier:
+                        null
+                }
+            };
+        }
+    }
+
+    /* =====================================================
+    EXPOSE CURRENT MMR THROUGH PROFILE COMPATIBILITY FIELDS
+    ===================================================== */
+
+    if (
+        latestMmr?.available ===
+        true
+    ) {
+        profile.ranks = {
+            ...profile.ranks,
+
+            current: {
+                ones:
+                    latestMmr.ones,
+
+                twos:
+                    latestMmr.twos,
+
+                threes:
+                    latestMmr.threes,
+
+                capturedAt:
+                    latestMmr.capturedAt,
+
+                stale:
+                    latestMmr.stale ===
+                    true,
+
+                verified:
+                    latestMmr.verified ===
+                    true
+            }
+        };
+
+        profile.ranked =
+            profile.ranks.current;
+
+        profile.stats = {
+            ...profile.stats,
+
+            ranked:
+                profile.ranks.current
+        };
+    }
+
+    /* =====================================================
     ROCKET LEAGUE PRESENCE MONITOR
-
-    Presence opt-in remains intentionally separate from full
-    league registration/access.
-
-    Supabase performs its own authoritative wake eligibility
-    validation before the Worker is triggered.
     ===================================================== */
 
     const presenceEligible =
@@ -1916,8 +2051,7 @@ async function handleProfileGet(
             presence =
                 await fetchRocketLeaguePresence(
                     env,
-                    epicUser
-                        .EpicUniqueId
+                    epicUser.EpicUniqueId
                 );
         }
         catch (
@@ -1988,13 +2122,11 @@ async function handleProfileGet(
 
                 rlPlayerId:
                     profileExists
-                        ? profile
-                            .rlPlayerId
+                        ? profile.rlPlayerId
                         : null,
 
                 bpdDisplayName:
-                    profile
-                        .bpdDisplayName,
+                    profile.bpdDisplayName,
 
                 role:
                     profile.role,
@@ -2003,16 +2135,13 @@ async function handleProfileGet(
                     profile.active,
 
                 EpicUniqueId:
-                    epicUser
-                        .EpicUniqueId,
+                    epicUser.EpicUniqueId,
 
                 EpicDisplayName:
-                    profile
-                        .EpicDisplayName,
+                    profile.EpicDisplayName,
 
                 EpicPreferredUsername:
-                    epicUser
-                        .EpicPreferredUsername
+                    epicUser.EpicPreferredUsername
             },
 
             location:
@@ -2026,6 +2155,8 @@ async function handleProfileGet(
             presence,
 
             statsRefresh,
+
+            latestMmr,
 
             profile
         },

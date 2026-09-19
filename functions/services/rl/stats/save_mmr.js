@@ -24,6 +24,9 @@ Important:
       root or as the /rest/v1/ endpoint.
     - Never logs Supabase credentials.
 ========================================================= */
+import {
+    setLatestMmrCache
+} from "./latest_cache.js";
 
 const PLAYLIST_1V1 =
     10;
@@ -772,5 +775,111 @@ export async function saveMmrStats(
         }
     );
 
-    return saved;
+    /* =========================================================
+    LATEST MMR CACHE
+
+    Supabase has already accepted the authoritative snapshot.
+
+    Store the same latest-known values in Cloudflare KV so the
+    profile can continue displaying the user's last recorded MMR
+    without repeatedly querying Supabase.
+
+    A KV failure must never invalidate the successful Supabase
+    snapshot.
+    ========================================================= */
+
+    let latestCacheStored =
+        false;
+
+    try {
+        latestCacheStored =
+            await setLatestMmrCache(
+                env,
+                normalizedAccountId,
+                {
+                    rlPlayerId:
+                        saved.playerId,
+
+                    epicAccountId:
+                        normalizedEpicAccountId,
+
+                    capturedAt:
+                        saved.refreshedAt,
+                    snapshotId:
+                        saved.snapshotId,
+                    verifiedAt:
+                        new Date()
+                            .toISOString(),
+
+                    ones: {
+                        mmr:
+                            payload.p_ones_mmr,
+
+                        tier:
+                            payload.p_ones_tier
+                    },
+
+                    twos: {
+                        mmr:
+                            payload.p_twos_mmr,
+
+                        tier:
+                            payload.p_twos_tier
+                    },
+
+                    threes: {
+                        mmr:
+                            payload.p_threes_mmr,
+
+                        tier:
+                            payload.p_threes_tier
+                    },
+
+                    source:
+                        payload.p_source
+                }
+            );
+
+        console.info(
+            "MMR SNAPSHOT SAVE: Latest MMR cache updated.",
+            {
+                accountId:
+                    normalizedAccountId,
+
+                stored:
+                    latestCacheStored,
+
+                capturedAt:
+                    saved.refreshedAt
+            }
+        );
+    }
+    catch (
+        error
+    ) {
+        console.warn(
+            "MMR SNAPSHOT SAVE: Latest MMR cache update failed.",
+            {
+                accountId:
+                    normalizedAccountId,
+
+                name:
+                    error?.name
+                    || "Error",
+
+                message:
+                    error?.message
+                    || "Unknown error"
+            }
+        );
+
+        latestCacheStored =
+            false;
+    }
+
+    return {
+        ...saved,
+
+        latestCacheStored
+    };
 }
