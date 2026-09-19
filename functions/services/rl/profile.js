@@ -1738,6 +1738,115 @@ async function handleProfileGet(
             true;
 
     /* =====================================================
+    MMR REFRESH GATE CHECK
+
+    Normal Rocket League page activity reaches this GET
+    endpoint.
+
+    Cloudflare KV prevents repeated Supabase refresh-state
+    checks while the refresh gate remains active.
+
+    When the gate is missing or expired, the authoritative
+    refresh service determines whether an MMR refresh is due.
+
+    MMR refresh failures never fail profile retrieval.
+    ===================================================== */
+
+    let statsRefresh =
+        null;
+
+    console.info(
+        "ROCKET LEAGUE PROFILE: Stats refresh eligibility.",
+        {
+            accountId,
+
+            profileExists,
+
+            profileActive:
+                profile?.active ===
+                true,
+
+            epicLinked:
+                epicUser?.linked ===
+                true,
+
+            rocketLeagueAccess
+        }
+    );
+
+    if (
+        profileExists
+        && profile.active ===
+            true
+        && epicUser.linked ===
+            true
+    ) {
+        try {
+            statsRefresh =
+                await refreshStatsWithGate(
+                    env,
+                    accountId
+                );
+
+            console.info(
+                "ROCKET LEAGUE PROFILE: Background stats check completed.",
+                {
+                    accountId,
+
+                    result:
+                        statsRefresh
+                }
+            );
+        }
+        catch (
+            error
+        ) {
+            console.error(
+                "ROCKET LEAGUE PROFILE: Background stats check failed.",
+                {
+                    accountId,
+
+                    name:
+                        error?.name
+                        || "Error",
+
+                    code:
+                        error?.code
+                        || null,
+
+                    status:
+                        error?.status
+                        || null,
+
+                    upstreamCode:
+                        error?.upstreamCode
+                        || null,
+
+                    upstreamStatus:
+                        error?.upstreamStatus
+                        || null,
+
+                    message:
+                        error?.message
+                        || "Unknown error"
+                }
+            );
+
+            statsRefresh = {
+                success:
+                    false,
+
+                refreshed:
+                    false,
+
+                code:
+                    error?.code
+                    || "STATS_REFRESH_FAILED"
+            };
+        }
+    }
+
+    /* =====================================================
     ROCKET LEAGUE PRESENCE MONITOR
 
     Presence opt-in remains intentionally separate from full
@@ -1915,6 +2024,8 @@ async function handleProfileGet(
                 detectLocationRequested,
 
             presence,
+
+            statsRefresh,
 
             profile
         },
@@ -2478,24 +2589,7 @@ async function handleProfilePost(
 
     let statsRefresh =
         null;
-    console.info(
-        "ROCKET LEAGUE PROFILE: Stats refresh eligibility.",
-        {
-            accountId,
 
-            profileExists,
-
-            profileActive:
-                profile?.active ===
-                true,
-
-            epicLinked:
-                epicUser?.linked ===
-                true,
-
-            rocketLeagueAccess
-        }
-    );
     if (
         profileSaved ===
             true
