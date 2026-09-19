@@ -44,19 +44,19 @@ import {
     AuthorizationError,
     authorizeRequest,
     getVerifiedProvider
-} from "../../authorization.js";
+} from "../../../../services/auth/authorization.js";
 
 import {
     DiscordMatchBotError
-} from "./client.js";
+} from "../../../../services/auth/providers/discord_matchbot/client.js";
 
 import {
     requireDiscordMatchBotGuild
-} from "./guilds.js";
+} from "../../../../services/auth/providers/discord_matchbot/guilds.js";
 
 import {
     requireDiscordMatchBotGuildMember
-} from "./members.js";
+} from "../../../../services/auth/providers/discord_matchbot/members.js";
 
 /* =========================================================
 DISCORD PERMISSIONS

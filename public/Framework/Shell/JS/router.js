@@ -911,6 +911,8 @@ function getRouteAuthRequirements(
         )
     ) {
         return {
+            recovery: routeConfig.auth.recovery === true,
+            rocketLeague: routeConfig.auth.rocketLeague === true,
             required:
                 routeConfig.auth.required ===
                     true,
@@ -1386,10 +1388,8 @@ async function enforceRouteAuthentication(
     CONFIRMED SIGNED OUT
     ----------------------------------------------------- */
 
-    if (
-        evaluation.status ===
-        "signed_out"
-    ) {
+    if (evaluation.status === "signed_out") {
+        document.dispatchEvent(new CustomEvent("bpd:before-auth-redirect"));
         const loginRoute =
             resolveRoute(
                 LOGIN_ROUTE
@@ -1440,6 +1440,18 @@ async function enforceRouteAuthentication(
             authUnavailable:
                 false
         };
+    }
+
+    if (["provider_reauthorization_required", "profile_provider_required", "rl_registration_required", "provider_required"].includes(evaluation.status)) {
+        document.dispatchEvent(new CustomEvent("bpd:before-auth-redirect"));
+        const destination = evaluation.status === "rl_registration_required"
+            ? "/RocketLeague/Profile"
+            : evaluation.status === "provider_reauthorization_required"
+                ? "/Account?reauthorize=" + encodeURIComponent(evaluation.requiredProvider)
+                : "/Account";
+        window.history.replaceState({}, "", destination);
+        return { route: resolveRoute(destination), authState: state, authEvaluation: evaluation,
+            redirected: true, authUnavailable: false };
     }
 
     /* -----------------------------------------------------
@@ -2193,6 +2205,21 @@ async function loadShell() {
         /* -------------------------------------------------
         5. INJECT ROUTE FRAGMENTS
         ------------------------------------------------- */
+
+        if (!authCheck.redirected && authCheck.authEvaluation?.allowed === false) {
+            document.dispatchEvent(new CustomEvent("bpd:before-auth-redirect"));
+            elements.content.replaceChildren();
+            const message = document.createElement("p");
+            message.setAttribute("role", "status");
+            message.textContent = authCheck.authUnavailable
+                ? "Authorization is temporarily unavailable. Please retry. Your login has not been cleared."
+                : "This account cannot access this page.";
+            const accountLink = document.createElement("a");
+            accountLink.href = "/Account";
+            accountLink.textContent = "BPD Account";
+            elements.content.append(message, accountLink);
+            return;
+        }
 
         injectRouteFragments(
             elements,

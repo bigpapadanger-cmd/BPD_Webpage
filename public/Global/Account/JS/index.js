@@ -626,6 +626,26 @@ function setProviderStatus(
             ? "true"
             : "false";
 
+    const providerContext =
+        getProviderContext(
+            authState,
+            normalizedProvider
+        );
+
+    const requiresReauthorization =
+        connected ===
+            true
+        && providerContext
+            ?.requiresReauthorization ===
+            true;
+
+    row.dataset.providerState =
+        !connected
+            ? "disconnected"
+            : requiresReauthorization
+                ? "reauthorization-required"
+                : "connected";
+
     if (
         connected
     ) {
@@ -634,6 +654,29 @@ function setProviderStatus(
                 authState,
                 normalizedProvider
             );
+
+        if (
+            requiresReauthorization
+        ) {
+            status.textContent =
+                providerDisplayName
+                    ? `Connected as ${providerDisplayName} — reauthorization required`
+                    : "Connected — reauthorization required";
+
+            action.textContent =
+                "Verify Again";
+
+            action.dataset.action =
+                "reauthorize";
+
+            action.disabled =
+                false;
+
+            action.title =
+                "Verify this provider account again.";
+
+            return;
+        }
 
         status.textContent =
             providerDisplayName
@@ -649,6 +692,10 @@ function setProviderStatus(
         action.disabled =
             false;
 
+        action.removeAttribute(
+            "title"
+        );
+
         return;
     }
 
@@ -663,6 +710,10 @@ function setProviderStatus(
 
     action.disabled =
         false;
+
+    action.removeAttribute(
+        "title"
+    );
 }
 
 /* =========================================================
@@ -971,8 +1022,23 @@ function renderAuthenticatedAccount(
     setPageState(
         "ready"
     );
-}
 
+    /*
+     * If the Account page was opened from a flashing provider
+     * icon, automatically start that provider's existing
+     * authorization route.
+     *
+     * The server determines whether the operation is:
+     *
+     *     link
+     *     reauthorize
+     *
+     * based on the authoritative Supabase identity state.
+     */
+    startRequestedProviderReauthorization(
+        authState
+    );
+}
 /* =========================================================
 RENDER INACTIVE ACCOUNT
 ========================================================= */
@@ -1408,7 +1474,171 @@ function linkProvider(
         linkUrl.href
     );
 }
+/* =========================================================
+QUERY-DRIVEN PROVIDER REAUTHORIZATION
+========================================================= */
 
+function getRequestedReauthorizationProvider() {
+    const url =
+        new URL(
+            window.location.href
+        );
+
+    const provider =
+        normalizeProviderName(
+            url.searchParams.get(
+                "reauthorize"
+            )
+        );
+
+    if (
+        !provider
+    ) {
+        return null;
+    }
+
+    if (
+        !PROVIDER_CONFIG[
+            provider
+        ]
+    ) {
+        return null;
+    }
+
+    /*
+     * Steam is displayed in the account UI, but the current
+     * provider authentication service only supports:
+     *
+     *     Google
+     *     Discord
+     *     Epic
+     */
+    if (
+        ![
+            "google",
+            "discord",
+            "epic"
+        ].includes(
+            provider
+        )
+    ) {
+        return null;
+    }
+
+    return provider;
+}
+
+function clearReauthorizationQuery() {
+    const url =
+        new URL(
+            window.location.href
+        );
+
+    if (
+        !url.searchParams.has(
+            "reauthorize"
+        )
+    ) {
+        return;
+    }
+
+    url.searchParams.delete(
+        "reauthorize"
+    );
+
+    const nextUrl =
+        url.pathname
+        + (
+            url.search
+            || ""
+        )
+        + (
+            url.hash
+            || ""
+        );
+
+    window.history.replaceState(
+        window.history.state,
+        "",
+        nextUrl
+    );
+}
+
+function startRequestedProviderReauthorization(
+    authState
+) {
+    if (
+        authState?.authenticated !==
+            true
+        || authState?.active !==
+            true
+    ) {
+        return false;
+    }
+
+    const provider =
+        getRequestedReauthorizationProvider();
+
+    if (
+        !provider
+    ) {
+        return false;
+    }
+
+    const providerContext =
+        getProviderContext(
+            authState,
+            provider
+        );
+
+    /*
+     * Only start the automatic flow when the provider is
+     * actually still linked.
+     *
+     * If it is no longer linked, remove the query parameter
+     * and leave the normal Account page visible.
+     */
+    if (
+        providerContext?.linked !==
+        true
+    ) {
+        clearReauthorizationQuery();
+
+        showStatusMessage(
+            "That provider is no longer linked to this account.",
+            "error"
+        );
+
+        return false;
+    }
+
+    /*
+     * If the provider no longer requires reauthorization,
+     * remove the stale query parameter and remain on Account.
+     */
+    if (
+        providerContext
+            ?.requiresReauthorization !==
+        true
+    ) {
+        clearReauthorizationQuery();
+
+        return false;
+    }
+
+    /*
+     * Prevent the same query parameter from repeatedly
+     * launching OAuth if the browser returns to this page
+     * before navigation completes.
+     */
+    clearReauthorizationQuery();
+
+    linkProvider(
+        provider
+    );
+
+    return true;
+}
 /* =========================================================
 UNLINK PROVIDER REQUEST
 ========================================================= */
@@ -1521,6 +1751,10 @@ async function handleProviderAction(
         return;
     }
 
+    /* =====================================================
+    CONNECT
+    ===================================================== */
+
     if (
         action ===
         "connect"
@@ -1531,6 +1765,41 @@ async function handleProviderAction(
 
         return;
     }
+
+    /* =====================================================
+    REAUTHORIZE
+    ===================================================== */
+
+    if (
+        action ===
+        "reauthorize"
+    ) {
+        /*
+         * The generic provider authorization route checks
+         * authoritative Supabase linkage.
+         *
+         * Because this provider is already linked, the server
+         * automatically starts mode = reauthorize rather than
+         * mode = link.
+         */
+        button.disabled =
+            true;
+
+        button.textContent =
+            "Opening...";
+
+        clearStatusMessage();
+
+        linkProvider(
+            providerName
+        );
+
+        return;
+    }
+
+    /* =====================================================
+    DISCONNECT
+    ===================================================== */
 
     if (
         action !==

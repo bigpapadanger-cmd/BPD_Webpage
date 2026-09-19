@@ -1,3 +1,4 @@
+import { authorizationErrorResponse } from "../../../services/rl/authorization.js";
 "use strict";
 
 /* =========================================================
@@ -145,6 +146,11 @@ export async function onRequestGet(
         AUTHORIZE ACCOUNT + DISCORD PROVIDER
         ===================================================== */
 
+        // Registration eligibility is available before registration is complete,
+        // but still requires current Epic authorization.
+        try { await authorizeRequest(request, env, { account: true, provider: "epic" }); }
+        catch (error) { return authorizationErrorResponse(error); }
+
         let authorization;
 
         try {
@@ -175,8 +181,7 @@ export async function onRequestGet(
                 && (
                     error.code ===
                         "PROVIDER_REQUIRED"
-                    || error.code ===
-                        "ACCOUNT_IDENTITY_MISSING"
+
                 )
             ) {
                 return discordNotLinkedResponse(

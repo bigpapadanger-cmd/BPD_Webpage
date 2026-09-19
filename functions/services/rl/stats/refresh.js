@@ -1,3 +1,4 @@
+import { verifyBackgroundEpicAccount } from "../authorization.js";
 "use strict";
 
 /* =========================================================
@@ -329,8 +330,10 @@ export async function refreshStats(
         };
     }
 
-    const stats =
-        await fetchMmrStats(
+    if (!await verifyBackgroundEpicAccount(env, normalizedAccountId, epicAccountId)) {
+        return { success: true, refreshed: false, reason: "EPIC_REAUTHORIZATION_REQUIRED" };
+    }
+    const stats = await fetchMmrStats(
             env,
             epicAccountId
         );

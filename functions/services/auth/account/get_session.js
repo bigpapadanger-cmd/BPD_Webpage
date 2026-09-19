@@ -367,7 +367,7 @@ PostgREST.
 The browser never supplies accountId.
 ========================================================= */
 
-async function getCanonicalAccount(
+export async function getCanonicalAccount(
     env,
     accountId
 ) {
@@ -933,11 +933,9 @@ export async function handleAuthSession(
         ) {
             return json(
                 {
-                    success:
-                        false,
-
-                    authenticated:
-                        false,
+                    success: false,
+                    authenticated: null,
+                    available: false,
 
                     user:
                         null,
@@ -984,11 +982,9 @@ export async function handleAuthSession(
 
             return json(
                 {
-                    success:
-                        false,
-
-                    authenticated:
-                        false,
+                    success: false,
+                    authenticated: null,
+                    available: false,
 
                     user:
                         null,
@@ -1129,8 +1125,8 @@ export async function handleAuthSession(
                 success:
                     false,
 
-                authenticated:
-                    false,
+                authenticated: null,
+                available: false,
 
                 user:
                     null,
@@ -1148,14 +1144,14 @@ export async function handleAuthSession(
                     null,
 
                 code:
-                    "AUTH_SESSION_LOAD_FAILED",
+                    "AUTH_SERVICE_UNAVAILABLE",
 
                 message:
                     "Authentication session could not be loaded.",
 
                 debugId
             },
-            500
+            503
         );
     }
 }

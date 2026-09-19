@@ -12,20 +12,17 @@ Purpose:
     canonical BPD account.
 ========================================================= */
 
-import {
-    getSessionContext
-} from "../../../services/auth/sessions/session_context.js";
+import { authorizeRequest } from "../../../services/auth/authorization.js";
+import { authorizationErrorResponse } from "../../../services/rl/authorization.js";
 
 import {
-    touchAccountLastSeen
+    handleAccountLastLogin
 } from "../../../services/auth/account/last_login.js";
 
 import {
     json
 } from "../../../services/common_helpers/responses.js";
-import {
-    refreshStats
-} from "../../../services/rl/stats/refresh.js";
+
 export async function onRequestPost(
     context
 ) {
@@ -38,11 +35,8 @@ export async function onRequestPost(
         crypto.randomUUID();
 
     try {
-        const session =
-            await getSessionContext(
-                request,
-                env
-            );
+        const authorization = await authorizeRequest(request, env, { account: true });
+        const session = authorization.sessionContext;
 
         if (
             session.authenticated !==
@@ -87,29 +81,16 @@ export async function onRequestPost(
             );
         }
 
-        const lastSeenAt =
-            await touchAccountLastSeen(
-                env,
-                session.userId
-            );
-        const mmrRefresh =
-            await refreshPlayerMmrIfDue(
-                env,
-                {
-                    accountId:
-                        session.userId,
+        // Activity must not advance the successful BPD login timestamp.
+        const { lastSeenAt, statsRefresh } = await handleAccountLastLogin(env, authorization.accountId);
 
-                    epicAccountId:
-                        session.providers?.epic?.accountId
-                        || null
-                }
-            );
         return json(
             {
                 success:
                     true,
 
                 lastSeenAt,
+                statsRefresh,
 
                 debugId
             }
@@ -137,22 +118,6 @@ export async function onRequestPost(
             }
         );
 
-        return json(
-            {
-                success:
-                    false,
-
-                code:
-                    error?.code
-                    || "LAST_LOGIN_FAILED",
-
-                message:
-                    "Account activity could not be updated.",
-
-                debugId
-            },
-            error?.status
-            || 500
-        );
+        return authorizationErrorResponse(error);
     }
 }

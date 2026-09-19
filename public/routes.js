@@ -118,6 +118,7 @@ export const ROUTES = {
     },
 
     "/Account": {
+        auth: { required: true, recovery: true },
         title:
             "Dashboard | BPD Gaming Network",
 
@@ -197,6 +198,7 @@ export const ROUTES = {
     },
 
     "/RocketLeague/Profile": {
+        auth: { required: true, provider: "epic" },
         title:
             "Rocket League Profile | BPD Gaming Network",
 
@@ -223,6 +225,7 @@ export const ROUTES = {
     },
 
     "/RocketLeague/SubmitMatchResults": {
+        auth: { required: true, provider: "epic", rocketLeague: true },
         title:
             "Submit Match Results | BPD Gaming Network",
 
@@ -249,6 +252,7 @@ export const ROUTES = {
     },
 
     "/RocketLeague/ImageScanning": {
+        auth: { required: true, provider: "epic", rocketLeague: true },
         title:
             "Rocket League Image Scanning | BPD Gaming Network",
 
@@ -298,6 +302,7 @@ export const ROUTES = {
     },
 
     "/RocketLeague/MatchResults": {
+        auth: { required: true, provider: "epic", rocketLeague: true },
         title:
             "Match Results | BPD Gaming Network",
 

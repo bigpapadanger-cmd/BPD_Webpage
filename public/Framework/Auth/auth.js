@@ -76,7 +76,7 @@ Important:
 ========================================================= */
 
 import {
-    BPD_AUTH_SESSION_URL
+    BPD_AUTH_SESSION_URL, ROCKET_LEAGUE_SESSION_URL
 } from "/scripts/apiRoutes.js";
 
 /* =========================================================
@@ -437,12 +437,7 @@ function normalizeProvider(
         providerData?.authorized ===
         true;
 
-    const requiresReauthorization =
-        linked ===
-            true
-        && providerData
-            ?.requiresReauthorization ===
-            true;
+    const requiresReauthorization = linked && (providerData?.requiresReauthorization === true || !authorized);
 
     return {
         provider:
@@ -1301,166 +1296,39 @@ export function hasLinkedProvider(
     );
 }
 
-export function hasAuthorizedProvider(
-    provider,
-    state =
-        currentState
-) {
-    if (
-        !hasActiveAccount(
-            state
-        )
-    ) {
-        return false;
-    }
-
-    const providerContext =
-        getProvider(
-            provider,
-            state
-        );
-
-    return (
-        providerContext?.linked ===
-            true
-        && providerContext?.authorized ===
-            true
-        && providerContext
-            ?.requiresReauthorization !==
-            true
-    );
+export function hasAuthorizedProvider(provider, state = currentState) {
+    if (!hasActiveAccount(state)) return false;
+    const context = getProvider(provider, state);
+    const expiresAt = normalizeTimestamp(context?.expiresAt);
+    return context?.linked === true && context?.authorized === true
+        && context?.requiresReauthorization !== true
+        && expiresAt !== null && expiresAt > Date.now();
 }
 
-export function requiresProviderReauthorization(
-    provider,
-    state =
-        currentState
-) {
-    if (
-        !hasActiveAccount(
-            state
-        )
-    ) {
-        return false;
-    }
-
-    const providerContext =
-        getProvider(
-            provider,
-            state
-        );
-
-    return (
-        providerContext?.linked ===
-            true
-        && providerContext
-            ?.requiresReauthorization ===
-            true
-    );
+export function requiresProviderReauthorization(provider, state = currentState) {
+    return hasActiveAccount(state) && hasLinkedProvider(provider, state)
+        && !hasAuthorizedProvider(provider, state);
 }
 
-export function hasAuthenticatedProvider(
-    provider,
-    state =
-        currentState
-) {
-    if (
-        !hasActiveAccount(
-            state
-        )
-    ) {
-        return false;
-    }
+export function hasAuthenticatedProvider(provider, state = currentState) {
+    return hasAuthorizedProvider(provider, state);
+}
 
-    const providerName =
-        normalizeProviderName(
-            provider
-        );
-
-    if (
-        !providerName
-    ) {
-        return false;
-    }
-
-    const providerContext =
-        getProvider(
-            providerName,
-            state
-        );
-
-    return (
-        providerContext
-            ?.authenticated ===
-            true
-        || state
-            ?.authenticatedProviders
-            ?.includes(
-                providerName
-            )
-    );
+export function hasProfileAuthorization(state = currentState) {
+    return ["epic", "google", "discord"].some(provider => hasAuthorizedProvider(provider, state));
 }
 
 /* =========================================================
 ROUTE AUTH REQUIREMENTS
 ========================================================= */
 
-function normalizeRouteAuthRequirements(
-    requirements
-) {
-    if (
-        requirements ===
-        true
-    ) {
-        return {
-            required:
-                true,
-
-            provider:
-                null,
-
-            role:
-                null
-        };
-    }
-
-    if (
-        !requirements
-        || typeof requirements !==
-            "object"
-        || Array.isArray(
-            requirements
-        )
-    ) {
-        return {
-            required:
-                false,
-
-            provider:
-                null,
-
-            role:
-                null
-        };
-    }
-
-    return {
-        required:
-            requirements.required ===
-            true,
-
-        provider:
-            normalizeProviderName(
-                requirements.provider
-            )
-            || null,
-
-        role:
-            normalizeRole(
-                requirements.role
-            )
-            || null
-    };
+function normalizeRouteAuthRequirements(requirements) {
+    const input = requirements === true ? { required: true } : requirements || {};
+    return { required: input.required === true,
+        provider: normalizeProviderName(input.provider) || null,
+        role: normalizeRole(input.role) || null,
+        recovery: input.recovery === true,
+        rocketLeague: input.rocketLeague === true };
 }
 
 /* =========================================================
@@ -1511,10 +1379,9 @@ export function evaluateRouteAuth(
         };
     }
 
-    if (
-        state?.available !==
-        true
-    ) {
+    if (policy.recovery && state?.available !== true) return { allowed: true, status: "allowed", policy };
+
+    if (state?.available !== true) {
         return {
             allowed:
                 false,
@@ -1547,11 +1414,9 @@ export function evaluateRouteAuth(
         };
     }
 
-    if (
-        !hasActiveAccount(
-            state
-        )
-    ) {
+    if (policy.recovery) return { allowed: true, status: "allowed", policy };
+
+    if (!hasActiveAccount(state)) {
         return {
             allowed:
                 false,
@@ -1614,6 +1479,14 @@ export function evaluateRouteAuth(
         };
     }
 
+    if (policy.provider && !hasAuthorizedProvider(policy.provider, state)) {
+        return { allowed: false, status: "provider_reauthorization_required",
+            requiredProvider: policy.provider, reason: "Provider verification is required.", policy };
+    }
+    if (!policy.recovery && !hasProfileAuthorization(state)) {
+        return { allowed: false, status: "profile_provider_required",
+            reason: "Verify an Epic, Google, or Discord provider.", policy };
+    }
     return {
         allowed:
             true,
@@ -1632,26 +1505,25 @@ export function evaluateRouteAuth(
 ROUTE AUTH LOAD + EVALUATION
 ========================================================= */
 
-export async function authorizeRoute(
-    requirements,
-    {
-        force = false
-    } = {}
-) {
-    const state =
-        await getAuthState({
-            force
-        });
-
-    return {
-        state,
-
-        evaluation:
-            evaluateRouteAuth(
-                requirements,
-                state
-            )
-    };
+export async function authorizeRoute(requirements, { force = false } = {}) {
+    const state = await getAuthState({ force });
+    let evaluation = evaluateRouteAuth(requirements, state);
+    if (evaluation.allowed && requirements?.rocketLeague === true) {
+        try {
+            const response = await fetch(ROCKET_LEAGUE_SESSION_URL, {
+                credentials: "same-origin", cache: "no-store", headers: { Accept: "application/json" }
+            });
+            const result = await response.json();
+            if (response.status >= 500 || result.available === false || result.profileError) throw new Error();
+            if (result.authenticated === false) evaluation = { allowed: false, status: "signed_out" };
+            else if (result.requiresEpicReauthorization) evaluation = { allowed: false, status: "provider_reauthorization_required", requiredProvider: "epic" };
+            else if (result.requiresEpicLogin) evaluation = { allowed: false, status: "provider_required", requiredProvider: "epic" };
+            else if (!response.ok || result.rocketLeagueAccess !== true) evaluation = { allowed: false, status: "rl_registration_required" };
+        } catch {
+            evaluation = { allowed: false, status: "unavailable", reason: "Rocket League authorization is unavailable. Please retry." };
+        }
+    }
+    return { state, evaluation };
 }
 
 /* =========================================================

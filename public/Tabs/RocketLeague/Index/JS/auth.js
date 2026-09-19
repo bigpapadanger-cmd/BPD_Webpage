@@ -9,29 +9,46 @@ File:
 
 Purpose:
     Controls Rocket League client-side authentication,
-    Epic-link state, profile state, sidebar access, and
-    protected-route behavior.
+    Epic-link state, Epic authorization freshness, profile
+    state, sidebar access, and protected-route behavior.
 
 Access Requirements:
     Full Rocket League access requires:
 
         1. Active authenticated BPD account.
-        2. Verified Epic Games identity linked to that account.
-        3. Rocket League profile exists.
-        4. Rocket League profile is complete.
-        5. Required registration state has been accepted.
+        2. Epic Games identity permanently linked.
+        3. Epic Games identity currently authorized.
+        4. Rocket League profile exists.
+        5. Rocket League profile is complete.
+        6. Required registration state has been accepted.
+        7. Server has authorized Rocket League access.
+
+Important Provider Distinction:
+    epicLinked
+        Permanent Epic identity exists for the BPD account.
+
+    epicAuthorized
+        Linked Epic identity currently satisfies provider
+        authentication freshness requirements.
+
+    requiresEpicReauthorization
+        Epic remains permanently linked, but the current
+        provider authentication proof is stale or missing.
 
 Description:
     - Uses Framework/Auth/auth.js as the authoritative source
       of global BPD authentication state.
-    - Keeps Epic-link state separate from profile state.
+    - Keeps Epic linkage separate from Epic authorization.
+    - Does not treat stale Epic authorization as disconnected.
+    - Prevents stale Epic authorization from granting full
+      Rocket League access.
     - Loads Rocket League profile state only after Epic is
-      verified as linked.
+      linked and currently authorized.
     - Exposes normalized Rocket League state to the sidebar
       and page.
     - Allows public Rocket League pages without full access.
-    - Redirects protected Rocket League routes to Profile
-      when requirements are incomplete.
+    - Redirects protected Rocket League routes when access
+      requirements are incomplete.
     - Preserves authentication/profile-service failures as
       distinct unavailable states.
 
@@ -51,14 +68,17 @@ Protected Rocket League Routes:
 Security:
     - Client-side route checks control UX only.
     - Protected Rocket League APIs must independently enforce
-      account, Epic, profile, and access requirements.
+      account, Epic authorization, profile, and access
+      requirements.
     - Browser state is never authoritative for API access.
 ========================================================= */
 
 import {
     getAuthState,
     hasActiveAccount,
-    hasLinkedProvider
+    hasLinkedProvider,
+    hasAuthorizedProvider,
+    requiresProviderReauthorization
 } from "/Framework/Auth/auth.js";
 
 import {
@@ -79,6 +99,9 @@ ROUTES
 
 const ROCKET_LEAGUE_PROFILE_PAGE =
     "/RocketLeague/Profile";
+
+const EPIC_REAUTHORIZATION_PAGE =
+    "/Account?reauthorize=epic";
 
 const PROTECTED_ROCKET_LEAGUE_ROUTES =
     Object.freeze([
@@ -186,6 +209,24 @@ function hasRocketLeagueProvider(
     );
 }
 
+function hasAuthorizedRocketLeagueProvider(
+    authState
+) {
+    return hasAuthorizedProvider(
+        "epic",
+        authState
+    );
+}
+
+function requiresRocketLeagueProviderReauthorization(
+    authState
+) {
+    return requiresProviderReauthorization(
+        "epic",
+        authState
+    );
+}
+
 /* =========================================================
 PROFILE EXISTENCE
 
@@ -234,7 +275,14 @@ Important distinction:
         BPD account session exists.
 
     epicLinked
-        BPD account has a verified Epic identity.
+        BPD account has a permanent Epic identity.
+
+    epicAuthorized
+        Epic identity currently satisfies provider
+        authorization freshness requirements.
+
+    requiresEpicReauthorization
+        Epic remains linked but must be authenticated again.
 
     profileExists
         Rocket League player/profile record exists.
@@ -250,6 +298,8 @@ function createRocketLeagueSession(
     authState,
     {
         epicLinked = false,
+        epicAuthorized = false,
+        requiresEpicReauthorization = false,
         profileExists = false,
         registrationAccepted = false,
         profileComplete = false,
@@ -294,6 +344,14 @@ function createRocketLeagueSession(
             epicLinked ===
             true,
 
+        epicAuthorized:
+            epicAuthorized ===
+            true,
+
+        requiresEpicReauthorization:
+            requiresEpicReauthorization ===
+            true,
+
         profileExists:
             profileExists ===
             true,
@@ -307,8 +365,10 @@ function createRocketLeagueSession(
             true,
 
         rocketLeagueAccess:
-            rocketLeagueAccess ===
-            true
+            epicAuthorized ===
+                true
+            && rocketLeagueAccess ===
+                true
     };
 }
 
@@ -330,6 +390,20 @@ function applyRocketLeagueBodyState(
         String(
             rocketLeagueSession
                 ?.epicLinked ===
+            true
+        );
+
+    document.body.dataset.rlEpicAuthorized =
+        String(
+            rocketLeagueSession
+                ?.epicAuthorized ===
+            true
+        );
+
+    document.body.dataset.rlEpicReauthorizationRequired =
+        String(
+            rocketLeagueSession
+                ?.requiresEpicReauthorization ===
             true
         );
 
@@ -377,6 +451,16 @@ function applyRocketLeagueAuthView(
     const epicLinked =
         rocketLeagueSession
             ?.epicLinked ===
+        true;
+
+    const epicAuthorized =
+        rocketLeagueSession
+            ?.epicAuthorized ===
+        true;
+
+    const requiresEpicReauthorization =
+        rocketLeagueSession
+            ?.requiresEpicReauthorization ===
         true;
 
     const rocketLeagueAccess =
@@ -428,24 +512,28 @@ function applyRocketLeagueAuthView(
     ) {
         playerProfile.hidden =
             !authenticated
-            || !epicLinked;
+            || !epicLinked
+            || !epicAuthorized;
     }
 
-    /*
-     * Access CTA
-     *
-     * Epic not linked:
-     *     Login with Epic for Full Access
-     *
-     * Epic linked but RL registration incomplete:
-     *     Create Rocket League Profile for Full Access
-     *
-     * Full access:
-     *     Hide CTA
-     */
-    if (
-        accessButton
-    ) {
+    /* =====================================================
+    ACCESS CTA
+
+    Epic not linked:
+        Login with Epic for Full Access
+
+    Epic linked but authorization stale:
+        Verify Epic Again for Full Access
+
+    Epic authorized but RL registration incomplete:
+        Create Rocket League Profile for Full Access
+
+    Full access:
+        Hide CTA
+    ===================================================== */
+
+    if (accessButton) {
+        accessButton.disabled = false;
         const buttonText =
             accessButton.querySelector(
                 "span:last-child"
@@ -454,6 +542,30 @@ function applyRocketLeagueAuthView(
         if (
             authenticated
             && epicLinked
+            && requiresEpicReauthorization
+        ) {
+            if (
+                buttonText
+            ) {
+                buttonText.textContent =
+                    "Verify Epic Again for Full Access";
+            }
+
+            accessButton.setAttribute(
+                "aria-label",
+                "Reauthorize Epic Games for full Rocket League access"
+            );
+
+            accessButton.dataset.action =
+                "epic-reauthorize";
+
+            accessButton.dataset.reauthorizeUrl =
+                EPIC_REAUTHORIZATION_PAGE;
+        }
+        else if (
+            authenticated
+            && epicLinked
+            && epicAuthorized
             && !rocketLeagueAccess
         ) {
             if (
@@ -470,6 +582,8 @@ function applyRocketLeagueAuthView(
 
             accessButton.dataset.action =
                 "create-profile";
+
+            delete accessButton.dataset.reauthorizeUrl;
         }
         else {
             if (
@@ -486,6 +600,8 @@ function applyRocketLeagueAuthView(
 
             accessButton.dataset.action =
                 "epic-login";
+
+            delete accessButton.dataset.reauthorizeUrl;
         }
     }
 
@@ -512,6 +628,16 @@ AUTH UNAVAILABLE VIEW
 ========================================================= */
 
 function applyRocketLeagueUnavailableView() {
+    const accessButton = document.getElementById("mainRLLoginButton");
+    if (accessButton) {
+        accessButton.disabled = true;
+        const label = accessButton.querySelector("span:last-child");
+        if (label) label.textContent = "Authorization temporarily unavailable";
+    }
+    const sidebar = document.getElementById("sidebar");
+    sidebar?.querySelectorAll("[data-rl-access='required'], [data-rl-access='unlocked'], [data-auth]")
+        .forEach(element => { element.hidden = true; });
+
     const loggedOutContent =
         document.getElementById(
             "rocketLeagueLoggedOut"
@@ -555,6 +681,12 @@ function applyRocketLeagueUnavailableView() {
         "false";
 
     document.body.dataset.rlEpicLinked =
+        "unknown";
+
+    document.body.dataset.rlEpicAuthorized =
+        "unknown";
+
+    document.body.dataset.rlEpicReauthorizationRequired =
         "unknown";
 
     document.body.dataset.rlProfileExists =
@@ -622,6 +754,45 @@ function redirectProtectedRouteToProfile() {
 }
 
 /* =========================================================
+PROTECTED ROUTE -> EPIC REAUTHORIZATION
+
+Used only when Epic is permanently linked but the provider
+authorization is stale or missing.
+
+Public Rocket League pages remain available.
+========================================================= */
+
+function redirectProtectedRouteToEpicReauthorization() {
+    if (
+        !isProtectedRocketLeagueRoute()
+    ) {
+        return false;
+    }
+
+    if (
+        window.BPDRouter
+        && typeof window.BPDRouter.navigate ===
+            "function"
+    ) {
+        void window.BPDRouter.navigate(
+            EPIC_REAUTHORIZATION_PAGE,
+            {
+                replace:
+                    true
+            }
+        );
+
+        return true;
+    }
+
+    window.location.replace(
+        EPIC_REAUTHORIZATION_PAGE
+    );
+
+    return true;
+}
+
+/* =========================================================
 SIGNED-OUT STATE
 ========================================================= */
 
@@ -675,13 +846,25 @@ BASE AUTHENTICATED STATE
 
 function createAuthenticatedBaseSession(
     authState,
-    epicLinked
+    {
+        epicLinked = false,
+        epicAuthorized = false,
+        requiresEpicReauthorization = false
+    } = {}
 ) {
     return createRocketLeagueSession(
         authState,
         {
             epicLinked:
                 epicLinked ===
+                true,
+
+            epicAuthorized:
+                epicAuthorized ===
+                true,
+
+            requiresEpicReauthorization:
+                requiresEpicReauthorization ===
                 true
         }
     );
@@ -732,6 +915,12 @@ async function loadProfileState(
             epicLinked:
                 true,
 
+            epicAuthorized:
+                true,
+
+            requiresEpicReauthorization:
+                false,
+
             profileExists,
 
             profileComplete:
@@ -746,12 +935,6 @@ async function loadProfileState(
                     ?.registrationAccepted ===
                     true,
 
-            /*
-             * Access remains server-derived.
-             *
-             * The client additionally fails closed if either
-             * Epic or profile state is inconsistent.
-             */
             rocketLeagueAccess:
                 profileExists
                 && profileResult
@@ -823,7 +1006,7 @@ export async function initializeRocketLeagueAuthView() {
         }
 
         /* =====================================================
-        EPIC LINK STATE
+        EPIC PROVIDER STATE
         ===================================================== */
 
         const epicLinked =
@@ -831,30 +1014,42 @@ export async function initializeRocketLeagueAuthView() {
                 authState
             );
 
+        const epicAuthorized =
+            epicLinked
+            && hasAuthorizedRocketLeagueProvider(
+                authState
+            );
+
+        const requiresEpicReauthorization =
+            epicLinked
+            && !epicAuthorized
+            && requiresRocketLeagueProviderReauthorization(
+                authState
+            );
+
         /*
-         * Apply the authenticated state immediately so the
-         * page/sidebar can reflect account and Epic state before
-         * waiting on the profile request.
+         * Apply the provider state immediately so the UI can
+         * distinguish permanent linkage from current provider
+         * authorization before profile loading begins.
          */
         const baseSession =
             applyRocketLeagueAuthView(
                 createAuthenticatedBaseSession(
                     authState,
-                    epicLinked
+                    {
+                        epicLinked,
+                        epicAuthorized,
+                        requiresEpicReauthorization
+                    }
                 )
             );
 
         /* =====================================================
         EPIC NOT LINKED
 
-        Do not infer Epic ownership from an existing Rocket
-        League profile.
+        Public Rocket League routes remain available.
 
-        Epic identity must originate from verified Epic OAuth.
-
-        Server-side reconciliation can attach an existing
-        Rocket League profile after Epic OAuth proves that the
-        returned Epic account ID matches the profile.
+        Protected routes redirect to Rocket League Profile.
         ===================================================== */
 
         if (
@@ -866,7 +1061,46 @@ export async function initializeRocketLeagueAuthView() {
         }
 
         /* =====================================================
+        EPIC NOT CURRENTLY AUTHORIZED
+
+        Epic remains permanently linked.
+
+        Do not treat the provider as disconnected.
+
+        Public Rocket League routes remain accessible.
+
+        Personal/protected Rocket League functionality fails
+        closed until Epic ownership is proven again.
+        ===================================================== */
+
+        if (
+            !epicAuthorized
+        ) {
+            document.body.dataset.rlAccess =
+                "false";
+
+            renderUnavailableRanks(
+                requiresEpicReauthorization
+                    ? "Epic Games reauthorization is required before your Rocket League account data can be used."
+                    : "Epic Games authorization is currently unavailable."
+            );
+
+            if (
+                requiresEpicReauthorization
+            ) {
+                redirectProtectedRouteToEpicReauthorization();
+            }
+            else {
+                applyRocketLeagueUnavailableView();
+            }
+            return baseSession;
+        }
+
+        /* =====================================================
         ROCKET LEAGUE PROFILE
+
+        This point is reached only when Epic is both linked
+        and currently authorized.
         ===================================================== */
 
         try {
@@ -883,6 +1117,7 @@ export async function initializeRocketLeagueAuthView() {
              * Full access requires:
              *
              *     Epic linked
+             *     + Epic currently authorized
              *     + profile exists
              *     + profile complete
              *     + registration accepted
@@ -926,7 +1161,13 @@ export async function initializeRocketLeagueAuthView() {
                     authState,
                     {
                         epicLinked:
-                            true
+                            true,
+
+                        epicAuthorized:
+                            true,
+
+                        requiresEpicReauthorization:
+                            false
                     }
                 );
 

@@ -1,3 +1,5 @@
+import { authorizeRequest, requireProvider } from "../auth/authorization.js";
+import { authorizationErrorResponse } from "./authorization.js";
 "use strict";
 
 /* =========================================================
@@ -83,10 +85,7 @@ import {
     json
 } from "../common_helpers/responses.js";
 
-import {
-    getSessionContext,
-    getProviderContext
-} from "../auth/sessions/session_context.js";
+
 
 import {
     getRocketLeagueProfileByAccountId
@@ -262,11 +261,8 @@ export async function handleRocketLeagueSession(
         GLOBAL BPD SESSION
         ================================================= */
 
-        const session =
-            await getSessionContext(
-                request,
-                env
-            );
+        const authorization = await authorizeRequest(request, env, { recovery: true });
+        const session = authorization.sessionContext;
 
         if (
             session?.authenticated !==
@@ -399,11 +395,23 @@ export async function handleRocketLeagueSession(
         EPIC PROVIDER
         ================================================= */
 
-        const epic =
-            getProviderContext(
-                session,
-                "epic"
-            );
+        let epic;
+        try {
+            const verified = await requireProvider(authorization, env, "epic");
+            epic = { linked: true, accountId: verified.provider.subject,
+                displayName: verified.provider.displayUsername,
+                preferredUsername: verified.provider.displayUsername };
+        } catch (error) {
+            if (["PROVIDER_REQUIRED", "PROVIDER_REAUTHORIZATION_REQUIRED"].includes(error.code)) {
+                const linked = error.code === "PROVIDER_REAUTHORIZATION_REQUIRED";
+                return json({ success: true, authenticated: true, epicLinked: linked,
+                    epicAuthorized: false, requiresEpicReauthorization: linked,
+                    requiresEpicLogin: !linked, code: error.code,
+                    user: { accountId, userId: accountId, active: true, role: session.role },
+                    ...buildEmptyRocketLeagueState() }, 200);
+            }
+            return authorizationErrorResponse(error);
+        }
 
         const epicAccountId =
             normalizeNullableString(
@@ -707,6 +715,8 @@ export async function handleRocketLeagueSession(
 
                 epicLinked:
                     true,
+                epicAuthorized: true,
+                requiresEpicReauthorization: false,
 
                 requiresEpicLogin:
                     false,
@@ -766,34 +776,6 @@ export async function handleRocketLeagueSession(
             }
         );
 
-        return json(
-            {
-                success:
-                    false,
-
-                authenticated:
-                    false,
-
-                epicLinked:
-                    false,
-
-                requiresEpicLogin:
-                    false,
-
-                user:
-                    null,
-
-                ...buildEmptyRocketLeagueState(),
-
-                code:
-                    "ROCKET_LEAGUE_SESSION_FAILED",
-
-                message:
-                    "Rocket League session could not be loaded.",
-
-                debugId
-            },
-            500
-        );
+        return authorizationErrorResponse(error);
     }
 }

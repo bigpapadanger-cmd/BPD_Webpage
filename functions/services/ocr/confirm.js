@@ -1,3 +1,4 @@
+import { authorizeRocketLeagueRequest, authorizationErrorResponse } from "../rl/authorization.js";
 "use strict";
 
 /* =========================================================
@@ -39,7 +40,6 @@ import {
 } from "./storage.js";
 
 import {
-    getSessionContext,
     getProviderContext
 } from "../auth/sessions/session_context.js";
 
@@ -2034,11 +2034,14 @@ export async function handleOcrConfirmation(
         GLOBAL BPD SESSION
         ================================================= */
 
-        const session =
-            await getSessionContext(
-                request,
-                env
-            );
+        let verifiedAuthorization;
+        try { verifiedAuthorization = await authorizeRocketLeagueRequest(request, env); }
+        catch (error) { return authorizationErrorResponse(error); }
+        const session = { ...verifiedAuthorization.sessionContext, providers: {
+            ...verifiedAuthorization.sessionContext.providers,
+            epic: { linked: true, authenticated: true, authorized: true,
+                accountId: verifiedAuthorization.provider.subject }
+        } };
 
         if (
             session.authenticated !==

@@ -1092,8 +1092,7 @@ async function getExistingAccountContext(
                 request,
                 env,
                 {
-                    account:
-                        true
+                    account: true, recovery: true
                 }
             );
     }

@@ -872,8 +872,7 @@ export async function handleLinkProvider(
                     request,
                     env,
                     {
-                        account:
-                            true
+                        account: true, recovery: true
                     }
                 );
         }

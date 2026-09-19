@@ -1,3 +1,4 @@
+import { revokeProviderAuthentication } from "../providers/provider_auth_state.js";
 "use strict";
 
 /* =========================================================
@@ -28,7 +29,7 @@ Flow:
     Browser request
         ↓
     authorizeRequest({
-        account: true
+        account: true, recovery: true
     })
         ↓
     identity.accounts.id from trusted session
@@ -66,9 +67,7 @@ import {
 } from "../../common_helpers/responses.js";
 
 import {
-    removeProviderFromSession,
-    deleteSession,
-    clearSessionCookie
+    removeProviderFromSession
 } from "../sessions/session.js";
 
 import {
@@ -635,8 +634,7 @@ export async function handleUnlinkProvider(
                     request,
                     env,
                     {
-                        account:
-                            true
+                        account: true, recovery: true
                     }
                 );
         }
@@ -672,7 +670,7 @@ export async function handleUnlinkProvider(
             || !sessionId
         ) {
             /*
-             * authorizeRequest({ account: true }) should
+             * authorizeRequest({ account: true, recovery: true }) should
              * guarantee accountId. sessionId is also
              * required because the provider cache must be
              * synchronized after the database unlink.
@@ -849,11 +847,12 @@ export async function handleUnlinkProvider(
         Supabase is authoritative and has already completed
         the provider unlink.
 
-        If KV synchronization fails, invalidate the current
-        session so stale provider state cannot remain trusted.
+        If KV synchronization fails, report unavailability.
+        Protected operations verify permanent links in Supabase.
         ================================================= */
 
         try {
+            await revokeProviderAuthentication(env, accountId, provider);
             await removeProviderFromSession(
                 env,
                 sessionId,
@@ -876,65 +875,11 @@ export async function handleUnlinkProvider(
                 }
             );
 
-            try {
-                await deleteSession(
-                    env,
-                    sessionId
-                );
-            }
-            catch (
-                deleteError
-            ) {
-                console.error(
-                    "UNLINK PROVIDER: Session invalidation also failed.",
-                    {
-                        debugId,
-
-                        message:
-                            deleteError?.message
-                            || "Unknown error"
-                    }
-                );
-            }
-
-            const sessionCookie =
-                clearSessionCookie(
-                    request
-                );
-
-            return json(
-                {
-                    success:
-                        true,
-
-                    code:
-                        "PROVIDER_UNLINKED_SESSION_RESET",
-
-                    provider,
-
-                    unlinked:
-                        true,
-
-                    sessionReset:
-                        true,
-
-                    remainingLoginIdentities:
-                        result.remainingLoginIdentities,
-
-                    message:
-                        "The provider was unlinked, but your session was reset. Please sign in again.",
-
-                    debugId
-                },
-                200,
-                sessionCookie
-                    ? {
-                        "Set-Cookie":
-                            sessionCookie
-                    }
-                    : {}
-            );
+            return json({ success: false, unlinked: true, sessionReset: false,
+                available: false, code: "AUTH_SERVICE_UNAVAILABLE",
+                message: "The permanent link was removed. Session synchronization is unavailable; please retry.", debugId }, 503);
         }
+
 
         /* =================================================
         COMPLETE

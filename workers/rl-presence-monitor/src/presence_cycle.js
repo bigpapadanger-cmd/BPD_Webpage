@@ -1,3 +1,4 @@
+import { verifyBackgroundEpicAccount } from "../../../functions/services/rl/authorization.js";
 "use strict";
 
 /* =========================================================
@@ -608,8 +609,10 @@ export async function runPresenceCycle(
             await Promise.allSettled(
                 batch.map(
                     async player => {
-                        const presence =
-                            await fetchPresence(
+                        if (!await verifyBackgroundEpicAccount(env, player.accountId, player.epicAccountId)) {
+                            return { player, skipped: true };
+                        }
+                        const presence = await fetchPresence(
                                 env,
                                 player.epicAccountId
                             );
@@ -648,9 +651,7 @@ export async function runPresenceCycle(
 
                 if (
                     isOnlineState(
-                        result.value
-                            .presence
-                            .state
+                        result.value.presence?.state
                     )
                 ) {
                     anyOnline =

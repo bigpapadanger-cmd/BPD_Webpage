@@ -318,6 +318,16 @@ export async function recordProviderAuthentication(
         authenticationTime
         + PROVIDER_AUTH_DURATION_MS;
 
+    // Recover missing policy state without inventing a successful BPD login.
+    const loginKey = buildAccountLoginKey(normalizedAccountId);
+    if (!await loadJson(kv, loginKey)) {
+        await kv.put(loginKey, JSON.stringify({
+            accountId: normalizedAccountId,
+            lastLoginAt: null,
+            providerReauthAfter: toIsoTimestamp(authenticationTime)
+        }));
+    }
+
     const state = {
         accountId:
             normalizedAccountId,
@@ -658,6 +668,32 @@ export async function getProviderAuthorizationState(
                 ?.providerReauthAfter
         );
 
+    const lastLoginAt = parseTimestamp(accountLoginState?.lastLoginAt);
+    const nowForPolicy = Date.now();
+    if (providerState.accountId !== normalizedAccountId
+        || providerState.provider !== normalizedProvider
+        || !accountLoginState || accountLoginState.accountId !== normalizedAccountId
+        || (lastLoginAt === null && providerReauthAfter === null)
+        || (accountLoginState.lastLoginAt != null && lastLoginAt === null)
+        || (accountLoginState.providerReauthAfter != null && providerReauthAfter === null)
+        || lastLoginAt > nowForPolicy || providerReauthAfter > nowForPolicy
+        || connectedAt === null || connectedAt <= 0 || expiresAt === null
+        || expiresAt <= connectedAt) {
+        return { authorized: false, requiresReauthorization: true,
+            reason: "PROVIDER_AUTH_STATE_INVALID", connectedAt: null, expiresAt: null,
+            providerReauthAfter: null };
+    }
+
+    // A still-valid browser session cannot bypass a gap between successful logins.
+    const idleCutoff = lastLoginAt !== null && nowForPolicy - lastLoginAt >= LOGIN_GAP_DURATION_MS
+        ? lastLoginAt + LOGIN_GAP_DURATION_MS : 0;
+    if (connectedAt < Math.max(providerReauthAfter || 0, idleCutoff)) {
+        return { authorized: false, requiresReauthorization: true,
+            reason: "LOGIN_GAP_REAUTH_REQUIRED", connectedAt: providerState.connectedAt,
+            expiresAt: providerState.expiresAt,
+            providerReauthAfter: toIsoTimestamp(Math.max(providerReauthAfter || 0, idleCutoff)) };
+    }
+
     if (
         connectedAt ===
         null
@@ -843,4 +879,9 @@ export async function getProviderAuthorizationState(
                 ?.providerReauthAfter
             ?? null
     };
+}
+
+export async function revokeProviderAuthentication(env, accountId, provider) {
+    const kv = getAuthKv(env);
+    await kv.delete(buildProviderAuthKey(normalizeString(accountId), normalizeProvider(provider)));
 }

@@ -139,9 +139,12 @@ function handleMainRocketLeagueAction(
         button?.dataset?.action
         || "epic-login";
 
+    if (action === "epic-reauthorize") {
+        navigateTo("/Account?reauthorize=epic");
+        return;
+    }
     if (
-        action ===
-        "create-profile"
+        action === "create-profile"
     ) {
         handleCreateProfile();
 

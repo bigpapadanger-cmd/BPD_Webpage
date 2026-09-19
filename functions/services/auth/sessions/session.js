@@ -414,9 +414,11 @@ export async function getStoredSession(
     env
 ) {
     if (
-        !env.AUTH_SESSIONS
+        !env?.AUTH_SESSIONS
     ) {
-        return null;
+        throw Object.assign(new Error("Session storage is unavailable."), {
+            code: "AUTH_SERVICE_UNAVAILABLE", status: 503
+        });
     }
 
     const sessionId =

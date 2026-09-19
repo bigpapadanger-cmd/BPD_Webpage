@@ -17,6 +17,9 @@ const ROCKET_LEAGUE_PLAYLISTS = [
     }
 ];
 function applyRocketLeagueAuthView(authSession) {
+    const unavailable = authSession?.available === false || authSession?.authenticated === null;
+    const epicAuthorized = authSession?.epicAuthorized === true;
+    const access = authSession?.rocketLeagueAccess === true;
     const authenticated =
         authSession?.authenticated === true;
     const loggedOutContent =
@@ -32,27 +35,22 @@ function applyRocketLeagueAuthView(authSession) {
             "rocketLeaguePlayerProfile"
         );
     if (loggedOutContent) {
-        loggedOutContent.hidden =
-            authenticated;
+        loggedOutContent.hidden = unavailable || authenticated;
     }
     if (authenticatedContent) {
-        authenticatedContent.hidden =
-            !authenticated;
+        authenticatedContent.hidden = !access;
     }
     if (playerProfile) {
-        playerProfile.hidden =
-            !authenticated;
+        playerProfile.hidden = !epicAuthorized;
     }
     document.body.dataset.authenticated =
-        String(authenticated);
+        unavailable ? "unknown" : String(authenticated);
+    document.body.dataset.rlAccess = String(access);
+    if (authSession?.requiresEpicReauthorization) {
+        renderUnavailableRocketLeagueRanks("Verify Epic Again in BPD Account to use Rocket League features.");
+    }
 }
 async function loadAuthenticatedRocketLeagueUser() {
-    if (
-        window.BPDAuth &&
-        typeof window.BPDAuth.getSession === "function"
-    ) {
-        return window.BPDAuth.getSession();
-    }
     const response = await apiFetch(
         ROCKET_LEAGUE_SESSION_URL,
         {
@@ -283,7 +281,7 @@ async function initializeRocketLeagueAuthView() {
         const authSession =
             await loadAuthenticatedRocketLeagueUser();
         applyRocketLeagueAuthView(authSession);
-        if (!authSession?.authenticated) {
+        if (!authSession?.authenticated || authSession.epicAuthorized !== true) {
             return;
         }
         try {
@@ -305,15 +303,10 @@ async function initializeRocketLeagueAuthView() {
             error
         );
         applyRocketLeagueAuthView({
-            authenticated: false,
+            authenticated: null,
+            available: false,
             user: null
         });
     }
 }
-document.addEventListener(
-    "DOMContentLoaded",
-    initializeRocketLeagueAuthView,
-    {
-        once: true
-    }
-);
+export { initializeRocketLeagueAuthView as initializePage };

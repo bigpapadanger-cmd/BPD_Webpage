@@ -50,6 +50,10 @@ import {
 } from "./timezone.js";
 
 import {
+    BPD_LOGIN_PAGE_URL,
+    BPD_ACCOUNT_PAGE_URL,
+    ROCKET_LEAGUE_PAGE_URL,
+    ROCKET_LEAGUE_PROFILE_PAGE_URL,
     ROCKET_LEAGUE_PROFILE_URL,
     DISCORD_NOTIFICATION_STATUS_URL
 } from "../../../../scripts/apiRoutes.js";
@@ -62,6 +66,8 @@ import {
     getAuthState,
     hasActiveAccount,
     hasLinkedProvider,
+    hasAuthorizedProvider,
+    requiresProviderReauthorization,
     getProvider
 } from "../../../../Framework/Auth/auth.js";
 
@@ -2191,6 +2197,30 @@ function populateProfileForm(
 AUTHENTICATED EPIC USER
 ========================================================= */
 
+function preserveRegistrationDraft(payload = null) {
+    const form = document.getElementById("rlRegistrationForm");
+    if (payload) saveRegistrationDraft(payload);
+    else if (form?.dataset.draftDirty === "true") saveRegistrationDraft(buildRegistrationPayload(form));
+}
+
+function handleRegistrationAuthFailure(response, result, payload = null) {
+    if (response.status >= 500 || result.available === false) return false;
+    let destination = null;
+    if (result.requiresEpicReauthorization || result.code === "PROVIDER_REAUTHORIZATION_REQUIRED") {
+        destination = "/Account?reauthorize=epic";
+    } else if (response.status === 401) {
+        destination = "/Login?returnTo=" + encodeURIComponent("/RocketLeague/Profile");
+    } else if (result.requiresEpicLogin || ["PROVIDER_REQUIRED", "EPIC_ACCOUNT_REQUIRED", "ACCOUNT_INACTIVE", "PROFILE_PROVIDER_REAUTHORIZATION_REQUIRED"].includes(result.code)) {
+        destination = "/Account";
+    }
+    if (!destination) return false;
+    preserveRegistrationDraft(payload);
+    window.location.replace(destination);
+    return true;
+}
+
+document.addEventListener("bpd:before-auth-redirect", () => preserveRegistrationDraft());
+
 async function getAuthenticatedEpicUser() {
     const authState =
         await getAuthState();
@@ -2201,8 +2231,7 @@ async function getAuthenticatedEpicUser() {
         || !hasActiveAccount(
             authState
         )
-        || !hasLinkedProvider(
-            "epic",
+        || !hasAuthorizedProvider( "epic",
             authState
         )
     ) {
@@ -2304,7 +2333,7 @@ async function loadRocketLeagueProfile() {
                 false,
 
             warning:
-                "Your Epic sign-in is still active. Profile storage is currently unavailable, so your entries will be preserved locally."
+                "Profile authorization or storage is currently unavailable, so your entries will be preserved locally."
         };
     }
 
@@ -2315,40 +2344,7 @@ async function loadRocketLeagueProfile() {
                 () => ({})
             );
 
-    if (
-        response.status ===
-            401
-    ) {
-        const loginUrl =
-            new URL(
-                "/Login",
-                window.location.origin
-            );
-
-        loginUrl.searchParams.set(
-            "returnTo",
-            "/RocketLeague/Profile"
-        );
-
-        window.location.replace(
-            loginUrl.href
-        );
-
-        return null;
-    }
-
-    if (
-        response.status ===
-            403
-        || result.requiresEpicLogin ===
-            true
-    ) {
-        window.location.replace(
-            "/RocketLeague"
-        );
-
-        return null;
-    }
+    if (handleRegistrationAuthFailure(response, result)) return null;
 
     const normalized =
         normalizeProfile(
@@ -2370,7 +2366,7 @@ async function loadRocketLeagueProfile() {
 
             warning:
                 result.message
-                || "Your Epic sign-in is still active. Profile storage is currently unavailable."
+                || "Profile authorization or storage is currently unavailable."
         };
     }
 
@@ -2945,18 +2941,7 @@ async function submitRegistration(
                     () => ({})
                 );
 
-        if (
-            response.status ===
-                401
-            || result.requiresEpicLogin ===
-                true
-        ) {
-            window.location.replace(
-                "/RocketLeague"
-            );
-
-            return;
-        }
+        if (handleRegistrationAuthFailure(response, result, payload)) return;
 
         if (
             !response.ok
@@ -3303,6 +3288,8 @@ export async function initializePage() {
             }
         );
 
+    form.addEventListener("input", () => { form.dataset.draftDirty = "true"; });
+    form.addEventListener("change", () => { form.dataset.draftDirty = "true"; });
     form.addEventListener(
         "submit",
         submitRegistration

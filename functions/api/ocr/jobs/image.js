@@ -1,3 +1,4 @@
+import { authorizeRocketLeagueRequest, authorizationErrorResponse } from "../../../services/rl/authorization.js";
 "use strict";
 
 /* =========================================================
@@ -33,7 +34,6 @@ Ownership Model:
 ========================================================= */
 
 import {
-    getSessionContext,
     getProviderContext
 } from "../../../services/auth/sessions/session_context.js";
 
@@ -107,11 +107,14 @@ export async function onRequestGet(
         GLOBAL BPD SESSION
         ================================================= */
 
-        const session =
-            await getSessionContext(
-                request,
-                env
-            );
+        let verifiedAuthorization;
+        try { verifiedAuthorization = await authorizeRocketLeagueRequest(request, env); }
+        catch (error) { return authorizationErrorResponse(error); }
+        const session = { ...verifiedAuthorization.sessionContext, providers: {
+            ...verifiedAuthorization.sessionContext.providers,
+            epic: { linked: true, authenticated: true, authorized: true,
+                accountId: verifiedAuthorization.provider.subject }
+        } };
 
         if (
             session.authenticated !== true

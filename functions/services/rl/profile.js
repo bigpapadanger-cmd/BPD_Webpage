@@ -1,3 +1,4 @@
+import { authorizationErrorResponse } from "./authorization.js";
 "use strict";
 
 /* =========================================================
@@ -1211,6 +1212,9 @@ async function getAuthenticatedContext(
             throw error;
         }
 
+        if (error.status >= 500 || error.code === "PROVIDER_REAUTHORIZATION_REQUIRED") {
+            return { error: authorizationErrorResponse(error) };
+        }
         if (
             error.code ===
             "AUTH_REQUIRED"
@@ -2672,38 +2676,6 @@ export async function handleRocketLeagueProfile(
             }
         );
 
-        return json(
-            {
-                success:
-                    false,
-
-                authenticated:
-                    false,
-
-                requiresEpicLogin:
-                    false,
-
-                registrationAccepted:
-                    false,
-
-                profileSaved:
-                    false,
-
-                profileComplete:
-                    false,
-
-                rocketLeagueAccess:
-                    false,
-
-                code:
-                    "ROCKET_LEAGUE_PROFILE_FAILED",
-
-                message:
-                    "Rocket League profile request failed.",
-
-                debugId
-            },
-            500
-        );
+        return authorizationErrorResponse(error);
     }
 }

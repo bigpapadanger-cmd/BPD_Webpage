@@ -186,7 +186,7 @@ async function handleScheduled(
 
     if (
         controller.cron ===
-        "7 12 * * SAT"
+        "5 11 * * SAT"
     ) {
         ctx.waitUntil(
             runScheduledMmrRefresh(
