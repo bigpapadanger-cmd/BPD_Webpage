@@ -2478,7 +2478,24 @@ async function handleProfilePost(
 
     let statsRefresh =
         null;
+    console.info(
+        "ROCKET LEAGUE PROFILE: Stats refresh eligibility.",
+        {
+            accountId,
 
+            profileExists,
+
+            profileActive:
+                profile?.active ===
+                true,
+
+            epicLinked:
+                epicUser?.linked ===
+                true,
+
+            rocketLeagueAccess
+        }
+    );
     if (
         profileSaved ===
             true
