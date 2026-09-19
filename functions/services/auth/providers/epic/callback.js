@@ -74,7 +74,11 @@ Important:
     - Linking or reauthorizing Epic does not automatically
       create core.rl_players.
 ========================================================= */
+//added login connection for getting MMR
 
+import {
+    handleAccountLastLogin
+} from "../../account/last_login.js";
 import {
     json,
     redirect
@@ -1353,18 +1357,65 @@ async function recordCompletedAuthentication(
         recordLogin
     }
 ) {
-    return completeAuthentication(
-        env,
-        {
-            accountId,
-            provider:
-                "epic",
+    const isLogin =
+        recordLogin ===
+        true;
 
-            recordLogin:
-                recordLogin ===
-                true
+    const result =
+        await completeAuthentication(
+            env,
+            {
+                accountId,
+
+                provider:
+                    "epic",
+
+                recordLogin:
+                    isLogin
+            }
+        );
+
+    /*
+     * Only a true BPD login updates account activity and
+     * triggers the throttled Rocket League MMR refresh.
+     *
+     * Epic linking and reauthorization only refresh provider
+     * authorization state and do not count as new BPD logins.
+     */
+    if (
+        isLogin
+    ) {
+        try {
+            await handleAccountLastLogin(
+                env,
+                accountId
+            );
         }
-    );
+        catch (
+            error
+        ) {
+            console.error(
+                "EPIC CALLBACK: Post-login account activity failed.",
+                {
+                    accountId,
+
+                    code:
+                        error?.code
+                        || null,
+
+                    status:
+                        error?.status
+                        || null,
+
+                    message:
+                        error?.message
+                        || "Unknown error"
+                }
+            );
+        }
+    }
+
+    return result;
 }
 
 /* =========================================================

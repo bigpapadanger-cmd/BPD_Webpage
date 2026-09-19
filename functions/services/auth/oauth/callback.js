@@ -85,7 +85,7 @@ Important:
     - Reauthorize mode never creates or relinks an identity.
     - Provider ownership is based on provider subject.
 ========================================================= */
-
+//added last login handle for reloading mmr
 import {
     SUPPORTED_OAUTH_PROVIDERS,
     getProviderConfig,
@@ -132,7 +132,9 @@ import {
     completeAuthentication,
     isAuthenticationCompletionError
 } from "../authentication.js";
-
+import {
+    handleAccountLastLogin
+} from "../account/last_login.js";
 /* =========================================================
 CONSTANTS
 ========================================================= */

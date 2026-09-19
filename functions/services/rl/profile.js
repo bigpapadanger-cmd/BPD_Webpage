@@ -74,6 +74,13 @@ Important:
     - Discord notification eligibility is enforced on POST.
     - Age consent and policy/privacy consent are mandatory.
 ========================================================= */
+//For the next step, the important file is functions/services/rl/profile.js. 
+//That is where we should fire the first MMR lookup after a Rocket League
+//profile becomes fully valid.
+
+import {
+    refreshStats
+} from "./stats/refresh.js";
 
 import {
     fetchRocketLeaguePresence
@@ -2452,7 +2459,73 @@ async function handleProfilePost(
             true
         && storedRocketLeagueAccess ===
             true;
+    /* =====================================================
+    INITIAL MMR REFRESH
 
+    Once registration is successfully completed and full
+    Rocket League access has been granted, request an MMR
+    refresh.
+
+    refreshStats() owns the 24-hour throttle, so this is safe
+    for subsequent profile saves as well.
+    ===================================================== */
+
+    let statsRefresh =
+        null;
+
+    if (
+        profileSaved ===
+            true
+        && registrationAccepted ===
+            true
+        && profileComplete ===
+            true
+        && rocketLeagueAccess ===
+            true
+    ) {
+        try {
+            statsRefresh =
+                await refreshStats(
+                    env,
+                    accountId
+                );
+        }
+        catch (
+            error
+        ) {
+            console.error(
+                "ROCKET LEAGUE PROFILE: Initial MMR refresh failed.",
+                {
+                    accountId,
+
+                    code:
+                        error?.code
+                        || null,
+
+                    status:
+                        error?.status
+                        || null,
+
+                    message:
+                        error?.message
+                        || "Unknown error"
+                }
+            );
+
+            /*
+            * MMR availability must not undo a successfully
+            * completed Rocket League registration.
+            */
+            statsRefresh = {
+                success:
+                    false,
+
+                code:
+                    error?.code
+                    || "STATS_REFRESH_FAILED"
+            };
+        }
+    }
     const rlPlayerId =
         result?.rl_player_id
         || result?.rlPlayerId
@@ -2504,6 +2577,8 @@ async function handleProfilePost(
                 result?.active ===
                 true,
 
+            statsRefresh,
+            
             user: {
                 accountId,
 
