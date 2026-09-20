@@ -143,7 +143,9 @@ export const ROCKET_LEAGUE_SESSION_URL =
 
 export const ROCKET_LEAGUE_PROFILE_URL =
     "/api/auth/rocketleague/profile";
-
+    
+export const ADMIN_ACCESS_URL =
+    "/api/auth/admin/access";
 /* =========================================================
 OCR
 ========================================================= */

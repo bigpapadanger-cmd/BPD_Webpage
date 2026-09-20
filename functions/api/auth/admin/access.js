@@ -13,19 +13,21 @@ Route:
 Purpose:
     Verifies that the currently authenticated BPD account
     has authorized Discord-backed Admin access AND at least
-    one active Admin responsibility role before allowing
+    one current Admin responsibility role before allowing
     access to any Admin page.
 
 Description:
     - Verifies Discord-backed Admin access.
+    - Reads current responsibility roles from live Discord
+      guild membership.
+    - Synchronizes Discord responsibility roles into
+      identity.account_roles.
     - Requires at least one active Admin responsibility role.
     - Returns authoritative Admin operation permissions.
     - Returns verified Discord staff state.
-    - Returns active Admin/Taskboard responsibility roles.
+    - Returns synchronized Admin responsibility roles.
     - Denies all Admin access when no responsibility role
-      is assigned.
-    - Keeps Discord authorization and responsibility-role
-      authorization independently verified server-side.
+      is currently assigned.
 
 Access Requirements:
     A user may access the Admin area only when:
@@ -34,20 +36,21 @@ Access Requirements:
     2. The BPD account has an associated Discord identity.
     3. The Discord account currently satisfies the
        Discord-backed Admin staff authorization policy.
-    4. The BPD account has at least one active role from:
+    4. The Discord account currently has at least one
+       responsibility role mapped to:
            owner
            database
            security
            ui
-
-    Failure of either authorization layer denies access to
-    the entire Admin area.
+    5. The current Discord responsibility-role state has
+       been synchronized into identity.account_roles.
 
 Security:
     - Discord identity is resolved server-side.
     - Discord guild roles are verified server-side.
-    - Responsibility roles are resolved server-side from
-      the canonical identity.account_roles source.
+    - Responsibility roles originate from the live,
+      server-verified Discord guild member.
+    - identity.account_roles is synchronized server-side.
     - Browser-submitted account IDs, Discord IDs,
       permissions, or roles are never trusted.
     - Supabase credentials are never exposed.
@@ -64,6 +67,10 @@ import {
 import {
     requireTaskboardMembership
 } from "../../../services/admin/taskboard_roles.js";
+
+import {
+    syncDiscordResponsibilityRoles
+} from "../../../services/auth/providers/discord/role_sync.js";
 
 /* =========================================================
 CONSTANTS
@@ -92,7 +99,8 @@ JSON RESPONSE
 
 function jsonResponse(
     body,
-    status = 200
+    status = 200,
+    extraHeaders = null
 ) {
     return new Response(
         JSON.stringify(
@@ -101,8 +109,17 @@ function jsonResponse(
         {
             status,
 
-            headers:
-                JSON_HEADERS
+            headers: {
+                ...JSON_HEADERS,
+
+                ...(
+                    extraHeaders
+                    && typeof extraHeaders ===
+                        "object"
+                        ? extraHeaders
+                        : {}
+                )
+            }
         }
     );
 }
@@ -114,7 +131,8 @@ NORMALIZATION
 function normalizeString(
     value
 ) {
-    return typeof value === "string"
+    return typeof value ===
+        "string"
         ? value.trim()
         : "";
 }
@@ -137,7 +155,8 @@ function normalizeResponsibilityRoles(
                     role =>
                         normalizeString(
                             role
-                        ).toLowerCase()
+                        )
+                            .toLowerCase()
                 )
                 .filter(
                     role =>
@@ -263,10 +282,14 @@ Successful response:
 }
 
 Important:
-    authorized:true means BOTH authorization layers have
-    succeeded:
+    authorized:true means all required authorization layers
+    have succeeded:
 
-    - Discord-backed Admin authorization
+    - BPD account authorization
+    - Discord provider authorization
+    - live Discord guild authorization
+    - Discord staff authorization
+    - responsibility-role synchronization
     - active responsibility-role membership
 ========================================================= */
 
@@ -283,9 +306,13 @@ export async function onRequestGet(
         /* -------------------------------------------------
         DISCORD-BACKED ADMIN AUTHORIZATION
 
-        This verifies the authenticated BPD account,
-        associated Discord identity, guild membership,
-        current Discord roles, and Admin staff policy.
+        This resolves:
+            authenticated BPD account
+            verified Discord identity
+            live Discord guild member
+            current Discord role IDs
+            staff authorization
+            current responsibilityRoles
         ------------------------------------------------- */
 
         const authorization =
@@ -295,13 +322,66 @@ export async function onRequestGet(
             );
 
         /* -------------------------------------------------
-        RESPONSIBILITY ROLE AUTHORIZATION
+        SYNCHRONIZE RESPONSIBILITY ROLES
 
-        Every Admin page requires at least one active role
-        from the canonical responsibility-role source.
+        Discord is authoritative for the four Admin
+        responsibility roles.
 
-        requireTaskboardMembership() returns the verified
-        role context so another role lookup is not needed.
+        This occurs BEFORE reading identity.account_roles so
+        newly granted roles are immediately available and
+        removed roles are immediately revoked.
+
+        No browser-supplied role information is involved.
+        ------------------------------------------------- */
+
+        const synchronizedRoleContext =
+            await syncDiscordResponsibilityRoles(
+                env,
+                authorization
+            );
+
+        const synchronizedRoles =
+            normalizeResponsibilityRoles(
+                synchronizedRoleContext?.roles
+            );
+
+        /* -------------------------------------------------
+        FAIL CLOSED AFTER SYNCHRONIZATION
+
+        A successful Discord staff authorization alone does
+        not grant access to /Admin.
+
+        At least one current responsibility role is also
+        required.
+        ------------------------------------------------- */
+
+        if (
+            synchronizedRoles.length ===
+            0
+        ) {
+            return jsonResponse(
+                {
+                    success:
+                        false,
+
+                    authorized:
+                        false,
+
+                    error:
+                        "ADMIN_ACCESS_DENIED"
+                },
+                403
+            );
+        }
+
+        /* -------------------------------------------------
+        CANONICAL RESPONSIBILITY ROLE AUTHORIZATION
+
+        The synchronized role state has now been persisted.
+
+        Read it through the normal Taskboard role service so
+        the same canonical responsibility-role source is
+        used throughout the rest of the Admin system.
         ------------------------------------------------- */
 
         const roleContext =
@@ -316,14 +396,10 @@ export async function onRequestGet(
             );
 
         /* -------------------------------------------------
-        FAIL CLOSED
+        FINAL FAIL-CLOSED CHECK
 
-        requireTaskboardMembership() should already reject
-        an account without a qualifying role.
-
-        This additional check ensures this API never returns
-        authorized:true if an invalid or empty role context
-        reaches this point.
+        The synchronization result and canonical database
+        role lookup must both produce valid membership.
         ------------------------------------------------- */
 
         if (
@@ -342,6 +418,71 @@ export async function onRequestGet(
                         "ADMIN_ACCESS_DENIED"
                 },
                 403
+            );
+        }
+
+        /* -------------------------------------------------
+        SYNCHRONIZATION CONSISTENCY CHECK
+
+        The canonical responsibility-role lookup must match
+        the role state produced by the Discord synchronization
+        performed during this request.
+
+        A mismatch indicates that authoritative Discord state
+        and persisted responsibility state could not be
+        confirmed consistently.
+
+        Fail closed rather than authorizing against stale or
+        partially synchronized role state.
+        ------------------------------------------------- */
+
+        const synchronizedRoleKey =
+            [
+                ...synchronizedRoles
+            ]
+                .sort()
+                .join(
+                    "|"
+                );
+
+        const responsibilityRoleKey =
+            [
+                ...responsibilityRoles
+            ]
+                .sort()
+                .join(
+                    "|"
+                );
+
+        if (
+            synchronizedRoleKey !==
+            responsibilityRoleKey
+        ) {
+            console.error(
+                "[ADMIN ACCESS API] Responsibility role synchronization mismatch.",
+                {
+                    accountId:
+                        authorization?.accountId
+                        ?? null,
+
+                    synchronizedRoles,
+
+                    responsibilityRoles
+                }
+            );
+
+            return jsonResponse(
+                {
+                    success:
+                        false,
+
+                    authorized:
+                        false,
+
+                    error:
+                        "ADMIN_ACCESS_CHECK_FAILED"
+                },
+                503
             );
         }
 
@@ -378,7 +519,11 @@ export async function onRequestGet(
                         Array.isArray(
                             authorization?.admin?.permissions
                         )
-                            ? authorization.admin.permissions
+                            ? [
+                                ...authorization
+                                    .admin
+                                    .permissions
+                            ]
                             : []
                 },
 
@@ -417,10 +562,12 @@ export async function onRequest(
     const method =
         normalizeString(
             context?.request?.method
-        ).toUpperCase();
+        )
+            .toUpperCase();
 
     if (
-        method === "GET"
+        method ===
+        "GET"
     ) {
         return onRequestGet(
             context
@@ -438,6 +585,10 @@ export async function onRequest(
             error:
                 "METHOD_NOT_ALLOWED"
         },
-        405
+        405,
+        {
+            "Allow":
+                "GET"
+        }
     );
 }

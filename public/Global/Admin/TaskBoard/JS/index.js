@@ -12,8 +12,8 @@ Purpose:
     preliminary Taskboard API integration.
 
 Responsibilities:
-    - Verify Discord-backed Admin access.
-    - Verify active Taskboard membership.
+    - Require current centralized Admin authorization.
+    - Require an active Admin responsibility role.
     - Load verified Taskboard role context.
     - Load task summary.
     - Load task list.
@@ -23,47 +23,50 @@ Responsibilities:
     - Export initializePage() for the BPD router.
 
 Access Requirements:
-    A user may access the Taskboard only when:
+    All Admin pages, including Taskboard, require:
 
-    1. The user has an authenticated BPD account.
-    2. The BPD account has an associated Discord identity.
-    3. That Discord account currently satisfies the
-       server-side Admin staff authorization policy.
-    4. The BPD account has at least one active Taskboard
-       responsibility role:
+    1. An authenticated active BPD account.
+    2. A verified and currently authorized Discord identity.
+    3. Current Discord Admin staff authorization.
+    4. At least one active responsibility role:
            owner
            database
            security
            ui
 
-    General Admin authorization alone is not sufficient
-    for Taskboard access.
-
 Security:
+    - This module is NOT a security boundary.
+    - Admin authorization is established by the centralized
+      client auth service through the server-side Admin
+      authorization endpoint.
     - Discord authorization is performed server-side.
     - Discord guild roles are verified server-side.
-    - Taskboard roles are resolved server-side.
-    - Client-side role claims are never trusted.
-    - Task APIs independently enforce permissions.
-    - Task APIs independently enforce Taskboard membership
-      and task responsibility where applicable.
+    - Responsibility roles are synchronized server-side.
+    - Client-side role claims are never authoritative.
+    - Task APIs independently enforce permissions,
+      membership, and task responsibility.
     - Supabase credentials never reach the browser.
 
 Important:
-    - This client-side gate controls page presentation only.
-    - It is not the authoritative security boundary.
+    - This client-side gate controls presentation only.
     - Server-side Taskboard APIs remain authoritative.
-    - Sidebar HTML and sidebar behavior are handled by the
-      global router/shell.
+    - This module must not call /api/auth/admin/access
+      directly.
     - This module must not load or initialize the sidebar.
 ========================================================= */
 
 /* =========================================================
-ENDPOINTS
+IMPORTS
 ========================================================= */
 
-const ADMIN_ACCESS_URL =
-    "/api/auth/admin/access";
+import {
+    getAuthState,
+    hasAdminAccess
+} from "/Framework/Auth/auth.js";
+
+/* =========================================================
+ENDPOINTS
+========================================================= */
 
 const TASKS_URL =
     "/api/auth/admin/tasks";
@@ -151,7 +154,8 @@ NORMALIZATION
 function normalizeString(
     value
 ) {
-    return typeof value === "string"
+    return typeof value ===
+        "string"
         ? value.trim()
         : "";
 }
@@ -174,7 +178,8 @@ function normalizeTaskboardRoles(
                     role =>
                         normalizeString(
                             role
-                        ).toLowerCase()
+                        )
+                            .toLowerCase()
                 )
                 .filter(
                     role =>
@@ -322,192 +327,113 @@ function setTaskboardStatus(
     }
 
     taskboardStatus.textContent =
-        message;
+        normalizeString(
+            message
+        );
 }
 
 /* =========================================================
-ACCESS RESULT
+CENTRALIZED TASKBOARD ACCESS
+
+The centralized auth service performs:
+
+    GET /api/auth/session
+        ↓
+    active authenticated account
+        ↓
+    GET /api/auth/admin/access
+        ↓
+    live Discord authorization
+        ↓
+    responsibility-role synchronization
+        ↓
+    state.admin
+
+Entering Taskboard forces a fresh authorization check.
+
+The browser uses this result for presentation only.
 ========================================================= */
 
-function createDeniedAccessResult(
-    status,
-    reason
-) {
-    return {
-        authorized:
-            false,
-
-        adminAuthorized:
-            false,
-
-        taskboardMember:
-            false,
-
-        taskboardRoles:
-            [],
-
-        isOwner:
-            false,
-
-        status,
-
-        reason
-    };
-}
-
-/* =========================================================
-VERIFY TASKBOARD ACCESS
-
-The general Admin access endpoint intentionally permits
-Discord-authorized Admin staff who do not hold Taskboard
-responsibility roles.
-
-This Taskboard client therefore requires BOTH:
-
-    result.authorized === true
-    result.taskboard.member === true
-
-The Taskboard APIs independently enforce this requirement
-server-side. This function is only the page-level gate.
-========================================================= */
-
-async function verifyTaskboardAccess() {
-    const response =
-        await fetch(
-            ADMIN_ACCESS_URL,
-            {
-                method:
-                    "GET",
-
-                credentials:
-                    "same-origin",
-
-                headers: {
-                    "Accept":
-                        "application/json"
-                },
-
-                cache:
-                    "no-store"
-            }
-        );
-
-    let result =
-        null;
-
-    try {
-        result =
-            await response.json();
-    }
-    catch {
-        return createDeniedAccessResult(
-            response.status,
-            "INVALID_RESPONSE"
-        );
-    }
+async function loadTaskboardAccess() {
+    const state =
+        await getAuthState({
+            force:
+                true
+        });
 
     const adminAuthorized =
-        response.ok
-        && result?.success ===
-            true
-        && result?.authorized ===
-            true;
-
-    if (
-        !adminAuthorized
-    ) {
-        return {
-            authorized:
-                false,
-
-            adminAuthorized:
-                false,
-
-            taskboardMember:
-                false,
-
-            taskboardRoles:
-                [],
-
-            isOwner:
-                false,
-
-            status:
-                response.status,
-
-            reason:
-                response.status === 401
-                    ? "AUTHENTICATION_REQUIRED"
-                    : response.status === 403
-                        ? "ADMIN_ACCESS_DENIED"
-                        : result?.error
-                            || "ADMIN_ACCESS_CHECK_FAILED"
-        };
-    }
-
-    const taskboardRoles =
-        normalizeTaskboardRoles(
-            result?.taskboard?.roles
+        hasAdminAccess(
+            state
         );
 
+    const taskboardRoles =
+        adminAuthorized
+            ? normalizeTaskboardRoles(
+                state?.admin?.roles
+            )
+            : [];
+
     const taskboardMember =
-        result?.taskboard?.member ===
-            true
+        adminAuthorized
         && taskboardRoles.length >
             0;
 
-    const isOwner =
-        taskboardRoles.includes(
-            "owner"
-        );
-
-    if (
-        !taskboardMember
-    ) {
-        return {
-            authorized:
-                false,
-
-            adminAuthorized:
-                true,
-
-            taskboardMember:
-                false,
-
-            taskboardRoles:
-                [],
-
-            isOwner:
-                false,
-
-            status:
-                response.status,
-
-            reason:
-                "TASKBOARD_ROLE_REQUIRED"
-        };
-    }
-
     return {
+        state,
+
         authorized:
-            true,
+            taskboardMember,
 
-        adminAuthorized:
-            true,
+        adminAuthorized,
 
-        taskboardMember:
-            true,
+        taskboardMember,
 
         taskboardRoles,
 
-        isOwner,
-
-        status:
-            response.status,
-
-        reason:
-            null
+        isOwner:
+            taskboardRoles.includes(
+                "owner"
+            )
     };
+}
+
+/* =========================================================
+API ERROR
+========================================================= */
+
+function createAdminApiError(
+    {
+        message,
+        code,
+        status,
+        response = null
+    }
+) {
+    const error =
+        new Error(
+            normalizeString(
+                message
+            )
+            || "Admin API request failed."
+        );
+
+    error.code =
+        normalizeString(
+            code
+        )
+        || "ADMIN_API_REQUEST_FAILED";
+
+    error.status =
+        Number.isInteger(
+            status
+        )
+            ? status
+            : null;
+
+    error.response =
+        response;
+
+    return error;
 }
 
 /* =========================================================
@@ -517,25 +443,49 @@ API REQUEST
 async function requestAdminApi(
     url
 ) {
-    const response =
-        await fetch(
-            url,
-            {
-                method:
-                    "GET",
+    let response;
 
-                credentials:
-                    "same-origin",
+    try {
+        response =
+            await fetch(
+                url,
+                {
+                    method:
+                        "GET",
 
-                headers: {
-                    "Accept":
-                        "application/json"
-                },
+                    credentials:
+                        "same-origin",
 
-                cache:
-                    "no-store"
-            }
-        );
+                    cache:
+                        "no-store",
+
+                    headers: {
+                        "Accept":
+                            "application/json"
+                    }
+                }
+            );
+    }
+    catch (
+        cause
+    ) {
+        const error =
+            createAdminApiError({
+                message:
+                    "The Admin API is temporarily unavailable.",
+
+                code:
+                    "ADMIN_API_NETWORK_ERROR",
+
+                status:
+                    null
+            });
+
+        error.cause =
+            cause;
+
+        throw error;
+    }
 
     let result =
         null;
@@ -545,44 +495,58 @@ async function requestAdminApi(
             await response.json();
     }
     catch {
-        const error =
-            new Error(
-                `${url} returned a non-JSON response (${response.status}).`
-            );
+        throw createAdminApiError({
+            message:
+                "The Admin API returned an invalid response.",
 
-        error.status =
-            response.status;
+            code:
+                "ADMIN_API_INVALID_RESPONSE",
 
-        error.code =
-            "ADMIN_API_INVALID_RESPONSE";
-
-        throw error;
+            status:
+                response.status
+        });
     }
 
     if (
         !response.ok
     ) {
-        const message =
-            result?.message
-            || result?.error
-            || `Request failed with status ${response.status}.`;
+        throw createAdminApiError({
+            message:
+                result?.message
+                || result?.error
+                || `Request failed with status ${response.status}.`,
 
-        const error =
-            new Error(
-                message
-            );
+            code:
+                result?.code
+                || result?.error
+                || "ADMIN_API_REQUEST_FAILED",
 
-        error.status =
-            response.status;
+            status:
+                response.status,
 
-        error.code =
-            result?.error
-            || "ADMIN_API_REQUEST_FAILED";
+            response:
+                result
+        });
+    }
 
-        error.response =
-            result;
+    if (
+        !result
+        || typeof result !==
+            "object"
+        || Array.isArray(
+            result
+        )
+    ) {
+        throw createAdminApiError({
+            message:
+                "The Admin API returned an invalid result.",
 
-        throw error;
+            code:
+                "ADMIN_API_RESULT_INVALID",
+
+            status:
+                response.status
+        });
     }
 
     return result;
@@ -737,12 +701,26 @@ async function loadTaskboardData() {
     ) {
         console.error(
             "[TASKBOARD DATA LOAD FAILED]",
-            error
+            {
+                code:
+                    error?.code
+                    || null,
+
+                status:
+                    error?.status
+                    || null,
+
+                message:
+                    error?.message
+                    || "Unknown error"
+            }
         );
 
         if (
-            error?.status === 401
-            || error?.status === 403
+            error?.status ===
+                401
+            || error?.status ===
+                403
         ) {
             throw error;
         }
@@ -769,10 +747,12 @@ async function loadTaskboardData() {
 /* =========================================================
 REFRESH
 
-Access is checked again before refreshing Taskboard data.
+A manual Taskboard refresh forces the centralized auth
+service to re-evaluate current Admin authorization before
+loading Taskboard data.
 
-This matters because Discord guild roles or Taskboard roles
-may have changed since the page was initially loaded.
+This causes current Discord authorization and responsibility
+roles to be checked again by the server.
 ========================================================= */
 
 function setupTaskboardRefresh() {
@@ -788,7 +768,9 @@ function setupTaskboardRefresh() {
     }
 
     if (
-        taskboardRefresh.dataset.initialized ===
+        taskboardRefresh
+            .dataset
+            .initialized ===
         "true"
     ) {
         return;
@@ -797,17 +779,41 @@ function setupTaskboardRefresh() {
     taskboardRefresh.addEventListener(
         "click",
         async function() {
+            if (
+                taskboardRefresh.disabled
+            ) {
+                return;
+            }
+
+            taskboardRefresh.disabled =
+                true;
+
             try {
                 const access =
-                    await verifyTaskboardAccess();
+                    await loadTaskboardAccess();
 
                 if (
                     !access.authorized
                 ) {
-                    showTaskboardDenied();
+                    if (
+                        access
+                            ?.state
+                            ?.admin
+                            ?.available ===
+                        false
+                    ) {
+                        showTaskboardError(
+                            "Taskboard authorization is temporarily unavailable."
+                        );
+                    }
+                    else {
+                        showTaskboardDenied();
+                    }
 
                     return;
                 }
+
+                showTaskboardAuthorized();
 
                 await loadTaskboardData();
             }
@@ -816,14 +822,48 @@ function setupTaskboardRefresh() {
             ) {
                 console.error(
                     "[TASKBOARD REFRESH FAILED]",
-                    error
+                    {
+                        code:
+                            error?.code
+                            || null,
+
+                        status:
+                            error?.status
+                            || null,
+
+                        message:
+                            error?.message
+                            || "Unknown error"
+                    }
                 );
 
                 if (
-                    error?.status === 401
-                    || error?.status === 403
+                    error?.status ===
+                        401
+                    || error?.status ===
+                        403
                 ) {
                     showTaskboardDenied();
+
+                    return;
+                }
+
+                showTaskboardError(
+                    error?.message
+                    || "The Taskboard could not be refreshed."
+                );
+            }
+            finally {
+                /*
+                 * loadTaskboardData() also controls this
+                 * button. Explicit restoration here covers
+                 * failures occurring before data loading.
+                 */
+                if (
+                    taskboardRefresh
+                ) {
+                    taskboardRefresh.disabled =
+                        false;
                 }
             }
         }
@@ -852,45 +892,52 @@ export async function initializePage() {
 
     try {
         const access =
-            await verifyTaskboardAccess();
+            await loadTaskboardAccess();
 
         /* -------------------------------------------------
-        ACCESS DENIED
+        ADMIN AUTHORIZATION UNAVAILABLE
 
-        This covers:
-            - no authenticated BPD session
-            - no authorized Discord identity
-            - Discord account missing required staff role
-            - no active Taskboard responsibility role
+        This is distinct from an authoritative denial.
+
+        Do not claim the user lacks access when the server
+        could not establish current Admin authorization.
         ------------------------------------------------- */
 
         if (
-            !access.authorized
+            access
+                ?.state
+                ?.admin
+                ?.available ===
+            false
         ) {
-            if (
-                access.status === 401
-                || access.status === 403
-                || access.reason ===
-                    "TASKBOARD_ROLE_REQUIRED"
-            ) {
-                showTaskboardDenied();
-
-                return;
-            }
-
             showTaskboardError(
-                `Taskboard access verification failed (${access.status}).`
+                "Taskboard authorization is temporarily unavailable."
             );
 
             return;
         }
 
         /* -------------------------------------------------
-        AUTHORIZED
+        ACCESS DENIED
 
-        At this point the server has confirmed Admin access
-        and at least one active Taskboard responsibility
-        role.
+        Covers:
+            - signed-out BPD account
+            - inactive BPD account
+            - Discord provider authorization failure
+            - Discord staff authorization failure
+            - no active responsibility role
+        ------------------------------------------------- */
+
+        if (
+            !access.authorized
+        ) {
+            showTaskboardDenied();
+
+            return;
+        }
+
+        /* -------------------------------------------------
+        AUTHORIZED
         ------------------------------------------------- */
 
         console.log(
@@ -913,15 +960,17 @@ export async function initializePage() {
             error
         ) {
             /*
-             * A 401/403 from any Taskboard endpoint means
-             * the server no longer authorizes this user.
+             * Task APIs remain authoritative.
              *
-             * Do not leave Taskboard content visible.
+             * If any endpoint rejects access after the page
+             * gate succeeded, immediately hide Taskboard
+             * content.
              */
-
             if (
-                error?.status === 401
-                || error?.status === 403
+                error?.status ===
+                    401
+                || error?.status ===
+                    403
             ) {
                 showTaskboardDenied();
 
@@ -929,15 +978,27 @@ export async function initializePage() {
             }
 
             /*
-             * During preliminary integration, non-access
-             * API errors remain visible through the status
-             * area and console while the Taskboard itself
-             * stays available.
+             * Preliminary integration behavior:
+             *
+             * Keep the authorized Taskboard shell visible
+             * while surfacing non-access data failures in
+             * the status area.
              */
-
             console.error(
                 "[TASKBOARD INITIALIZATION DATA ERROR]",
-                error
+                {
+                    code:
+                        error?.code
+                        || null,
+
+                    status:
+                        error?.status
+                        || null,
+
+                    message:
+                        error?.message
+                        || "Unknown error"
+                }
             );
         }
     }
@@ -946,7 +1007,19 @@ export async function initializePage() {
     ) {
         console.error(
             "[ADMIN TASKBOARD INITIALIZATION FAILED]",
-            error
+            {
+                code:
+                    error?.code
+                    || null,
+
+                status:
+                    error?.status
+                    || null,
+
+                message:
+                    error?.message
+                    || "Unknown error"
+            }
         );
 
         showTaskboardError(

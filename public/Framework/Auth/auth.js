@@ -8,75 +8,66 @@ File:
     /Framework/Auth/auth.js
 
 Purpose:
-    Provides one centralized client-side authentication and
+    Provides the centralized client-side authentication and
     authorization state service for the BPD Gaming Network.
 
 Description:
-    - Loads the global BPD session through the centralized
-      client API route registry.
-    - Normalizes the public authentication response.
-    - Caches the current authentication state.
-    - Deduplicates simultaneous session requests.
-    - Distinguishes confirmed signed-out state from
-      authentication-service unavailability.
-    - Exposes account, provider, and role helpers.
-    - Evaluates client-side route authorization requirements.
+    - Loads the global BPD session.
+    - Loads current Discord-backed Admin authorization for
+      authenticated active accounts.
+    - Normalizes all public authentication state.
+    - Keeps global account roles separate from Admin
+      responsibility roles.
+    - Caches current authentication state.
+    - Deduplicates simultaneous refresh requests.
+    - Distinguishes signed-out state from service failure.
+    - Distinguishes ordinary non-Admin users from Admin
+      authorization-service failure.
+    - Exposes account, provider, Admin, and route helpers.
     - Dispatches one canonical auth-state change event.
     - Provides explicit refresh and invalidation controls.
 
 Security:
     - This module is NOT a security boundary.
-    - Client-side authorization controls navigation and UI
-      only.
-    - Protected APIs must independently enforce authorization
-      on the server.
-    - Provider state exposed here may be cached session state.
-    - Server-side provider authorization must verify the
-      canonical provider identity against Supabase.
+    - Client-side authorization controls navigation and UI.
+    - Protected APIs MUST independently enforce authorization.
+    - Global account roles and Admin responsibility roles are
+      separate authorization domains.
+    - Admin authorization is accepted only from:
+          GET /api/auth/admin/access
+    - Browser-derived role information is never authoritative.
+    - Admin access is fail-closed in the UI.
 
-Session Endpoint:
+Global Session Endpoint:
     BPD_AUTH_SESSION_URL
         /api/auth/session
 
-Session Contract:
-    Authenticated:
-        HTTP 200
-        {
-            success: true,
-            authenticated: true,
-            user: {
-                userId,
-                displayName,
-                role,
-                active
-            },
-            providers,
-            linkedProviders,
-            authenticatedProviders,
-            session
-        }
-
-    Signed Out:
-        HTTP 200
-        {
-            success: true,
-            authenticated: false
-        }
-
-    Unavailable:
-        HTTP 5xx or network failure
+Admin Access Endpoint:
+    ADMIN_ACCESS_URL
+        /api/auth/admin/access
 
 Important:
     - authenticated:false is a confirmed signed-out state.
-    - API/network failure is NOT treated as signed out.
-    - Route code must never redirect to Login merely because
-      authentication could not be checked.
+    - Session HTTP/network failure is NOT treated as logout.
+    - Admin 401/403 means authenticated user is not currently
+      authorized for Admin.
+    - Admin HTTP 5xx/network failure means Admin authorization
+      is unavailable, not that the BPD session is invalid.
     - This module is the only client module that should load
       /api/auth/session directly.
+    - Admin responsibility roles:
+          owner
+          database
+          security
+          ui
+    - state.role is the GLOBAL BPD account role.
+    - state.admin.roles are Admin responsibility roles.
 ========================================================= */
 
 import {
-    BPD_AUTH_SESSION_URL, ROCKET_LEAGUE_SESSION_URL
+    BPD_AUTH_SESSION_URL,
+    ROCKET_LEAGUE_SESSION_URL,
+    ADMIN_ACCESS_URL
 } from "/scripts/apiRoutes.js";
 
 /* =========================================================
@@ -88,6 +79,19 @@ const AUTH_STATE_EVENT =
 
 const DEFAULT_CACHE_TTL_MS =
     15_000;
+
+const ADMIN_RESPONSIBILITY_ROLES =
+    Object.freeze([
+        "owner",
+        "database",
+        "security",
+        "ui"
+    ]);
+
+const ADMIN_RESPONSIBILITY_ROLE_SET =
+    new Set(
+        ADMIN_RESPONSIBILITY_ROLES
+    );
 
 /* =========================================================
 INTERNAL STATE
@@ -109,14 +113,10 @@ NORMALIZATION
 function normalizeString(
     value
 ) {
-    if (
-        typeof value !==
+    return typeof value ===
         "string"
-    ) {
-        return "";
-    }
-
-    return value.trim();
+        ? value.trim()
+        : "";
 }
 
 function normalizeNullableString(
@@ -162,7 +162,7 @@ function normalizeTimestamp(
 
     if (
         typeof value ===
-        "number"
+            "number"
         && Number.isFinite(
             value
         )
@@ -183,9 +183,6 @@ function normalizeTimestamp(
         return null;
     }
 
-    /*
-     * Preserve numeric timestamp strings.
-     */
     const numericValue =
         Number(
             stringValue
@@ -199,9 +196,6 @@ function normalizeTimestamp(
         return numericValue;
     }
 
-    /*
-     * Support ISO timestamps returned by provider auth state.
-     */
     const parsedValue =
         Date.parse(
             stringValue
@@ -214,8 +208,185 @@ function normalizeTimestamp(
         : null;
 }
 
+function normalizePermissionList(
+    permissions
+) {
+    if (
+        !Array.isArray(
+            permissions
+        )
+    ) {
+        return [];
+    }
+
+    const normalized =
+        [];
+
+    for (
+        const permission
+        of permissions
+    ) {
+        const value =
+            normalizeString(
+                permission
+            );
+
+        if (
+            !value
+            || normalized.includes(
+                value
+            )
+        ) {
+            continue;
+        }
+
+        normalized.push(
+            value
+        );
+    }
+
+    return normalized;
+}
+
+function normalizeAdminRoleList(
+    roles
+) {
+    if (
+        !Array.isArray(
+            roles
+        )
+    ) {
+        return [];
+    }
+
+    const roleSet =
+        new Set();
+
+    for (
+        const role
+        of roles
+    ) {
+        const normalizedRole =
+            normalizeRole(
+                role
+            );
+
+        if (
+            ADMIN_RESPONSIBILITY_ROLE_SET.has(
+                normalizedRole
+            )
+        ) {
+            roleSet.add(
+                normalizedRole
+            );
+        }
+    }
+
+    /*
+     * Return roles in one deterministic order regardless of
+     * server/database ordering.
+     */
+    return ADMIN_RESPONSIBILITY_ROLES.filter(
+        role =>
+            roleSet.has(
+                role
+            )
+    );
+}
+
 /* =========================================================
-STATE FACTORIES
+ADMIN STATE FACTORIES
+========================================================= */
+
+function createUnknownAdminState() {
+    return {
+        checked:
+            false,
+
+        available:
+            null,
+
+        authorized:
+            false,
+
+        staff:
+            false,
+
+        isAdmin:
+            false,
+
+        isModerator:
+            false,
+
+        isLeagueStaff:
+            false,
+
+        permissions:
+            [],
+
+        roles:
+            [],
+
+        isOwner:
+            false,
+
+        error:
+            null
+    };
+}
+
+function createDeniedAdminState() {
+    return {
+        ...createUnknownAdminState(),
+
+        checked:
+            true,
+
+        available:
+            true,
+
+        authorized:
+            false
+    };
+}
+
+function createUnavailableAdminState(
+    error = null
+) {
+    return {
+        ...createUnknownAdminState(),
+
+        checked:
+            true,
+
+        available:
+            false,
+
+        error: {
+            code:
+                normalizeNullableString(
+                    error?.code
+                )
+                || "ADMIN_ACCESS_UNAVAILABLE",
+
+            message:
+                normalizeNullableString(
+                    error?.message
+                )
+                || "Admin authorization is temporarily unavailable.",
+
+            status:
+                Number.isInteger(
+                    error?.status
+                )
+                    ? error.status
+                    : null
+        }
+    };
+}
+
+/* =========================================================
+AUTH STATE FACTORIES
 ========================================================= */
 
 function createUnknownAuthState() {
@@ -260,6 +431,9 @@ function createUnknownAuthState() {
             absoluteExpiresAt:
                 null
         },
+
+        admin:
+            createUnknownAdminState(),
 
         error:
             null,
@@ -326,6 +500,13 @@ function createSignedOutAuthState() {
                 null
         },
 
+        /*
+         * Admin authorization is conclusively unavailable
+         * because there is no authenticated BPD account.
+         */
+        admin:
+            createDeniedAdminState(),
+
         error:
             null,
 
@@ -378,6 +559,9 @@ function createUnavailableAuthState(
             absoluteExpiresAt:
                 null
         },
+
+        admin:
+            createUnknownAdminState(),
 
         error: {
             code:
@@ -437,26 +621,21 @@ function normalizeProvider(
         providerData?.authorized ===
         true;
 
-    const requiresReauthorization = linked && (providerData?.requiresReauthorization === true || !authorized);
+    const requiresReauthorization =
+        linked
+        && (
+            providerData
+                ?.requiresReauthorization ===
+                true
+            || !authorized
+        );
 
     return {
         provider:
             name,
 
-        /*
-         * Permanent linkage.
-         *
-         * Source:
-         * Supabase identity.account_identities
-         */
         linked,
 
-        /*
-         * Current temporary provider authentication state.
-         *
-         * Source:
-         * Cloudflare KV freshness policy.
-         */
         authenticated,
 
         authorized,
@@ -469,17 +648,16 @@ function normalizeProvider(
                     ?.reauthorizationReason
             ),
 
-        /*
-         * External provider subject / account identifier.
-         */
         accountId:
             normalizeNullableString(
-                providerData?.accountId
+                providerData
+                    ?.accountId
             ),
 
         displayName:
             normalizeNullableString(
-                providerData?.displayName
+                providerData
+                    ?.displayName
             ),
 
         preferredUsername:
@@ -490,37 +668,28 @@ function normalizeProvider(
 
         email:
             normalizeNullableString(
-                providerData?.email
+                providerData
+                    ?.email
             ),
 
-        /*
-         * Successful provider authentication timestamp.
-         */
         authenticatedAt:
             normalizeTimestamp(
                 providerData
                     ?.authenticatedAt
             ),
 
-        /*
-         * Permanent provider-link timestamp.
-         */
         linkedAt:
             normalizeTimestamp(
-                providerData?.linkedAt
+                providerData
+                    ?.linkedAt
             ),
 
-        /*
-         * Firm provider authentication expiration.
-         */
         expiresAt:
             normalizeTimestamp(
-                providerData?.expiresAt
+                providerData
+                    ?.expiresAt
             ),
 
-        /*
-         * Account-wide login-gap cutoff.
-         */
         providerReauthAfter:
             normalizeTimestamp(
                 providerData
@@ -642,26 +811,6 @@ function normalizeAuthenticatedResponse(
             data?.authenticatedProviders
         );
 
-    const userId =
-        normalizeNullableString(
-            data?.user?.userId
-        );
-
-    const displayName =
-        normalizeNullableString(
-            data?.user?.displayName
-        );
-
-    const role =
-        normalizeRole(
-            data?.user?.role
-        )
-        || null;
-
-    const active =
-        data?.user?.active ===
-        true;
-
     return {
         status:
             "authenticated",
@@ -672,13 +821,25 @@ function normalizeAuthenticatedResponse(
         authenticated:
             true,
 
-        userId,
+        userId:
+            normalizeNullableString(
+                data?.user?.userId
+            ),
 
-        displayName,
+        displayName:
+            normalizeNullableString(
+                data?.user?.displayName
+            ),
 
-        role,
+        role:
+            normalizeRole(
+                data?.user?.role
+            )
+            || null,
 
-        active,
+        active:
+            data?.user?.active ===
+            true,
 
         providers,
 
@@ -699,9 +860,13 @@ function normalizeAuthenticatedResponse(
 
             absoluteExpiresAt:
                 normalizeTimestamp(
-                    data?.session?.absoluteExpiresAt
+                    data?.session
+                        ?.absoluteExpiresAt
                 )
         },
+
+        admin:
+            createUnknownAdminState(),
 
         error:
             null,
@@ -712,7 +877,7 @@ function normalizeAuthenticatedResponse(
 }
 
 /* =========================================================
-PUBLIC RESPONSE NORMALIZATION
+PUBLIC AUTH RESPONSE NORMALIZATION
 ========================================================= */
 
 function normalizeAuthResponse(
@@ -726,9 +891,15 @@ function normalizeAuthResponse(
             data
         )
     ) {
-        throw new Error(
-            "Authentication response was invalid."
-        );
+        const error =
+            new Error(
+                "Authentication response was invalid."
+            );
+
+        error.code =
+            "AUTH_RESPONSE_INVALID";
+
+        throw error;
     }
 
     if (
@@ -765,35 +936,215 @@ function normalizeAuthResponse(
 }
 
 /* =========================================================
+ADMIN RESPONSE NORMALIZATION
+========================================================= */
+
+function normalizeAdminResponse(
+    data
+) {
+    if (
+        !data
+        || typeof data !==
+            "object"
+        || Array.isArray(
+            data
+        )
+    ) {
+        const error =
+            new Error(
+                "Admin authorization response was invalid."
+            );
+
+        error.code =
+            "ADMIN_ACCESS_RESPONSE_INVALID";
+
+        throw error;
+    }
+
+    /*
+     * A successful Admin authorization must satisfy the
+     * complete server response contract.
+     *
+     * Fail closed if any required condition is absent.
+     */
+    if (
+        data.success !==
+            true
+        || data.authorized !==
+            true
+        || data?.taskboard?.member !==
+            true
+    ) {
+        return createDeniedAdminState();
+    }
+
+    const roles =
+        normalizeAdminRoleList(
+            data?.taskboard?.roles
+        );
+
+    /*
+     * The server contract requires at least one active
+     * responsibility role for all Admin access.
+     */
+    if (
+        roles.length ===
+        0
+    ) {
+        return createDeniedAdminState();
+    }
+
+    return {
+        checked:
+            true,
+
+        available:
+            true,
+
+        authorized:
+            true,
+
+        staff:
+            data?.admin?.staff ===
+            true,
+
+        isAdmin:
+            data?.admin?.isAdmin ===
+            true,
+
+        isModerator:
+            data?.admin?.isModerator ===
+            true,
+
+        isLeagueStaff:
+            data?.admin
+                ?.isLeagueStaff ===
+            true,
+
+        permissions:
+            normalizePermissionList(
+                data?.admin?.permissions
+            ),
+
+        roles,
+
+        isOwner:
+            roles.includes(
+                "owner"
+            ),
+
+        error:
+            null
+    };
+}
+
+/* =========================================================
 STATE CLONE
 ========================================================= */
+
+function cloneAdminState(
+    admin
+) {
+    const source =
+        admin
+        && typeof admin ===
+            "object"
+        && !Array.isArray(
+            admin
+        )
+            ? admin
+            : createUnknownAdminState();
+
+    return {
+        ...source,
+
+        permissions:
+            Array.isArray(
+                source.permissions
+            )
+                ? [
+                    ...source.permissions
+                ]
+                : [],
+
+        roles:
+            Array.isArray(
+                source.roles
+            )
+                ? [
+                    ...source.roles
+                ]
+                : [],
+
+        error:
+            source.error
+                ? {
+                    ...source.error
+                }
+                : null
+    };
+}
 
 function cloneAuthState(
     state
 ) {
+    const source =
+        state
+        && typeof state ===
+            "object"
+        && !Array.isArray(
+            state
+        )
+            ? state
+            : createUnknownAuthState();
+
     return {
-        ...state,
+        ...source,
 
         providers: {
-            ...state.providers
+            ...(
+                source.providers
+                || {}
+            )
         },
 
         linkedProviders: [
-            ...state.linkedProviders
+            ...(
+                Array.isArray(
+                    source.linkedProviders
+                )
+                    ? source.linkedProviders
+                    : []
+            )
         ],
 
         authenticatedProviders: [
-            ...state.authenticatedProviders
+            ...(
+                Array.isArray(
+                    source.authenticatedProviders
+                )
+                    ? source
+                        .authenticatedProviders
+                    : []
+            )
         ],
 
         session: {
-            ...state.session
+            ...(
+                source.session
+                || {}
+            )
         },
 
+        admin:
+            cloneAdminState(
+                source.admin
+            ),
+
         error:
-            state.error
+            source.error
                 ? {
-                    ...state.error
+                    ...source.error
                 }
                 : null
     };
@@ -830,15 +1181,18 @@ function setAuthState(
     } = {}
 ) {
     currentState =
-        state;
+        cloneAuthState(
+            state
+        );
 
     if (
         Number.isFinite(
-            state?.loadedAt
+            currentState
+                ?.loadedAt
         )
     ) {
         lastLoadedAt =
-            state.loadedAt;
+            currentState.loadedAt;
     }
 
     if (
@@ -868,7 +1222,7 @@ function isCacheFresh(
 
     if (
         currentState.status ===
-        "unknown"
+            "unknown"
         || currentState.status ===
             "loading"
     ) {
@@ -882,7 +1236,7 @@ function isCacheFresh(
 }
 
 /* =========================================================
-LOAD SESSION
+LOAD GLOBAL SESSION
 ========================================================= */
 
 async function loadSessionFromServer() {
@@ -910,20 +1264,20 @@ async function loadSessionFromServer() {
             );
     }
     catch (
-        error
+        cause
     ) {
-        const networkError =
+        const error =
             new Error(
                 "Authentication service is unavailable."
             );
 
-        networkError.code =
+        error.code =
             "AUTH_NETWORK_ERROR";
 
-        networkError.cause =
-            error;
+        error.cause =
+            cause;
 
-        throw networkError;
+        throw error;
     }
 
     let data =
@@ -948,16 +1302,6 @@ async function loadSessionFromServer() {
         throw error;
     }
 
-    /*
-     * /api/auth/session uses HTTP 200 for:
-     *
-     *     authenticated
-     *     signed out
-     *
-     * A non-2xx response therefore means authentication
-     * status is unavailable. It must not be treated as a
-     * confirmed logout.
-     */
     if (
         !response.ok
     ) {
@@ -987,6 +1331,142 @@ async function loadSessionFromServer() {
 }
 
 /* =========================================================
+LOAD ADMIN ACCESS
+
+Every fresh authenticated account load performs this check.
+
+The Admin endpoint is responsible for:
+    - Live Discord identity/guild verification.
+    - Current Discord staff authorization.
+    - Current responsibility-role evaluation.
+    - Synchronizing responsibility roles into Supabase.
+    - Requiring active responsibility membership.
+
+401 / 403:
+    Valid authoritative denial.
+
+5xx / network:
+    Admin authorization unavailable.
+
+Neither result invalidates an otherwise valid global BPD
+session.
+========================================================= */
+
+async function loadAdminAccessFromServer() {
+    let response;
+
+    try {
+        response =
+            await fetch(
+                ADMIN_ACCESS_URL,
+                {
+                    method:
+                        "GET",
+
+                    credentials:
+                        "same-origin",
+
+                    cache:
+                        "no-store",
+
+                    headers: {
+                        "Accept":
+                            "application/json"
+                    }
+                }
+            );
+    }
+    catch (
+        cause
+    ) {
+        return createUnavailableAdminState({
+            code:
+                "ADMIN_ACCESS_NETWORK_ERROR",
+
+            message:
+                "Admin authorization is temporarily unavailable.",
+
+            cause
+        });
+    }
+
+    let data =
+        null;
+
+    try {
+        data =
+            await response.json();
+    }
+    catch {
+        return createUnavailableAdminState({
+            code:
+                "ADMIN_ACCESS_RESPONSE_INVALID",
+
+            message:
+                "Admin authorization returned an invalid response.",
+
+            status:
+                response.status
+        });
+    }
+
+    /*
+     * 401 and 403 are normal authoritative denial states.
+     *
+     * Do not log them as application failures and do not
+     * mark global authentication unavailable.
+     */
+    if (
+        response.status ===
+            401
+        || response.status ===
+            403
+    ) {
+        return createDeniedAdminState();
+    }
+
+    if (
+        !response.ok
+    ) {
+        return createUnavailableAdminState({
+            code:
+                normalizeNullableString(
+                    data?.error
+                )
+                || "ADMIN_ACCESS_REQUEST_FAILED",
+
+            message:
+                "Admin authorization is temporarily unavailable.",
+
+            status:
+                response.status
+        });
+    }
+
+    try {
+        return normalizeAdminResponse(
+            data
+        );
+    }
+    catch (
+        error
+    ) {
+        return createUnavailableAdminState({
+            code:
+                error?.code
+                || "ADMIN_ACCESS_RESPONSE_INVALID",
+
+            message:
+                error?.message
+                || "Admin authorization returned an invalid response.",
+
+            status:
+                response.status
+        });
+    }
+}
+
+/* =========================================================
 REFRESH AUTH STATE
 ========================================================= */
 
@@ -1006,8 +1486,11 @@ export async function refreshAuthState(
     }
 
     /*
-     * If another caller is already refreshing auth, reuse
-     * that exact request.
+     * All callers share one complete refresh operation:
+     *
+     *     global session
+     *         +
+     *     Admin authorization when applicable
      */
     if (
         currentRequest
@@ -1029,8 +1512,43 @@ export async function refreshAuthState(
         (
             async () => {
                 try {
-                    const nextState =
+                    let nextState =
                         await loadSessionFromServer();
+
+                    /*
+                     * Only an authenticated active canonical
+                     * account can possibly have Admin access.
+                     *
+                     * Do not waste a Discord/Admin request for
+                     * signed-out or inactive accounts.
+                     */
+                    if (
+                        nextState.authenticated ===
+                            true
+                        && nextState.active ===
+                            true
+                        && normalizeString(
+                            nextState.userId
+                        )
+                    ) {
+                        const adminState =
+                            await loadAdminAccessFromServer();
+
+                        nextState = {
+                            ...nextState,
+
+                            admin:
+                                adminState,
+
+                            /*
+                             * loadedAt represents completion
+                             * of the complete global client
+                             * authorization refresh.
+                             */
+                            loadedAt:
+                                Date.now()
+                        };
+                    }
 
                     return setAuthState(
                         nextState
@@ -1159,10 +1677,8 @@ export function isAuthAvailable(
     state =
         currentState
 ) {
-    return (
-        state?.available ===
-        true
-    );
+    return state?.available ===
+        true;
 }
 
 export function isAuthenticated(
@@ -1171,7 +1687,7 @@ export function isAuthenticated(
 ) {
     return (
         state?.available ===
-        true
+            true
         && state?.authenticated ===
             true
     );
@@ -1196,7 +1712,11 @@ export function hasActiveAccount(
 }
 
 /* =========================================================
-ROLE HELPERS
+GLOBAL ACCOUNT ROLE HELPERS
+
+These helpers operate ONLY on the global BPD account role.
+
+They MUST NOT be used for Discord/Admin responsibility roles.
 ========================================================= */
 
 export function hasRole(
@@ -1218,12 +1738,114 @@ export function hasRole(
         return false;
     }
 
+    return normalizeRole(
+        state?.role
+    ) === expectedRole;
+}
+
+/* =========================================================
+ADMIN HELPERS
+========================================================= */
+
+export function isAdminAccessAvailable(
+    state =
+        currentState
+) {
     return (
-        normalizeRole(
-            state?.role
+        hasActiveAccount(
+            state
         )
-        === expectedRole
+        && state?.admin?.checked ===
+            true
+        && state?.admin?.available ===
+            true
     );
+}
+
+export function hasAdminAccess(
+    state =
+        currentState
+) {
+    return (
+        isAdminAccessAvailable(
+            state
+        )
+        && state?.admin?.authorized ===
+            true
+    );
+}
+
+export function hasAdminPermission(
+    permission,
+    state =
+        currentState
+) {
+    const expectedPermission =
+        normalizeString(
+            permission
+        );
+
+    if (
+        !expectedPermission
+        || !hasAdminAccess(
+            state
+        )
+    ) {
+        return false;
+    }
+
+    return state
+        ?.admin
+        ?.permissions
+        ?.includes(
+            expectedPermission
+        ) === true;
+}
+
+export function hasAdminResponsibilityRole(
+    role,
+    state =
+        currentState
+) {
+    const expectedRole =
+        normalizeRole(
+            role
+        );
+
+    if (
+        !ADMIN_RESPONSIBILITY_ROLE_SET.has(
+            expectedRole
+        )
+        || !hasAdminAccess(
+            state
+        )
+    ) {
+        return false;
+    }
+
+    return state
+        ?.admin
+        ?.roles
+        ?.includes(
+            expectedRole
+        ) === true;
+}
+
+export function getAdminResponsibilityRoles(
+    state =
+        currentState
+) {
+    if (
+        !hasAdminAccess(
+            state
+        )
+    ) {
+        return [];
+    }
+
+    return [
+        ...state.admin.roles
+    ];
 }
 
 /* =========================================================
@@ -1246,13 +1868,9 @@ export function getProvider(
         return null;
     }
 
-    return (
-        state?.providers
-            ?.[
-                providerName
-            ]
-        || null
-    );
+    return state?.providers
+        ?.[providerName]
+        || null;
 }
 
 export function hasLinkedProvider(
@@ -1292,61 +1910,153 @@ export function hasLinkedProvider(
             ?.linkedProviders
             ?.includes(
                 providerName
-            )
+            ) ===
+                true
     );
 }
 
-export function hasAuthorizedProvider(provider, state = currentState) {
-    if (!hasActiveAccount(state)) return false;
-    const context = getProvider(provider, state);
-    const expiresAt = normalizeTimestamp(context?.expiresAt);
-    return context?.linked === true && context?.authorized === true
-        && context?.requiresReauthorization !== true
-        && expiresAt !== null && expiresAt > Date.now();
+export function hasAuthorizedProvider(
+    provider,
+    state =
+        currentState
+) {
+    if (
+        !hasActiveAccount(
+            state
+        )
+    ) {
+        return false;
+    }
+
+    const context =
+        getProvider(
+            provider,
+            state
+        );
+
+    const expiresAt =
+        normalizeTimestamp(
+            context?.expiresAt
+        );
+
+    return (
+        context?.linked ===
+            true
+        && context?.authorized ===
+            true
+        && context
+            ?.requiresReauthorization !==
+            true
+        && expiresAt !==
+            null
+        && expiresAt >
+            Date.now()
+    );
 }
 
-export function requiresProviderReauthorization(provider, state = currentState) {
-    return hasActiveAccount(state) && hasLinkedProvider(provider, state)
-        && !hasAuthorizedProvider(provider, state);
+export function requiresProviderReauthorization(
+    provider,
+    state =
+        currentState
+) {
+    return (
+        hasActiveAccount(
+            state
+        )
+        && hasLinkedProvider(
+            provider,
+            state
+        )
+        && !hasAuthorizedProvider(
+            provider,
+            state
+        )
+    );
 }
 
-export function hasAuthenticatedProvider(provider, state = currentState) {
-    return hasAuthorizedProvider(provider, state);
+export function hasAuthenticatedProvider(
+    provider,
+    state =
+        currentState
+) {
+    return hasAuthorizedProvider(
+        provider,
+        state
+    );
 }
 
-export function hasProfileAuthorization(state = currentState) {
-    return ["epic", "google", "discord"].some(provider => hasAuthorizedProvider(provider, state));
+export function hasProfileAuthorization(
+    state =
+        currentState
+) {
+    return [
+        "epic",
+        "google",
+        "discord"
+    ]
+        .some(
+            provider =>
+                hasAuthorizedProvider(
+                    provider,
+                    state
+                )
+        );
 }
 
 /* =========================================================
 ROUTE AUTH REQUIREMENTS
 ========================================================= */
 
-function normalizeRouteAuthRequirements(requirements) {
-    const input = requirements === true ? { required: true } : requirements || {};
-    return { required: input.required === true,
-        provider: normalizeProviderName(input.provider) || null,
-        role: normalizeRole(input.role) || null,
-        recovery: input.recovery === true,
-        rocketLeague: input.rocketLeague === true };
+function normalizeRouteAuthRequirements(
+    requirements
+) {
+    const input =
+        requirements ===
+            true
+            ? {
+                required:
+                    true
+            }
+            : requirements
+                || {};
+
+    return {
+        required:
+            input.required ===
+            true,
+
+        provider:
+            normalizeProviderName(
+                input.provider
+            )
+            || null,
+
+        role:
+            normalizeRole(
+                input.role
+            )
+            || null,
+
+        recovery:
+            input.recovery ===
+            true,
+
+        rocketLeague:
+            input.rocketLeague ===
+            true
+    };
 }
 
 /* =========================================================
 ROUTE AUTH EVALUATION
 
-Result statuses:
-    allowed
-    signed_out
-    account_invalid
-    provider_required
-    role_required
-    unavailable
-
 Important:
-    This is client navigation logic only.
+    This evaluates global BPD route requirements.
 
-    Server APIs must independently enforce the equivalent
-    authorization policy.
+    Admin routes should additionally require:
+        hasAdminAccess(state) === true
+
+    Server APIs remain authoritative.
 ========================================================= */
 
 export function evaluateRouteAuth(
@@ -1379,9 +2089,29 @@ export function evaluateRouteAuth(
         };
     }
 
-    if (policy.recovery && state?.available !== true) return { allowed: true, status: "allowed", policy };
+    if (
+        policy.recovery
+        && state?.available !==
+            true
+    ) {
+        return {
+            allowed:
+                true,
 
-    if (state?.available !== true) {
+            status:
+                "allowed",
+
+            reason:
+                null,
+
+            policy
+        };
+    }
+
+    if (
+        state?.available !==
+        true
+    ) {
         return {
             allowed:
                 false,
@@ -1414,9 +2144,28 @@ export function evaluateRouteAuth(
         };
     }
 
-    if (policy.recovery) return { allowed: true, status: "allowed", policy };
+    if (
+        policy.recovery
+    ) {
+        return {
+            allowed:
+                true,
 
-    if (!hasActiveAccount(state)) {
+            status:
+                "allowed",
+
+            reason:
+                null,
+
+            policy
+        };
+    }
+
+    if (
+        !hasActiveAccount(
+            state
+        )
+    ) {
         return {
             allowed:
                 false,
@@ -1479,14 +2228,50 @@ export function evaluateRouteAuth(
         };
     }
 
-    if (policy.provider && !hasAuthorizedProvider(policy.provider, state)) {
-        return { allowed: false, status: "provider_reauthorization_required",
-            requiredProvider: policy.provider, reason: "Provider verification is required.", policy };
+    if (
+        policy.provider
+        && !hasAuthorizedProvider(
+            policy.provider,
+            state
+        )
+    ) {
+        return {
+            allowed:
+                false,
+
+            status:
+                "provider_reauthorization_required",
+
+            requiredProvider:
+                policy.provider,
+
+            reason:
+                "Provider verification is required.",
+
+            policy
+        };
     }
-    if (!policy.recovery && !hasProfileAuthorization(state)) {
-        return { allowed: false, status: "profile_provider_required",
-            reason: "Verify an Epic, Google, or Discord provider.", policy };
+
+    if (
+        !policy.recovery
+        && !hasProfileAuthorization(
+            state
+        )
+    ) {
+        return {
+            allowed:
+                false,
+
+            status:
+                "profile_provider_required",
+
+            reason:
+                "Verify an Epic, Google, or Discord provider.",
+
+            policy
+        };
     }
+
     return {
         allowed:
             true,
@@ -1505,25 +2290,147 @@ export function evaluateRouteAuth(
 ROUTE AUTH LOAD + EVALUATION
 ========================================================= */
 
-export async function authorizeRoute(requirements, { force = false } = {}) {
-    const state = await getAuthState({ force });
-    let evaluation = evaluateRouteAuth(requirements, state);
-    if (evaluation.allowed && requirements?.rocketLeague === true) {
+export async function authorizeRoute(
+    requirements,
+    {
+        force = false
+    } = {}
+) {
+    const state =
+        await getAuthState({
+            force
+        });
+
+    let evaluation =
+        evaluateRouteAuth(
+            requirements,
+            state
+        );
+
+    if (
+        evaluation.allowed
+        && requirements?.rocketLeague ===
+            true
+    ) {
         try {
-            const response = await fetch(ROCKET_LEAGUE_SESSION_URL, {
-                credentials: "same-origin", cache: "no-store", headers: { Accept: "application/json" }
-            });
-            const result = await response.json();
-            if (response.status >= 500 || result.available === false || result.profileError) throw new Error();
-            if (result.authenticated === false) evaluation = { allowed: false, status: "signed_out" };
-            else if (result.requiresEpicReauthorization) evaluation = { allowed: false, status: "provider_reauthorization_required", requiredProvider: "epic" };
-            else if (result.requiresEpicLogin) evaluation = { allowed: false, status: "provider_required", requiredProvider: "epic" };
-            else if (!response.ok || result.rocketLeagueAccess !== true) evaluation = { allowed: false, status: "rl_registration_required" };
-        } catch {
-            evaluation = { allowed: false, status: "unavailable", reason: "Rocket League authorization is unavailable. Please retry." };
+            const response =
+                await fetch(
+                    ROCKET_LEAGUE_SESSION_URL,
+                    {
+                        method:
+                            "GET",
+
+                        credentials:
+                            "same-origin",
+
+                        cache:
+                            "no-store",
+
+                        headers: {
+                            "Accept":
+                                "application/json"
+                        }
+                    }
+                );
+
+            let result;
+
+            try {
+                result =
+                    await response.json();
+            }
+            catch {
+                throw new Error(
+                    "Rocket League authorization returned an invalid response."
+                );
+            }
+
+            if (
+                response.status >=
+                    500
+                || result?.available ===
+                    false
+                || result?.profileError
+            ) {
+                throw new Error(
+                    "Rocket League authorization is unavailable."
+                );
+            }
+
+            if (
+                result?.authenticated ===
+                false
+            ) {
+                evaluation = {
+                    allowed:
+                        false,
+
+                    status:
+                        "signed_out"
+                };
+            }
+            else if (
+                result
+                    ?.requiresEpicReauthorization
+            ) {
+                evaluation = {
+                    allowed:
+                        false,
+
+                    status:
+                        "provider_reauthorization_required",
+
+                    requiredProvider:
+                        "epic"
+                };
+            }
+            else if (
+                result?.requiresEpicLogin
+            ) {
+                evaluation = {
+                    allowed:
+                        false,
+
+                    status:
+                        "provider_required",
+
+                    requiredProvider:
+                        "epic"
+                };
+            }
+            else if (
+                !response.ok
+                || result
+                    ?.rocketLeagueAccess !==
+                    true
+            ) {
+                evaluation = {
+                    allowed:
+                        false,
+
+                    status:
+                        "rl_registration_required"
+                };
+            }
+        }
+        catch {
+            evaluation = {
+                allowed:
+                    false,
+
+                status:
+                    "unavailable",
+
+                reason:
+                    "Rocket League authorization is unavailable. Please retry."
+            };
         }
     }
-    return { state, evaluation };
+
+    return {
+        state,
+        evaluation
+    };
 }
 
 /* =========================================================
@@ -1535,7 +2442,7 @@ export function subscribeToAuthState(
 ) {
     if (
         typeof listener !==
-        "function"
+            "function"
     ) {
         return () => {};
     }
@@ -1564,19 +2471,13 @@ export function subscribeToAuthState(
 /* =========================================================
 NOTIFY AUTH CHANGED
 
-Use after a successful operation that changes authentication
-or account identity state when the caller wants the shared
-state refreshed immediately.
+A forced refresh now refreshes BOTH:
 
-Examples:
-    login completion
-    provider link
-    provider unlink
-    profile/account mutation
+    global BPD session
+    Admin authorization
 
-This function does not emit a separate command event.
-refreshAuthState() updates the canonical state and then emits
-the normal bpd:auth-state-changed state event.
+Therefore login/provider changes automatically re-evaluate
+current Discord-backed Admin access.
 ========================================================= */
 
 export async function notifyAuthChanged() {

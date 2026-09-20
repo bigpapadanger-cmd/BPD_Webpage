@@ -261,6 +261,10 @@ function createDiscordAuthorizationContext(
                 member.communicationDisabledUntil
                 ?? null,
 
+            /* =============================================
+            STAFF AUTHORIZATION ROLES
+            ============================================= */
+
             isAdmin:
                 member.isAdmin ===
                 true,
@@ -275,11 +279,39 @@ function createDiscordAuthorizationContext(
 
             isStaff:
                 member.isStaff ===
-                true
+                true,
+
+            /* =============================================
+            RESPONSIBILITY ROLES
+            ============================================= */
+
+            isOwner:
+                member.isOwner ===
+                true,
+
+            isDatabase:
+                member.isDatabase ===
+                true,
+
+            isSecurity:
+                member.isSecurity ===
+                true,
+
+            isUi:
+                member.isUi ===
+                true,
+
+            responsibilityRoles:
+                Array.isArray(
+                    member.responsibilityRoles
+                )
+                    ? [
+                        ...member.responsibilityRoles
+                    ]
+                    : []
         }
     };
 }
-
 /* =========================================================
 ROLE REQUIREMENTS
 ========================================================= */

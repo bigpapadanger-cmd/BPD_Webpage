@@ -35,6 +35,9 @@ CONSTANTS
 
 const TASK_RPC_NAMES =
     Object.freeze({
+        ROLE_SYNC:
+            "admin_sync_discord_account_roles",
+
         CREATE:
             "admin_create_task",
 

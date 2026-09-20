@@ -17,10 +17,14 @@ Description:
     - Uses the configured BPD authorization guild and bot
       credentials.
     - Returns the member's current Discord role IDs.
-    - Evaluates configured BPD staff role IDs.
+    - Evaluates configured BPD staff authorization roles.
+    - Evaluates configured BPD responsibility roles.
+    - Returns normalized responsibility-role names for
+      synchronization with identity.account_roles.
     - Provides reusable helpers for authorization throughout
       the website.
     - Does not perform Discord login or account linking.
+    - Does not write responsibility roles to Supabase.
     - Does not use the installable MatchBot.
     - Does not trust Discord user IDs supplied by clients.
 
@@ -28,10 +32,29 @@ Required Environment:
     DISCORD_AUTHZ_GUILD_ID
     DISCORD_AUTHZ_BOT_TOKEN
 
-Configured Staff Roles:
+Configured Staff Authorization Roles:
     DISCORD_AUTHZ_ADMIN_ROLE_ID
     DISCORD_AUTHZ_MOD_ROLE_ID
     DISCORD_AUTHZ_LEAGUE_STAFF_ROLE_ID
+
+Configured Responsibility Roles:
+    DISCORD_AUTHZ_OWNER_ROLE_ID
+    DISCORD_AUTHZ_DATABASE_ROLE_ID
+    DISCORD_AUTHZ_SECURITY_ROLE_ID
+    DISCORD_AUTHZ_UI_ROLE_ID
+
+Responsibility Mapping:
+    Discord Owner
+        -> owner
+
+    Discord Database
+        -> database
+
+    Discord Security
+        -> security
+
+    Discord UI
+        -> ui
 
 Architecture:
     Canonical Discord authentication:
@@ -51,6 +74,10 @@ Architecture:
         fixed BPD Gaming Network guild
             ↓
         current Discord role IDs
+            ↓
+        staff authorization state
+            +
+        responsibility role state
 
     MatchBot:
         Completely separate.
@@ -66,6 +93,8 @@ Security:
     - Role IDs, not role names, are authoritative.
     - Authorization bot credentials are server-only.
     - MatchBot credentials are never used here.
+    - Responsibility roles returned by this service are
+      derived exclusively from live Discord guild roles.
 ========================================================= */
 
 /* =========================================================
@@ -77,6 +106,21 @@ const DISCORD_API_BASE_URL =
 
 const DISCORD_REQUEST_TIMEOUT_MS =
     8000;
+
+const RESPONSIBILITY_ROLES =
+    Object.freeze({
+        OWNER:
+            "owner",
+
+        DATABASE:
+            "database",
+
+        SECURITY:
+            "security",
+
+        UI:
+            "ui"
+    });
 
 /* =========================================================
 ERROR
@@ -222,6 +266,26 @@ function getDiscordAuthorizationConfiguration(
         leagueStaffRoleId:
             normalizeString(
                 env?.DISCORD_AUTHZ_LEAGUE_STAFF_ROLE_ID
+            ),
+
+        ownerRoleId:
+            normalizeString(
+                env?.DISCORD_AUTHZ_OWNER_ROLE_ID
+            ),
+
+        databaseRoleId:
+            normalizeString(
+                env?.DISCORD_AUTHZ_DATABASE_ROLE_ID
+            ),
+
+        securityRoleId:
+            normalizeString(
+                env?.DISCORD_AUTHZ_SECURITY_ROLE_ID
+            ),
+
+        uiRoleId:
+            normalizeString(
+                env?.DISCORD_AUTHZ_UI_ROLE_ID
             )
     };
 }
@@ -544,6 +608,10 @@ export function hasDiscordRole(
 
 /* =========================================================
 STAFF ROLE STATE
+
+These roles determine operation-level staff authorization.
+
+They do not automatically create responsibility roles.
 ========================================================= */
 
 export function evaluateDiscordStaffRoles(
@@ -595,6 +663,114 @@ export function evaluateDiscordStaffRoles(
 }
 
 /* =========================================================
+RESPONSIBILITY ROLE STATE
+
+These roles map directly to identity.account_roles.
+
+Discord role:
+    Owner       -> owner
+    Database    -> database
+    Security    -> security
+    UI          -> ui
+
+A Webpage Administrator role does NOT imply owner.
+========================================================= */
+
+export function evaluateDiscordResponsibilityRoles(
+    roleIds,
+    env
+) {
+    const normalizedRoles =
+        normalizeRoleIds(
+            roleIds
+        );
+
+    const {
+        ownerRoleId,
+        databaseRoleId,
+        securityRoleId,
+        uiRoleId
+    } =
+        getDiscordAuthorizationConfiguration(
+            env
+        );
+
+    if ([ownerRoleId, databaseRoleId, securityRoleId, uiRoleId].some(id => !/^\d{17,20}$/.test(id))) {
+        throw new DiscordGuildRolesError("Discord responsibility-role configuration is incomplete.", {
+            code: "DISCORD_RESPONSIBILITY_CONFIG_INVALID", status: 503, unavailable: true
+        });
+    }
+
+    const isOwner =
+        hasDiscordRole(
+            normalizedRoles,
+            ownerRoleId
+        );
+
+    const isDatabase =
+        hasDiscordRole(
+            normalizedRoles,
+            databaseRoleId
+        );
+
+    const isSecurity =
+        hasDiscordRole(
+            normalizedRoles,
+            securityRoleId
+        );
+
+    const isUi =
+        hasDiscordRole(
+            normalizedRoles,
+            uiRoleId
+        );
+
+    const responsibilityRoles =
+        [];
+
+    if (
+        isOwner
+    ) {
+        responsibilityRoles.push(
+            RESPONSIBILITY_ROLES.OWNER
+        );
+    }
+
+    if (
+        isDatabase
+    ) {
+        responsibilityRoles.push(
+            RESPONSIBILITY_ROLES.DATABASE
+        );
+    }
+
+    if (
+        isSecurity
+    ) {
+        responsibilityRoles.push(
+            RESPONSIBILITY_ROLES.SECURITY
+        );
+    }
+
+    if (
+        isUi
+    ) {
+        responsibilityRoles.push(
+            RESPONSIBILITY_ROLES.UI
+        );
+    }
+
+    return {
+        isOwner,
+        isDatabase,
+        isSecurity,
+        isUi,
+
+        responsibilityRoles
+    };
+}
+
+/* =========================================================
 GET GUILD MEMBER
 
 Returns normalized BPD authorization-guild member data.
@@ -619,9 +795,28 @@ export async function getDiscordGuildMember(
             env
         );
 
+    if (!Array.isArray(member.roles) || member.roles.some(role => typeof role !== "string" || !role.trim())
+        || normalizeString(member.user?.id) !== userId) {
+        throw new DiscordGuildRolesError("Discord returned an invalid guild member response.", {
+            code: "DISCORD_MEMBER_RESPONSE_INVALID", status: 503, unavailable: true
+        });
+    }
+
     const roleIds =
         normalizeRoleIds(
             member.roles
+        );
+
+    const staffRoles =
+        evaluateDiscordStaffRoles(
+            roleIds,
+            env
+        );
+
+    const responsibilityRoles =
+        evaluateDiscordResponsibilityRoles(
+            roleIds,
+            env
         );
 
     return {
@@ -654,10 +849,9 @@ export async function getDiscordGuildMember(
             )
             || null,
 
-        ...evaluateDiscordStaffRoles(
-            roleIds,
-            env
-        )
+        ...staffRoles,
+
+        ...responsibilityRoles
     };
 }
 
@@ -695,7 +889,23 @@ export async function getDiscordGuildRoles(
             member.isLeagueStaff,
 
         isStaff:
-            member.isStaff
+            member.isStaff,
+
+        isOwner:
+            member.isOwner,
+
+        isDatabase:
+            member.isDatabase,
+
+        isSecurity:
+            member.isSecurity,
+
+        isUi:
+            member.isUi,
+
+        responsibilityRoles: [
+            ...member.responsibilityRoles
+        ]
     };
 }
 
