@@ -1,3 +1,7 @@
+import { subscribeToAuthState, hasAuthorizedProvider } from "/Framework/Auth/auth.js";
+let authSubscriptionStarted = false;
+let accessCheckVersion = 0;
+
 "use strict";
 
 /* =========================================================
@@ -42,7 +46,12 @@ function setAdminNavigationVisible(
 INITIALIZE ADMIN NAVIGATION
 ========================================================= */
 
-export async function setupAdminNavigation() {
+export async function setupAdminNavigation(state) {
+    const checkVersion = ++accessCheckVersion;
+    if (!authSubscriptionStarted) {
+        authSubscriptionStarted = true;
+        subscribeToAuthState(nextState => { void setupAdminNavigation(nextState); });
+    }
     const adminNavItem =
         document.getElementById(
             "adminNavItem"
@@ -64,6 +73,9 @@ export async function setupAdminNavigation() {
         adminNavItem,
         false
     );
+
+    if (state && (state.available !== true || state.authenticated !== true
+        || state.active !== true || !hasAuthorizedProvider("discord", state))) return;
 
     try {
         const response =
@@ -107,6 +119,8 @@ export async function setupAdminNavigation() {
         ) {
             return;
         }
+
+        if (checkVersion !== accessCheckVersion || document.getElementById("adminNavItem") !== adminNavItem) return;
 
         setAdminNavigationVisible(
             adminNavItem,

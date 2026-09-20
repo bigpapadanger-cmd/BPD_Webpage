@@ -614,6 +614,19 @@ function handleTurnstileSuccess(
     );
 
     updateProviderButtonState();
+    continueRequestedEpicLogin();
+}
+
+function continueRequestedEpicLogin() {
+    if (!sessionReady || !captchaToken || redirecting || callbackErrorMessage || !getElements().page) return;
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("provider") !== "epic") return;
+    // Consume the request before starting so verification retries cannot loop.
+    url.searchParams.delete("provider");
+    window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+    redirecting = true;
+    setProviderButtonsEnabled(false);
+    void startProviderLogin("epic");
 }
 
 function handleTurnstileExpired() {
@@ -1201,6 +1214,7 @@ async function applyAuthState(
         await initializeTurnstile();
 
         updateProviderButtonState();
+        continueRequestedEpicLogin();
     }
     catch (
         error

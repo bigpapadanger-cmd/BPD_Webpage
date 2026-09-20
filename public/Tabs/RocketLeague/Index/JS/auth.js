@@ -590,7 +590,7 @@ function applyRocketLeagueAuthView(
                 buttonText
             ) {
                 buttonText.textContent =
-                    "Login with Epic for Full Access";
+                    authenticated ? "Connect Epic for Full Access" : "Login with Epic for Full Access";
             }
 
             accessButton.setAttribute(

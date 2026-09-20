@@ -1002,3 +1002,7 @@ ACCESSIBILITY
             none;
     }
 }
+/* Authorization-hidden links must override the normal flex layout. */
+.site-sidebar .nav-item[hidden] {
+    display: none !important;
+}

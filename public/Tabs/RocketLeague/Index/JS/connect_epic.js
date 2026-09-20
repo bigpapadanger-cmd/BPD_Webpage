@@ -46,10 +46,12 @@ Important:
 ========================================================= */
 
 import {
+    getAuthState,
     invalidateAuthState
 } from "/Framework/Auth/auth.js";
 
 import {
+    BPD_AUTH_LINK_URL,
     BPD_AUTH_LOGOUT_URL
 } from "/scripts/apiRoutes.js";
 
@@ -98,26 +100,37 @@ function navigateTo(
 EPIC LOGIN
 ========================================================= */
 
-function handleEpicLogin() {
-    const loginUrl =
-        new URL(
-            LOGIN_PAGE_URL,
-            window.location.origin
-        );
-
-    loginUrl.searchParams.set(
-        "returnTo",
-        ROCKET_LEAGUE_PAGE_URL
-    );
-
-    window.location.assign(
-        loginUrl.href
-    );
+let epicStartPending = false;
+async function handleEpicLogin(event) {
+    const button = event?.currentTarget;
+    if (epicStartPending) return;
+    epicStartPending = true;
+    if (button) button.disabled = true;
+    try {
+        const state = await getAuthState();
+        if (!state || state.available !== true) throw new Error("Authentication is temporarily unavailable. Please try again.");
+        if (state.authenticated === true) {
+            if (state.active !== true) {
+                window.location.assign("/Account");
+                return;
+            }
+            const url = new URL(BPD_AUTH_LINK_URL, window.location.origin);
+            url.searchParams.set("provider", "epic");
+            url.searchParams.set("returnTo", ROCKET_LEAGUE_PAGE_URL);
+            window.location.assign(url.href);
+            return;
+        }
+        const url = new URL(LOGIN_PAGE_URL, window.location.origin);
+        url.searchParams.set("provider", "epic");
+        url.searchParams.set("returnTo", ROCKET_LEAGUE_PAGE_URL);
+        window.location.assign(url.href);
+    } catch (error) {
+        window.alert(error?.message || "Epic sign-in could not be started. Please try again.");
+    } finally {
+        epicStartPending = false;
+        if (button) button.disabled = false;
+    }
 }
-
-/* =========================================================
-ROCKET LEAGUE PROFILE
-========================================================= */
 
 function handleCreateProfile() {
     navigateTo(
@@ -140,7 +153,7 @@ function handleMainRocketLeagueAction(
         || "epic-login";
 
     if (action === "epic-reauthorize") {
-        navigateTo("/Account?reauthorize=epic");
+        void handleEpicLogin(event);
         return;
     }
     if (
@@ -151,7 +164,7 @@ function handleMainRocketLeagueAction(
         return;
     }
 
-    handleEpicLogin();
+    void handleEpicLogin(event);
 }
 
 /* =========================================================
