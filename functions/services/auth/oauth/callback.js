@@ -1,3 +1,4 @@
+import { completeOAuthCallback } from "./callback_response.js";
 "use strict";
 
 /* =========================================================
@@ -1346,7 +1347,7 @@ async function recordCompletedAuthentication(
     }
 ) {
     try {
-        return await completeAuthentication(
+        const result = await completeAuthentication(
             env,
             {
                 accountId,
@@ -1356,6 +1357,19 @@ async function recordCompletedAuthentication(
                     true
             }
         );
+
+        if (recordLogin === true) {
+            try {
+                await handleAccountLastLogin(env, accountId);
+            } catch (error) {
+                // Activity/MMR availability must not undo completed authentication.
+                console.warn("OAUTH CALLBACK: Post-login activity unavailable.", {
+                    provider,
+                    code: error?.code || "ACCOUNT_ACTIVITY_UNAVAILABLE"
+                });
+            }
+        }
+        return result;
     }
     catch (
         error
@@ -1420,7 +1434,7 @@ function getAuthenticationStateErrorResponse(
 MAIN CALLBACK
 ========================================================= */
 
-export async function handleOAuthCallback(
+async function executeCallback(
     request,
     env
 ) {
@@ -2350,4 +2364,7 @@ export async function handleOAuthCallback(
             500
         );
     }
+}
+export async function handleOAuthCallback(request, env) {
+    return completeOAuthCallback(request, env, () => executeCallback(request, env));
 }

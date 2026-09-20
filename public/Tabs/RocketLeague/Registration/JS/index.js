@@ -78,6 +78,14 @@ CONFIGURATION
 const REGISTRATION_DRAFT_KEY =
     "bpdRocketLeagueRegistrationDraft";
 
+let registrationDraftAccountId = "";
+
+function getRegistrationDraftKey() {
+    return registrationDraftAccountId
+        ? `${REGISTRATION_DRAFT_KEY}:${registrationDraftAccountId}`
+        : null;
+}
+
 const REGISTRATION_CONFIG =
     Object.freeze({
         availability: {
@@ -2225,6 +2233,9 @@ async function getAuthenticatedEpicUser() {
     const authState =
         await getAuthState();
 
+    registrationDraftAccountId = authState?.authenticated === true
+        ? normalizeString(authState.userId) : "";
+
     if (
         authState?.available !==
             true
@@ -2389,10 +2400,12 @@ LOCAL DRAFT
 ========================================================= */
 
 function readRegistrationDraft() {
+    const draftKey = getRegistrationDraftKey();
+    if (!draftKey) return null;
     try {
         const raw =
             localStorage.getItem(
-                REGISTRATION_DRAFT_KEY
+                draftKey
             );
 
         if (
@@ -2425,6 +2438,8 @@ function readRegistrationDraft() {
 function saveRegistrationDraft(
     payload
 ) {
+    const draftKey = getRegistrationDraftKey();
+    if (!draftKey) return;
     /*
      * Consent and location opt-in are deliberately excluded.
      *
@@ -2486,7 +2501,7 @@ function saveRegistrationDraft(
 
     try {
         localStorage.setItem(
-            REGISTRATION_DRAFT_KEY,
+            draftKey,
             JSON.stringify(
                 draft
             )
@@ -2503,9 +2518,11 @@ function saveRegistrationDraft(
 }
 
 function clearRegistrationDraft() {
+    const draftKey = getRegistrationDraftKey();
+    if (!draftKey) return;
     try {
         localStorage.removeItem(
-            REGISTRATION_DRAFT_KEY
+            draftKey
         );
     }
     catch (
@@ -3081,6 +3098,8 @@ export async function initializePage() {
     form.dataset.initialized =
         "true";
 
+    registrationDraftAccountId = "";
+
     renderAvailabilityRows();
 
     setInputValue(
@@ -3331,21 +3350,7 @@ export async function initializePage() {
             profileResult.warning
         );
 
-        const draft =
-            readRegistrationDraft();
 
-        if (
-            draft
-        ) {
-            populateDraft(
-                draft
-            );
-
-            showMessage(
-                "Saved profile data is unavailable, so your locally saved registration draft has been restored.",
-                "warning"
-            );
-        }
     }
     else {
         setBackendWarning(
@@ -3353,7 +3358,17 @@ export async function initializePage() {
         );
     }
 
+    restoreRegistrationDraft(profileResult);
+
     applyDiscordNotificationState();
     updateDirectContactWarning();
     updateNotificationState();
+}
+function restoreRegistrationDraft(profileResult) {
+    if (profileResult?.profile?.profileComplete === true) return false;
+    const draft = readRegistrationDraft();
+    if (!draft) return false;
+    populateDraft(draft);
+    showMessage("Your locally saved registration draft has been restored. Please review it and confirm the required consent fields.", "info");
+    return true;
 }

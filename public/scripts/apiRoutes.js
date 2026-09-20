@@ -192,3 +192,4 @@ CURSEFORGE
 
 export const CF_MOD_LIST_API =
     "/api/curseforge/mods";
+export const BPD_AUTH_ACCOUNT_DEACTIVATE_URL = "/api/auth/account/deactivate";

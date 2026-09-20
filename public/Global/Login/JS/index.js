@@ -1,3 +1,4 @@
+import { consumeOAuthError } from "/Framework/Auth/oauthErrors.js";
 "use strict";
 
 /* =========================================================
@@ -118,8 +119,8 @@ const PROVIDER_CONFIG =
 STATE
 ========================================================= */
 
-let initialized =
-    false;
+let initializedPage = null;
+let callbackErrorMessage = "";
 
 let redirecting =
     false;
@@ -213,6 +214,10 @@ STATUS
 ========================================================= */
 
 function clearStatus() {
+    if (callbackErrorMessage) {
+        showOAuthCallbackError();
+        return;
+    }
     const {
         status
     } =
@@ -280,6 +285,7 @@ function getReturnTo() {
         || !requested.startsWith(
             "/"
         )
+        || /[\\\u0000-\u0020\u007f]/u.test(requested)
         || requested.startsWith(
             "//"
         )
@@ -700,7 +706,7 @@ async function initializeTurnstile() {
                     "auto",
 
                 size:
-                    "normal",
+                    turnstile.clientWidth < 300 ? "compact" : "normal",
 
                 appearance:
                     "always",
@@ -781,6 +787,7 @@ START PROVIDER LOGIN
 async function startProviderLogin(
     providerName
 ) {
+    callbackErrorMessage = "";
     const provider =
         normalizeProvider(
             providerName
@@ -1034,55 +1041,9 @@ OAUTH CALLBACK ERROR
 ========================================================= */
 
 function showOAuthCallbackError() {
-    const url =
-        new URL(
-            window.location.href
-        );
-
-    const error =
-        normalizeString(
-            url.searchParams.get(
-                "error"
-            )
-        );
-
-    if (
-        !error
-    ) {
-        return;
+    if (callbackErrorMessage && getElements().page) {
+        showStatus(callbackErrorMessage, "error");
     }
-
-    let message =
-        "Sign in could not be completed. Please try again.";
-
-    if (
-        error ===
-        "oauth_callback_failed"
-    ) {
-        message =
-            "Authentication could not be completed. Please try signing in again.";
-    }
-
-    showStatus(
-        message,
-        "error"
-    );
-
-    url.searchParams.delete(
-        "error"
-    );
-
-    url.searchParams.delete(
-        "debugId"
-    );
-
-    window.history.replaceState(
-        {},
-        "",
-        url.pathname
-        + url.search
-        + url.hash
-    );
 }
 
 /* =========================================================
@@ -1151,6 +1112,7 @@ APPLY AUTH STATE
 async function applyAuthState(
     authState
 ) {
+    if (!getElements().page) return;
     if (
         redirecting
     ) {
@@ -1399,6 +1361,7 @@ NETWORK STATUS
 function handleNetworkStatus(
     event
 ) {
+    if (!getElements().page) return;
     const online =
         event?.detail?.online;
 
@@ -1487,21 +1450,21 @@ INITIALIZATION
 ========================================================= */
 
 export async function initializePage() {
-    showOAuthCallbackError();
-
-    if (
-        initialized
-    ) {
-        await loadLoginState();
-        return;
+    const page = getElements().page;
+    if (!page) return;
+    callbackErrorMessage = consumeOAuthError() || (page === initializedPage ? callbackErrorMessage : "");
+    if (page !== initializedPage) {
+        if (turnstileWidgetId !== null && window.turnstile?.remove) {
+            window.turnstile.remove(turnstileWidgetId);
+        }
+        turnstileWidgetId = null;
+        captchaToken = "";
+        redirecting = false;
+        initializedPage = page;
+        initializeProviderIcons();
+        registerProviderEvents();
+        if (!unsubscribeAuthState) registerGlobalEvents();
     }
-
-    initializeProviderIcons();
-    registerProviderEvents();
-    registerGlobalEvents();
-
-    initialized =
-        true;
-
     await loadLoginState();
+    showOAuthCallbackError();
 }

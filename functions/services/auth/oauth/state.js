@@ -241,6 +241,7 @@ export function normalizeReturnTo(
         || !returnTo.startsWith(
             "/"
         )
+        || /[\\\u0000-\u0020\u007f]/u.test(returnTo)
         || returnTo.startsWith(
             "//"
         )

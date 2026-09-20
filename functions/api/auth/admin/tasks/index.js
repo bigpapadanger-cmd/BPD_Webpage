@@ -212,20 +212,18 @@ function getListInput(
     copyQueryParameter(
         filters,
         searchParams,
-        "timeline"
+        "timeline_days"
     );
 
     copyQueryParameter(
         filters,
         searchParams,
-        "assignedRole"
+        "responsibleRole"
     );
 
-    copyQueryParameter(
-        filters,
-        searchParams,
-        "assignedAccountId"
-    );
+    for (const obsolete of ["assignedRole", "assignedAccountId", "timeline", "due_at", "description"]) {
+        if (searchParams.has(obsolete)) throw createRequestError("TASK_FILTERS_UNSUPPORTED", "Unsupported task filter.");
+    }
 
     copyQueryParameter(
         filters,
@@ -502,7 +500,7 @@ Expected Body:
         "title": "...",
         "description": "...",
         "priority": "...",
-        "timeline": "...",
+        "timeline_days": "...",
         "assigned_role": "...",
         "assigned_account_id": "...",
         "due_at": "..."

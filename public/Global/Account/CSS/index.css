@@ -1241,3 +1241,9 @@ REDUCED MOTION
             none;
     }
 }
+/* Keep common status changes from moving the form below them. */
+.account-feedback {
+    min-block-size: 5rem;
+    min-inline-size: 0;
+    overflow-wrap: anywhere;
+}

@@ -9,3 +9,10 @@ secrets.json
 **/node_modules
 **/__pycache__
 **/Notes
+
+# Test and SQL support artifacts are not website assets
+**/*.test.mjs
+**/taskboard_sql_validation.mjs
+**/taskboard_schema_repair.sql
+**/taskboard_verify.sql
+**/taskboard_schema.sql

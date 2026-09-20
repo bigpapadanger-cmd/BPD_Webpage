@@ -1,3 +1,4 @@
+import { completeOAuthCallback } from "../../oauth/callback_response.js";
 "use strict";
 
 /* =========================================================
@@ -251,6 +252,7 @@ function normalizeReturnTo(
         || !returnTo.startsWith(
             "/"
         )
+        || /[\\\u0000-\u0020\u007f]/u.test(returnTo)
         || returnTo.startsWith(
             "//"
         )
@@ -1502,7 +1504,7 @@ function getOAuthClearCookies(
 MAIN EPIC CALLBACK
 ========================================================= */
 
-export async function handleEpicCallback(
+async function executeCallback(
     request,
     env
 ) {
@@ -2198,4 +2200,7 @@ export async function handleEpicCallback(
                 : 500
         );
     }
+}
+export async function handleEpicCallback(request, env) {
+    return completeOAuthCallback(request, env, () => executeCallback(request, env));
 }

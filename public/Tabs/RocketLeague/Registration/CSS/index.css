@@ -962,3 +962,9 @@
         scroll-behavior: auto !important;
     }
 }
+/* Keep common status changes from moving the form below them. */
+.registration-feedback {
+    min-block-size: 5rem;
+    min-inline-size: 0;
+    overflow-wrap: anywhere;
+}

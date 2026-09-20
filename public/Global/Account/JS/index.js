@@ -1,3 +1,4 @@
+import { consumeOAuthError } from "/Framework/Auth/oauthErrors.js";
 "use strict";
 
 /* =========================================================
@@ -66,6 +67,7 @@ import {
 import {
     BPD_AUTH_ACCOUNT_PROFILE_URL,
     BPD_AUTH_ACCOUNT_URL,
+    BPD_AUTH_ACCOUNT_DEACTIVATE_URL,
     BPD_AUTH_LINK_URL,
     BPD_AUTH_UNLINK_URL
 } from "/scripts/apiRoutes.js";
@@ -83,6 +85,13 @@ const LOGIN_URL =
 
 const ACCOUNT_RETURN_URL =
     "/Account";
+
+// Enable only after the corresponding server handlers and database contracts
+// exist. These UI flags never replace server authorization.
+const ACCOUNT_CAPABILITIES = Object.freeze({
+    updateProfile: true,
+    deleteAccount: true
+});
 
 const FALLBACK_IMAGE_URL =
     "/images/bad_image/fallback.png";
@@ -118,6 +127,7 @@ const PROVIDER_CONFIG =
         },
 
         steam: {
+            authorizationAvailable: false,
             label:
                 "Steam",
 
@@ -136,8 +146,8 @@ let currentAuthState =
 let originalDisplayName =
     "";
 
-let initialized =
-    false;
+let initializedPage = null;
+let callbackErrorMessage = "";
 
 let savingProfile =
     false;
@@ -218,6 +228,8 @@ function getElements() {
                 "accountRoleValue"
             ),
 
+        deactivateAccountButton: document.getElementById("accountDeactivateButton"),
+
         deleteAccountButton:
             document.getElementById(
                 "accountDeleteButton"
@@ -252,6 +264,10 @@ STATUS MESSAGE
 ========================================================= */
 
 function clearStatusMessage() {
+    if (callbackErrorMessage) {
+        showStatusMessage(callbackErrorMessage, "error");
+        return;
+    }
     const {
         status
     } =
@@ -626,6 +642,17 @@ function setProviderStatus(
             ? "true"
             : "false";
 
+    if (PROVIDER_CONFIG[normalizedProvider]?.authorizationAvailable === false) {
+        row.dataset.providerState = connected ? "verification-unavailable" : "unavailable";
+        status.textContent = connected
+            ? "Connected — Steam verification is not available yet"
+            : "Steam connection is not available yet";
+        action.textContent = connected ? "Disconnect" : "Unavailable";
+        action.dataset.action = connected ? "disconnect" : "unavailable";
+        action.disabled = !connected;
+        return;
+    }
+
     const providerContext =
         getProviderContext(
             authState,
@@ -749,6 +776,8 @@ DISABLE ACCOUNT CONTROLS
 ========================================================= */
 
 function disableAccountControls() {
+    const deactivate = getElements().deactivateAccountButton;
+    if (deactivate) deactivate.disabled = true;
     const {
         displayName,
         saveProfileButton,
@@ -868,7 +897,7 @@ function renderProfile(
         originalDisplayName;
 
     displayName.disabled =
-        false;
+        !ACCOUNT_CAPABILITIES.updateProfile;
 
     saveProfileButton.disabled =
         true;
@@ -892,8 +921,12 @@ function renderDangerZone(
         return;
     }
 
+    const deactivate = getElements().deactivateAccountButton;
+    if (deactivate) deactivate.disabled = !enabled || deletingAccount;
+
     deleteAccountButton.disabled =
-        !enabled
+        !ACCOUNT_CAPABILITIES.deleteAccount
+        || !enabled
         || deletingAccount;
 }
 
@@ -963,7 +996,8 @@ function updateProfileSaveState() {
     }
 
     if (
-        savingProfile
+        !ACCOUNT_CAPABILITIES.updateProfile
+        || savingProfile
         || currentAuthState?.authenticated !==
             true
         || currentAuthState?.active !==
@@ -1123,6 +1157,7 @@ APPLY AUTH STATE
 function applyAuthState(
     authState
 ) {
+    if (!getElements().page) return;
     if (
         redirectingToLogin
     ) {
@@ -1314,7 +1349,10 @@ PROFILE SUBMIT
 async function handleProfileSubmit(
     event
 ) {
+    callbackErrorMessage = "";
     event.preventDefault();
+
+    if (!ACCOUNT_CAPABILITIES.updateProfile) return;
 
     const {
         displayName,
@@ -1722,6 +1760,7 @@ PROVIDER ACTION
 async function handleProviderAction(
     event
 ) {
+    callbackErrorMessage = "";
     if (
         currentAuthState?.authenticated !==
             true
@@ -1833,8 +1872,7 @@ async function handleProviderAction(
     clearStatusMessage();
 
     try {
-        const result =
-            await unlinkProvider(
+        await unlinkProvider(
                 providerName
             );
 
@@ -1845,11 +1883,8 @@ async function handleProviderAction(
             });
 
         if (
-            result?.sessionReset ===
-                true
-            || refreshedState
-                ?.authenticated !==
-                true
+            refreshedState?.available === true
+            && refreshedState.authenticated === false
         ) {
             redirectToLogin();
             return;
@@ -1858,6 +1893,8 @@ async function handleProviderAction(
         applyAuthState(
             refreshedState
         );
+
+        if (refreshedState?.available !== true) return;
 
         showStatusMessage(
             `${config?.label || providerName} disconnected successfully.`,
@@ -1902,53 +1939,39 @@ DELETE ACCOUNT REQUEST
 ========================================================= */
 
 async function deleteAccount() {
-    const response =
-        await apiFetch(
-            BPD_AUTH_ACCOUNT_URL,
-            {
-                method:
-                    "DELETE",
+    return removeAccount(BPD_AUTH_ACCOUNT_URL, "DELETE", "DELETE");
+}
 
-                credentials:
-                    "same-origin",
-
-                cache:
-                    "no-store",
-
-                headers: {
-                    "Accept":
-                        "application/json"
-                }
-            }
-        );
-
-    let body =
-        null;
-
-    try {
-        body =
-            await response.json();
+async function removeAccount(url, method, confirmation) {
+    const response = await apiFetch(url, {
+        method, credentials: "same-origin", cache: "no-store",
+        headers: { Accept: "application/json", "Content-Type": "application/json" },
+        body: JSON.stringify({ confirmation })
+    });
+    let body = null;
+    try { body = await response.json(); } catch { /* Fail closed below. */ }
+    if (!response.ok || body?.success !== true) {
+        throw new Error(body?.message || "Account change failed. Please try again.");
     }
-    catch {
-        // Response body is optional.
-    }
-
-    if (
-        !response.ok
-    ) {
-        const message =
-            normalizeString(
-                body?.message
-                || body?.error
-            )
-            || `Account deletion failed: ${response.status}`;
-
-        throw new Error(
-            message
-        );
-    }
-
     return body;
+}
+
+async function handleDeactivateAccount() {
+    if (deletingAccount || currentAuthState?.authenticated !== true || currentAuthState?.active !== true) return;
+    if (!window.confirm("Deactivate your BPD account? Access will be disabled. This action is reversible; your provider links and history will be retained.")) return;
+    callbackErrorMessage = "";
+    deletingAccount = true;
+    renderDangerZone(false);
+    clearStatusMessage();
+    try {
+        await removeAccount(BPD_AUTH_ACCOUNT_DEACTIVATE_URL, "POST", "DEACTIVATE");
+        invalidateAuthState();
+        window.location.assign("/");
+    } catch (error) {
+        showStatusMessage(error?.message || "Account deactivation failed.", "error");
+        deletingAccount = false;
+        renderDangerZone(currentAuthState?.authenticated === true && currentAuthState?.active === true);
+    }
 }
 
 /* =========================================================
@@ -1993,6 +2016,8 @@ DELETE ACCOUNT ACTION
 ========================================================= */
 
 async function handleDeleteAccount() {
+    if (!ACCOUNT_CAPABILITIES.deleteAccount) return;
+    callbackErrorMessage = "";
     const {
         deleteAccountButton
     } =
@@ -2028,6 +2053,7 @@ async function handleDeleteAccount() {
 
     deleteAccountButton.textContent =
         "Deleting...";
+    renderDangerZone(false);
 
     clearStatusMessage();
 
@@ -2123,6 +2149,7 @@ REGISTER DANGER ZONE EVENTS
 ========================================================= */
 
 function registerDangerZoneEvents() {
+    getElements().deactivateAccountButton?.addEventListener("click", handleDeactivateAccount);
     const {
         deleteAccountButton
     } =
@@ -2153,6 +2180,7 @@ NETWORK STATE CHANGE
 function handleNetworkStatus(
     event
 ) {
+    if (!getElements().page) return;
     const online =
         event?.detail?.online;
 
@@ -2203,21 +2231,18 @@ INITIALIZATION
 ========================================================= */
 
 export async function initializePage() {
-    if (
-        initialized
-    ) {
-        await loadAccount();
-        return;
+    const page = getElements().page;
+    if (!page) return;
+    callbackErrorMessage = consumeOAuthError() || (page === initializedPage ? callbackErrorMessage : "");
+    if (page !== initializedPage) {
+        initializedPage = page;
+        redirectingToLogin = false;
+        initializeProviderIcons();
+        registerProfileEvents();
+        registerProviderEvents();
+        registerDangerZoneEvents();
+        if (!unsubscribeAuthState) registerGlobalEvents();
     }
-
-    initializeProviderIcons();
-    registerProfileEvents();
-    registerProviderEvents();
-    registerDangerZoneEvents();
-    registerGlobalEvents();
-
-    initialized =
-        true;
-
     await loadAccount();
+    if (callbackErrorMessage) showStatusMessage(callbackErrorMessage, "error");
 }

@@ -335,7 +335,7 @@ TURNSTILE
 
     width: 100%;
 
-    min-height: 65px;
+    min-height: 73px;
 
     margin:
         0
@@ -350,7 +350,7 @@ TURNSTILE
 }
 
 .login-turnstile:empty {
-    min-height: 65px;
+    min-height: 73px;
 }
 
 /* =========================================================
@@ -787,4 +787,18 @@ REDUCED MOTION
     .login-back-link {
         transition: none;
     }
+}
+/* Keep common status changes from moving the form below them. */
+.login-feedback {
+    min-block-size: 6rem;
+    min-inline-size: 0;
+    overflow-wrap: anywhere;
+}
+
+.login-page { align-items: flex-start; }
+.login-card { min-inline-size: 0; container-type: inline-size; }
+
+/* Reserve the compact verification footprint before the widget arrives. */
+@container (width < 300px) {
+    .login-turnstile, .login-turnstile:empty { min-height: 148px; }
 }

@@ -20,3 +20,7 @@ V12/
 *.backup.json
 *.bak
 *.backup
+
+# Local Taskboard SQL support and regression tests
+/functions/services/supabase/admin/tasks/sql/
+/workers/rl-presence-monitor/tests/

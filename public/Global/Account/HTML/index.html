@@ -47,6 +47,7 @@ Description:
         PAGE STATUS
         ================================================== -->
 
+        <div class="account-feedback">
         <div
             class="account-page__status"
             id="accountPageStatus"
@@ -54,6 +55,7 @@ Description:
             aria-live="polite"
             hidden
         >
+        </div>
         </div>
 
         <!-- =================================================
@@ -407,9 +409,25 @@ Description:
                     </h2>
 
                     <p class="account-card__description">
-                        Permanently delete your BPD Gaming Network
-                        account and associated account data.
+                        Deactivate your account, or choose permanent deletion.
                     </p>
+                </div>
+            </div>
+
+            <div class="account-danger">
+                <div class="account-danger__content">
+                    <div class="account-danger__details">
+                        <h3 class="account-danger__title">Deactivate Account</h3>
+                        <p class="account-danger__description">
+                            Disable account access while keeping your provider links and history.
+                            Deactivation can be reversed.
+                        </p>
+                    </div>
+                    <div class="account-danger__actions">
+                        <button class="account-button account-button--danger" id="accountDeactivateButton" type="button" disabled>
+                            Deactivate Account
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -435,7 +453,7 @@ Description:
                             type="button"
                             disabled
                         >
-                            Delete Account
+                            Permanently Delete Account
                         </button>
                     </div>
                 </div>

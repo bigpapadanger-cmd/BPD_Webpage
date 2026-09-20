@@ -365,6 +365,7 @@ function getTaskDomainErrorCode(
 
         "TASK_NOT_DELETED",
 
+        "TASK_INPUT_INVALID", "TASK_FIELDS_UNSUPPORTED", "TASK_PRIORITY_INVALID", "TASK_TIMELINE_INVALID", "TASK_ROLES_INVALID", "TASK_STATE_CONFLICT",
         "TASK_CODE_INVALID",
 
         "TASK_CHANGES_INVALID",
@@ -388,10 +389,7 @@ function getTaskDomainErrorCode(
 
     const matched =
         codes.find(
-            code =>
-                message.includes(
-                    code
-                )
+            code => message === code || result?.code === code
         );
 
     if (
@@ -400,12 +398,7 @@ function getTaskDomainErrorCode(
         return matched;
     }
 
-    return (
-        normalizeString(
-            result?.code
-        )
-        || "ADMIN_TASK_RPC_FAILED"
-    );
+    return "ADMIN_TASK_RPC_FAILED";
 }
 
 /* =========================================================
@@ -416,6 +409,8 @@ function mapTaskErrorStatus(
     code,
     supabaseStatus
 ) {
+    if (code === "TASK_STATE_CONFLICT") return 409;
+    if (["TASK_INPUT_INVALID", "TASK_FIELDS_UNSUPPORTED", "TASK_PRIORITY_INVALID", "TASK_TIMELINE_INVALID", "TASK_ROLES_INVALID"].includes(code)) return 400;
     if (
         code ===
         "TASK_NOT_FOUND"
@@ -500,43 +495,13 @@ function createSupabaseRpcError(
             result
         );
 
-    const status =
-        mapTaskErrorStatus(
-            code,
-            response.status
-        );
-
-    const message =
-        normalizeString(
-            result?.message
-        )
-        || "The Admin task operation failed.";
-
-    return new AdminTaskRpcError(
-        message,
-        {
-            code,
-
-            status,
-
-            databaseCode:
-                normalizeString(
-                    result?.code
-                )
-                || null,
-
-            details:
-                result?.details
-                ?? null,
-
-            hint:
-                result?.hint
-                ?? null,
-
-            unavailable:
-                response.status >= 500
-        }
-    );
+    const unavailable = code === "ADMIN_TASK_RPC_FAILED";
+    const status = unavailable ? 503 : mapTaskErrorStatus(code, response.status);
+    const message = code === "TASK_VERSION_CONFLICT"
+        ? "This task changed. Refresh it before trying again."
+        : unavailable ? "The task service is temporarily unavailable. Please try again."
+        : "The task operation could not be completed (" + code + ").";
+    return new AdminTaskRpcError(message, { code, status, unavailable });
 }
 
 /* =========================================================
@@ -585,7 +550,7 @@ export async function callAdminTaskRpc(
     try {
         response =
             await fetch(
-                `${supabaseUrl}/rest/v1/rpc/${encodeURIComponent(
+                `${supabaseUrl.replace(/\/rest\/v1$/, "")}/rest/v1/rpc/${encodeURIComponent(
                     rpc
                 )}`,
                 {

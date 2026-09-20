@@ -27,7 +27,8 @@ Security:
 ========================================================= */
 
 import {
-    authorizeTaskRead
+    authorizeTaskRead,
+    authorizeTaskDelete
 } from "../../../admin/permissions.js";
 
 import {
@@ -68,9 +69,8 @@ const ALLOWED_FILTER_FIELDS =
     new Set([
         "search",
         "priority",
-        "timeline",
-        "assignedRole",
-        "assignedAccountId",
+        "timeline_days",
+        "responsibleRole",
         "lifecycle",
         "includeDeleted"
     ]);
@@ -191,67 +191,33 @@ function normalizeFilters(value) {
     if (
         Object.prototype.hasOwnProperty.call(
             value,
-            "timeline"
+            "timeline_days"
         )
     ) {
-        const timeline =
-            normalizeNullableString(
-                value.timeline
-            );
+        const timeline_days =
+            normalizeNullableString(typeof value.timeline_days === "number" ? String(value.timeline_days) : value.timeline_days);
 
-        if (timeline !== null) {
-            filters.timeline = timeline;
+        if (timeline_days !== null) {
+            const days = Number(timeline_days);
+            if (!Number.isSafeInteger(days) || days < 3 || days > 30) throw new AdminTaskListError("Invalid timeline days.", { code: "TASK_TIMELINE_INVALID" });
+            filters.timeline_days = days;
         }
     }
 
     if (
         Object.prototype.hasOwnProperty.call(
             value,
-            "assignedRole"
+            "responsibleRole"
         )
     ) {
-        const assignedRole =
+        const responsibleRole =
             normalizeNullableString(
-                value.assignedRole
+                value.responsibleRole
             );
 
-        if (assignedRole !== null) {
-            filters.assignedRole =
-                assignedRole;
-        }
-    }
-
-    if (
-        Object.prototype.hasOwnProperty.call(
-            value,
-            "assignedAccountId"
-        )
-    ) {
-        const assignedAccountId =
-            normalizeNullableString(
-                value.assignedAccountId
-            );
-
-        if (assignedAccountId !== null) {
-            if (
-                !UUID_PATTERN.test(
-                    assignedAccountId
-                )
-            ) {
-                throw new AdminTaskListError(
-                    "The assigned account filter is invalid.",
-                    {
-                        code:
-                            "TASK_ASSIGNED_ACCOUNT_FILTER_INVALID",
-
-                        status:
-                            400
-                    }
-                );
-            }
-
-            filters.assignedAccountId =
-                assignedAccountId;
+        if (responsibleRole !== null) {
+            filters.responsibleRole =
+                responsibleRole;
         }
     }
 
@@ -402,9 +368,9 @@ Expected caller input:
     filters?: {
         search?,
         priority?,
-        timeline?,
-        assignedRole?,
-        assignedAccountId?,
+        timeline_days?,
+        responsibleRole?,
+
         lifecycle?,
         includeDeleted?
     },
@@ -448,6 +414,11 @@ export async function listAdminTasks(
         request,
         env
     );
+
+    // Match the single-task endpoint: deleted records require delete permission.
+    if (normalizedFilters.includeDeleted === true) {
+        await authorizeTaskDelete(request, env);
+    }
 
     return callAdminTaskRpc(
         env,
