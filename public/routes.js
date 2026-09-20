@@ -11,8 +11,7 @@ When adding a new page:
 4. Set its page module.
 5. Set the appropriate header, sidebar, and footer.
 6. Add it to HEADER_MAP if its header behavior differs.
-7. Add it to PRIORITY_MAP if sitemap: true.
-8. Add the clean URL to _redirects when required.
+7. Add the clean URL to _redirects when required.
 
 CSS POLICY
 
@@ -892,51 +891,3 @@ export const HEADER_MAP = {
         false
 };
 
-/* =========================================================
-SITEMAP PRIORITIES
-Only routes with sitemap: true belong here.
-========================================================= */
-
-export const PRIORITY_MAP = {
-    "/":
-        1.0,
-
-    "/Dashboard":
-        0.9,
-
-    "/RocketLeague":
-        0.9,
-
-    "/RocketLeague/Leaderboards":
-        0.8,
-
-    "/Minecraft":
-        0.7,
-
-    "/Minecraft/Mods":
-        0.7,
-
-    "/Minecraft/Announcements":
-        0.5,
-
-    "/Ark":
-        0.7,
-
-    "/Ark/Mods":
-        0.7,
-
-    "/Ark/Announcements":
-        0.5,
-
-    "/FAQ":
-        0.5,
-
-    "/About":
-        0.4,
-
-    "/Privacy":
-        0.3,
-
-    "/TOS":
-        0.3
-};

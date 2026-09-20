@@ -801,6 +801,11 @@ async function createTask(
 ) {
     let response;
 
+    const requestBody = {
+        task:
+            payload
+    };
+
     try {
         response =
             await fetch(
@@ -825,7 +830,7 @@ async function createTask(
 
                     body:
                         JSON.stringify(
-                            payload
+                            requestBody
                         )
                 }
             );

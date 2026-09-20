@@ -24,16 +24,11 @@ Used for all valid /Admin routes.
 @import url("../Sidebar/sidebar.css");
 @import url("../Sidebar/hover.css");
 
-/* =========================================================
-   GLOBAL
-   ========================================================= */
-
-@import url("/Global/Links/links.css");
 
 /* =========================================================
    ADMIN
    ========================================================= */
-@import url("/Global/Admin/Home/CSS/index.css");
-@import url("/Global/Admin/TaskBoard/CSS/index.css");
-@import url("/Global/Admin/TaskBoard/CSS/overlay.css");
+@import url("../../../../Global/Admin/Home/CSS/index.css");
+@import url("../../../../Global/Admin/TaskBoard/CSS/index.css");
+@import url("../../../../Global/Admin/TaskBoard/CSS/overlay.css");
 

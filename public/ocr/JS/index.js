@@ -1,5 +1,30 @@
 "use strict";
 
+/* =========================================================
+BPD GAMING NETWORK
+OCR PAGE INITIALIZER
+
+File:
+    /ocr/JS/index.js
+
+Purpose:
+    Initializes the protected Rocket League OCR page.
+
+Responsibilities:
+    - Verifies Epic-backed route authorization.
+    - Refreshes Rocket League auth/profile UI state.
+    - Exposes the OCR API bridge.
+    - Loads OCR page scripts in order.
+    - Initializes OCR subsystems once.
+    - Preserves SPA-safe reinitialization behavior.
+
+Security:
+    - authorizeRoute() remains the route-access gate.
+    - Rocket League auth-view initialization is UI/state
+      synchronization and is not a replacement for route
+      authorization.
+========================================================= */
+
 import {
     OCR_JOB_SUBMIT_URL,
     OCR_JOB_RESULT_URL,
@@ -13,9 +38,19 @@ import {
 import {
     OCR_SCRIPT_ID
 } from "/scripts/cacheHandler.js";
+
 import {
     authorizeRoute
 } from "/Framework/Auth/auth.js";
+
+import {
+    initializeRocketLeagueAuthView
+} from "../../Tabs/RocketLeague/Index/JS/auth.js";
+
+/* =========================================================
+OCR SCRIPT REGISTRY
+========================================================= */
+
 const OCR_SCRIPTS = [
     "/ocr/JS/submit_core.js",
     "/ocr/JS/submit_img.js",
@@ -24,13 +59,12 @@ const OCR_SCRIPTS = [
 ];
 
 /* =========================================================
-   SCRIPT LOADING
-   ========================================================= */
+SCRIPT LOADING
+========================================================= */
 
 function loadScript(
     src
 ) {
-
     const scriptUrl =
         new URL(
             src,
@@ -123,8 +157,8 @@ async function loadOcrScripts() {
 }
 
 /* =========================================================
-   OCR API BRIDGE
-   ========================================================= */
+OCR API BRIDGE
+========================================================= */
 
 function initializeOcrApi() {
     if (
@@ -143,8 +177,8 @@ function initializeOcrApi() {
 }
 
 /* =========================================================
-   INITIALIZER SAFETY
-   ========================================================= */
+INITIALIZER SAFETY
+========================================================= */
 
 function runInitializer(
     name,
@@ -163,7 +197,8 @@ function runInitializer(
         initializer();
 
     if (
-        result === false
+        result ===
+        false
     ) {
         throw new Error(
             `${name} initialization failed.`
@@ -172,8 +207,8 @@ function runInitializer(
 }
 
 /* =========================================================
-   OCR SYSTEM INITIALIZATION
-   ========================================================= */
+OCR SYSTEM INITIALIZATION
+========================================================= */
 
 function initializeOcrSystems() {
     try {
@@ -237,8 +272,69 @@ function initializeOcrSystems() {
 }
 
 /* =========================================================
-   ROUTE INITIALIZATION
-   ========================================================= */
+ROCKET LEAGUE AUTH STATE
+
+Route authorization and Rocket League UI-state
+initialization are intentionally separate.
+
+authorizeRoute():
+    Determines whether the user may access OCR.
+
+initializeRocketLeagueAuthView():
+    Refreshes normalized Rocket League account/profile state
+    used by Rocket League UI such as the sidebar.
+========================================================= */
+
+async function initializeRocketLeagueState() {
+    if (
+        typeof initializeRocketLeagueAuthView !==
+        "function"
+    ) {
+        throw new Error(
+            "Rocket League auth view initializer was not found."
+        );
+    }
+
+    await initializeRocketLeagueAuthView();
+
+    console.log(
+        "[OCR PAGE] Rocket League auth state initialized."
+    );
+}
+
+/* =========================================================
+ROUTE AUTHORIZATION
+========================================================= */
+
+async function authorizeOcrRoute() {
+    const {
+        evaluation
+    } =
+        await authorizeRoute({
+            required:
+                true,
+
+            provider:
+                "epic"
+        });
+
+    if (
+        evaluation?.allowed !==
+        true
+    ) {
+        console.warn(
+            "[OCR PAGE] Route authorization denied."
+        );
+
+        return false;
+    }
+
+    return true;
+}
+
+/* =========================================================
+ROUTE INITIALIZATION
+========================================================= */
 
 export async function initializePage() {
     const page =
@@ -253,27 +349,42 @@ export async function initializePage() {
             "OCR page was not found."
         );
     }
-    const {
-        evaluation
-    } =
-        await authorizeRoute({
-            required:
-                true,
 
-            provider:
-                "epic"
-        });
+    /*
+     * Always re-evaluate protected route access.
+     *
+     * This runs before the page's initialization guard so
+     * an SPA revisit cannot rely on stale authorization.
+     */
+    const authorized =
+        await authorizeOcrRoute();
 
     if (
-        evaluation.allowed !==
-        true
+        !authorized
     ) {
         return false;
     }
+
+    /*
+     * Refresh Rocket League auth/profile state even if OCR
+     * itself was already initialized.
+     *
+     * This allows the Rocket League sidebar to receive the
+     * current profileComplete / rocketLeagueAccess state.
+     */
+    await initializeRocketLeagueState();
+
+    /*
+     * OCR subsystems themselves only need to initialize once.
+     */
     if (
         page.dataset.initialized ===
         "true"
     ) {
+        console.log(
+            "[OCR PAGE] OCR systems already initialized."
+        );
+
         return true;
     }
 

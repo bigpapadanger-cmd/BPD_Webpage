@@ -6,51 +6,43 @@ File:
     public/Global/Admin/TaskBoard/CSS/overlays.css
 
 Purpose:
-    Shared overlay styling for modular Admin Taskboard
-    interfaces.
+    Shared styling for Taskboard modal/overlay interfaces.
 
 Used By:
-    - create_task.html
-    - task_detail.html
-    - task_comments.html
-    - task_history.html
+    - Create Task
+    - Task Detail
+    - Edit Task
+    - Confirmation dialogs
+    - Comments
+    - History
 
-Responsibilities:
-    - Shared full-screen overlay presentation.
-    - Shared dialog structure.
-    - Shared dialog headers and actions.
-    - Shared form and message presentation.
-    - Shared metadata cards and content sections.
-    - Shared comments/history containers.
-    - Shared responsive behavior.
-    - Shared scrolling and overflow protection.
+Design Goals:
+    - Never exceed the viewport.
+    - Keep dialog scrolling inside the dialog.
+    - Prevent horizontal overflow.
+    - Keep all form controls readable.
+    - Keep native select menus readable on Windows.
+    - Support desktop, tablet, and mobile consistently.
 
 Important:
-    - The global application shell owns sidebar positioning.
-    - Overlays render above the existing routed page.
-    - Overlay dialogs never use sidebar offsets.
-    - Feature-specific classes should extend these shared
-      classes rather than duplicate them.
+    - The global shell owns normal page positioning.
+    - Overlay dialogs are viewport-relative.
+    - No sidebar offsets belong here.
 ========================================================= */
 
 /* =========================================================
-OVERLAY OPEN STATE
+OPEN STATE
 ========================================================= */
 
 html.task-overlay-open,
-html.task-overlay-open body {
-    overflow: hidden;
-}
-
-/* Compatibility with Create Task controller name. */
-
+html.task-overlay-open body,
 html.task-create-open,
 html.task-create-open body {
     overflow: hidden;
 }
 
 /* =========================================================
-SHARED BOX SIZING
+BOX MODEL
 ========================================================= */
 
 .task-overlay,
@@ -61,10 +53,11 @@ SHARED BOX SIZING
 }
 
 /* =========================================================
-OVERLAY BACKDROP
+BACKDROP
 ========================================================= */
 
-.task-overlay {
+.task-overlay,
+.task-create-overlay {
     position: fixed;
 
     inset: 0;
@@ -73,49 +66,38 @@ OVERLAY BACKDROP
 
     display: flex;
 
-    align-items: flex-start;
-
+    align-items: center;
     justify-content: center;
 
     width: 100%;
-
     min-width: 0;
 
-    height: 100%;
+    height: 100dvh;
+    min-height: 100vh;
 
     padding:
-        40px
+        24px
         20px;
 
     background:
-        rgba(
-            0,
-            0,
-            0,
-            0.72
-        );
+        rgba(0, 0, 0, 0.76);
 
-    overflow-x: hidden;
+    overflow: hidden;
 
-    overflow-y: auto;
-
-    overscroll-behavior:
-        contain;
+    overscroll-behavior: contain;
 }
 
-/* =========================================================
-HIDDEN OVERLAYS
-========================================================= */
-
-.task-overlay[hidden] {
+.task-overlay[hidden],
+.task-create-overlay[hidden] {
     display: none !important;
 }
 
 /* =========================================================
-SHARED DIALOG
+DIALOG
 ========================================================= */
 
-.task-dialog {
+.task-dialog,
+.task-create-dialog {
     position: relative;
 
     width:
@@ -125,50 +107,44 @@ SHARED DIALOG
         );
 
     min-width: 0;
-
     max-width: 100%;
 
-    margin:
-        auto;
+    max-height:
+        calc(
+            100dvh
+            -
+            48px
+        );
 
-    padding:
-        24px;
+    margin: 0 auto;
+
+    padding: 24px;
 
     border:
         1px solid
-        rgba(
-            255,
-            255,
-            255,
-            0.14
-        );
+        rgba(255, 255, 255, 0.14);
 
-    border-radius:
-        14px;
+    border-radius: 14px;
 
-    background:
-        #11151d;
+    background: #11151d;
 
-    color:
-        inherit;
+    color: #f5f7fb;
 
     box-shadow:
         0
         24px
         80px
-        rgba(
-            0,
-            0,
-            0,
-            0.45
-        );
+        rgba(0, 0, 0, 0.5);
 
-    overflow:
-        hidden;
+    overflow-x: hidden;
+    overflow-y: auto;
+
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
 }
 
 /* =========================================================
-FEATURE DIALOG WIDTHS
+FEATURE WIDTHS
 ========================================================= */
 
 .task-create-dialog {
@@ -204,42 +180,61 @@ FEATURE DIALOG WIDTHS
 }
 
 /* =========================================================
-DIALOG HEADER
+HARD WIDTH CONTAINMENT
 ========================================================= */
 
-.task-dialog-header {
+.task-dialog > *,
+.task-dialog-section > *,
+.task-dialog-form > *,
+.task-dialog-form-row > *,
+.task-dialog-header > * {
+    min-width: 0;
+    max-width: 100%;
+}
+
+.task-dialog img,
+.task-dialog svg,
+.task-dialog video,
+.task-dialog canvas,
+.task-dialog iframe {
+    max-width: 100%;
+}
+
+.task-dialog pre,
+.task-dialog code {
+    max-width: 100%;
+
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+/* =========================================================
+HEADER
+========================================================= */
+
+.task-dialog-header,
+.task-create-header {
     display: flex;
 
     align-items: flex-start;
-
     justify-content: space-between;
 
-    gap:
-        20px;
+    gap: 20px;
 
     width: 100%;
 
-    min-width: 0;
+    margin-bottom: 24px;
 
-    margin-bottom:
-        24px;
-
-    padding-bottom:
-        18px;
+    padding-bottom: 18px;
 
     border-bottom:
         1px solid
-        rgba(
-            255,
-            255,
-            255,
-            0.1
-        );
+        rgba(255, 255, 255, 0.1);
 }
 
 .task-dialog-header-content {
-    flex:
-        1 1 auto;
+    flex: 1 1 auto;
 
     min-width: 0;
 }
@@ -250,25 +245,20 @@ DIALOG HEADER
         0
         7px;
 
-    font-size:
-        0.76rem;
+    color:
+        rgba(255, 255, 255, 0.6);
 
-    font-weight:
-        700;
+    font-size: 0.76rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
 
-    letter-spacing:
-        0.09em;
-
-    text-transform:
-        uppercase;
-
-    opacity:
-        0.68;
+    text-transform: uppercase;
 }
 
 .task-dialog-header h2 {
-    margin:
-        0;
+    margin: 0;
+
+    color: #ffffff;
 
     font-size:
         clamp(
@@ -277,35 +267,26 @@ DIALOG HEADER
             1.9rem
         );
 
-    line-height:
-        1.15;
+    line-height: 1.15;
 
-    overflow-wrap:
-        anywhere;
+    overflow-wrap: anywhere;
 }
 
 .task-dialog-header p {
+    max-width: 700px;
+
     margin:
         9px
         0
         0;
 
-    max-width:
-        700px;
+    color:
+        rgba(255, 255, 255, 0.7);
 
-    line-height:
-        1.55;
+    line-height: 1.55;
 
-    overflow-wrap:
-        anywhere;
-
-    opacity:
-        0.72;
+    overflow-wrap: anywhere;
 }
-
-/* =========================================================
-DIALOG CLOSE BUTTON
-========================================================= */
 
 .task-dialog-close {
     flex:
@@ -313,53 +294,37 @@ DIALOG CLOSE BUTTON
 }
 
 /* =========================================================
-DIALOG BODY
+BODY
 ========================================================= */
 
 .task-dialog-body {
     width: 100%;
 
     min-width: 0;
-
     max-width: 100%;
 }
 
 /* =========================================================
-DIALOG SECTIONS
+SECTIONS
 ========================================================= */
 
 .task-dialog-section {
     width: 100%;
 
-    min-width: 0;
+    margin-top: 20px;
 
-    max-width: 100%;
-
-    margin-top:
-        20px;
-
-    padding:
-        18px;
+    padding: 18px;
 
     border:
         1px solid
-        rgba(
-            255,
-            255,
-            255,
-            0.11
-        );
+        rgba(255, 255, 255, 0.11);
 
-    border-radius:
-        9px;
+    border-radius: 9px;
 
     background:
-        rgba(
-            255,
-            255,
-            255,
-            0.02
-        );
+        rgba(255, 255, 255, 0.02);
+
+    overflow-x: hidden;
 }
 
 .task-dialog-section:first-child {
@@ -372,8 +337,9 @@ DIALOG SECTIONS
         0
         8px;
 
-    overflow-wrap:
-        anywhere;
+    color: #ffffff;
+
+    overflow-wrap: anywhere;
 }
 
 .task-dialog-section > p {
@@ -382,34 +348,26 @@ DIALOG SECTIONS
         0
         14px;
 
-    line-height:
-        1.5;
+    color:
+        rgba(255, 255, 255, 0.68);
 
-    overflow-wrap:
-        anywhere;
+    line-height: 1.5;
 
-    opacity:
-        0.7;
+    overflow-wrap: anywhere;
 }
 
 /* =========================================================
-SHARED FORM
+FORM
 ========================================================= */
 
 .task-dialog-form {
     display: flex;
 
-    flex-direction:
-        column;
+    flex-direction: column;
 
-    gap:
-        20px;
+    gap: 20px;
 
-    width:
-        100%;
-
-    min-width:
-        0;
+    width: 100%;
 }
 
 .task-dialog-form-row {
@@ -418,47 +376,40 @@ SHARED FORM
     grid-template-columns:
         repeat(
             2,
-            minmax(
-                0,
-                1fr
-            )
+            minmax(0, 1fr)
         );
 
-    gap:
-        18px;
+    gap: 18px;
 
-    width:
-        100%;
-
-    min-width:
-        0;
+    width: 100%;
 }
 
 /* =========================================================
-SHARED FIELD
+FIELD
 ========================================================= */
 
 .task-dialog-field {
     display: flex;
 
-    flex-direction:
-        column;
+    flex-direction: column;
 
-    gap:
-        7px;
+    gap: 7px;
 
-    width:
-        100%;
+    width: 100%;
 
-    min-width:
-        0;
+    min-width: 0;
 }
 
 .task-dialog-field label,
 .task-dialog-fieldset legend {
-    font-weight:
-        700;
+    color: #f5f7fb;
+
+    font-weight: 700;
 }
+
+/* =========================================================
+FORM CONTROLS
+========================================================= */
 
 .task-dialog-field input,
 .task-dialog-field textarea,
@@ -468,11 +419,9 @@ SHARED FIELD
     width: 100%;
 
     min-width: 0;
-
     max-width: 100%;
 
-    min-height:
-        42px;
+    min-height: 42px;
 
     padding:
         10px
@@ -480,72 +429,97 @@ SHARED FIELD
 
     border:
         1px solid
-        rgba(
-            255,
-            255,
-            255,
-            0.18
-        );
+        rgba(255, 255, 255, 0.22);
 
-    border-radius:
-        7px;
+    border-radius: 7px;
 
-    background:
-        rgba(
-            0,
-            0,
-            0,
-            0.18
-        );
+    background: #0f131a;
 
-    color:
-        inherit;
+    color: #f5f7fb;
 
-    font:
-        inherit;
+    font: inherit;
+
+    color-scheme: dark;
 }
 
 .task-dialog-field textarea {
-    min-height:
-        110px;
+    min-height: 110px;
 
-    resize:
-        vertical;
+    resize: vertical;
 
-    line-height:
-        1.5;
+    line-height: 1.5;
 }
+
+.task-dialog-field input::placeholder,
+.task-dialog-field textarea::placeholder {
+    color: #818a99;
+}
+
+/* =========================================================
+SELECT / DROPDOWN READABILITY
+========================================================= */
+
+.task-dialog-field select {
+    background-color: #0f131a;
+
+    color: #f5f7fb;
+
+    color-scheme: dark;
+
+    cursor: pointer;
+}
+
+.task-dialog-field select option,
+.task-dialog-field select optgroup {
+    background-color: #151a23;
+
+    color: #f5f7fb;
+}
+
+.task-dialog-field select option:disabled {
+    color: #8f98a8;
+}
+
+/* =========================================================
+FOCUS
+========================================================= */
 
 .task-dialog-field input:focus,
 .task-dialog-field textarea:focus,
 .task-dialog-field select:focus {
+    border-color:
+        rgba(121, 166, 255, 0.8);
+
     outline:
         2px solid
-        currentColor;
+        rgba(121, 166, 255, 0.35);
 
-    outline-offset:
-        2px;
+    outline-offset: 1px;
 }
+
+/* =========================================================
+DISABLED CONTROLS
+========================================================= */
 
 .task-dialog-field input:disabled,
 .task-dialog-field textarea:disabled,
 .task-dialog-field select:disabled {
-    cursor:
-        not-allowed;
+    background-color: #151922;
 
-    opacity:
-        0.55;
+    color: #8f98a8;
+
+    cursor: not-allowed;
+
+    opacity: 0.78;
 }
 
 .task-dialog-field small {
-    line-height:
-        1.4;
+    color:
+        rgba(255, 255, 255, 0.58);
 
-    overflow-wrap:
-        anywhere;
+    line-height: 1.4;
 
-    opacity:
-        0.62;
+    overflow-wrap: anywhere;
 }
 
 /* =========================================================
@@ -553,29 +527,18 @@ FIELDSET
 ========================================================= */
 
 .task-dialog-fieldset {
-    min-width:
-        0;
+    min-width: 0;
+    max-width: 100%;
 
-    max-width:
-        100%;
+    margin: 0;
 
-    margin:
-        0;
-
-    padding:
-        16px;
+    padding: 16px;
 
     border:
         1px solid
-        rgba(
-            255,
-            255,
-            255,
-            0.14
-        );
+        rgba(255, 255, 255, 0.14);
 
-    border-radius:
-        9px;
+    border-radius: 9px;
 }
 
 .task-dialog-fieldset > p {
@@ -584,14 +547,12 @@ FIELDSET
         0
         14px;
 
-    line-height:
-        1.45;
+    color:
+        rgba(255, 255, 255, 0.68);
 
-    overflow-wrap:
-        anywhere;
+    line-height: 1.45;
 
-    opacity:
-        0.7;
+    overflow-wrap: anywhere;
 }
 
 /* =========================================================
@@ -603,24 +564,19 @@ ROLE OPTIONS
 
     flex-wrap: wrap;
 
-    gap:
-        10px;
+    gap: 10px;
 
     min-width: 0;
 }
 
 .task-dialog-role-options label {
-    display:
-        inline-flex;
+    display: inline-flex;
 
-    align-items:
-        center;
+    align-items: center;
 
-    gap:
-        8px;
+    gap: 8px;
 
-    max-width:
-        100%;
+    max-width: 100%;
 
     padding:
         9px
@@ -628,18 +584,19 @@ ROLE OPTIONS
 
     border:
         1px solid
-        rgba(
-            255,
-            255,
-            255,
-            0.14
-        );
+        rgba(255, 255, 255, 0.14);
 
-    border-radius:
-        8px;
+    border-radius: 8px;
 
-    cursor:
-        pointer;
+    background:
+        rgba(255, 255, 255, 0.025);
+
+    cursor: pointer;
+}
+
+.task-dialog-role-options label:hover {
+    border-color:
+        rgba(120, 168, 255, 0.45);
 }
 
 .task-dialog-role-options input {
@@ -650,15 +607,11 @@ ROLE OPTIONS
 }
 
 /* =========================================================
-DIALOG MESSAGE
+MESSAGES
 ========================================================= */
 
 .task-dialog-message {
     width: 100%;
-
-    min-width: 0;
-
-    max-width: 100%;
 
     padding:
         11px
@@ -666,111 +619,72 @@ DIALOG MESSAGE
 
     border:
         1px solid
-        rgba(
-            255,
-            255,
-            255,
-            0.14
-        );
+        rgba(255, 255, 255, 0.14);
 
-    border-radius:
-        8px;
+    border-radius: 8px;
 
-    line-height:
-        1.45;
+    line-height: 1.45;
 
-    overflow-wrap:
-        anywhere;
+    overflow-wrap: anywhere;
 }
 
 .task-dialog-message[data-state="success"] {
     border-color:
-        rgba(
-            70,
-            200,
-            120,
-            0.55
-        );
+        rgba(70, 200, 120, 0.55);
 
     background:
-        rgba(
-            70,
-            200,
-            120,
-            0.06
-        );
+        rgba(70, 200, 120, 0.08);
+
+    color: #8de3b0;
 }
 
 .task-dialog-message[data-state="warning"] {
     border-color:
-        rgba(
-            240,
-            180,
-            60,
-            0.6
-        );
+        rgba(240, 180, 60, 0.6);
 
     background:
-        rgba(
-            240,
-            180,
-            60,
-            0.06
-        );
+        rgba(240, 180, 60, 0.08);
+
+    color: #ffd277;
 }
 
 .task-dialog-message[data-state="error"] {
     border-color:
-        rgba(
-            230,
-            80,
-            80,
-            0.65
-        );
+        rgba(230, 80, 80, 0.65);
 
     background:
-        rgba(
-            230,
-            80,
-            80,
-            0.06
-        );
+        rgba(230, 80, 80, 0.08);
+
+    color: #ff9ca6;
 }
 
 /* =========================================================
-DIALOG ACTIONS
+ACTIONS
 ========================================================= */
 
 .task-dialog-actions {
     display: flex;
 
     align-items: center;
-
     justify-content: flex-end;
 
     flex-wrap: wrap;
 
-    gap:
-        10px;
+    gap: 10px;
 
     width: 100%;
 
-    min-width: 0;
-
-    margin-top:
-        4px;
+    margin-top: 4px;
 }
 
 /* =========================================================
-SHARED BUTTONS
+BUTTONS
 ========================================================= */
 
 .task-dialog button {
-    max-width:
-        100%;
+    min-height: 38px;
 
-    min-height:
-        38px;
+    max-width: 100%;
 
     padding:
         8px
@@ -778,226 +692,142 @@ SHARED BUTTONS
 
     border:
         1px solid
-        rgba(
-            255,
-            255,
-            255,
-            0.2
-        );
+        rgba(255, 255, 255, 0.2);
 
-    border-radius:
-        7px;
+    border-radius: 7px;
 
     background:
-        rgba(
-            255,
-            255,
-            255,
-            0.06
-        );
+        rgba(255, 255, 255, 0.06);
 
-    color:
-        inherit;
+    color: #f5f7fb;
 
-    font:
-        inherit;
+    font: inherit;
+    font-weight: 600;
 
-    font-weight:
-        600;
+    white-space: normal;
 
-    white-space:
-        normal;
+    overflow-wrap: anywhere;
 
-    overflow-wrap:
-        anywhere;
-
-    cursor:
-        pointer;
+    cursor: pointer;
 }
 
 .task-dialog button:hover,
 .task-dialog button:focus-visible {
     border-color:
-        currentColor;
+        rgba(120, 168, 255, 0.65);
 
     background:
-        rgba(
-            255,
-            255,
-            255,
-            0.1
-        );
+        rgba(255, 255, 255, 0.1);
+}
+
+.task-dialog button:focus-visible {
+    outline:
+        2px solid
+        #8b5cf6;
+
+    outline-offset: 2px;
 }
 
 .task-dialog button:disabled {
-    cursor:
-        wait;
+    cursor: not-allowed;
 
-    opacity:
-        0.5;
+    opacity: 0.5;
 }
-
-/* =========================================================
-PRIMARY BUTTON
-========================================================= */
 
 .task-dialog-primary {
     border-color:
-        rgba(
-            100,
-            156,
-            255,
-            0.5
-        ) !important;
+        rgba(100, 156, 255, 0.5) !important;
 
     background:
-        rgba(
-            70,
-            125,
-            255,
-            0.16
-        ) !important;
+        rgba(70, 125, 255, 0.16) !important;
 }
-
-/* =========================================================
-DANGER BUTTON
-========================================================= */
 
 .task-dialog-danger {
     border-color:
-        rgba(
-            230,
-            80,
-            80,
-            0.55
-        ) !important;
+        rgba(230, 80, 80, 0.55) !important;
 
     background:
-        rgba(
-            230,
-            80,
-            80,
-            0.08
-        ) !important;
+        rgba(230, 80, 80, 0.08) !important;
 }
 
 /* =========================================================
-TASK METADATA GRID
+METADATA
 ========================================================= */
 
 .task-dialog-metadata {
-    display:
-        grid;
+    display: grid;
 
     grid-template-columns:
         repeat(
             4,
-            minmax(
-                0,
-                1fr
-            )
+            minmax(0, 1fr)
         );
 
-    gap:
-        12px;
+    gap: 12px;
 
-    width:
-        100%;
+    width: 100%;
 
-    min-width:
-        0;
-
-    margin-bottom:
-        20px;
+    margin-bottom: 20px;
 }
 
 .task-dialog-metadata > div {
-    min-width:
-        0;
+    min-width: 0;
 
-    padding:
-        14px;
+    padding: 14px;
 
     border:
         1px solid
-        rgba(
-            255,
-            255,
-            255,
-            0.11
-        );
+        rgba(255, 255, 255, 0.11);
 
-    border-radius:
-        8px;
+    border-radius: 8px;
 
     background:
-        rgba(
-            255,
-            255,
-            255,
-            0.02
-        );
+        rgba(255, 255, 255, 0.02);
+
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 .task-dialog-metadata span {
-    display:
-        block;
+    display: block;
 
-    margin-bottom:
-        6px;
+    margin-bottom: 6px;
 
-    font-size:
-        0.76rem;
+    color:
+        rgba(255, 255, 255, 0.58);
 
-    font-weight:
-        600;
-
-    overflow-wrap:
-        anywhere;
-
-    opacity:
-        0.64;
+    font-size: 0.76rem;
+    font-weight: 600;
 }
 
 .task-dialog-metadata strong {
-    display:
-        block;
+    display: block;
 
-    overflow-wrap:
-        anywhere;
+    color: #ffffff;
+
+    overflow-wrap: anywhere;
 }
 
 /* =========================================================
-TASK DESCRIPTION
+DESCRIPTION
 ========================================================= */
 
 .task-dialog-description {
     width: 100%;
 
-    min-width: 0;
-
-    padding:
-        18px;
+    padding: 18px;
 
     border:
         1px solid
-        rgba(
-            255,
-            255,
-            255,
-            0.11
-        );
+        rgba(255, 255, 255, 0.11);
 
-    border-radius:
-        9px;
+    border-radius: 9px;
 
     background:
-        rgba(
-            255,
-            255,
-            255,
-            0.02
-        );
+        rgba(255, 255, 255, 0.02);
+
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 .task-dialog-description h3 {
@@ -1010,14 +840,11 @@ TASK DESCRIPTION
 .task-dialog-description p {
     margin: 0;
 
-    white-space:
-        pre-wrap;
+    white-space: pre-wrap;
 
-    line-height:
-        1.55;
+    line-height: 1.55;
 
-    overflow-wrap:
-        anywhere;
+    overflow-wrap: anywhere;
 }
 
 /* =========================================================
@@ -1029,21 +856,19 @@ BADGES
 
     flex-wrap: wrap;
 
-    gap:
-        8px;
+    gap: 8px;
 
     min-width: 0;
 }
 
 .task-dialog-badge {
-    display:
-        inline-flex;
+    display: inline-flex;
 
-    align-items:
-        center;
+    align-items: center;
 
-    min-height:
-        25px;
+    min-height: 25px;
+
+    max-width: 100%;
 
     padding:
         4px
@@ -1051,28 +876,18 @@ BADGES
 
     border:
         1px solid
-        rgba(
-            255,
-            255,
-            255,
-            0.18
-        );
+        rgba(255, 255, 255, 0.18);
 
-    border-radius:
-        999px;
+    border-radius: 999px;
 
-    font-size:
-        0.73rem;
+    font-size: 0.73rem;
+    font-weight: 600;
 
-    font-weight:
-        600;
-
-    overflow-wrap:
-        anywhere;
+    overflow-wrap: anywhere;
 }
 
 /* =========================================================
-LIFECYCLE ACTIONS
+LIFECYCLE
 ========================================================= */
 
 .task-dialog-lifecycle-actions {
@@ -1080,13 +895,11 @@ LIFECYCLE ACTIONS
 
     flex-wrap: wrap;
 
-    gap:
-        9px;
+    gap: 9px;
 
     min-width: 0;
 
-    margin-top:
-        14px;
+    margin-top: 14px;
 }
 
 /* =========================================================
@@ -1096,16 +909,11 @@ COMMENTS
 .task-comments-list {
     display: flex;
 
-    flex-direction:
-        column;
+    flex-direction: column;
 
-    gap:
-        10px;
+    gap: 10px;
 
-    width:
-        100%;
-
-    min-width: 0;
+    width: 100%;
 }
 
 .task-comment {
@@ -1117,30 +925,20 @@ COMMENTS
 
     border:
         1px solid
-        rgba(
-            255,
-            255,
-            255,
-            0.11
-        );
+        rgba(255, 255, 255, 0.11);
 
-    border-radius:
-        8px;
+    border-radius: 8px;
 
     background:
-        rgba(
-            255,
-            255,
-            255,
-            0.02
-        );
+        rgba(255, 255, 255, 0.02);
+
+    overflow-wrap: anywhere;
 }
 
 .task-comment-header {
     display: flex;
 
     align-items: flex-start;
-
     justify-content: space-between;
 
     flex-wrap: wrap;
@@ -1149,63 +947,42 @@ COMMENTS
         8px
         12px;
 
-    min-width: 0;
+    margin-bottom: 7px;
 
-    margin-bottom:
-        7px;
-
-    font-size:
-        0.8rem;
+    font-size: 0.8rem;
 }
 
 .task-comment-author {
-    min-width: 0;
+    font-weight: 700;
 
-    font-weight:
-        700;
-
-    overflow-wrap:
-        anywhere;
+    overflow-wrap: anywhere;
 }
 
 .task-comment-time {
-    opacity:
-        0.58;
+    color:
+        rgba(255, 255, 255, 0.55);
 }
 
 .task-comment-body {
     margin: 0;
 
-    white-space:
-        pre-wrap;
+    white-space: pre-wrap;
 
-    line-height:
-        1.5;
+    line-height: 1.5;
 
-    overflow-wrap:
-        anywhere;
+    overflow-wrap: anywhere;
 }
-
-/* =========================================================
-COMMENT FORM
-========================================================= */
 
 .task-comments-form {
     display: flex;
 
-    flex-direction:
-        column;
+    flex-direction: column;
 
-    gap:
-        14px;
+    gap: 14px;
 
-    width:
-        100%;
+    width: 100%;
 
-    min-width: 0;
-
-    margin-top:
-        18px;
+    margin-top: 18px;
 }
 
 /* =========================================================
@@ -1215,22 +992,14 @@ HISTORY
 .task-history-list {
     display: flex;
 
-    flex-direction:
-        column;
+    flex-direction: column;
 
-    gap:
-        9px;
+    gap: 9px;
 
-    width:
-        100%;
-
-    min-width: 0;
+    width: 100%;
 }
 
 .task-history-item {
-    position:
-        relative;
-
     min-width: 0;
 
     padding:
@@ -1241,102 +1010,58 @@ HISTORY
 
     border-left:
         2px solid
-        rgba(
-            255,
-            255,
-            255,
-            0.2
-        );
+        rgba(255, 255, 255, 0.2);
+
+    overflow-wrap: anywhere;
 }
 
 .task-history-item p {
     margin: 0;
 
-    line-height:
-        1.45;
-
-    overflow-wrap:
-        anywhere;
+    line-height: 1.45;
 }
 
 .task-history-item time {
-    display:
-        block;
+    display: block;
 
-    margin-top:
-        5px;
+    margin-top: 5px;
 
-    font-size:
-        0.75rem;
+    color:
+        rgba(255, 255, 255, 0.52);
 
-    opacity:
-        0.58;
+    font-size: 0.75rem;
 }
 
 /* =========================================================
-EMPTY STATE
+EMPTY / LOADING
 ========================================================= */
 
+.task-dialog-empty,
+.task-dialog-loading {
+    width: 100%;
+
+    padding: 24px;
+
+    text-align: center;
+
+    color:
+        rgba(255, 255, 255, 0.62);
+
+    overflow-wrap: anywhere;
+}
+
 .task-dialog-empty {
-    width:
-        100%;
-
-    min-width:
-        0;
-
     margin: 0;
-
-    padding:
-        24px;
 
     border:
         1px dashed
-        rgba(
-            255,
-            255,
-            255,
-            0.18
-        );
+        rgba(255, 255, 255, 0.18);
 
-    border-radius:
-        8px;
-
-    text-align:
-        center;
-
-    line-height:
-        1.45;
-
-    overflow-wrap:
-        anywhere;
-
-    opacity:
-        0.68;
+    border-radius: 8px;
 }
 
 /* =========================================================
-LOADING BLOCK
-========================================================= */
-
-.task-dialog-loading {
-    width:
-        100%;
-
-    min-width:
-        0;
-
-    padding:
-        24px;
-
-    text-align:
-        center;
-
-    opacity:
-        0.68;
-}
-
-/* =========================================================
-MEDIUM VIEWPORTS
+MEDIUM
 ========================================================= */
 
 @media (max-width: 900px) {
@@ -1344,39 +1069,39 @@ MEDIUM VIEWPORTS
         grid-template-columns:
             repeat(
                 2,
-                minmax(
-                    0,
-                    1fr
-                )
+                minmax(0, 1fr)
             );
     }
 }
 
 /* =========================================================
-SMALL VIEWPORTS
+SMALL
 ========================================================= */
 
 @media (max-width: 700px) {
     .task-overlay,
     .task-create-overlay {
         padding:
-            18px
             14px;
     }
 
     .task-dialog,
     .task-create-dialog {
-        padding:
-            20px;
+        max-height:
+            calc(
+                100dvh
+                -
+                28px
+            );
+
+        padding: 20px;
     }
 
     .task-dialog-header,
     .task-create-header {
-        flex-direction:
-            column;
+        flex-direction: column;
 
-        gap:
-            14px;
+        gap: 14px;
     }
 
     .task-dialog-form-row,
@@ -1394,8 +1119,7 @@ SMALL VIEWPORTS
     .task-dialog-actions,
     .task-overlay .taskboard-form-actions,
     .task-create-overlay .taskboard-form-actions {
-        flex-direction:
-            column-reverse;
+        flex-direction: column-reverse;
     }
 
     .task-dialog-actions button,
@@ -1406,35 +1130,37 @@ SMALL VIEWPORTS
 }
 
 /* =========================================================
-VERY SMALL VIEWPORTS
+VERY SMALL
 ========================================================= */
 
 @media (max-width: 480px) {
     .task-overlay,
     .task-create-overlay {
-        padding:
-            10px;
+        padding: 8px;
     }
 
     .task-dialog,
     .task-create-dialog {
-        padding:
-            16px;
+        max-height:
+            calc(
+                100dvh
+                -
+                16px
+            );
 
-        border-radius:
-            10px;
+        padding: 16px;
+
+        border-radius: 10px;
     }
 
     .task-dialog-section {
-        padding:
-            15px;
+        padding: 15px;
     }
 
     .task-dialog-role-options,
     .task-overlay .taskboard-role-options,
     .task-create-overlay .taskboard-role-options {
-        flex-direction:
-            column;
+        flex-direction: column;
     }
 
     .task-dialog-role-options label,
@@ -1444,8 +1170,7 @@ VERY SMALL VIEWPORTS
     }
 
     .task-dialog-lifecycle-actions {
-        flex-direction:
-            column;
+        flex-direction: column;
     }
 
     .task-dialog-lifecycle-actions button {
@@ -1453,8 +1178,7 @@ VERY SMALL VIEWPORTS
     }
 
     .task-comment-header {
-        flex-direction:
-            column;
+        flex-direction: column;
     }
 }
 
