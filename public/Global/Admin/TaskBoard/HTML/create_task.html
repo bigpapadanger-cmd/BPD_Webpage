@@ -1,0 +1,313 @@
+<!-- =========================================================
+BPD GAMING NETWORK
+TASKBOARD CREATE TASK OVERLAY
+
+File:
+    public/Global/Admin/TaskBoard/HTML/create_task.html
+
+Purpose:
+    Provides the modular Create Task overlay used by the
+    Admin Taskboard.
+
+Responsibilities:
+    - Display task creation fields.
+    - Display priority and timeline controls.
+    - Display responsibility-role assignment controls.
+    - Display task creation status messages.
+    - Provide submit, cancel, and close controls.
+
+Shared Styling:
+    public/Global/Admin/TaskBoard/CSS/overlays.css
+
+Important:
+    - This file is loaded dynamically by create_task.js.
+    - This file must not load CSS or JavaScript directly.
+    - Server-side validation remains authoritative.
+========================================================= -->
+
+<section
+    id="taskCreateOverlay"
+    class="task-overlay task-create-overlay"
+    hidden
+>
+    <div
+        id="taskCreateDialog"
+        class="task-dialog task-create-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="taskCreateTitle"
+        aria-describedby="taskCreateDescription"
+    >
+        <!-- =================================================
+        HEADER
+        ================================================== -->
+
+        <header class="task-dialog-header">
+            <div class="task-dialog-header-content">
+                <p class="task-dialog-eyebrow">
+                    New Task
+                </p>
+
+                <h2 id="taskCreateTitle">
+                    Create New Task
+                </h2>
+
+                <p id="taskCreateDescription">
+                    Define the work, priority, completion
+                    timeline, and responsible administrative
+                    roles.
+                </p>
+            </div>
+
+            <button
+                id="taskCreateClose"
+                class="task-dialog-close"
+                type="button"
+                aria-label="Close Create Task"
+            >
+                Close
+            </button>
+        </header>
+
+        <!-- =================================================
+        BODY
+        ================================================== -->
+
+        <div class="task-dialog-body">
+            <form
+                id="taskCreateForm"
+                class="task-dialog-form"
+            >
+                <!-- =========================================
+                TITLE
+                ========================================== -->
+
+                <div class="task-dialog-field">
+                    <label for="taskCreateName">
+                        Task Title
+                    </label>
+
+                    <input
+                        id="taskCreateName"
+                        name="title"
+                        type="text"
+                        maxlength="160"
+                        autocomplete="off"
+                        placeholder="Enter task title"
+                        required
+                    >
+
+                    <small>
+                        Maximum 160 characters.
+                    </small>
+                </div>
+
+                <!-- =========================================
+                DESCRIPTION
+                ========================================== -->
+
+                <div class="task-dialog-field">
+                    <label for="taskCreateBody">
+                        Description
+                    </label>
+
+                    <textarea
+                        id="taskCreateBody"
+                        name="body"
+                        rows="7"
+                        maxlength="10000"
+                        placeholder="Describe the work that needs to be completed..."
+                        required
+                    ></textarea>
+
+                    <small>
+                        Include enough information for the
+                        responsible administrators to
+                        understand and complete the task.
+                    </small>
+                </div>
+
+                <!-- =========================================
+                PRIORITY / TIMELINE
+                ========================================== -->
+
+                <div class="task-dialog-form-row">
+                    <div class="task-dialog-field">
+                        <label for="taskCreatePriority">
+                            Priority
+                        </label>
+
+                        <select
+                            id="taskCreatePriority"
+                            name="priority"
+                            required
+                        >
+                            <option
+                                value=""
+                                selected
+                                disabled
+                            >
+                                Select priority
+                            </option>
+
+                            <option value="Low">
+                                Low
+                            </option>
+
+                            <option value="Medium">
+                                Medium
+                            </option>
+
+                            <option value="High">
+                                High
+                            </option>
+
+                            <option value="Critical">
+                                Critical
+                            </option>
+                        </select>
+                    </div>
+
+                    <div class="task-dialog-field">
+                        <label for="taskCreateTimeline">
+                            Timeline
+                        </label>
+
+                        <select
+                            id="taskCreateTimeline"
+                            name="timeline_days"
+                            required
+                            disabled
+                        >
+                            <option
+                                value=""
+                                selected
+                            >
+                                Select priority first
+                            </option>
+                        </select>
+
+                        <small id="taskCreateTimelineHelp">
+                            Timeline options depend on task
+                            priority.
+                        </small>
+                    </div>
+                </div>
+
+                <!-- =========================================
+                RESPONSIBILITY
+                ========================================== -->
+
+                <fieldset class="task-dialog-fieldset">
+                    <legend>
+                        Responsible Roles
+                    </legend>
+
+                    <p>
+                        Select every administrative
+                        responsibility role involved in
+                        completing this task.
+                    </p>
+
+                    <div class="task-dialog-role-options">
+                        <!-- =================================
+                        OWNER
+                        ================================== -->
+
+                        <label>
+                            <input
+                                type="checkbox"
+                                name="responsible_roles"
+                                value="owner"
+                            >
+
+                            <span>
+                                Owner
+                            </span>
+                        </label>
+
+                        <!-- =================================
+                        DATABASE
+                        ================================== -->
+
+                        <label>
+                            <input
+                                type="checkbox"
+                                name="responsible_roles"
+                                value="database"
+                            >
+
+                            <span>
+                                Database
+                            </span>
+                        </label>
+
+                        <!-- =================================
+                        SECURITY
+                        ================================== -->
+
+                        <label>
+                            <input
+                                type="checkbox"
+                                name="responsible_roles"
+                                value="security"
+                            >
+
+                            <span>
+                                Security
+                            </span>
+                        </label>
+
+                        <!-- =================================
+                        UI
+                        ================================== -->
+
+                        <label>
+                            <input
+                                type="checkbox"
+                                name="responsible_roles"
+                                value="ui"
+                            >
+
+                            <span>
+                                UI
+                            </span>
+                        </label>
+                    </div>
+                </fieldset>
+
+                <!-- =========================================
+                STATUS MESSAGE
+                ========================================== -->
+
+                <div
+                    id="taskCreateMessage"
+                    class="task-dialog-message"
+                    aria-live="polite"
+                    hidden
+                ></div>
+
+                <!-- =========================================
+                ACTIONS
+                ========================================== -->
+
+                <div class="task-dialog-actions">
+                    <button
+                        id="taskCreateCancel"
+                        type="button"
+                    >
+                        Cancel
+                    </button>
+
+                    <button
+                        id="taskCreateSubmit"
+                        class="task-dialog-primary"
+                        type="submit"
+                    >
+                        Create Task
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</section>

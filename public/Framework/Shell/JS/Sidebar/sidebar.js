@@ -13,6 +13,7 @@ Purpose:
 Responsibilities:
     - Applies stored sidebar/theme preferences.
     - Handles sidebar expansion and collapse.
+    - Prevents duplicate SPA toggle initialization.
     - Handles route visibility and active navigation.
     - Handles disabled navigation items.
     - Handles collapsed-sidebar tooltips.
@@ -23,8 +24,8 @@ Responsibilities:
 Important:
     - Admin authorization belongs to admin_navigation.js.
     - Submenu behavior belongs to submenu.js.
-    - This file should coordinate those modules rather than
-      duplicate their implementations.
+    - This file coordinates those modules rather than
+      duplicating their implementations.
 ========================================================= */
 
 import {
@@ -34,6 +35,10 @@ import {
 import {
     initializeSidebarSubmenus
 } from "./submenu.js";
+
+/* =========================================================
+MODULE STATE
+========================================================= */
 
 let sidebarResizeInitialized =
     false;
@@ -67,9 +72,6 @@ export function initializeSidebar() {
 
 /* =========================================================
 CRITICAL INITIALIZATION
-
-Required for correct first-render behavior.
-Keep this phase lightweight and synchronous.
 ========================================================= */
 
 function initializeCriticalSidebar() {
@@ -86,11 +88,6 @@ function initializeCriticalSidebar() {
 
 /* =========================================================
 INTERACTIVE INITIALIZATION
-
-Runs after the browser has had an opportunity to paint.
-
-These features should become available quickly but do not
-need to block the initial sidebar render.
 ========================================================= */
 
 function initializeInteractiveSidebar() {
@@ -107,9 +104,6 @@ function initializeInteractiveSidebar() {
 
 /* =========================================================
 DEFERRED INITIALIZATION
-
-Non-critical enhancements are initialized when the browser
-has idle time available.
 ========================================================= */
 
 function scheduleSidebarIdleWork() {
@@ -130,9 +124,6 @@ function scheduleSidebarIdleWork() {
         return;
     }
 
-    /*
-     * Fallback for browsers without requestIdleCallback.
-     */
     window.setTimeout(
         () => {
             initializeDeferredSidebar();
@@ -151,11 +142,9 @@ function initializeDeferredSidebar() {
     setupSidebarResize();
 }
 
-/*
-=========================================================
+/* =========================================================
 LOAD HOVER TOOLTIP HTML
-=========================================================
-*/
+========================================================= */
 
 export async function loadSidebarHover() {
     const hoverFile =
@@ -215,15 +204,13 @@ export async function loadSidebarHover() {
     }
 }
 
-
-/*
-=========================================================
+/* =========================================================
 GLOBAL SETTINGS
+
 Theme, animations and saved sidebar state.
 
 Sidebar preference is respected at every viewport size.
-=========================================================
-*/
+========================================================= */
 
 function applyGlobalSettings() {
     const sidebar =
@@ -310,12 +297,9 @@ function applyGlobalSettings() {
     );
 }
 
-
-/*
-=========================================================
+/* =========================================================
 SET SIDEBAR STATE
-=========================================================
-*/
+========================================================= */
 
 function setSidebarCollapsed(
     sidebar,
@@ -362,14 +346,16 @@ function setSidebarCollapsed(
     }
 }
 
-
-/*
-=========================================================
+/* =========================================================
 SIDEBAR TOGGLE
 
 Expansion is available on every screen size.
-=========================================================
-*/
+
+SPA protection:
+    initializeSidebar() may run again after routed navigation.
+    Do not attach another click listener to an already
+    initialized toggle button.
+========================================================= */
 
 function setupSidebarToggle() {
     const sidebar =
@@ -385,6 +371,15 @@ function setupSidebarToggle() {
     if (
         !sidebar
         || !sidebarToggle
+    ) {
+        return;
+    }
+
+    if (
+        sidebarToggle
+            .dataset
+            .sidebarToggleInitialized ===
+        "true"
     ) {
         return;
     }
@@ -416,18 +411,20 @@ function setupSidebarToggle() {
             hideSidebarTooltip();
         }
     );
+
+    sidebarToggle
+        .dataset
+        .sidebarToggleInitialized =
+        "true";
 }
 
-
-/*
-=========================================================
+/* =========================================================
 WINDOW RESIZE
 
 Do not force a sidebar state during resize.
 
 The user's explicit state remains authoritative.
-=========================================================
-*/
+========================================================= */
 
 function setupSidebarResize() {
     if (
@@ -486,12 +483,9 @@ function handleSidebarResize() {
     hideSidebarTooltip();
 }
 
-
-/*
-=========================================================
+/* =========================================================
 TOOLTIP SYSTEM
-=========================================================
-*/
+========================================================= */
 
 function setupSidebarTooltips() {
     const sidebar =
@@ -526,6 +520,18 @@ function setupSidebarTooltips() {
         function(
             item
         ) {
+            /*
+             * SPA-safe tooltip initialization.
+             */
+            if (
+                item
+                    .dataset
+                    .sidebarTooltipInitialized ===
+                "true"
+            ) {
+                return;
+            }
+
             item.addEventListener(
                 "mouseenter",
                 function(
@@ -594,26 +600,44 @@ function setupSidebarTooltips() {
                 "mouseleave",
                 hideSidebarTooltip
             );
+
+            item
+                .dataset
+                .sidebarTooltipInitialized =
+                "true";
         }
     );
 
-    sidebar.addEventListener(
-        "mouseleave",
-        hideSidebarTooltip
-    );
+    /*
+     * The sidebar itself may survive multiple SPA route
+     * initializations, so guard these shared listeners too.
+     */
+    if (
+        sidebar
+            .dataset
+            .sidebarTooltipContainerInitialized !==
+        "true"
+    ) {
+        sidebar.addEventListener(
+            "mouseleave",
+            hideSidebarTooltip
+        );
 
-    sidebar.addEventListener(
-        "scroll",
-        hideSidebarTooltip
-    );
+        sidebar.addEventListener(
+            "scroll",
+            hideSidebarTooltip
+        );
+
+        sidebar
+            .dataset
+            .sidebarTooltipContainerInitialized =
+            "true";
+    }
 }
 
-
-/*
-=========================================================
+/* =========================================================
 SHOW TOOLTIP
-=========================================================
-*/
+========================================================= */
 
 function showSidebarTooltip(
     tooltip,
@@ -640,12 +664,9 @@ function showSidebarTooltip(
     );
 }
 
-
-/*
-=========================================================
+/* =========================================================
 HIDE TOOLTIP
-=========================================================
-*/
+========================================================= */
 
 function hideSidebarTooltip() {
     const tooltip =
@@ -668,8 +689,8 @@ function hideSidebarTooltip() {
         "true"
     );
 }
-/*
-=========================================================
+
+/* =========================================================
 ROUTE VISIBILITY
 
 Hides navigation items configured to be hidden on an exact
@@ -677,8 +698,7 @@ route.
 
 Example:
     data-hide-on-route="/RocketLeague"
-=========================================================
-*/
+========================================================= */
 
 function setupRouteVisibility() {
     const currentPath =
@@ -707,11 +727,9 @@ function setupRouteVisibility() {
     );
 }
 
-/*
-=========================================================
+/* =========================================================
 ACTIVE NAVIGATION
-=========================================================
-*/
+========================================================= */
 
 function setupActiveNavigation() {
     const currentPath =
@@ -738,7 +756,8 @@ function setupActiveNavigation() {
                 route;
 
             const childMatch =
-                route !== "/"
+                route !==
+                "/"
                 && currentPath.startsWith(
                     `${route}/`
                 );
@@ -752,12 +771,9 @@ function setupActiveNavigation() {
     );
 }
 
-
-/*
-=========================================================
+/* =========================================================
 NORMALIZE PATH
-=========================================================
-*/
+========================================================= */
 
 function normalizePath(
     path
@@ -774,7 +790,8 @@ function normalizePath(
         );
 
     if (
-        normalizedPath.length > 1
+        normalizedPath.length >
+            1
         && normalizedPath.endsWith(
             "/"
         )
@@ -796,12 +813,9 @@ function normalizePath(
     return normalizedPath;
 }
 
-
-/*
-=========================================================
+/* =========================================================
 DISABLED NAVIGATION
-=========================================================
-*/
+========================================================= */
 
 function setupDisabledNavigation() {
     const disabledItems =
@@ -813,6 +827,15 @@ function setupDisabledNavigation() {
         function(
             item
         ) {
+            if (
+                item
+                    .dataset
+                    .disabledNavigationInitialized ===
+                "true"
+            ) {
+                return;
+            }
+
             item.addEventListener(
                 "click",
                 function(
@@ -826,6 +849,11 @@ function setupDisabledNavigation() {
                 "aria-disabled",
                 "true"
             );
+
+            item
+                .dataset
+                .disabledNavigationInitialized =
+                "true";
         }
     );
 }

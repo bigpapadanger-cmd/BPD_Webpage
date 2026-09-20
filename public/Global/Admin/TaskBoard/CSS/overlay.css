@@ -1,0 +1,1470 @@
+/* =========================================================
+BPD GAMING NETWORK
+TASKBOARD OVERLAY STYLES
+
+File:
+    public/Global/Admin/TaskBoard/CSS/overlays.css
+
+Purpose:
+    Shared overlay styling for modular Admin Taskboard
+    interfaces.
+
+Used By:
+    - create_task.html
+    - task_detail.html
+    - task_comments.html
+    - task_history.html
+
+Responsibilities:
+    - Shared full-screen overlay presentation.
+    - Shared dialog structure.
+    - Shared dialog headers and actions.
+    - Shared form and message presentation.
+    - Shared metadata cards and content sections.
+    - Shared comments/history containers.
+    - Shared responsive behavior.
+    - Shared scrolling and overflow protection.
+
+Important:
+    - The global application shell owns sidebar positioning.
+    - Overlays render above the existing routed page.
+    - Overlay dialogs never use sidebar offsets.
+    - Feature-specific classes should extend these shared
+      classes rather than duplicate them.
+========================================================= */
+
+/* =========================================================
+OVERLAY OPEN STATE
+========================================================= */
+
+html.task-overlay-open,
+html.task-overlay-open body {
+    overflow: hidden;
+}
+
+/* Compatibility with Create Task controller name. */
+
+html.task-create-open,
+html.task-create-open body {
+    overflow: hidden;
+}
+
+/* =========================================================
+SHARED BOX SIZING
+========================================================= */
+
+.task-overlay,
+.task-overlay *,
+.task-dialog,
+.task-dialog * {
+    box-sizing: border-box;
+}
+
+/* =========================================================
+OVERLAY BACKDROP
+========================================================= */
+
+.task-overlay {
+    position: fixed;
+
+    inset: 0;
+
+    z-index: 1000;
+
+    display: flex;
+
+    align-items: flex-start;
+
+    justify-content: center;
+
+    width: 100%;
+
+    min-width: 0;
+
+    height: 100%;
+
+    padding:
+        40px
+        20px;
+
+    background:
+        rgba(
+            0,
+            0,
+            0,
+            0.72
+        );
+
+    overflow-x: hidden;
+
+    overflow-y: auto;
+
+    overscroll-behavior:
+        contain;
+}
+
+/* =========================================================
+HIDDEN OVERLAYS
+========================================================= */
+
+.task-overlay[hidden] {
+    display: none !important;
+}
+
+/* =========================================================
+SHARED DIALOG
+========================================================= */
+
+.task-dialog {
+    position: relative;
+
+    width:
+        min(
+            100%,
+            760px
+        );
+
+    min-width: 0;
+
+    max-width: 100%;
+
+    margin:
+        auto;
+
+    padding:
+        24px;
+
+    border:
+        1px solid
+        rgba(
+            255,
+            255,
+            255,
+            0.14
+        );
+
+    border-radius:
+        14px;
+
+    background:
+        #11151d;
+
+    color:
+        inherit;
+
+    box-shadow:
+        0
+        24px
+        80px
+        rgba(
+            0,
+            0,
+            0,
+            0.45
+        );
+
+    overflow:
+        hidden;
+}
+
+/* =========================================================
+FEATURE DIALOG WIDTHS
+========================================================= */
+
+.task-create-dialog {
+    width:
+        min(
+            100%,
+            760px
+        );
+}
+
+.task-detail-dialog {
+    width:
+        min(
+            100%,
+            920px
+        );
+}
+
+.task-comments-dialog {
+    width:
+        min(
+            100%,
+            760px
+        );
+}
+
+.task-history-dialog {
+    width:
+        min(
+            100%,
+            860px
+        );
+}
+
+/* =========================================================
+DIALOG HEADER
+========================================================= */
+
+.task-dialog-header {
+    display: flex;
+
+    align-items: flex-start;
+
+    justify-content: space-between;
+
+    gap:
+        20px;
+
+    width: 100%;
+
+    min-width: 0;
+
+    margin-bottom:
+        24px;
+
+    padding-bottom:
+        18px;
+
+    border-bottom:
+        1px solid
+        rgba(
+            255,
+            255,
+            255,
+            0.1
+        );
+}
+
+.task-dialog-header-content {
+    flex:
+        1 1 auto;
+
+    min-width: 0;
+}
+
+.task-dialog-eyebrow {
+    margin:
+        0
+        0
+        7px;
+
+    font-size:
+        0.76rem;
+
+    font-weight:
+        700;
+
+    letter-spacing:
+        0.09em;
+
+    text-transform:
+        uppercase;
+
+    opacity:
+        0.68;
+}
+
+.task-dialog-header h2 {
+    margin:
+        0;
+
+    font-size:
+        clamp(
+            1.4rem,
+            3vw,
+            1.9rem
+        );
+
+    line-height:
+        1.15;
+
+    overflow-wrap:
+        anywhere;
+}
+
+.task-dialog-header p {
+    margin:
+        9px
+        0
+        0;
+
+    max-width:
+        700px;
+
+    line-height:
+        1.55;
+
+    overflow-wrap:
+        anywhere;
+
+    opacity:
+        0.72;
+}
+
+/* =========================================================
+DIALOG CLOSE BUTTON
+========================================================= */
+
+.task-dialog-close {
+    flex:
+        0 0 auto;
+}
+
+/* =========================================================
+DIALOG BODY
+========================================================= */
+
+.task-dialog-body {
+    width: 100%;
+
+    min-width: 0;
+
+    max-width: 100%;
+}
+
+/* =========================================================
+DIALOG SECTIONS
+========================================================= */
+
+.task-dialog-section {
+    width: 100%;
+
+    min-width: 0;
+
+    max-width: 100%;
+
+    margin-top:
+        20px;
+
+    padding:
+        18px;
+
+    border:
+        1px solid
+        rgba(
+            255,
+            255,
+            255,
+            0.11
+        );
+
+    border-radius:
+        9px;
+
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            0.02
+        );
+}
+
+.task-dialog-section:first-child {
+    margin-top: 0;
+}
+
+.task-dialog-section h3 {
+    margin:
+        0
+        0
+        8px;
+
+    overflow-wrap:
+        anywhere;
+}
+
+.task-dialog-section > p {
+    margin:
+        0
+        0
+        14px;
+
+    line-height:
+        1.5;
+
+    overflow-wrap:
+        anywhere;
+
+    opacity:
+        0.7;
+}
+
+/* =========================================================
+SHARED FORM
+========================================================= */
+
+.task-dialog-form {
+    display: flex;
+
+    flex-direction:
+        column;
+
+    gap:
+        20px;
+
+    width:
+        100%;
+
+    min-width:
+        0;
+}
+
+.task-dialog-form-row {
+    display: grid;
+
+    grid-template-columns:
+        repeat(
+            2,
+            minmax(
+                0,
+                1fr
+            )
+        );
+
+    gap:
+        18px;
+
+    width:
+        100%;
+
+    min-width:
+        0;
+}
+
+/* =========================================================
+SHARED FIELD
+========================================================= */
+
+.task-dialog-field {
+    display: flex;
+
+    flex-direction:
+        column;
+
+    gap:
+        7px;
+
+    width:
+        100%;
+
+    min-width:
+        0;
+}
+
+.task-dialog-field label,
+.task-dialog-fieldset legend {
+    font-weight:
+        700;
+}
+
+.task-dialog-field input,
+.task-dialog-field textarea,
+.task-dialog-field select {
+    display: block;
+
+    width: 100%;
+
+    min-width: 0;
+
+    max-width: 100%;
+
+    min-height:
+        42px;
+
+    padding:
+        10px
+        12px;
+
+    border:
+        1px solid
+        rgba(
+            255,
+            255,
+            255,
+            0.18
+        );
+
+    border-radius:
+        7px;
+
+    background:
+        rgba(
+            0,
+            0,
+            0,
+            0.18
+        );
+
+    color:
+        inherit;
+
+    font:
+        inherit;
+}
+
+.task-dialog-field textarea {
+    min-height:
+        110px;
+
+    resize:
+        vertical;
+
+    line-height:
+        1.5;
+}
+
+.task-dialog-field input:focus,
+.task-dialog-field textarea:focus,
+.task-dialog-field select:focus {
+    outline:
+        2px solid
+        currentColor;
+
+    outline-offset:
+        2px;
+}
+
+.task-dialog-field input:disabled,
+.task-dialog-field textarea:disabled,
+.task-dialog-field select:disabled {
+    cursor:
+        not-allowed;
+
+    opacity:
+        0.55;
+}
+
+.task-dialog-field small {
+    line-height:
+        1.4;
+
+    overflow-wrap:
+        anywhere;
+
+    opacity:
+        0.62;
+}
+
+/* =========================================================
+FIELDSET
+========================================================= */
+
+.task-dialog-fieldset {
+    min-width:
+        0;
+
+    max-width:
+        100%;
+
+    margin:
+        0;
+
+    padding:
+        16px;
+
+    border:
+        1px solid
+        rgba(
+            255,
+            255,
+            255,
+            0.14
+        );
+
+    border-radius:
+        9px;
+}
+
+.task-dialog-fieldset > p {
+    margin:
+        7px
+        0
+        14px;
+
+    line-height:
+        1.45;
+
+    overflow-wrap:
+        anywhere;
+
+    opacity:
+        0.7;
+}
+
+/* =========================================================
+ROLE OPTIONS
+========================================================= */
+
+.task-dialog-role-options {
+    display: flex;
+
+    flex-wrap: wrap;
+
+    gap:
+        10px;
+
+    min-width: 0;
+}
+
+.task-dialog-role-options label {
+    display:
+        inline-flex;
+
+    align-items:
+        center;
+
+    gap:
+        8px;
+
+    max-width:
+        100%;
+
+    padding:
+        9px
+        12px;
+
+    border:
+        1px solid
+        rgba(
+            255,
+            255,
+            255,
+            0.14
+        );
+
+    border-radius:
+        8px;
+
+    cursor:
+        pointer;
+}
+
+.task-dialog-role-options input {
+    flex:
+        0 0 auto;
+
+    margin: 0;
+}
+
+/* =========================================================
+DIALOG MESSAGE
+========================================================= */
+
+.task-dialog-message {
+    width: 100%;
+
+    min-width: 0;
+
+    max-width: 100%;
+
+    padding:
+        11px
+        13px;
+
+    border:
+        1px solid
+        rgba(
+            255,
+            255,
+            255,
+            0.14
+        );
+
+    border-radius:
+        8px;
+
+    line-height:
+        1.45;
+
+    overflow-wrap:
+        anywhere;
+}
+
+.task-dialog-message[data-state="success"] {
+    border-color:
+        rgba(
+            70,
+            200,
+            120,
+            0.55
+        );
+
+    background:
+        rgba(
+            70,
+            200,
+            120,
+            0.06
+        );
+}
+
+.task-dialog-message[data-state="warning"] {
+    border-color:
+        rgba(
+            240,
+            180,
+            60,
+            0.6
+        );
+
+    background:
+        rgba(
+            240,
+            180,
+            60,
+            0.06
+        );
+}
+
+.task-dialog-message[data-state="error"] {
+    border-color:
+        rgba(
+            230,
+            80,
+            80,
+            0.65
+        );
+
+    background:
+        rgba(
+            230,
+            80,
+            80,
+            0.06
+        );
+}
+
+/* =========================================================
+DIALOG ACTIONS
+========================================================= */
+
+.task-dialog-actions {
+    display: flex;
+
+    align-items: center;
+
+    justify-content: flex-end;
+
+    flex-wrap: wrap;
+
+    gap:
+        10px;
+
+    width: 100%;
+
+    min-width: 0;
+
+    margin-top:
+        4px;
+}
+
+/* =========================================================
+SHARED BUTTONS
+========================================================= */
+
+.task-dialog button {
+    max-width:
+        100%;
+
+    min-height:
+        38px;
+
+    padding:
+        8px
+        14px;
+
+    border:
+        1px solid
+        rgba(
+            255,
+            255,
+            255,
+            0.2
+        );
+
+    border-radius:
+        7px;
+
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            0.06
+        );
+
+    color:
+        inherit;
+
+    font:
+        inherit;
+
+    font-weight:
+        600;
+
+    white-space:
+        normal;
+
+    overflow-wrap:
+        anywhere;
+
+    cursor:
+        pointer;
+}
+
+.task-dialog button:hover,
+.task-dialog button:focus-visible {
+    border-color:
+        currentColor;
+
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            0.1
+        );
+}
+
+.task-dialog button:disabled {
+    cursor:
+        wait;
+
+    opacity:
+        0.5;
+}
+
+/* =========================================================
+PRIMARY BUTTON
+========================================================= */
+
+.task-dialog-primary {
+    border-color:
+        rgba(
+            100,
+            156,
+            255,
+            0.5
+        ) !important;
+
+    background:
+        rgba(
+            70,
+            125,
+            255,
+            0.16
+        ) !important;
+}
+
+/* =========================================================
+DANGER BUTTON
+========================================================= */
+
+.task-dialog-danger {
+    border-color:
+        rgba(
+            230,
+            80,
+            80,
+            0.55
+        ) !important;
+
+    background:
+        rgba(
+            230,
+            80,
+            80,
+            0.08
+        ) !important;
+}
+
+/* =========================================================
+TASK METADATA GRID
+========================================================= */
+
+.task-dialog-metadata {
+    display:
+        grid;
+
+    grid-template-columns:
+        repeat(
+            4,
+            minmax(
+                0,
+                1fr
+            )
+        );
+
+    gap:
+        12px;
+
+    width:
+        100%;
+
+    min-width:
+        0;
+
+    margin-bottom:
+        20px;
+}
+
+.task-dialog-metadata > div {
+    min-width:
+        0;
+
+    padding:
+        14px;
+
+    border:
+        1px solid
+        rgba(
+            255,
+            255,
+            255,
+            0.11
+        );
+
+    border-radius:
+        8px;
+
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            0.02
+        );
+}
+
+.task-dialog-metadata span {
+    display:
+        block;
+
+    margin-bottom:
+        6px;
+
+    font-size:
+        0.76rem;
+
+    font-weight:
+        600;
+
+    overflow-wrap:
+        anywhere;
+
+    opacity:
+        0.64;
+}
+
+.task-dialog-metadata strong {
+    display:
+        block;
+
+    overflow-wrap:
+        anywhere;
+}
+
+/* =========================================================
+TASK DESCRIPTION
+========================================================= */
+
+.task-dialog-description {
+    width: 100%;
+
+    min-width: 0;
+
+    padding:
+        18px;
+
+    border:
+        1px solid
+        rgba(
+            255,
+            255,
+            255,
+            0.11
+        );
+
+    border-radius:
+        9px;
+
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            0.02
+        );
+}
+
+.task-dialog-description h3 {
+    margin:
+        0
+        0
+        10px;
+}
+
+.task-dialog-description p {
+    margin: 0;
+
+    white-space:
+        pre-wrap;
+
+    line-height:
+        1.55;
+
+    overflow-wrap:
+        anywhere;
+}
+
+/* =========================================================
+BADGES
+========================================================= */
+
+.task-dialog-badges {
+    display: flex;
+
+    flex-wrap: wrap;
+
+    gap:
+        8px;
+
+    min-width: 0;
+}
+
+.task-dialog-badge {
+    display:
+        inline-flex;
+
+    align-items:
+        center;
+
+    min-height:
+        25px;
+
+    padding:
+        4px
+        8px;
+
+    border:
+        1px solid
+        rgba(
+            255,
+            255,
+            255,
+            0.18
+        );
+
+    border-radius:
+        999px;
+
+    font-size:
+        0.73rem;
+
+    font-weight:
+        600;
+
+    overflow-wrap:
+        anywhere;
+}
+
+/* =========================================================
+LIFECYCLE ACTIONS
+========================================================= */
+
+.task-dialog-lifecycle-actions {
+    display: flex;
+
+    flex-wrap: wrap;
+
+    gap:
+        9px;
+
+    min-width: 0;
+
+    margin-top:
+        14px;
+}
+
+/* =========================================================
+COMMENTS
+========================================================= */
+
+.task-comments-list {
+    display: flex;
+
+    flex-direction:
+        column;
+
+    gap:
+        10px;
+
+    width:
+        100%;
+
+    min-width: 0;
+}
+
+.task-comment {
+    min-width: 0;
+
+    padding:
+        13px
+        15px;
+
+    border:
+        1px solid
+        rgba(
+            255,
+            255,
+            255,
+            0.11
+        );
+
+    border-radius:
+        8px;
+
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            0.02
+        );
+}
+
+.task-comment-header {
+    display: flex;
+
+    align-items: flex-start;
+
+    justify-content: space-between;
+
+    flex-wrap: wrap;
+
+    gap:
+        8px
+        12px;
+
+    min-width: 0;
+
+    margin-bottom:
+        7px;
+
+    font-size:
+        0.8rem;
+}
+
+.task-comment-author {
+    min-width: 0;
+
+    font-weight:
+        700;
+
+    overflow-wrap:
+        anywhere;
+}
+
+.task-comment-time {
+    opacity:
+        0.58;
+}
+
+.task-comment-body {
+    margin: 0;
+
+    white-space:
+        pre-wrap;
+
+    line-height:
+        1.5;
+
+    overflow-wrap:
+        anywhere;
+}
+
+/* =========================================================
+COMMENT FORM
+========================================================= */
+
+.task-comments-form {
+    display: flex;
+
+    flex-direction:
+        column;
+
+    gap:
+        14px;
+
+    width:
+        100%;
+
+    min-width: 0;
+
+    margin-top:
+        18px;
+}
+
+/* =========================================================
+HISTORY
+========================================================= */
+
+.task-history-list {
+    display: flex;
+
+    flex-direction:
+        column;
+
+    gap:
+        9px;
+
+    width:
+        100%;
+
+    min-width: 0;
+}
+
+.task-history-item {
+    position:
+        relative;
+
+    min-width: 0;
+
+    padding:
+        12px
+        14px
+        12px
+        20px;
+
+    border-left:
+        2px solid
+        rgba(
+            255,
+            255,
+            255,
+            0.2
+        );
+}
+
+.task-history-item p {
+    margin: 0;
+
+    line-height:
+        1.45;
+
+    overflow-wrap:
+        anywhere;
+}
+
+.task-history-item time {
+    display:
+        block;
+
+    margin-top:
+        5px;
+
+    font-size:
+        0.75rem;
+
+    opacity:
+        0.58;
+}
+
+/* =========================================================
+EMPTY STATE
+========================================================= */
+
+.task-dialog-empty {
+    width:
+        100%;
+
+    min-width:
+        0;
+
+    margin: 0;
+
+    padding:
+        24px;
+
+    border:
+        1px dashed
+        rgba(
+            255,
+            255,
+            255,
+            0.18
+        );
+
+    border-radius:
+        8px;
+
+    text-align:
+        center;
+
+    line-height:
+        1.45;
+
+    overflow-wrap:
+        anywhere;
+
+    opacity:
+        0.68;
+}
+
+/* =========================================================
+LOADING BLOCK
+========================================================= */
+
+.task-dialog-loading {
+    width:
+        100%;
+
+    min-width:
+        0;
+
+    padding:
+        24px;
+
+    text-align:
+        center;
+
+    opacity:
+        0.68;
+}
+
+/* =========================================================
+MEDIUM VIEWPORTS
+========================================================= */
+
+@media (max-width: 900px) {
+    .task-dialog-metadata {
+        grid-template-columns:
+            repeat(
+                2,
+                minmax(
+                    0,
+                    1fr
+                )
+            );
+    }
+}
+
+/* =========================================================
+SMALL VIEWPORTS
+========================================================= */
+
+@media (max-width: 700px) {
+    .task-overlay,
+    .task-create-overlay {
+        padding:
+            18px
+            14px;
+    }
+
+    .task-dialog,
+    .task-create-dialog {
+        padding:
+            20px;
+    }
+
+    .task-dialog-header,
+    .task-create-header {
+        flex-direction:
+            column;
+
+        gap:
+            14px;
+    }
+
+    .task-dialog-form-row,
+    .task-overlay .taskboard-form-row,
+    .task-create-overlay .taskboard-form-row {
+        grid-template-columns:
+            1fr;
+    }
+
+    .task-dialog-metadata {
+        grid-template-columns:
+            1fr;
+    }
+
+    .task-dialog-actions,
+    .task-overlay .taskboard-form-actions,
+    .task-create-overlay .taskboard-form-actions {
+        flex-direction:
+            column-reverse;
+    }
+
+    .task-dialog-actions button,
+    .task-overlay .taskboard-form-actions button,
+    .task-create-overlay .taskboard-form-actions button {
+        width: 100%;
+    }
+}
+
+/* =========================================================
+VERY SMALL VIEWPORTS
+========================================================= */
+
+@media (max-width: 480px) {
+    .task-overlay,
+    .task-create-overlay {
+        padding:
+            10px;
+    }
+
+    .task-dialog,
+    .task-create-dialog {
+        padding:
+            16px;
+
+        border-radius:
+            10px;
+    }
+
+    .task-dialog-section {
+        padding:
+            15px;
+    }
+
+    .task-dialog-role-options,
+    .task-overlay .taskboard-role-options,
+    .task-create-overlay .taskboard-role-options {
+        flex-direction:
+            column;
+    }
+
+    .task-dialog-role-options label,
+    .task-overlay .taskboard-role-options label,
+    .task-create-overlay .taskboard-role-options label {
+        width: 100%;
+    }
+
+    .task-dialog-lifecycle-actions {
+        flex-direction:
+            column;
+    }
+
+    .task-dialog-lifecycle-actions button {
+        width: 100%;
+    }
+
+    .task-comment-header {
+        flex-direction:
+            column;
+    }
+}
+
+/* =========================================================
+REDUCED MOTION
+========================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+    .task-dialog button {
+        transition:
+            none !important;
+    }
+}

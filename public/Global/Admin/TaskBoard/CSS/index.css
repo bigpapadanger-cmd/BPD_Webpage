@@ -22,17 +22,27 @@ Layout:
     - Uses the same 1100px primary content width as the
       Account and Admin Management pages.
     - Never allows the Taskboard shell to exceed the
-      available viewport width.
+      available routed-content width.
     - Components collapse progressively on smaller screens.
+
+Important:
+    - The global shell owns sidebar positioning.
+    - This stylesheet must not add sidebar offsets.
+    - #taskboardContent owns available routed-content width.
+    - .taskboard-page owns the centered Taskboard width.
 ========================================================= */
 
 /* =========================================================
-GLOBAL
+HIDDEN STATE
 ========================================================= */
 
 [hidden] {
     display: none !important;
 }
+
+/* =========================================================
+DOCUMENT
+========================================================= */
 
 html,
 body {
@@ -44,8 +54,18 @@ body {
     min-height: 100vh;
 }
 
+/* =========================================================
+BOX SIZING
+
+Authorized content and standalone state pages both need
+border-box sizing so 100%-wide elements plus padding never
+overflow their available width.
+========================================================= */
+
 .taskboard-page,
-.taskboard-page * {
+.taskboard-page *,
+.taskboard-state-page,
+.taskboard-state-page * {
     box-sizing: border-box;
 }
 
@@ -55,13 +75,13 @@ PAGE SHELL
 The global shell/router is responsible for positioning the
 main page beside the sidebar.
 
-Do not add a second sidebar margin here. Doing so can make
-100%-wide content extend beyond the viewport.
+Do not add sidebar margins or fixed left offsets here.
 ========================================================= */
 
 #taskboardContent {
     width: 100%;
     min-width: 0;
+    max-width: 100%;
     min-height: 100%;
 
     padding:
@@ -74,6 +94,10 @@ Do not add a second sidebar margin here. Doing so can make
     overflow-x: clip;
 }
 
+/* =========================================================
+INNER TASKBOARD PAGE
+========================================================= */
+
 .taskboard-page {
     width:
         min(
@@ -82,9 +106,9 @@ Do not add a second sidebar margin here. Doing so can make
         );
 
     min-width: 0;
+    max-width: 100%;
 
-    margin-inline:
-        auto;
+    margin-inline: auto;
 }
 
 /* =========================================================
@@ -102,6 +126,7 @@ HERO
 
     width: 100%;
     min-width: 0;
+    max-width: 100%;
 
     margin-bottom:
         28px;
@@ -162,8 +187,7 @@ HERO
 }
 
 .taskboard-hero h1 {
-    margin:
-        0;
+    margin: 0;
 
     font-size:
         clamp(
@@ -216,6 +240,9 @@ IDENTITY / ROLES
     min-width:
         190px;
 
+    max-width:
+        100%;
+
     padding:
         16px
         18px;
@@ -265,17 +292,15 @@ IDENTITY / ROLES
 }
 
 .taskboard-role-list {
-    display:
-        flex;
+    display: flex;
 
-    flex-wrap:
-        wrap;
+    flex-wrap: wrap;
 
     gap:
         7px;
 
-    min-width:
-        0;
+    min-width: 0;
+    max-width: 100%;
 }
 
 .taskboard-role {
@@ -325,6 +350,9 @@ GLOBAL STATUS
 
     min-width:
         0;
+
+    max-width:
+        100%;
 
     margin-bottom:
         22px;
@@ -394,6 +422,9 @@ SECTIONS
     min-width:
         0;
 
+    max-width:
+        100%;
+
     margin-bottom:
         28px;
 }
@@ -415,6 +446,9 @@ SECTIONS
 
     min-width:
         0;
+
+    max-width:
+        100%;
 }
 
 .taskboard-section-heading {
@@ -479,6 +513,9 @@ PRIMARY ACTIONS
 
     min-width:
         0;
+
+    max-width:
+        100%;
 }
 
 .taskboard-action-card {
@@ -499,6 +536,9 @@ PRIMARY ACTIONS
 
     min-width:
         0;
+
+    max-width:
+        100%;
 
     min-height:
         130px;
@@ -677,11 +717,17 @@ SUMMARY
 
     min-width:
         0;
+
+    max-width:
+        100%;
 }
 
 .taskboard-summary-card {
     min-width:
         0;
+
+    max-width:
+        100%;
 
     min-height:
         105px;
@@ -834,6 +880,9 @@ WORKSPACES
     min-width:
         0;
 
+    max-width:
+        100%;
+
     margin:
         28px
         0;
@@ -860,6 +909,9 @@ WORKSPACES
             255,
             0.025
         );
+
+    overflow:
+        hidden;
 }
 
 .taskboard-workspace-header {
@@ -898,6 +950,9 @@ FORMS
 
     min-width:
         0;
+
+    max-width:
+        100%;
 }
 
 .taskboard-form-row {
@@ -1036,6 +1091,9 @@ FORMS
     min-width:
         0;
 
+    max-width:
+        100%;
+
     margin:
         0;
 
@@ -1147,6 +1205,9 @@ FORMS
     min-width:
         0;
 
+    max-width:
+        100%;
+
     padding:
         11px
         13px;
@@ -1198,6 +1259,9 @@ FILTERS
     min-width:
         0;
 
+    max-width:
+        100%;
+
     margin-bottom:
         20px;
 }
@@ -1221,6 +1285,9 @@ TASK LIST
 
     min-width:
         0;
+
+    max-width:
+        100%;
 }
 
 .taskboard-task-card {
@@ -1242,6 +1309,9 @@ TASK LIST
 
     min-width:
         0;
+
+    max-width:
+        100%;
 
     padding:
         18px;
@@ -1442,6 +1512,9 @@ TASK DETAILS
     min-width:
         0;
 
+    max-width:
+        100%;
+
     margin-bottom:
         24px;
 }
@@ -1501,6 +1574,9 @@ TASK DETAILS
     min-width:
         0;
 
+    max-width:
+        100%;
+
     margin-bottom:
         24px;
 
@@ -1551,6 +1627,9 @@ TASK SUBSECTIONS
 
     min-width:
         0;
+
+    max-width:
+        100%;
 
     margin-top:
         20px;
@@ -1635,6 +1714,9 @@ DISCUSSION
     min-width:
         0;
 
+    max-width:
+        100%;
+
     margin:
         18px
         0;
@@ -1643,6 +1725,9 @@ DISCUSSION
 .taskboard-comment {
     min-width:
         0;
+
+    max-width:
+        100%;
 
     padding:
         13px
@@ -1722,6 +1807,9 @@ DISCUSSION
     min-width:
         0;
 
+    max-width:
+        100%;
+
     margin-top:
         16px;
 }
@@ -1746,6 +1834,9 @@ HISTORY
     min-width:
         0;
 
+    max-width:
+        100%;
+
     margin-top:
         14px;
 }
@@ -1756,6 +1847,9 @@ HISTORY
 
     min-width:
         0;
+
+    max-width:
+        100%;
 
     padding:
         12px
@@ -1809,6 +1903,9 @@ EMPTY STATE
     min-width:
         0;
 
+    max-width:
+        100%;
+
     margin:
         0;
 
@@ -1839,9 +1936,6 @@ EMPTY STATE
 
 /* =========================================================
 LOADING / DENIED / ERROR
-
-These states use the same general 1100px outer-page
-geometry but keep their message panel centered.
 ========================================================= */
 
 #taskboardLoading,
@@ -1853,6 +1947,9 @@ geometry but keep their message panel centered.
     min-width:
         0;
 
+    max-width:
+        100%;
+
     min-height:
         100%;
 
@@ -1863,7 +1960,14 @@ geometry but keep their message panel centered.
 
     box-sizing:
         border-box;
+
+    overflow-x:
+        hidden;
 }
+
+/* =========================================================
+STATE PANEL
+========================================================= */
 
 .taskboard-state-panel {
     width:
@@ -1874,6 +1978,9 @@ geometry but keep their message panel centered.
 
     min-width:
         0;
+
+    max-width:
+        100%;
 
     margin:
         80px

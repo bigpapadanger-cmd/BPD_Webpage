@@ -2,12 +2,21 @@
 BPD GAMING NETWORK
 RESPONSIVE ATTACHED SIDEBAR
 
+File:
+    /Framework/Shell/CSS/sidebar.css
+
 Purpose:
     Provides the persistent floating sidebar with:
     - shared body/sidebar vertical height
     - attached toggle header
     - animated expand/collapse width
     - animated hamburger/X toggle icon
+
+Important:
+    - Only direct child spans of .sidebar-toggle are treated
+      as hamburger/X bars.
+    - Nested spans used by route-specific content are not
+      styled as toggle bars.
 ========================================================= */
 
 :root {
@@ -362,9 +371,15 @@ TOGGLE BUTTON
 
 /* =========================================================
 TOGGLE ICON BARS
+
+Only the three direct child spans belong to the hamburger/X
+animation.
+
+This prevents nested spans from route-specific sidebar
+content from accidentally becoming toggle bars.
 ========================================================= */
 
-.sidebar-toggle span {
+.sidebar-toggle > span {
     display: block;
 
     width:
@@ -399,7 +414,7 @@ Hamburger
 
 body.sidebar-collapsed
 .sidebar-toggle
-span:nth-child(1) {
+> span:nth-child(1) {
     transform:
         translateY(0)
         rotate(0deg);
@@ -407,7 +422,7 @@ span:nth-child(1) {
 
 body.sidebar-collapsed
 .sidebar-toggle
-span:nth-child(2) {
+> span:nth-child(2) {
     opacity: 1;
 
     transform:
@@ -416,7 +431,7 @@ span:nth-child(2) {
 
 body.sidebar-collapsed
 .sidebar-toggle
-span:nth-child(3) {
+> span:nth-child(3) {
     transform:
         translateY(0)
         rotate(0deg);
@@ -435,7 +450,7 @@ body:not(.sidebar-collapsed)
 
 body:not(.sidebar-collapsed)
 .sidebar-toggle
-span:nth-child(1) {
+> span:nth-child(1) {
     transform:
         translateY(6px)
         rotate(45deg);
@@ -443,7 +458,7 @@ span:nth-child(1) {
 
 body:not(.sidebar-collapsed)
 .sidebar-toggle
-span:nth-child(2) {
+> span:nth-child(2) {
     opacity: 0;
 
     transform:
@@ -452,7 +467,7 @@ span:nth-child(2) {
 
 body:not(.sidebar-collapsed)
 .sidebar-toggle
-span:nth-child(3) {
+> span:nth-child(3) {
     transform:
         translateY(-6px)
         rotate(-45deg);
@@ -993,7 +1008,7 @@ ACCESSIBILITY
     .site-sidebar,
     .sidebar-toggle-box,
     .sidebar-toggle,
-    .sidebar-toggle span,
+    .sidebar-toggle > span,
     .sidebar-navigation,
     .site-sidebar .nav-item,
     .site-sidebar .nav-icon,
@@ -1002,7 +1017,11 @@ ACCESSIBILITY
             none;
     }
 }
-/* Authorization-hidden links must override the normal flex layout. */
+
+/* =========================================================
+AUTHORIZATION VISIBILITY
+========================================================= */
+
 .site-sidebar .nav-item[hidden] {
     display: none !important;
 }

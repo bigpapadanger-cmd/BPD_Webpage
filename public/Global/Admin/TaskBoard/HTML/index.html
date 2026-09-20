@@ -9,21 +9,23 @@ Purpose:
     Admin Taskboard management interface.
 
 Responsibilities:
-    - Display the authenticated administrator's verified roles.
-    - Present the Taskboard summary before management actions.
+    - Display verified administrator responsibility roles.
+    - Present Taskboard summary information first.
     - Provide task creation controls.
-    - Provide role-based "My Tasks" review controls.
-    - Provide task detail and status management.
+    - Provide role-based task review controls.
+    - Provide task filtering and search.
+    - Provide task detail and lifecycle controls.
     - Provide task questions, comments, and history.
     - Provide loading, denied, and error states.
 
 Layout Order:
-    1. Taskboard header and verified roles.
+    1. Taskboard hero and verified roles.
     2. Global Taskboard status.
     3. Task summary.
-    4. Primary management actions.
-    5. Active task workspace.
-    6. Task detail workspace.
+    4. Task management actions.
+    5. Create Task workspace.
+    6. Review Tasks workspace.
+    7. Task Detail workspace.
 
 Important:
     - CSS is injected by the global page/router system.
@@ -59,7 +61,7 @@ Important:
 
     <main
         id="taskboardLoading"
-        class="taskboard-page taskboard-state-page"
+        class="taskboard-state-page"
     >
         <section
             class="taskboard-state-panel"
@@ -80,7 +82,7 @@ Important:
     </main>
 
     <!-- =====================================================
-    TASKBOARD
+    AUTHORIZED TASKBOARD CONTENT
     ====================================================== -->
 
     <main
@@ -89,7 +91,7 @@ Important:
     >
         <div class="taskboard-page">
             <!-- =============================================
-            HEADER / IDENTITY
+            HERO
             ============================================== -->
 
             <header class="taskboard-hero">
@@ -110,9 +112,13 @@ Important:
                     </p>
                 </div>
 
+                <!-- =========================================
+                VERIFIED RESPONSIBILITY ROLES
+                ========================================== -->
+
                 <aside
                     class="taskboard-identity"
-                    aria-label="Your Taskboard roles"
+                    aria-label="Your Taskboard responsibility roles"
                 >
                     <span class="taskboard-identity-label">
                         Your Role
@@ -160,8 +166,8 @@ Important:
                         </h2>
 
                         <p>
-                            Current workload for tasks available
-                            to your administrative roles.
+                            Current workload available to your
+                            verified administrative roles.
                         </p>
                     </div>
 
@@ -174,6 +180,10 @@ Important:
                 </div>
 
                 <div class="taskboard-summary-grid">
+                    <!-- =====================================
+                    ACTIVE
+                    ====================================== -->
+
                     <article class="taskboard-summary-card">
                         <span>
                             Active
@@ -183,6 +193,10 @@ Important:
                             —
                         </strong>
                     </article>
+
+                    <!-- =====================================
+                    COMPLETED
+                    ====================================== -->
 
                     <article class="taskboard-summary-card">
                         <span>
@@ -194,6 +208,10 @@ Important:
                         </strong>
                     </article>
 
+                    <!-- =====================================
+                    SHELVED
+                    ====================================== -->
+
                     <article class="taskboard-summary-card">
                         <span>
                             Shelved
@@ -203,6 +221,10 @@ Important:
                             —
                         </strong>
                     </article>
+
+                    <!-- =====================================
+                    LATE
+                    ====================================== -->
 
                     <article class="taskboard-summary-card">
                         <span>
@@ -217,7 +239,7 @@ Important:
             </section>
 
             <!-- =============================================
-            PRIMARY ACTIONS
+            TASK MANAGEMENT
             ============================================== -->
 
             <section
@@ -235,13 +257,18 @@ Important:
                         </h2>
 
                         <p>
-                            Create administrative work or review
-                            tasks assigned to your roles.
+                            Create administrative work or
+                            review tasks assigned to your
+                            responsibility roles.
                         </p>
                     </div>
                 </div>
 
                 <div class="taskboard-action-grid">
+                    <!-- =====================================
+                    CREATE TASK
+                    ====================================== -->
+
                     <button
                         id="taskboardCreateAction"
                         class="taskboard-action-card"
@@ -260,12 +287,16 @@ Important:
                             </strong>
 
                             <span>
-                                Create a task and assign
-                                responsibility to one or more
-                                administrative roles.
+                                Define administrative work,
+                                priority, timeline, and
+                                responsible roles.
                             </span>
                         </span>
                     </button>
+
+                    <!-- =====================================
+                    REVIEW TASKS
+                    ====================================== -->
 
                     <button
                         id="taskboardReviewAction"
@@ -294,7 +325,7 @@ Important:
                         <span
                             id="taskboardMyTaskCount"
                             class="taskboard-action-count"
-                            aria-label="Assigned tasks"
+                            aria-label="Assigned active tasks"
                         >
                             —
                         </span>
@@ -323,9 +354,9 @@ Important:
                         </h2>
 
                         <p>
-                            Define the work, priority, timeline,
-                            and responsible administrative
-                            roles.
+                            Define the task, priority,
+                            completion timeline, and responsible
+                            administrative roles.
                         </p>
                     </div>
 
@@ -343,7 +374,7 @@ Important:
                     class="taskboard-form"
                 >
                     <!-- =====================================
-                    TASK INFORMATION
+                    TASK TITLE
                     ====================================== -->
 
                     <div class="taskboard-field">
@@ -360,6 +391,10 @@ Important:
                             required
                         >
                     </div>
+
+                    <!-- =====================================
+                    TASK DESCRIPTION
+                    ====================================== -->
 
                     <div class="taskboard-field">
                         <label for="taskBody">
@@ -443,7 +478,7 @@ Important:
                     </div>
 
                     <!-- =====================================
-                    RESPONSIBILITY
+                    RESPONSIBLE ROLES
                     ====================================== -->
 
                     <fieldset class="taskboard-role-fieldset">
@@ -509,7 +544,7 @@ Important:
                     </fieldset>
 
                     <!-- =====================================
-                    CREATE MESSAGE
+                    CREATE STATUS MESSAGE
                     ====================================== -->
 
                     <div
@@ -542,7 +577,7 @@ Important:
             </section>
 
             <!-- =============================================
-            REVIEW MY TASKS WORKSPACE
+            REVIEW MY TASKS
             ============================================== -->
 
             <section
@@ -563,7 +598,7 @@ Important:
 
                         <p>
                             Tasks assigned to one or more of
-                            your verified administrative roles.
+                            your verified responsibility roles.
                         </p>
                     </div>
 
@@ -652,6 +687,19 @@ Important:
                 </div>
 
                 <!-- =========================================
+                FILTER ACTIONS
+                ========================================== -->
+
+                <div class="taskboard-form-actions">
+                    <button
+                        id="taskboardClearFilters"
+                        type="button"
+                    >
+                        Clear Filters
+                    </button>
+                </div>
+
+                <!-- =========================================
                 TASK LIST
                 ========================================== -->
 
@@ -667,7 +715,7 @@ Important:
             </section>
 
             <!-- =============================================
-            TASK DETAILS WORKSPACE
+            TASK DETAILS
             ============================================== -->
 
             <section
@@ -693,9 +741,9 @@ Important:
                     <button
                         id="taskboardTaskDetailClose"
                         type="button"
-                        aria-label="Close task details"
+                        aria-label="Return to task review"
                     >
-                        Close
+                        Back to Tasks
                     </button>
                 </div>
 
@@ -856,7 +904,7 @@ Important:
                 </section>
 
                 <!-- =========================================
-                HISTORY
+                TASK HISTORY
                 ========================================== -->
 
                 <section

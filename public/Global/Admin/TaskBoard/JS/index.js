@@ -8,39 +8,40 @@ File:
     public/Global/Admin/TaskBoard/JS/index.js
 
 Purpose:
-    Initializes and controls the Admin Taskboard interface.
+    Initializes and controls the primary Admin Taskboard page.
 
 Responsibilities:
     - Require centralized Admin authorization.
     - Require an active Admin responsibility role.
-    - Load verified Taskboard role context.
-    - Load task summary.
-    - Load task list.
-    - Load task assignees.
-    - Render Taskboard summary information.
-    - Render verified responsibility roles.
-    - Render and filter the user's accessible tasks.
-    - Control dashboard, create, review, and detail views.
+    - Load Taskboard summary data.
+    - Load accessible task records.
+    - Load Taskboard assignee information.
+    - Render summary information and responsibility roles.
+    - Render and filter accessible tasks.
+    - Open the modular Create Task interface.
+    - Open the modular Task Detail interface.
+    - Refresh dashboard data after task changes.
     - Handle manual refresh and retry.
-    - Export initializePage() for the BPD router.
 
-Access Requirements:
-    All Admin pages, including Taskboard, require:
+Modular Interfaces:
+    Create Task:
+        /Global/Admin/TaskBoard/JS/create_task.js
 
-    1. An authenticated active BPD account.
-    2. A verified and currently authorized Discord identity.
-    3. Current Discord Admin staff authorization.
-    4. At least one active responsibility role:
-           owner
-           database
-           security
-           ui
+    Task Detail:
+        /Global/Admin/TaskBoard/JS/task_detail.js
+
+    Task Detail internally coordinates:
+        task_lifecycle.js
+        task_comments.js
+        task_history.js
+        task_edit.js
+        task_confirm.js
 
 Security:
     - This module is NOT a security boundary.
-    - Client-side role claims are never authoritative.
-    - Task APIs independently enforce permissions,
-      membership, and task responsibility.
+    - Client-side permissions control presentation only.
+    - Task APIs independently enforce authorization,
+      responsibility membership, validation, and mutations.
     - Supabase credentials never reach the browser.
 
 Important:
@@ -56,7 +57,8 @@ IMPORTS
 
 import {
     getAuthState,
-    hasAdminAccess
+    hasAdminAccess,
+    getAdminResponsibilityRoles
 } from "/Framework/Auth/auth.js";
 
 /* =========================================================
@@ -71,6 +73,16 @@ const TASK_SUMMARY_URL =
 
 const TASK_ASSIGNEES_URL =
     "/api/auth/admin/tasks/task-assignees";
+
+/* =========================================================
+MODULAR CLIENT PATHS
+========================================================= */
+
+const CREATE_TASK_MODULE_URL =
+    "/Global/Admin/TaskBoard/JS/create_task.js";
+
+const TASK_DETAIL_MODULE_URL =
+    "/Global/Admin/TaskBoard/JS/task_detail.js";
 
 /* =========================================================
 TASKBOARD ROLES
@@ -92,6 +104,9 @@ const taskboardState = {
     access:
         null,
 
+    permissions:
+        [],
+
     summary:
         null,
 
@@ -99,9 +114,6 @@ const taskboardState = {
         [],
 
     assignees:
-        null,
-
-    selectedTask:
         null,
 
     view:
@@ -205,44 +217,14 @@ function getTaskboardElements() {
                 "taskboardReviewAction"
             ),
 
-        taskboardCreateView:
-            document.getElementById(
-                "taskboardCreateView"
-            ),
-
         taskboardReviewView:
             document.getElementById(
                 "taskboardReviewView"
             ),
 
-        taskboardTaskDetail:
-            document.getElementById(
-                "taskboardTaskDetail"
-            ),
-
-        taskboardCreateClose:
-            document.getElementById(
-                "taskboardCreateClose"
-            ),
-
-        taskboardCreateCancel:
-            document.getElementById(
-                "taskboardCreateCancel"
-            ),
-
-        taskboardCreateForm:
-            document.getElementById(
-                "taskboardCreateForm"
-            ),
-
         taskboardReviewClose:
             document.getElementById(
                 "taskboardReviewClose"
-            ),
-
-        taskboardTaskDetailClose:
-            document.getElementById(
-                "taskboardTaskDetailClose"
             ),
 
         taskboardTaskSearch:
@@ -260,9 +242,31 @@ function getTaskboardElements() {
                 "taskboardPriorityFilter"
             ),
 
+        taskboardClearFilters:
+            document.getElementById(
+                "taskboardClearFilters"
+            ),
+
         taskboardTaskList:
             document.getElementById(
                 "taskboardTaskList"
+            ),
+
+        /*
+         * Legacy embedded interfaces.
+         *
+         * These may still exist in index.html until the final
+         * HTML cleanup. They are explicitly hidden because
+         * Create Task and Task Detail now use overlays.
+         */
+        legacyCreateView:
+            document.getElementById(
+                "taskboardCreateView"
+            ),
+
+        legacyDetailView:
+            document.getElementById(
+                "taskboardTaskDetail"
             )
     };
 }
@@ -278,6 +282,16 @@ function normalizeString(
         "string"
         ? value.trim()
         : "";
+}
+
+function normalizeArray(
+    value
+) {
+    return Array.isArray(
+        value
+    )
+        ? value
+        : [];
 }
 
 function normalizeTaskboardRoles(
@@ -311,14 +325,31 @@ function normalizeTaskboardRoles(
     ];
 }
 
-function normalizeArray(
-    value
+function normalizePermissions(
+    permissions
 ) {
-    return Array.isArray(
-        value
-    )
-        ? value
-        : [];
+    if (
+        !Array.isArray(
+            permissions
+        )
+    ) {
+        return [];
+    }
+
+    return [
+        ...new Set(
+            permissions
+                .map(
+                    permission =>
+                        normalizeString(
+                            permission
+                        )
+                )
+                .filter(
+                    Boolean
+                )
+        )
+    ];
 }
 
 /* =========================================================
@@ -439,23 +470,46 @@ function showTaskboardError(
 }
 
 /* =========================================================
-WORKSPACE VIEW STATE
+LEGACY INTERFACE CLEANUP
+
+Create Task and Task Detail now render as independent
+overlays. Hide the old embedded versions if they still exist
+in index.html during migration.
 ========================================================= */
 
-function hideTaskboardWorkspaces() {
+function hideLegacyTaskInterfaces() {
     const {
-        taskboardCreateView,
-        taskboardReviewView,
-        taskboardTaskDetail
+        legacyCreateView,
+        legacyDetailView
     } =
         getTaskboardElements();
 
     if (
-        taskboardCreateView
+        legacyCreateView
     ) {
-        taskboardCreateView.hidden =
+        legacyCreateView.hidden =
             true;
     }
+
+    if (
+        legacyDetailView
+    ) {
+        legacyDetailView.hidden =
+            true;
+    }
+}
+
+/* =========================================================
+WORKSPACE STATE
+
+Only Review My Tasks remains an embedded Taskboard workspace.
+========================================================= */
+
+function hideTaskboardWorkspaces() {
+    const {
+        taskboardReviewView
+    } =
+        getTaskboardElements();
 
     if (
         taskboardReviewView
@@ -464,12 +518,7 @@ function hideTaskboardWorkspaces() {
             true;
     }
 
-    if (
-        taskboardTaskDetail
-    ) {
-        taskboardTaskDetail.hidden =
-            true;
-    }
+    hideLegacyTaskInterfaces();
 }
 
 function showDashboard() {
@@ -477,39 +526,6 @@ function showDashboard() {
 
     taskboardState.view =
         "dashboard";
-
-    taskboardState.selectedTask =
-        null;
-}
-
-function showCreateView() {
-    const {
-        taskboardCreateView
-    } =
-        getTaskboardElements();
-
-    hideTaskboardWorkspaces();
-
-    taskboardState.view =
-        "create";
-
-    taskboardState.selectedTask =
-        null;
-
-    if (
-        taskboardCreateView
-    ) {
-        taskboardCreateView.hidden =
-            false;
-
-        taskboardCreateView.scrollIntoView({
-            behavior:
-                "smooth",
-
-            block:
-                "start"
-        });
-    }
 }
 
 function showReviewView() {
@@ -523,9 +539,6 @@ function showReviewView() {
     taskboardState.view =
         "review";
 
-    taskboardState.selectedTask =
-        null;
-
     renderTaskList();
 
     if (
@@ -535,47 +548,6 @@ function showReviewView() {
             false;
 
         taskboardReviewView.scrollIntoView({
-            behavior:
-                "smooth",
-
-            block:
-                "start"
-        });
-    }
-}
-
-function showTaskDetailView(
-    task
-) {
-    const {
-        taskboardReviewView,
-        taskboardTaskDetail
-    } =
-        getTaskboardElements();
-
-    hideTaskboardWorkspaces();
-
-    taskboardState.view =
-        "detail";
-
-    taskboardState.selectedTask =
-        task
-        || null;
-
-    if (
-        taskboardReviewView
-    ) {
-        taskboardReviewView.hidden =
-            true;
-    }
-
-    if (
-        taskboardTaskDetail
-    ) {
-        taskboardTaskDetail.hidden =
-            false;
-
-        taskboardTaskDetail.scrollIntoView({
             behavior:
                 "smooth",
 
@@ -605,13 +577,13 @@ function setTaskboardStatus(
         return;
     }
 
-    const normalizedMessage =
+    const normalized =
         normalizeString(
             message
         );
 
     if (
-        !normalizedMessage
+        !normalized
     ) {
         taskboardStatus.textContent =
             "";
@@ -627,7 +599,7 @@ function setTaskboardStatus(
     }
 
     taskboardStatus.textContent =
-        normalizedMessage;
+        normalized;
 
     taskboardStatus.hidden =
         false;
@@ -661,10 +633,40 @@ async function loadTaskboardAccess() {
             state
         );
 
-    const taskboardRoles =
+    let taskboardRoles =
+        [];
+
+    if (
         adminAuthorized
-            ? normalizeTaskboardRoles(
-                state?.admin?.roles
+    ) {
+        /*
+         * Prefer the centralized helper.
+         */
+        try {
+            taskboardRoles =
+                normalizeTaskboardRoles(
+                    getAdminResponsibilityRoles(
+                        state
+                    )
+                );
+        }
+        catch {
+            /*
+             * Defensive fallback for older auth.js versions.
+             */
+            taskboardRoles =
+                normalizeTaskboardRoles(
+                    state?.admin?.roles
+                    || state?.admin?.taskboardRoles
+                    || state?.taskboard?.roles
+                );
+        }
+    }
+
+    const permissions =
+        adminAuthorized
+            ? normalizePermissions(
+                state?.admin?.permissions
             )
             : [];
 
@@ -684,6 +686,8 @@ async function loadTaskboardAccess() {
         taskboardMember,
 
         taskboardRoles,
+
+        permissions,
 
         isOwner:
             taskboardRoles.includes(
@@ -824,44 +828,20 @@ async function requestAdminApi(
         });
     }
 
-    if (
-        !result
-        || typeof result !==
-            "object"
-        || Array.isArray(
-            result
-        )
-    ) {
-        throw createAdminApiError({
-            message:
-                "The Admin API returned an invalid result.",
-
-            code:
-                "ADMIN_API_RESULT_INVALID",
-
-            status:
-                response.status
-        });
-    }
-
     return result;
 }
 
 /* =========================================================
-TASK SUMMARY API
+TASK DATA API
 ========================================================= */
 
-async function loadTaskSummary() {
+function loadTaskSummary() {
     return requestAdminApi(
         TASK_SUMMARY_URL
     );
 }
 
-/* =========================================================
-TASK LIST API
-========================================================= */
-
-async function loadTaskList() {
+function loadTaskList() {
     const url =
         new URL(
             TASKS_URL,
@@ -883,11 +863,7 @@ async function loadTaskList() {
     );
 }
 
-/* =========================================================
-TASK ASSIGNEES API
-========================================================= */
-
-async function loadTaskAssignees() {
+function loadTaskAssignees() {
     return requestAdminApi(
         TASK_ASSIGNEES_URL
     );
@@ -924,7 +900,35 @@ function extractTasks(
         return result.items;
     }
 
+    if (
+        Array.isArray(
+            result?.data?.tasks
+        )
+    ) {
+        return result.data.tasks;
+    }
+
+    if (
+        Array.isArray(
+            result?.data?.items
+        )
+    ) {
+        return result.data.items;
+    }
+
     return [];
+}
+
+function extractSummary(
+    result
+) {
+    return (
+        result?.summary
+        || result?.data?.summary
+        || result?.data
+        || result
+        || {}
+    );
 }
 
 function getSummaryNumber(
@@ -937,16 +941,17 @@ function getSummaryNumber(
         const value =
             summary?.[key];
 
-        if (
-            Number.isFinite(
-                Number(
-                    value
-                )
-            )
-        ) {
-            return Number(
+        const number =
+            Number(
                 value
             );
+
+        if (
+            Number.isFinite(
+                number
+            )
+        ) {
+            return number;
         }
     }
 
@@ -1001,6 +1006,28 @@ function renderTaskboardRoles() {
 
     taskboardRoleList.replaceChildren();
 
+    if (
+        roles.length ===
+        0
+    ) {
+        const element =
+            document.createElement(
+                "span"
+            );
+
+        element.className =
+            "taskboard-role";
+
+        element.textContent =
+            "No Responsibility Role";
+
+        taskboardRoleList.appendChild(
+            element
+        );
+
+        return;
+    }
+
     for (
         const role of roles
     ) {
@@ -1011,6 +1038,9 @@ function renderTaskboardRoles() {
 
         element.className =
             "taskboard-role";
+
+        element.dataset.role =
+            role;
 
         element.textContent =
             formatRoleName(
@@ -1038,8 +1068,9 @@ function renderTaskSummary() {
         getTaskboardElements();
 
     const summary =
-        taskboardState.summary
-        || {};
+        extractSummary(
+            taskboardState.summary
+        );
 
     const active =
         getSummaryNumber(
@@ -1147,10 +1178,12 @@ function getTaskCode(
 function getTaskTitle(
     task
 ) {
-    return normalizeString(
-        task?.title
-    )
-    || "Untitled Task";
+    return (
+        normalizeString(
+            task?.title
+        )
+        || "Untitled Task"
+    );
 }
 
 function getTaskBody(
@@ -1299,18 +1332,23 @@ function getFilteredTasks() {
                         getTaskCode(
                             task
                         ),
+
                         getTaskTitle(
                             task
                         ),
+
                         getTaskBody(
                             task
                         ),
+
                         getTaskStatus(
                             task
                         ),
+
                         getTaskPriority(
                             task
                         ),
+
                         ...getTaskRoles(
                             task
                         )
@@ -1325,6 +1363,75 @@ function getFilteredTasks() {
                 );
             }
         );
+}
+
+/* =========================================================
+TASK DETAIL MODULE
+========================================================= */
+
+async function openTaskDetailModule(
+    task
+) {
+    const taskCode =
+        getTaskCode(
+            task
+        );
+
+    if (
+        !taskCode
+    ) {
+        setTaskboardStatus(
+            "The selected task does not have a valid task code.",
+            "error"
+        );
+
+        return;
+    }
+
+    try {
+        const module =
+            await import(
+                TASK_DETAIL_MODULE_URL
+            );
+
+        if (
+            typeof module.openTaskDetail !==
+            "function"
+        ) {
+            throw new Error(
+                "Task Detail module does not export openTaskDetail()."
+            );
+        }
+
+        await module.openTaskDetail(
+            taskCode,
+            {
+                permissions:
+                    taskboardState.permissions,
+
+                onUpdated:
+                    handleTaskUpdated
+            }
+        );
+    }
+    catch (
+        error
+    ) {
+        console.error(
+            "[TASKBOARD DETAIL MODULE FAILED]",
+            {
+                message:
+                    error?.message
+                    || "Unknown error"
+            }
+        );
+
+        setTaskboardStatus(
+            error?.message
+            || "The Task Detail interface could not be loaded.",
+            "error"
+        );
+    }
 }
 
 /* =========================================================
@@ -1495,7 +1602,7 @@ function createTaskCard(
     viewButton.addEventListener(
         "click",
         function() {
-            showTaskDetailView(
+            openTaskDetailModule(
                 task
             );
         }
@@ -1514,7 +1621,7 @@ function createTaskCard(
 }
 
 /* =========================================================
-TASK LIST RENDERING
+TASK LIST
 ========================================================= */
 
 function renderTaskList() {
@@ -1572,6 +1679,215 @@ function renderTaskList() {
     taskboardTaskList.appendChild(
         fragment
     );
+}
+
+/* =========================================================
+CREATE TASK MODULE
+========================================================= */
+
+async function openCreateTaskModule() {
+    const {
+        taskboardCreateAction
+    } =
+        getTaskboardElements();
+
+    if (
+        taskboardCreateAction
+        && taskboardCreateAction.disabled
+    ) {
+        return;
+    }
+
+    if (
+        taskboardCreateAction
+    ) {
+        taskboardCreateAction.disabled =
+            true;
+    }
+
+    try {
+        const module =
+            await import(
+                CREATE_TASK_MODULE_URL
+            );
+
+        if (
+            typeof module.openCreateTask !==
+            "function"
+        ) {
+            throw new Error(
+                "Create Task module does not export openCreateTask()."
+            );
+        }
+
+        await module.openCreateTask({
+            access:
+                taskboardState.access,
+
+            roles:
+                normalizeTaskboardRoles(
+                    taskboardState
+                        ?.access
+                        ?.taskboardRoles
+                ),
+
+            onCreated:
+                handleTaskCreated
+        });
+    }
+    catch (
+        error
+    ) {
+        console.error(
+            "[TASKBOARD CREATE MODULE FAILED]",
+            {
+                message:
+                    error?.message
+                    || "Unknown error"
+            }
+        );
+
+        setTaskboardStatus(
+            "The Create Task interface could not be loaded.",
+            "error"
+        );
+    }
+    finally {
+        if (
+            taskboardCreateAction
+        ) {
+            taskboardCreateAction.disabled =
+                false;
+        }
+    }
+}
+
+/* =========================================================
+TASK CREATED CALLBACK
+========================================================= */
+
+async function handleTaskCreated(
+    createdTask
+) {
+    try {
+        await loadTaskboardData();
+
+        setTaskboardStatus(
+            "Task created successfully.",
+            "success"
+        );
+
+        const taskCode =
+            getTaskCode(
+                createdTask
+            );
+
+        if (
+            taskCode
+        ) {
+            await openTaskDetailModule(
+                createdTask
+            );
+
+            return;
+        }
+
+        showReviewView();
+    }
+    catch (
+        error
+    ) {
+        console.error(
+            "[TASKBOARD POST-CREATE REFRESH FAILED]",
+            {
+                message:
+                    error?.message
+                    || "Unknown error"
+            }
+        );
+
+        setTaskboardStatus(
+            "The task was created, but the Taskboard could not be refreshed.",
+            "warning"
+        );
+    }
+}
+
+/* =========================================================
+TASK UPDATED CALLBACK
+
+Called by Task Detail after:
+    - lifecycle changes
+    - task edits
+
+Comments/history do not require dashboard summary changes
+unless the server later makes them alter task state.
+========================================================= */
+
+async function handleTaskUpdated() {
+    try {
+        await loadTaskboardData();
+
+        setTaskboardStatus(
+            "Taskboard updated.",
+            "success"
+        );
+    }
+    catch (
+        error
+    ) {
+        console.error(
+            "[TASKBOARD POST-UPDATE REFRESH FAILED]",
+            {
+                message:
+                    error?.message
+                    || "Unknown error"
+            }
+        );
+
+        setTaskboardStatus(
+            "The task was updated, but the Taskboard summary could not be refreshed.",
+            "warning"
+        );
+    }
+}
+
+/* =========================================================
+FILTER RESET
+========================================================= */
+
+function clearTaskFilters() {
+    const {
+        taskboardTaskSearch,
+        taskboardStatusFilter,
+        taskboardPriorityFilter
+    } =
+        getTaskboardElements();
+
+    if (
+        taskboardTaskSearch
+    ) {
+        taskboardTaskSearch.value =
+            "";
+    }
+
+    if (
+        taskboardStatusFilter
+    ) {
+        taskboardStatusFilter.value =
+            "active";
+    }
+
+    if (
+        taskboardPriorityFilter
+    ) {
+        taskboardPriorityFilter.value =
+            "";
+    }
+
+    updateFilterState();
+
+    renderTaskList();
 }
 
 /* =========================================================
@@ -1643,8 +1959,10 @@ async function loadTaskboardData() {
 
         return {
             summary,
+
             tasks:
                 taskResult,
+
             assignees
         };
     }
@@ -1715,7 +2033,7 @@ function setupPrimaryActions() {
     ) {
         taskboardCreateAction.addEventListener(
             "click",
-            showCreateView
+            openCreateTaskModule
         );
 
         taskboardCreateAction.dataset.initialized =
@@ -1740,66 +2058,12 @@ function setupPrimaryActions() {
 }
 
 /* =========================================================
-CREATE WORKSPACE NAVIGATION
-========================================================= */
-
-function setupCreateNavigation() {
-    const {
-        taskboardCreateClose,
-        taskboardCreateCancel,
-        taskboardCreateForm
-    } =
-        getTaskboardElements();
-
-    if (
-        taskboardCreateClose
-        && taskboardCreateClose
-            .dataset
-            .initialized !==
-            "true"
-    ) {
-        taskboardCreateClose.addEventListener(
-            "click",
-            showDashboard
-        );
-
-        taskboardCreateClose.dataset.initialized =
-            "true";
-    }
-
-    if (
-        taskboardCreateCancel
-        && taskboardCreateCancel
-            .dataset
-            .initialized !==
-            "true"
-    ) {
-        taskboardCreateCancel.addEventListener(
-            "click",
-            function() {
-                if (
-                    taskboardCreateForm
-                ) {
-                    taskboardCreateForm.reset();
-                }
-
-                showDashboard();
-            }
-        );
-
-        taskboardCreateCancel.dataset.initialized =
-            "true";
-    }
-}
-
-/* =========================================================
-REVIEW WORKSPACE NAVIGATION
+REVIEW NAVIGATION
 ========================================================= */
 
 function setupReviewNavigation() {
     const {
-        taskboardReviewClose,
-        taskboardTaskDetailClose
+        taskboardReviewClose
     } =
         getTaskboardElements();
 
@@ -1816,22 +2080,6 @@ function setupReviewNavigation() {
         );
 
         taskboardReviewClose.dataset.initialized =
-            "true";
-    }
-
-    if (
-        taskboardTaskDetailClose
-        && taskboardTaskDetailClose
-            .dataset
-            .initialized !==
-            "true"
-    ) {
-        taskboardTaskDetailClose.addEventListener(
-            "click",
-            showReviewView
-        );
-
-        taskboardTaskDetailClose.dataset.initialized =
             "true";
     }
 }
@@ -1893,6 +2141,35 @@ function setupTaskFilters() {
 }
 
 /* =========================================================
+CLEAR FILTERS
+========================================================= */
+
+function setupClearFilters() {
+    const {
+        taskboardClearFilters
+    } =
+        getTaskboardElements();
+
+    if (
+        !taskboardClearFilters
+        || taskboardClearFilters
+            .dataset
+            .initialized ===
+            "true"
+    ) {
+        return;
+    }
+
+    taskboardClearFilters.addEventListener(
+        "click",
+        clearTaskFilters
+    );
+
+    taskboardClearFilters.dataset.initialized =
+        "true";
+}
+
+/* =========================================================
 REFRESH
 ========================================================= */
 
@@ -1943,6 +2220,9 @@ async function refreshTaskboard() {
 
         taskboardState.access =
             access;
+
+        taskboardState.permissions =
+            access.permissions;
 
         showTaskboardAuthorized();
 
@@ -2059,11 +2339,11 @@ INTERACTION SETUP
 function setupTaskboardInteractions() {
     setupPrimaryActions();
 
-    setupCreateNavigation();
-
     setupReviewNavigation();
 
     setupTaskFilters();
+
+    setupClearFilters();
 
     setupTaskboardRefresh();
 
@@ -2075,6 +2355,8 @@ INITIALIZE TASKBOARD
 ========================================================= */
 
 async function initializeTaskboard() {
+    hideLegacyTaskInterfaces();
+
     setupTaskboardInteractions();
 
     showDashboard();
@@ -2134,11 +2416,17 @@ export async function initializePage() {
         taskboardState.access =
             access;
 
+        taskboardState.permissions =
+            access.permissions;
+
         console.log(
             "[TASKBOARD ACCESS]",
             {
                 roles:
                     access.taskboardRoles,
+
+                permissions:
+                    access.permissions,
 
                 isOwner:
                     access.isOwner
