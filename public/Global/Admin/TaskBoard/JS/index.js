@@ -8,18 +8,20 @@ File:
     public/Global/Admin/TaskBoard/JS/index.js
 
 Purpose:
-    Initializes the Admin Taskboard page and performs the
-    preliminary Taskboard API integration.
+    Initializes and controls the Admin Taskboard interface.
 
 Responsibilities:
-    - Require current centralized Admin authorization.
+    - Require centralized Admin authorization.
     - Require an active Admin responsibility role.
     - Load verified Taskboard role context.
     - Load task summary.
     - Load task list.
     - Load task assignees.
-    - Display returned API data for verification.
-    - Allow manual refresh.
+    - Render Taskboard summary information.
+    - Render verified responsibility roles.
+    - Render and filter the user's accessible tasks.
+    - Control dashboard, create, review, and detail views.
+    - Handle manual refresh and retry.
     - Export initializePage() for the BPD router.
 
 Access Requirements:
@@ -36,23 +38,16 @@ Access Requirements:
 
 Security:
     - This module is NOT a security boundary.
-    - Admin authorization is established by the centralized
-      client auth service through the server-side Admin
-      authorization endpoint.
-    - Discord authorization is performed server-side.
-    - Discord guild roles are verified server-side.
-    - Responsibility roles are synchronized server-side.
     - Client-side role claims are never authoritative.
     - Task APIs independently enforce permissions,
       membership, and task responsibility.
     - Supabase credentials never reach the browser.
 
 Important:
-    - This client-side gate controls presentation only.
-    - Server-side Taskboard APIs remain authoritative.
-    - This module must not call /api/auth/admin/access
+    - This module does not call /api/auth/admin/access
       directly.
-    - This module must not load or initialize the sidebar.
+    - Centralized Admin authorization comes from auth.js.
+    - This module does not initialize the sidebar.
 ========================================================= */
 
 /* =========================================================
@@ -90,6 +85,41 @@ const TASKBOARD_ROLES =
     ]);
 
 /* =========================================================
+CLIENT STATE
+========================================================= */
+
+const taskboardState = {
+    access:
+        null,
+
+    summary:
+        null,
+
+    tasks:
+        [],
+
+    assignees:
+        null,
+
+    selectedTask:
+        null,
+
+    view:
+        "dashboard",
+
+    filters: {
+        search:
+            "",
+
+        status:
+            "active",
+
+        priority:
+            ""
+    }
+};
+
+/* =========================================================
 ELEMENT LOOKUP
 ========================================================= */
 
@@ -120,29 +150,119 @@ function getTaskboardElements() {
                 "taskboardErrorMessage"
             ),
 
-        taskboardRefresh:
+        taskboardRetry:
             document.getElementById(
-                "taskboardRefresh"
-            ),
-
-        taskSummaryOutput:
-            document.getElementById(
-                "taskSummaryOutput"
-            ),
-
-        taskListOutput:
-            document.getElementById(
-                "taskListOutput"
-            ),
-
-        taskAssigneesOutput:
-            document.getElementById(
-                "taskAssigneesOutput"
+                "taskboardRetry"
             ),
 
         taskboardStatus:
             document.getElementById(
                 "taskboardStatus"
+            ),
+
+        taskboardRoleList:
+            document.getElementById(
+                "taskboardRoleList"
+            ),
+
+        taskboardRefresh:
+            document.getElementById(
+                "taskboardRefresh"
+            ),
+
+        taskboardActiveCount:
+            document.getElementById(
+                "taskboardActiveCount"
+            ),
+
+        taskboardCompletedCount:
+            document.getElementById(
+                "taskboardCompletedCount"
+            ),
+
+        taskboardShelvedCount:
+            document.getElementById(
+                "taskboardShelvedCount"
+            ),
+
+        taskboardLateCount:
+            document.getElementById(
+                "taskboardLateCount"
+            ),
+
+        taskboardMyTaskCount:
+            document.getElementById(
+                "taskboardMyTaskCount"
+            ),
+
+        taskboardCreateAction:
+            document.getElementById(
+                "taskboardCreateAction"
+            ),
+
+        taskboardReviewAction:
+            document.getElementById(
+                "taskboardReviewAction"
+            ),
+
+        taskboardCreateView:
+            document.getElementById(
+                "taskboardCreateView"
+            ),
+
+        taskboardReviewView:
+            document.getElementById(
+                "taskboardReviewView"
+            ),
+
+        taskboardTaskDetail:
+            document.getElementById(
+                "taskboardTaskDetail"
+            ),
+
+        taskboardCreateClose:
+            document.getElementById(
+                "taskboardCreateClose"
+            ),
+
+        taskboardCreateCancel:
+            document.getElementById(
+                "taskboardCreateCancel"
+            ),
+
+        taskboardCreateForm:
+            document.getElementById(
+                "taskboardCreateForm"
+            ),
+
+        taskboardReviewClose:
+            document.getElementById(
+                "taskboardReviewClose"
+            ),
+
+        taskboardTaskDetailClose:
+            document.getElementById(
+                "taskboardTaskDetailClose"
+            ),
+
+        taskboardTaskSearch:
+            document.getElementById(
+                "taskboardTaskSearch"
+            ),
+
+        taskboardStatusFilter:
+            document.getElementById(
+                "taskboardStatusFilter"
+            ),
+
+        taskboardPriorityFilter:
+            document.getElementById(
+                "taskboardPriorityFilter"
+            ),
+
+        taskboardTaskList:
+            document.getElementById(
+                "taskboardTaskList"
             )
     };
 }
@@ -191,8 +311,18 @@ function normalizeTaskboardRoles(
     ];
 }
 
+function normalizeArray(
+    value
+) {
+    return Array.isArray(
+        value
+    )
+        ? value
+        : [];
+}
+
 /* =========================================================
-PAGE STATE
+TOP-LEVEL PAGE STATE
 ========================================================= */
 
 function hideAllTaskboardStates() {
@@ -309,11 +439,160 @@ function showTaskboardError(
 }
 
 /* =========================================================
+WORKSPACE VIEW STATE
+========================================================= */
+
+function hideTaskboardWorkspaces() {
+    const {
+        taskboardCreateView,
+        taskboardReviewView,
+        taskboardTaskDetail
+    } =
+        getTaskboardElements();
+
+    if (
+        taskboardCreateView
+    ) {
+        taskboardCreateView.hidden =
+            true;
+    }
+
+    if (
+        taskboardReviewView
+    ) {
+        taskboardReviewView.hidden =
+            true;
+    }
+
+    if (
+        taskboardTaskDetail
+    ) {
+        taskboardTaskDetail.hidden =
+            true;
+    }
+}
+
+function showDashboard() {
+    hideTaskboardWorkspaces();
+
+    taskboardState.view =
+        "dashboard";
+
+    taskboardState.selectedTask =
+        null;
+}
+
+function showCreateView() {
+    const {
+        taskboardCreateView
+    } =
+        getTaskboardElements();
+
+    hideTaskboardWorkspaces();
+
+    taskboardState.view =
+        "create";
+
+    taskboardState.selectedTask =
+        null;
+
+    if (
+        taskboardCreateView
+    ) {
+        taskboardCreateView.hidden =
+            false;
+
+        taskboardCreateView.scrollIntoView({
+            behavior:
+                "smooth",
+
+            block:
+                "start"
+        });
+    }
+}
+
+function showReviewView() {
+    const {
+        taskboardReviewView
+    } =
+        getTaskboardElements();
+
+    hideTaskboardWorkspaces();
+
+    taskboardState.view =
+        "review";
+
+    taskboardState.selectedTask =
+        null;
+
+    renderTaskList();
+
+    if (
+        taskboardReviewView
+    ) {
+        taskboardReviewView.hidden =
+            false;
+
+        taskboardReviewView.scrollIntoView({
+            behavior:
+                "smooth",
+
+            block:
+                "start"
+        });
+    }
+}
+
+function showTaskDetailView(
+    task
+) {
+    const {
+        taskboardReviewView,
+        taskboardTaskDetail
+    } =
+        getTaskboardElements();
+
+    hideTaskboardWorkspaces();
+
+    taskboardState.view =
+        "detail";
+
+    taskboardState.selectedTask =
+        task
+        || null;
+
+    if (
+        taskboardReviewView
+    ) {
+        taskboardReviewView.hidden =
+            true;
+    }
+
+    if (
+        taskboardTaskDetail
+    ) {
+        taskboardTaskDetail.hidden =
+            false;
+
+        taskboardTaskDetail.scrollIntoView({
+            behavior:
+                "smooth",
+
+            block:
+                "start"
+        });
+    }
+}
+
+/* =========================================================
 STATUS
 ========================================================= */
 
 function setTaskboardStatus(
-    message
+    message,
+    state =
+        ""
 ) {
     const {
         taskboardStatus
@@ -326,32 +605,48 @@ function setTaskboardStatus(
         return;
     }
 
-    taskboardStatus.textContent =
+    const normalizedMessage =
         normalizeString(
             message
         );
+
+    if (
+        !normalizedMessage
+    ) {
+        taskboardStatus.textContent =
+            "";
+
+        taskboardStatus.hidden =
+            true;
+
+        taskboardStatus.removeAttribute(
+            "data-state"
+        );
+
+        return;
+    }
+
+    taskboardStatus.textContent =
+        normalizedMessage;
+
+    taskboardStatus.hidden =
+        false;
+
+    if (
+        state
+    ) {
+        taskboardStatus.dataset.state =
+            state;
+    }
+    else {
+        taskboardStatus.removeAttribute(
+            "data-state"
+        );
+    }
 }
 
 /* =========================================================
 CENTRALIZED TASKBOARD ACCESS
-
-The centralized auth service performs:
-
-    GET /api/auth/session
-        ↓
-    active authenticated account
-        ↓
-    GET /api/auth/admin/access
-        ↓
-    live Discord authorization
-        ↓
-    responsibility-role synchronization
-        ↓
-    state.admin
-
-Entering Taskboard forces a fresh authorization check.
-
-The browser uses this result for presentation only.
 ========================================================= */
 
 async function loadTaskboardAccess() {
@@ -437,7 +732,7 @@ function createAdminApiError(
 }
 
 /* =========================================================
-API REQUEST
+GET API REQUEST
 ========================================================= */
 
 async function requestAdminApi(
@@ -553,7 +848,7 @@ async function requestAdminApi(
 }
 
 /* =========================================================
-TASK SUMMARY
+TASK SUMMARY API
 ========================================================= */
 
 async function loadTaskSummary() {
@@ -563,7 +858,7 @@ async function loadTaskSummary() {
 }
 
 /* =========================================================
-TASK LIST
+TASK LIST API
 ========================================================= */
 
 async function loadTaskList() {
@@ -589,7 +884,7 @@ async function loadTaskList() {
 }
 
 /* =========================================================
-TASK ASSIGNEES
+TASK ASSIGNEES API
 ========================================================= */
 
 async function loadTaskAssignees() {
@@ -599,25 +894,684 @@ async function loadTaskAssignees() {
 }
 
 /* =========================================================
-JSON OUTPUT
+API RESULT EXTRACTION
 ========================================================= */
 
-function renderJson(
-    element,
-    value
+function extractTasks(
+    result
 ) {
     if (
-        !element
+        Array.isArray(
+            result?.tasks
+        )
+    ) {
+        return result.tasks;
+    }
+
+    if (
+        Array.isArray(
+            result?.data
+        )
+    ) {
+        return result.data;
+    }
+
+    if (
+        Array.isArray(
+            result?.items
+        )
+    ) {
+        return result.items;
+    }
+
+    return [];
+}
+
+function getSummaryNumber(
+    summary,
+    keys
+) {
+    for (
+        const key of keys
+    ) {
+        const value =
+            summary?.[key];
+
+        if (
+            Number.isFinite(
+                Number(
+                    value
+                )
+            )
+        ) {
+            return Number(
+                value
+            );
+        }
+    }
+
+    return 0;
+}
+
+/* =========================================================
+ROLE RENDERING
+========================================================= */
+
+function formatRoleName(
+    role
+) {
+    switch (
+        role
+    ) {
+        case "owner":
+            return "Owner";
+
+        case "database":
+            return "Database";
+
+        case "security":
+            return "Security";
+
+        case "ui":
+            return "UI";
+
+        default:
+            return role;
+    }
+}
+
+function renderTaskboardRoles() {
+    const {
+        taskboardRoleList
+    } =
+        getTaskboardElements();
+
+    if (
+        !taskboardRoleList
     ) {
         return;
     }
 
-    element.textContent =
-        JSON.stringify(
-            value,
-            null,
-            2
+    const roles =
+        normalizeTaskboardRoles(
+            taskboardState
+                ?.access
+                ?.taskboardRoles
         );
+
+    taskboardRoleList.replaceChildren();
+
+    for (
+        const role of roles
+    ) {
+        const element =
+            document.createElement(
+                "span"
+            );
+
+        element.className =
+            "taskboard-role";
+
+        element.textContent =
+            formatRoleName(
+                role
+            );
+
+        taskboardRoleList.appendChild(
+            element
+        );
+    }
+}
+
+/* =========================================================
+SUMMARY RENDERING
+========================================================= */
+
+function renderTaskSummary() {
+    const {
+        taskboardActiveCount,
+        taskboardCompletedCount,
+        taskboardShelvedCount,
+        taskboardLateCount,
+        taskboardMyTaskCount
+    } =
+        getTaskboardElements();
+
+    const summary =
+        taskboardState.summary
+        || {};
+
+    const active =
+        getSummaryNumber(
+            summary,
+            [
+                "active",
+                "activeCount",
+                "active_count"
+            ]
+        );
+
+    const completed =
+        getSummaryNumber(
+            summary,
+            [
+                "completed",
+                "completedCount",
+                "completed_count"
+            ]
+        );
+
+    const shelved =
+        getSummaryNumber(
+            summary,
+            [
+                "shelved",
+                "shelvedCount",
+                "shelved_count"
+            ]
+        );
+
+    const late =
+        getSummaryNumber(
+            summary,
+            [
+                "late",
+                "lateCount",
+                "late_count",
+                "overdue",
+                "overdueCount",
+                "overdue_count"
+            ]
+        );
+
+    if (
+        taskboardActiveCount
+    ) {
+        taskboardActiveCount.textContent =
+            String(
+                active
+            );
+    }
+
+    if (
+        taskboardCompletedCount
+    ) {
+        taskboardCompletedCount.textContent =
+            String(
+                completed
+            );
+    }
+
+    if (
+        taskboardShelvedCount
+    ) {
+        taskboardShelvedCount.textContent =
+            String(
+                shelved
+            );
+    }
+
+    if (
+        taskboardLateCount
+    ) {
+        taskboardLateCount.textContent =
+            String(
+                late
+            );
+    }
+
+    if (
+        taskboardMyTaskCount
+    ) {
+        taskboardMyTaskCount.textContent =
+            String(
+                active
+            );
+    }
+}
+
+/* =========================================================
+TASK NORMALIZATION
+========================================================= */
+
+function getTaskCode(
+    task
+) {
+    return normalizeString(
+        task?.task_code
+        || task?.taskCode
+        || task?.code
+    );
+}
+
+function getTaskTitle(
+    task
+) {
+    return normalizeString(
+        task?.title
+    )
+    || "Untitled Task";
+}
+
+function getTaskBody(
+    task
+) {
+    return normalizeString(
+        task?.body
+        || task?.description
+    );
+}
+
+function getTaskStatus(
+    task
+) {
+    return normalizeString(
+        task?.status
+    );
+}
+
+function getTaskPriority(
+    task
+) {
+    return normalizeString(
+        task?.priority
+    );
+}
+
+function getTaskRoles(
+    task
+) {
+    return normalizeTaskboardRoles(
+        task?.responsible_roles
+        || task?.responsibleRoles
+    );
+}
+
+/* =========================================================
+FILTER STATE
+========================================================= */
+
+function updateFilterState() {
+    const {
+        taskboardTaskSearch,
+        taskboardStatusFilter,
+        taskboardPriorityFilter
+    } =
+        getTaskboardElements();
+
+    taskboardState.filters.search =
+        normalizeString(
+            taskboardTaskSearch
+                ?.value
+        )
+            .toLowerCase();
+
+    taskboardState.filters.status =
+        normalizeString(
+            taskboardStatusFilter
+                ?.value
+        )
+            .toLowerCase();
+
+    taskboardState.filters.priority =
+        normalizeString(
+            taskboardPriorityFilter
+                ?.value
+        )
+            .toLowerCase();
+}
+
+function taskMatchesStatusFilter(
+    task,
+    filter
+) {
+    if (
+        !filter
+        || filter ===
+            "all"
+    ) {
+        return true;
+    }
+
+    const status =
+        getTaskStatus(
+            task
+        )
+            .toLowerCase();
+
+    if (
+        filter ===
+        "active"
+    ) {
+        return (
+            status ===
+                "to do"
+            || status ===
+                "in progress"
+        );
+    }
+
+    return status ===
+        filter;
+}
+
+function getFilteredTasks() {
+    const {
+        search,
+        status,
+        priority
+    } =
+        taskboardState.filters;
+
+    return normalizeArray(
+        taskboardState.tasks
+    )
+        .filter(
+            task => {
+                if (
+                    !taskMatchesStatusFilter(
+                        task,
+                        status
+                    )
+                ) {
+                    return false;
+                }
+
+                if (
+                    priority
+                    && getTaskPriority(
+                        task
+                    )
+                        .toLowerCase() !==
+                        priority
+                ) {
+                    return false;
+                }
+
+                if (
+                    !search
+                ) {
+                    return true;
+                }
+
+                const searchable =
+                    [
+                        getTaskCode(
+                            task
+                        ),
+                        getTaskTitle(
+                            task
+                        ),
+                        getTaskBody(
+                            task
+                        ),
+                        getTaskStatus(
+                            task
+                        ),
+                        getTaskPriority(
+                            task
+                        ),
+                        ...getTaskRoles(
+                            task
+                        )
+                    ]
+                        .join(
+                            " "
+                        )
+                        .toLowerCase();
+
+                return searchable.includes(
+                    search
+                );
+            }
+        );
+}
+
+/* =========================================================
+TASK CARD
+========================================================= */
+
+function createTaskBadge(
+    value
+) {
+    const badge =
+        document.createElement(
+            "span"
+        );
+
+    badge.className =
+        "taskboard-task-badge";
+
+    badge.textContent =
+        value;
+
+    return badge;
+}
+
+function createTaskCard(
+    task
+) {
+    const card =
+        document.createElement(
+            "article"
+        );
+
+    card.className =
+        "taskboard-task-card";
+
+    const main =
+        document.createElement(
+            "div"
+        );
+
+    main.className =
+        "taskboard-task-card-main";
+
+    const header =
+        document.createElement(
+            "div"
+        );
+
+    header.className =
+        "taskboard-task-card-header";
+
+    const code =
+        document.createElement(
+            "span"
+        );
+
+    code.className =
+        "taskboard-task-code";
+
+    code.textContent =
+        getTaskCode(
+            task
+        )
+        || "TASK";
+
+    header.appendChild(
+        code
+    );
+
+    const title =
+        document.createElement(
+            "h3"
+        );
+
+    title.textContent =
+        getTaskTitle(
+            task
+        );
+
+    const description =
+        document.createElement(
+            "p"
+        );
+
+    description.textContent =
+        getTaskBody(
+            task
+        )
+        || "No description provided.";
+
+    const metadata =
+        document.createElement(
+            "div"
+        );
+
+    metadata.className =
+        "taskboard-task-card-meta";
+
+    const status =
+        getTaskStatus(
+            task
+        );
+
+    const priority =
+        getTaskPriority(
+            task
+        );
+
+    if (
+        status
+    ) {
+        metadata.appendChild(
+            createTaskBadge(
+                status
+            )
+        );
+    }
+
+    if (
+        priority
+    ) {
+        metadata.appendChild(
+            createTaskBadge(
+                priority
+            )
+        );
+    }
+
+    for (
+        const role of getTaskRoles(
+            task
+        )
+    ) {
+        metadata.appendChild(
+            createTaskBadge(
+                formatRoleName(
+                    role
+                )
+            )
+        );
+    }
+
+    main.append(
+        header,
+        title,
+        description,
+        metadata
+    );
+
+    const actions =
+        document.createElement(
+            "div"
+        );
+
+    actions.className =
+        "taskboard-task-card-actions";
+
+    const viewButton =
+        document.createElement(
+            "button"
+        );
+
+    viewButton.type =
+        "button";
+
+    viewButton.textContent =
+        "View Task";
+
+    viewButton.addEventListener(
+        "click",
+        function() {
+            showTaskDetailView(
+                task
+            );
+        }
+    );
+
+    actions.appendChild(
+        viewButton
+    );
+
+    card.append(
+        main,
+        actions
+    );
+
+    return card;
+}
+
+/* =========================================================
+TASK LIST RENDERING
+========================================================= */
+
+function renderTaskList() {
+    const {
+        taskboardTaskList
+    } =
+        getTaskboardElements();
+
+    if (
+        !taskboardTaskList
+    ) {
+        return;
+    }
+
+    const tasks =
+        getFilteredTasks();
+
+    taskboardTaskList.replaceChildren();
+
+    if (
+        tasks.length ===
+        0
+    ) {
+        const empty =
+            document.createElement(
+                "p"
+            );
+
+        empty.className =
+            "taskboard-empty-state";
+
+        empty.textContent =
+            "No tasks match the current filters.";
+
+        taskboardTaskList.appendChild(
+            empty
+        );
+
+        return;
+    }
+
+    const fragment =
+        document.createDocumentFragment();
+
+    for (
+        const task of tasks
+    ) {
+        fragment.appendChild(
+            createTaskCard(
+                task
+            )
+        );
+    }
+
+    taskboardTaskList.appendChild(
+        fragment
+    );
 }
 
 /* =========================================================
@@ -626,10 +1580,7 @@ LOAD TASKBOARD DATA
 
 async function loadTaskboardData() {
     const {
-        taskboardRefresh,
-        taskSummaryOutput,
-        taskListOutput,
-        taskAssigneesOutput
+        taskboardRefresh
     } =
         getTaskboardElements();
 
@@ -647,7 +1598,7 @@ async function loadTaskboardData() {
     try {
         const [
             summary,
-            tasks,
+            taskResult,
             assignees
         ] =
             await Promise.all([
@@ -656,23 +1607,23 @@ async function loadTaskboardData() {
                 loadTaskAssignees()
             ]);
 
-        renderJson(
-            taskSummaryOutput,
-            summary
-        );
+        taskboardState.summary =
+            summary;
 
-        renderJson(
-            taskListOutput,
-            tasks
-        );
+        taskboardState.tasks =
+            extractTasks(
+                taskResult
+            );
 
-        renderJson(
-            taskAssigneesOutput,
-            assignees
-        );
+        taskboardState.assignees =
+            assignees;
+
+        renderTaskSummary();
+
+        renderTaskList();
 
         setTaskboardStatus(
-            "Taskboard API test completed successfully."
+            ""
         );
 
         console.log(
@@ -682,7 +1633,7 @@ async function loadTaskboardData() {
 
         console.log(
             "[TASKBOARD TASKS]",
-            tasks
+            taskResult
         );
 
         console.log(
@@ -692,7 +1643,8 @@ async function loadTaskboardData() {
 
         return {
             summary,
-            tasks,
+            tasks:
+                taskResult,
             assignees
         };
     }
@@ -726,10 +1678,9 @@ async function loadTaskboardData() {
         }
 
         setTaskboardStatus(
-            `Taskboard API test failed: ${
-                error?.message
-                || "Unknown error."
-            }`
+            error?.message
+            || "Taskboard data could not be loaded.",
+            "error"
         );
 
         throw error;
@@ -745,15 +1696,305 @@ async function loadTaskboardData() {
 }
 
 /* =========================================================
-REFRESH
-
-A manual Taskboard refresh forces the centralized auth
-service to re-evaluate current Admin authorization before
-loading Taskboard data.
-
-This causes current Discord authorization and responsibility
-roles to be checked again by the server.
+PRIMARY ACTIONS
 ========================================================= */
+
+function setupPrimaryActions() {
+    const {
+        taskboardCreateAction,
+        taskboardReviewAction
+    } =
+        getTaskboardElements();
+
+    if (
+        taskboardCreateAction
+        && taskboardCreateAction
+            .dataset
+            .initialized !==
+            "true"
+    ) {
+        taskboardCreateAction.addEventListener(
+            "click",
+            showCreateView
+        );
+
+        taskboardCreateAction.dataset.initialized =
+            "true";
+    }
+
+    if (
+        taskboardReviewAction
+        && taskboardReviewAction
+            .dataset
+            .initialized !==
+            "true"
+    ) {
+        taskboardReviewAction.addEventListener(
+            "click",
+            showReviewView
+        );
+
+        taskboardReviewAction.dataset.initialized =
+            "true";
+    }
+}
+
+/* =========================================================
+CREATE WORKSPACE NAVIGATION
+========================================================= */
+
+function setupCreateNavigation() {
+    const {
+        taskboardCreateClose,
+        taskboardCreateCancel,
+        taskboardCreateForm
+    } =
+        getTaskboardElements();
+
+    if (
+        taskboardCreateClose
+        && taskboardCreateClose
+            .dataset
+            .initialized !==
+            "true"
+    ) {
+        taskboardCreateClose.addEventListener(
+            "click",
+            showDashboard
+        );
+
+        taskboardCreateClose.dataset.initialized =
+            "true";
+    }
+
+    if (
+        taskboardCreateCancel
+        && taskboardCreateCancel
+            .dataset
+            .initialized !==
+            "true"
+    ) {
+        taskboardCreateCancel.addEventListener(
+            "click",
+            function() {
+                if (
+                    taskboardCreateForm
+                ) {
+                    taskboardCreateForm.reset();
+                }
+
+                showDashboard();
+            }
+        );
+
+        taskboardCreateCancel.dataset.initialized =
+            "true";
+    }
+}
+
+/* =========================================================
+REVIEW WORKSPACE NAVIGATION
+========================================================= */
+
+function setupReviewNavigation() {
+    const {
+        taskboardReviewClose,
+        taskboardTaskDetailClose
+    } =
+        getTaskboardElements();
+
+    if (
+        taskboardReviewClose
+        && taskboardReviewClose
+            .dataset
+            .initialized !==
+            "true"
+    ) {
+        taskboardReviewClose.addEventListener(
+            "click",
+            showDashboard
+        );
+
+        taskboardReviewClose.dataset.initialized =
+            "true";
+    }
+
+    if (
+        taskboardTaskDetailClose
+        && taskboardTaskDetailClose
+            .dataset
+            .initialized !==
+            "true"
+    ) {
+        taskboardTaskDetailClose.addEventListener(
+            "click",
+            showReviewView
+        );
+
+        taskboardTaskDetailClose.dataset.initialized =
+            "true";
+    }
+}
+
+/* =========================================================
+FILTER EVENTS
+========================================================= */
+
+function handleFilterChange() {
+    updateFilterState();
+
+    renderTaskList();
+}
+
+function setupTaskFilters() {
+    const {
+        taskboardTaskSearch,
+        taskboardStatusFilter,
+        taskboardPriorityFilter
+    } =
+        getTaskboardElements();
+
+    const elements =
+        [
+            taskboardTaskSearch,
+            taskboardStatusFilter,
+            taskboardPriorityFilter
+        ];
+
+    for (
+        const element of elements
+    ) {
+        if (
+            !element
+            || element
+                .dataset
+                .initialized ===
+                "true"
+        ) {
+            continue;
+        }
+
+        const eventName =
+            element ===
+                taskboardTaskSearch
+                ? "input"
+                : "change";
+
+        element.addEventListener(
+            eventName,
+            handleFilterChange
+        );
+
+        element.dataset.initialized =
+            "true";
+    }
+
+    updateFilterState();
+}
+
+/* =========================================================
+REFRESH
+========================================================= */
+
+async function refreshTaskboard() {
+    const {
+        taskboardRefresh
+    } =
+        getTaskboardElements();
+
+    if (
+        taskboardRefresh
+        && taskboardRefresh.disabled
+    ) {
+        return;
+    }
+
+    if (
+        taskboardRefresh
+    ) {
+        taskboardRefresh.disabled =
+            true;
+    }
+
+    try {
+        const access =
+            await loadTaskboardAccess();
+
+        if (
+            !access.authorized
+        ) {
+            if (
+                access
+                    ?.state
+                    ?.admin
+                    ?.available ===
+                false
+            ) {
+                showTaskboardError(
+                    "Taskboard authorization is temporarily unavailable."
+                );
+            }
+            else {
+                showTaskboardDenied();
+            }
+
+            return;
+        }
+
+        taskboardState.access =
+            access;
+
+        showTaskboardAuthorized();
+
+        renderTaskboardRoles();
+
+        await loadTaskboardData();
+    }
+    catch (
+        error
+    ) {
+        console.error(
+            "[TASKBOARD REFRESH FAILED]",
+            {
+                code:
+                    error?.code
+                    || null,
+
+                status:
+                    error?.status
+                    || null,
+
+                message:
+                    error?.message
+                    || "Unknown error"
+            }
+        );
+
+        if (
+            error?.status ===
+                401
+            || error?.status ===
+                403
+        ) {
+            showTaskboardDenied();
+
+            return;
+        }
+
+        showTaskboardError(
+            error?.message
+            || "The Taskboard could not be refreshed."
+        );
+    }
+    finally {
+        if (
+            taskboardRefresh
+        ) {
+            taskboardRefresh.disabled =
+                false;
+        }
+    }
+}
 
 function setupTaskboardRefresh() {
     const {
@@ -763,110 +2004,17 @@ function setupTaskboardRefresh() {
 
     if (
         !taskboardRefresh
-    ) {
-        return;
-    }
-
-    if (
-        taskboardRefresh
+        || taskboardRefresh
             .dataset
             .initialized ===
-        "true"
+            "true"
     ) {
         return;
     }
 
     taskboardRefresh.addEventListener(
         "click",
-        async function() {
-            if (
-                taskboardRefresh.disabled
-            ) {
-                return;
-            }
-
-            taskboardRefresh.disabled =
-                true;
-
-            try {
-                const access =
-                    await loadTaskboardAccess();
-
-                if (
-                    !access.authorized
-                ) {
-                    if (
-                        access
-                            ?.state
-                            ?.admin
-                            ?.available ===
-                        false
-                    ) {
-                        showTaskboardError(
-                            "Taskboard authorization is temporarily unavailable."
-                        );
-                    }
-                    else {
-                        showTaskboardDenied();
-                    }
-
-                    return;
-                }
-
-                showTaskboardAuthorized();
-
-                await loadTaskboardData();
-            }
-            catch (
-                error
-            ) {
-                console.error(
-                    "[TASKBOARD REFRESH FAILED]",
-                    {
-                        code:
-                            error?.code
-                            || null,
-
-                        status:
-                            error?.status
-                            || null,
-
-                        message:
-                            error?.message
-                            || "Unknown error"
-                    }
-                );
-
-                if (
-                    error?.status ===
-                        401
-                    || error?.status ===
-                        403
-                ) {
-                    showTaskboardDenied();
-
-                    return;
-                }
-
-                showTaskboardError(
-                    error?.message
-                    || "The Taskboard could not be refreshed."
-                );
-            }
-            finally {
-                /*
-                 * loadTaskboardData() also controls this
-                 * button. Explicit restoration here covers
-                 * failures occurring before data loading.
-                 */
-                if (
-                    taskboardRefresh
-                ) {
-                    taskboardRefresh.disabled =
-                        false;
-                }
-            }
-        }
+        refreshTaskboard
     );
 
     taskboardRefresh.dataset.initialized =
@@ -874,11 +2022,64 @@ function setupTaskboardRefresh() {
 }
 
 /* =========================================================
+RETRY
+========================================================= */
+
+function setupTaskboardRetry() {
+    const {
+        taskboardRetry
+    } =
+        getTaskboardElements();
+
+    if (
+        !taskboardRetry
+        || taskboardRetry
+            .dataset
+            .initialized ===
+            "true"
+    ) {
+        return;
+    }
+
+    taskboardRetry.addEventListener(
+        "click",
+        function() {
+            initializePage();
+        }
+    );
+
+    taskboardRetry.dataset.initialized =
+        "true";
+}
+
+/* =========================================================
+INTERACTION SETUP
+========================================================= */
+
+function setupTaskboardInteractions() {
+    setupPrimaryActions();
+
+    setupCreateNavigation();
+
+    setupReviewNavigation();
+
+    setupTaskFilters();
+
+    setupTaskboardRefresh();
+
+    setupTaskboardRetry();
+}
+
+/* =========================================================
 INITIALIZE TASKBOARD
 ========================================================= */
 
 async function initializeTaskboard() {
-    setupTaskboardRefresh();
+    setupTaskboardInteractions();
+
+    showDashboard();
+
+    renderTaskboardRoles();
 
     return loadTaskboardData();
 }
@@ -895,12 +2096,7 @@ export async function initializePage() {
             await loadTaskboardAccess();
 
         /* -------------------------------------------------
-        ADMIN AUTHORIZATION UNAVAILABLE
-
-        This is distinct from an authoritative denial.
-
-        Do not claim the user lacks access when the server
-        could not establish current Admin authorization.
+        AUTHORIZATION UNAVAILABLE
         ------------------------------------------------- */
 
         if (
@@ -914,18 +2110,13 @@ export async function initializePage() {
                 "Taskboard authorization is temporarily unavailable."
             );
 
+            setupTaskboardRetry();
+
             return;
         }
 
         /* -------------------------------------------------
         ACCESS DENIED
-
-        Covers:
-            - signed-out BPD account
-            - inactive BPD account
-            - Discord provider authorization failure
-            - Discord staff authorization failure
-            - no active responsibility role
         ------------------------------------------------- */
 
         if (
@@ -939,6 +2130,9 @@ export async function initializePage() {
         /* -------------------------------------------------
         AUTHORIZED
         ------------------------------------------------- */
+
+        taskboardState.access =
+            access;
 
         console.log(
             "[TASKBOARD ACCESS]",
@@ -959,13 +2153,6 @@ export async function initializePage() {
         catch (
             error
         ) {
-            /*
-             * Task APIs remain authoritative.
-             *
-             * If any endpoint rejects access after the page
-             * gate succeeded, immediately hide Taskboard
-             * content.
-             */
             if (
                 error?.status ===
                     401
@@ -977,13 +2164,6 @@ export async function initializePage() {
                 return;
             }
 
-            /*
-             * Preliminary integration behavior:
-             *
-             * Keep the authorized Taskboard shell visible
-             * while surfacing non-access data failures in
-             * the status area.
-             */
             console.error(
                 "[TASKBOARD INITIALIZATION DATA ERROR]",
                 {
@@ -1026,5 +2206,7 @@ export async function initializePage() {
             error?.message
             || "The Taskboard could not be initialized."
         );
+
+        setupTaskboardRetry();
     }
 }

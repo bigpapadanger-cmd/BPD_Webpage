@@ -7,11 +7,27 @@ File:
 
 Purpose:
     Base styling for the Admin Management landing page.
+
+Description:
+    - Preserves the existing Admin page structure.
+    - Uses the same general page width and spacing as the
+      global BPD Account page.
+    - Supports Admin loading, denied, and authorized states.
+    - Leaves detailed Admin component styling to their
+      respective Admin stylesheets.
+========================================================= */
+
+/* =========================================================
+HIDDEN STATE
 ========================================================= */
 
 [hidden] {
     display: none !important;
 }
+
+/* =========================================================
+DOCUMENT
+========================================================= */
 
 html,
 body {
@@ -23,26 +39,153 @@ body {
     min-height: 100vh;
 }
 
+/* =========================================================
+ADMIN PAGE
+========================================================= */
+
 .admin-page {
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 24px;
+    width: 100%;
+    min-width: 0;
+
+    padding:
+        24px
+        24px
+        40px;
+
     box-sizing: border-box;
 }
 
+/* =========================================================
+ADMIN PANEL
+
+Matches the general content width used by the Account page
+while preserving the Admin page's existing panel structure.
+========================================================= */
+
 .admin-panel {
-    width: 100%;
-    max-width: 900px;
-    text-align: center;
+    width:
+        min(
+            100%,
+            1100px
+        );
+
+    min-width: 0;
+
+    margin-inline:
+        auto;
+
+    box-sizing:
+        border-box;
 }
+
+/* =========================================================
+ADMIN CONTENT
+========================================================= */
+
+#adminContent {
+    width: 100%;
+    min-width: 0;
+}
+
+/* =========================================================
+ADMIN TITLE
+========================================================= */
 
 .admin-title {
-    margin: 0;
+    margin:
+        0;
+
+    line-height:
+        1.15;
 }
 
+/* =========================================================
+ADMIN STATUS
+
+Used for loading and denied states.
+
+These states remain centered without forcing the authorized
+Admin workspace itself into a vertically centered layout.
+========================================================= */
+
 .admin-status {
-    margin: 0;
-    text-align: center;
+    width: 100%;
+    min-width: 0;
+
+    min-height:
+        220px;
+
+    display:
+        flex;
+
+    align-items:
+        center;
+
+    justify-content:
+        center;
+
+    margin:
+        0;
+
+    padding:
+        24px;
+
+    box-sizing:
+        border-box;
+
+    text-align:
+        center;
+}
+
+/* =========================================================
+LOADING STATE
+========================================================= */
+
+#adminLoading {
+    width: 100%;
+}
+
+/* =========================================================
+DENIED STATE
+========================================================= */
+
+#adminDenied {
+    width: 100%;
+}
+
+/* =========================================================
+SMALL VIEWPORTS
+========================================================= */
+
+@media (max-width: 700px) {
+    .admin-page {
+        padding:
+            16px
+            14px
+            28px;
+    }
+
+    .admin-status {
+        min-height:
+            180px;
+
+        padding:
+            20px
+            16px;
+    }
+}
+
+/* =========================================================
+VERY SMALL VIEWPORTS
+========================================================= */
+
+@media (max-width: 480px) {
+    .admin-status {
+        min-height:
+            160px;
+
+        padding:
+            18px
+            12px;
+    }
 }
