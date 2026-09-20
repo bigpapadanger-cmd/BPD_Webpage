@@ -9,15 +9,16 @@ File:
 
 Purpose:
     Provides the shared server-side transport for all Admin
-    task-board Supabase RPC calls.
+    Taskboard Supabase RPC calls.
 
 Description:
     - Calls only explicitly approved Admin task RPCs.
     - Uses the Supabase service-role key server-side.
     - Sends requests to the api PostgreSQL schema.
     - Normalizes Supabase/PostgREST errors.
-    - Converts task-domain errors into consistent server
-      errors for API handlers.
+    - Converts known task-domain errors into consistent
+      server errors for API handlers.
+    - Preserves database diagnostics server-side.
     - Keeps Supabase credentials out of browser code.
 
 Security:
@@ -26,16 +27,6 @@ Security:
     - Browser-submitted actor IDs are never trusted.
     - SUPABASE_SERVICE_ROLE_KEY is never returned.
     - Arbitrary RPC names cannot be called through this file.
-
-Important:
-    This file does NOT:
-    - authenticate users
-    - authorize Admin permissions
-    - derive Discord roles
-    - determine actor account IDs
-    - validate task business rules
-
-    Those responsibilities belong to their respective layers.
 ========================================================= */
 
 /* =========================================================
@@ -49,6 +40,9 @@ const TASK_RPC_NAMES =
 
         UPDATE:
             "admin_update_task",
+
+        START:
+            "admin_start_task",
 
         COMPLETE:
             "admin_complete_task",
@@ -86,8 +80,14 @@ const TASK_RPC_NAMES =
         ASSIGNEES:
             "admin_get_task_assignees",
 
+        TASKBOARD_ROLES:
+            "admin_get_taskboard_roles",
+
         EVENTS:
             "admin_get_task_events",
+
+        COMMENT:
+            "admin_add_task_comment",
 
         ACTIVITY:
             "admin_get_task_activity",
@@ -106,11 +106,79 @@ const ALLOWED_TASK_RPCS =
 const TASK_RPC_TIMEOUT_MS =
     10000;
 
+const TASK_DOMAIN_ERROR_CODES =
+    Object.freeze([
+        "TASK_NOT_FOUND",
+
+        "TASK_VERSION_CONFLICT",
+
+        "TASK_DELETED",
+
+        "TASK_ARCHIVED",
+
+        "TASK_SHELVED",
+
+        "TASK_COMPLETED",
+
+        "TASK_ALREADY_IN_PROGRESS",
+
+        "TASK_ALREADY_COMPLETED",
+
+        "TASK_ALREADY_SHELVED",
+
+        "TASK_ALREADY_ARCHIVED",
+
+        "TASK_ALREADY_DELETED",
+
+        "TASK_NOT_COMPLETED",
+
+        "TASK_NOT_SHELVED",
+
+        "TASK_NOT_ARCHIVED",
+
+        "TASK_NOT_DELETED",
+
+        "TASK_INPUT_INVALID",
+
+        "TASK_FIELDS_UNSUPPORTED",
+
+        "TASK_PRIORITY_INVALID",
+
+        "TASK_TIMELINE_INVALID",
+
+        "TASK_ROLES_INVALID",
+
+        "TASK_STATE_CONFLICT",
+
+        "TASK_CODE_INVALID",
+
+        "TASK_CHANGES_INVALID",
+
+        "TASK_CHANGES_UNSUPPORTED",
+
+        "TASK_COMMENT_REQUIRED",
+
+        "TASK_COMMENT_TOO_LONG",
+
+        "ACTOR_ACCOUNT_ID_REQUIRED",
+
+        "TASK_ACTIVITY_FILTERS_INVALID",
+
+        "TASK_ACTIVITY_FILTERS_UNSUPPORTED",
+
+        "TASK_ACTIVITY_DATE_RANGE_INVALID",
+
+        "TASK_EVENT_TYPE_INVALID",
+
+        "ACTOR_ACCOUNT_ID_INVALID",
+
+        "CREATED_AFTER_INVALID",
+
+        "CREATED_BEFORE_INVALID"
+    ]);
+
 /* =========================================================
 EXPORT RPC NAMES
-
-Consumers should use these constants rather than duplicating
-raw RPC strings.
 ========================================================= */
 
 export const ADMIN_TASK_RPCS =
@@ -177,10 +245,20 @@ NORMALIZATION
 function normalizeString(
     value
 ) {
-    return typeof value ===
-        "string"
+    return typeof value === "string"
         ? value.trim()
         : "";
+}
+
+function normalizeNullableString(
+    value
+) {
+    const normalized =
+        normalizeString(
+            value
+        );
+
+    return normalized || null;
 }
 
 function normalizeRpcParameters(
@@ -188,8 +266,7 @@ function normalizeRpcParameters(
 ) {
     if (
         !parameters
-        || typeof parameters !==
-            "object"
+        || typeof parameters !== "object"
         || Array.isArray(
             parameters
         )
@@ -321,11 +398,6 @@ async function readResponseBody(
 
 /* =========================================================
 TASK DOMAIN ERROR EXTRACTION
-
-PostgreSQL exceptions raised by task RPCs generally arrive
-through PostgREST in result.message.
-
-We preserve a normalized application code for API handlers.
 ========================================================= */
 
 function getTaskDomainErrorCode(
@@ -336,69 +408,19 @@ function getTaskDomainErrorCode(
             result?.message
         );
 
-    const codes = [
-        "TASK_NOT_FOUND",
-
-        "TASK_VERSION_CONFLICT",
-
-        "TASK_DELETED",
-
-        "TASK_ARCHIVED",
-
-        "TASK_SHELVED",
-
-        "TASK_COMPLETED",
-
-        "TASK_ALREADY_COMPLETED",
-
-        "TASK_ALREADY_SHELVED",
-
-        "TASK_ALREADY_ARCHIVED",
-
-        "TASK_ALREADY_DELETED",
-
-        "TASK_NOT_COMPLETED",
-
-        "TASK_NOT_SHELVED",
-
-        "TASK_NOT_ARCHIVED",
-
-        "TASK_NOT_DELETED",
-
-        "TASK_INPUT_INVALID", "TASK_FIELDS_UNSUPPORTED", "TASK_PRIORITY_INVALID", "TASK_TIMELINE_INVALID", "TASK_ROLES_INVALID", "TASK_STATE_CONFLICT",
-        "TASK_CODE_INVALID",
-
-        "TASK_CHANGES_INVALID",
-
-        "TASK_CHANGES_UNSUPPORTED",
-
-        "TASK_ACTIVITY_FILTERS_INVALID",
-
-        "TASK_ACTIVITY_FILTERS_UNSUPPORTED",
-
-        "TASK_ACTIVITY_DATE_RANGE_INVALID",
-
-        "TASK_EVENT_TYPE_INVALID",
-
-        "ACTOR_ACCOUNT_ID_INVALID",
-
-        "CREATED_AFTER_INVALID",
-
-        "CREATED_BEFORE_INVALID"
-    ];
-
-    const matched =
-        codes.find(
-            code => message === code || result?.code === code
+    const resultCode =
+        normalizeString(
+            result?.code
         );
 
-    if (
-        matched
-    ) {
-        return matched;
-    }
+    const matched =
+        TASK_DOMAIN_ERROR_CODES.find(
+            code =>
+                message === code
+                || resultCode === code
+        );
 
-    return "ADMIN_TASK_RPC_FAILED";
+    return matched || null;
 }
 
 /* =========================================================
@@ -409,8 +431,33 @@ function mapTaskErrorStatus(
     code,
     supabaseStatus
 ) {
-    if (code === "TASK_STATE_CONFLICT") return 409;
-    if (["TASK_INPUT_INVALID", "TASK_FIELDS_UNSUPPORTED", "TASK_PRIORITY_INVALID", "TASK_TIMELINE_INVALID", "TASK_ROLES_INVALID"].includes(code)) return 400;
+    if (
+        [
+            "TASK_STATE_CONFLICT",
+            "TASK_VERSION_CONFLICT",
+
+            "TASK_DELETED",
+            "TASK_ARCHIVED",
+            "TASK_SHELVED",
+            "TASK_COMPLETED",
+
+            "TASK_ALREADY_IN_PROGRESS",
+            "TASK_ALREADY_COMPLETED",
+            "TASK_ALREADY_SHELVED",
+            "TASK_ALREADY_ARCHIVED",
+            "TASK_ALREADY_DELETED",
+
+            "TASK_NOT_COMPLETED",
+            "TASK_NOT_SHELVED",
+            "TASK_NOT_ARCHIVED",
+            "TASK_NOT_DELETED"
+        ].includes(
+            code
+        )
+    ) {
+        return 409;
+    }
+
     if (
         code ===
         "TASK_NOT_FOUND"
@@ -419,52 +466,28 @@ function mapTaskErrorStatus(
     }
 
     if (
-        code ===
-        "TASK_VERSION_CONFLICT"
-    ) {
-        return 409;
-    }
-
-    if (
-        code ===
-            "TASK_DELETED"
-        || code ===
-            "TASK_ARCHIVED"
-        || code ===
-            "TASK_SHELVED"
-        || code ===
-            "TASK_COMPLETED"
-        || code.startsWith(
-            "TASK_ALREADY_"
-        )
-        || code.startsWith(
-            "TASK_NOT_"
-        )
-    ) {
-        return 409;
-    }
-
-    if (
-        code ===
-            "TASK_CODE_INVALID"
-        || code ===
-            "TASK_CHANGES_INVALID"
-        || code ===
-            "TASK_CHANGES_UNSUPPORTED"
-        || code ===
-            "TASK_ACTIVITY_FILTERS_INVALID"
-        || code ===
-            "TASK_ACTIVITY_FILTERS_UNSUPPORTED"
-        || code ===
-            "TASK_ACTIVITY_DATE_RANGE_INVALID"
-        || code ===
-            "TASK_EVENT_TYPE_INVALID"
-        || code ===
-            "ACTOR_ACCOUNT_ID_INVALID"
-        || code ===
-            "CREATED_AFTER_INVALID"
-        || code ===
+        [
+            "TASK_INPUT_INVALID",
+            "TASK_FIELDS_UNSUPPORTED",
+            "TASK_PRIORITY_INVALID",
+            "TASK_TIMELINE_INVALID",
+            "TASK_ROLES_INVALID",
+            "TASK_CODE_INVALID",
+            "TASK_CHANGES_INVALID",
+            "TASK_CHANGES_UNSUPPORTED",
+            "TASK_COMMENT_REQUIRED",
+            "TASK_COMMENT_TOO_LONG",
+            "ACTOR_ACCOUNT_ID_REQUIRED",
+            "TASK_ACTIVITY_FILTERS_INVALID",
+            "TASK_ACTIVITY_FILTERS_UNSUPPORTED",
+            "TASK_ACTIVITY_DATE_RANGE_INVALID",
+            "TASK_EVENT_TYPE_INVALID",
+            "ACTOR_ACCOUNT_ID_INVALID",
+            "CREATED_AFTER_INVALID",
             "CREATED_BEFORE_INVALID"
+        ].includes(
+            code
+        )
     ) {
         return 400;
     }
@@ -483,6 +506,42 @@ function mapTaskErrorStatus(
 }
 
 /* =========================================================
+PUBLIC DOMAIN ERROR MESSAGE
+========================================================= */
+
+function getTaskErrorMessage(
+    code
+) {
+    switch (
+        code
+    ) {
+        case "TASK_VERSION_CONFLICT":
+            return "This task changed. Refresh it before trying again.";
+
+        case "TASK_NOT_FOUND":
+            return "The requested task could not be found.";
+
+        case "TASK_ALREADY_IN_PROGRESS":
+            return "This task is already in progress.";
+
+        case "TASK_ALREADY_COMPLETED":
+            return "This task is already completed.";
+
+        case "TASK_ALREADY_SHELVED":
+            return "This task is already shelved.";
+
+        case "TASK_ALREADY_ARCHIVED":
+            return "This task is already archived.";
+
+        case "TASK_ALREADY_DELETED":
+            return "This task is already deleted.";
+
+        default:
+            return `The task operation could not be completed (${code}).`;
+    }
+}
+
+/* =========================================================
 SUPABASE ERROR CONVERSION
 ========================================================= */
 
@@ -490,18 +549,100 @@ function createSupabaseRpcError(
     response,
     result
 ) {
-    const code =
+    const taskCode =
         getTaskDomainErrorCode(
             result
         );
 
-    const unavailable = code === "ADMIN_TASK_RPC_FAILED";
-    const status = unavailable ? 503 : mapTaskErrorStatus(code, response.status);
-    const message = code === "TASK_VERSION_CONFLICT"
-        ? "This task changed. Refresh it before trying again."
-        : unavailable ? "The task service is temporarily unavailable. Please try again."
-        : "The task operation could not be completed (" + code + ").";
-    return new AdminTaskRpcError(message, { code, status, unavailable });
+    const databaseCode =
+        normalizeNullableString(
+            result?.code
+        );
+
+    const details =
+        result?.details ??
+        null;
+
+    const hint =
+        result?.hint ??
+        null;
+
+    /* -----------------------------------------------------
+    KNOWN TASK-DOMAIN ERROR
+
+    These are expected business-rule failures generated by
+    the Taskboard RPC layer.
+    ----------------------------------------------------- */
+
+    if (
+        taskCode
+    ) {
+        return new AdminTaskRpcError(
+            getTaskErrorMessage(
+                taskCode
+            ),
+            {
+                code:
+                    taskCode,
+
+                status:
+                    mapTaskErrorStatus(
+                        taskCode,
+                        response.status
+                    ),
+
+                databaseCode,
+
+                details,
+
+                hint,
+
+                unavailable:
+                    false
+            }
+        );
+    }
+
+    /* -----------------------------------------------------
+    UNKNOWN DATABASE / POSTGREST ERROR
+
+    Preserve the actual HTTP status when possible instead
+    of automatically converting every unknown failure to
+    503.
+
+    This makes schema/RPC/configuration errors distinguishable
+    from genuine service outages.
+    ----------------------------------------------------- */
+
+    const status =
+        Number.isInteger(
+            response?.status
+        )
+        && response.status >= 400
+        && response.status <= 599
+            ? response.status
+            : 500;
+
+    return new AdminTaskRpcError(
+        "The task database request failed.",
+        {
+            code:
+                "ADMIN_TASK_RPC_FAILED",
+
+            status,
+
+            databaseCode,
+
+            details,
+
+            hint,
+
+            unavailable:
+                status === 502
+                || status === 503
+                || status === 504
+        }
+    );
 }
 
 /* =========================================================
@@ -550,7 +691,10 @@ export async function callAdminTaskRpc(
     try {
         response =
             await fetch(
-                `${supabaseUrl.replace(/\/rest\/v1$/, "")}/rest/v1/rpc/${encodeURIComponent(
+                `${supabaseUrl.replace(
+                    /\/rest\/v1$/,
+                    ""
+                )}/rest/v1/rpc/${encodeURIComponent(
                     rpc
                 )}`,
                 {
@@ -654,8 +798,7 @@ export function isAdminTaskRpcError(
     error
 ) {
     return (
-        error instanceof
-            AdminTaskRpcError
+        error instanceof AdminTaskRpcError
         || error?.name ===
             "AdminTaskRpcError"
     );

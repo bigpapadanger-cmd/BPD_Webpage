@@ -7,31 +7,43 @@ ADMIN TASK EVENTS API
 File:
     functions/api/auth/admin/tasks/[taskCode]/events.js
 
-Route:
-    GET /api/auth/admin/tasks/:taskCode/events
+Routes:
+    GET  /api/auth/admin/tasks/:taskCode/events
+    POST /api/auth/admin/tasks/:taskCode/events
 
 Purpose:
-    HTTP boundary for retrieving the event/audit history of
-    one Admin task-board record.
+    HTTP boundary for retrieving task event history and
+    adding controlled comments/questions to an Admin task.
 
 Description:
-    - Reads the task code from the dynamic route.
-    - Supports bounded pagination.
-    - Requires TASKS_READ through the task activity service.
-    - Returns the authoritative task-event history from
-      Supabase.
-    - Does not mutate task state.
+    GET:
+        - Retrieves task event/audit history.
+        - Supports bounded pagination.
+        - Accepts only limit and offset query parameters.
+
+    POST:
+        - Adds a comment/question to the task.
+        - Accepts only a comment field.
+        - Does not modify task state or task version.
 
 Security:
     - Authentication and Discord-backed permissions are
-      enforced by the Admin service layer.
+      enforced by the service layer.
+    - Taskboard responsibility is enforced server-side
+      against the authoritative persisted task.
     - Browser-submitted permissions are never trusted.
+    - Browser-submitted actor IDs are never accepted.
+    - Browser-submitted event metadata is never accepted.
     - Supabase service-role credentials remain server-side.
 ========================================================= */
 
 import {
     getAdminTaskEvents
 } from "../../../../../services/supabase/admin/tasks/activity.js";
+
+import {
+    addAdminTaskComment
+} from "../../../../../services/supabase/admin/tasks/comments.js";
 
 /* =========================================================
 CONSTANTS
@@ -48,6 +60,17 @@ const JSON_HEADERS =
         "Cache-Control":
             "no-store"
     });
+
+const ALLOWED_GET_QUERY_PARAMETERS =
+    new Set([
+        "limit",
+        "offset"
+    ]);
+
+const ALLOWED_POST_FIELDS =
+    new Set([
+        "comment"
+    ]);
 
 /* =========================================================
 NORMALIZATION
@@ -71,9 +94,12 @@ function jsonResponse(
     additionalHeaders = {}
 ) {
     return new Response(
-        JSON.stringify(body),
+        JSON.stringify(
+            body
+        ),
         {
             status,
+
             headers: {
                 ...JSON_HEADERS,
                 ...additionalHeaders
@@ -93,7 +119,9 @@ function createRequestError(
     details = null
 ) {
     const error =
-        new Error(message);
+        new Error(
+            message
+        );
 
     error.name =
         "AdminTaskEventsApiRequestError";
@@ -138,6 +166,41 @@ function getTaskCode(
 }
 
 /* =========================================================
+GET QUERY VALIDATION
+========================================================= */
+
+function validateGetQueryParameters(
+    searchParams
+) {
+    const invalidParameters =
+        [
+            ...new Set(
+                [...searchParams.keys()]
+                    .filter(
+                        key =>
+                            !ALLOWED_GET_QUERY_PARAMETERS.has(
+                                key
+                            )
+                    )
+            )
+        ];
+
+    if (
+        invalidParameters.length >
+        0
+    ) {
+        throw createRequestError(
+            "TASK_EVENTS_QUERY_UNSUPPORTED",
+            "Unsupported task event query parameters were supplied.",
+            400,
+            {
+                invalidParameters
+            }
+        );
+    }
+}
+
+/* =========================================================
 PAGINATION
 ========================================================= */
 
@@ -153,10 +216,14 @@ function parseLimit(
     }
 
     const limit =
-        Number(value);
+        Number(
+            value
+        );
 
     if (
-        !Number.isSafeInteger(limit)
+        !Number.isSafeInteger(
+            limit
+        )
         || limit < 1
     ) {
         throw createRequestError(
@@ -184,10 +251,14 @@ function parseOffset(
     }
 
     const offset =
-        Number(value);
+        Number(
+            value
+        );
 
     if (
-        !Number.isSafeInteger(offset)
+        !Number.isSafeInteger(
+            offset
+        )
         || offset < 0
     ) {
         throw createRequestError(
@@ -198,6 +269,121 @@ function parseOffset(
     }
 
     return offset;
+}
+
+/* =========================================================
+JSON BODY
+========================================================= */
+
+async function readJsonBody(
+    request
+) {
+    const contentType =
+        normalizeString(
+            request.headers.get(
+                "content-type"
+            )
+        ).toLowerCase();
+
+    if (
+        !contentType.includes(
+            "application/json"
+        )
+    ) {
+        throw createRequestError(
+            "CONTENT_TYPE_INVALID",
+            "Content-Type must be application/json.",
+            415
+        );
+    }
+
+    let body;
+
+    try {
+        body =
+            await request.json();
+    }
+    catch {
+        throw createRequestError(
+            "REQUEST_BODY_INVALID",
+            "A valid JSON request body is required.",
+            400
+        );
+    }
+
+    if (
+        !body
+        || typeof body !== "object"
+        || Array.isArray(
+            body
+        )
+    ) {
+        throw createRequestError(
+            "REQUEST_BODY_INVALID",
+            "The request body must be a JSON object.",
+            400
+        );
+    }
+
+    return body;
+}
+
+/* =========================================================
+COMMENT BODY
+
+Only:
+{
+    "comment": "..."
+}
+
+is accepted.
+
+Actor IDs, permissions, roles, event types, task IDs, and
+other event metadata cannot be supplied by the browser.
+========================================================= */
+
+function getCommentFromBody(
+    body
+) {
+    const invalidFields =
+        Object.keys(
+            body
+        )
+            .filter(
+                field =>
+                    !ALLOWED_POST_FIELDS.has(
+                        field
+                    )
+            );
+
+    if (
+        invalidFields.length >
+        0
+    ) {
+        throw createRequestError(
+            "TASK_COMMENT_FIELDS_UNSUPPORTED",
+            "Unsupported fields were supplied.",
+            400,
+            {
+                invalidFields
+            }
+        );
+    }
+
+    if (
+        !Object.prototype.hasOwnProperty.call(
+            body,
+            "comment"
+        )
+    ) {
+        throw createRequestError(
+            "TASK_COMMENT_REQUIRED",
+            "A comment is required.",
+            400
+        );
+    }
+
+    return body.comment;
 }
 
 /* =========================================================
@@ -213,7 +399,9 @@ function getErrorStatus(
         );
 
     if (
-        Number.isInteger(status)
+        Number.isInteger(
+            status
+        )
         && status >= 400
         && status <= 599
     ) {
@@ -260,10 +448,14 @@ function handleApiError(
     error
 ) {
     const status =
-        getErrorStatus(error);
+        getErrorStatus(
+            error
+        );
 
     const code =
-        getErrorCode(error);
+        getErrorCode(
+            error
+        );
 
     if (
         status >= 500
@@ -281,14 +473,22 @@ function handleApiError(
                     error?.message
                     ?? null,
 
+                databaseCode:
+                    error?.databaseCode
+                    ?? null,
+
                 details:
                     error?.details
+                    ?? null,
+
+                hint:
+                    error?.hint
                     ?? null
             }
         );
     }
 
-    const body = {
+    const responseBody = {
         success:
             false,
 
@@ -307,12 +507,12 @@ function handleApiError(
         && error?.details !== undefined
         && error?.details !== null
     ) {
-        body.details =
+        responseBody.details =
             error.details;
     }
 
     return jsonResponse(
-        body,
+        responseBody,
         status
     );
 }
@@ -323,6 +523,9 @@ GET /api/auth/admin/tasks/:taskCode/events
 Query Parameters:
     limit
     offset
+
+Authorization and responsibility checks are performed by
+getAdminTaskEvents().
 ========================================================= */
 
 export async function onRequestGet(
@@ -344,6 +547,10 @@ export async function onRequestGet(
             new URL(
                 request.url
             );
+
+        validateGetQueryParameters(
+            url.searchParams
+        );
 
         const limit =
             parseLimit(
@@ -385,6 +592,67 @@ export async function onRequestGet(
 }
 
 /* =========================================================
+POST /api/auth/admin/tasks/:taskCode/events
+
+Body:
+{
+    "comment": "Question or comment text"
+}
+
+The actor account ID is derived by the service and is
+intentionally never accepted from the browser.
+========================================================= */
+
+export async function onRequestPost(
+    context
+) {
+    try {
+        const {
+            request,
+            env
+        } =
+            context;
+
+        const taskCode =
+            getTaskCode(
+                context
+            );
+
+        const body =
+            await readJsonBody(
+                request
+            );
+
+        const comment =
+            getCommentFromBody(
+                body
+            );
+
+        const result =
+            await addAdminTaskComment(
+                request,
+                env,
+                {
+                    taskCode,
+                    comment
+                }
+            );
+
+        return jsonResponse(
+            result,
+            201
+        );
+    }
+    catch (
+        error
+    ) {
+        return handleApiError(
+            error
+        );
+    }
+}
+
+/* =========================================================
 METHOD FALLBACK
 ========================================================= */
 
@@ -396,29 +664,36 @@ export async function onRequest(
             context?.request?.method
         ).toUpperCase();
 
-    if (
-        method === "GET"
+    switch (
+        method
     ) {
-        return onRequestGet(
-            context
-        );
+        case "GET":
+            return onRequestGet(
+                context
+            );
+
+        case "POST":
+            return onRequestPost(
+                context
+            );
+
+        default:
+            return jsonResponse(
+                {
+                    success:
+                        false,
+
+                    error:
+                        "METHOD_NOT_ALLOWED",
+
+                    message:
+                        "Method not allowed."
+                },
+                405,
+                {
+                    Allow:
+                        "GET, POST"
+                }
+            );
     }
-
-    return jsonResponse(
-        {
-            success:
-                false,
-
-            error:
-                "METHOD_NOT_ALLOWED",
-
-            message:
-                "Method not allowed."
-        },
-        405,
-        {
-            Allow:
-                "GET"
-        }
-    );
 }

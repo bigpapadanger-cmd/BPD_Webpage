@@ -13,6 +13,10 @@ Purpose:
 
 Description:
     - Individual task history requires TASKS_READ.
+    - Individual task history also requires Taskboard
+      responsibility for the requested task.
+    - owner may inspect any task history.
+    - database/security/ui require responsible-role overlap.
     - Global task activity requires AUDIT_READ.
     - Supports bounded pagination.
     - Supports filtered global activity.
@@ -21,6 +25,8 @@ Description:
 
 Security:
     - Browser-submitted permissions are never trusted.
+    - Browser-submitted Taskboard roles are never trusted.
+    - Task responsibility is derived from persisted data.
     - Authorization is derived server-side.
     - Supabase service-role credentials remain server-side.
     - Global audit visibility is intentionally more
@@ -31,6 +37,10 @@ import {
     authorizeTaskRead,
     authorizeTaskAuditRead
 } from "../../../admin/permissions.js";
+
+import {
+    requireTaskResponsibility
+} from "../../../admin/taskboard_roles.js";
 
 import {
     ADMIN_TASK_RPCS,
@@ -99,8 +109,7 @@ NORMALIZATION
 function normalizeString(
     value
 ) {
-    return typeof value ===
-        "string"
+    return typeof value === "string"
         ? value.trim()
         : "";
 }
@@ -299,8 +308,7 @@ function normalizeActivityFilters(
     }
 
     if (
-        typeof value !==
-            "object"
+        typeof value !== "object"
         || Array.isArray(
             value
         )
@@ -329,8 +337,7 @@ function normalizeActivityFilters(
             );
 
     if (
-        invalidFields.length >
-        0
+        invalidFields.length > 0
     ) {
         throw new AdminTaskActivityError(
             "Unsupported task activity filters were supplied.",
@@ -492,14 +499,72 @@ function normalizeActivityFilters(
 }
 
 /* =========================================================
+LOAD AUTHORITATIVE TASK
+
+Individual task history authorization uses the persisted
+responsible_roles value.
+
+The browser cannot supply or override the roles used for
+this access decision.
+========================================================= */
+
+async function getAuthoritativeTask(
+    env,
+    taskCode
+) {
+    const result =
+        await callAdminTaskRpc(
+            env,
+            ADMIN_TASK_RPCS.GET,
+            {
+                p_task_code:
+                    taskCode,
+
+                p_include_deleted:
+                    false
+            }
+        );
+
+    const task =
+        Array.isArray(
+            result
+        )
+            ? result[0]
+            : result;
+
+    if (
+        !task
+        || typeof task !== "object"
+    ) {
+        throw new AdminTaskActivityError(
+            "The requested task could not be found.",
+            {
+                code:
+                    "TASK_NOT_FOUND",
+
+                status:
+                    404
+            }
+        );
+    }
+
+    return task;
+}
+
+/* =========================================================
 INDIVIDUAL TASK EVENTS
 
 Requires:
     TASKS_READ
 
-This allows staff who can work with tasks to inspect the
-history of a specific task without granting access to the
-global Admin audit feed.
+Responsibility:
+    owner
+        -> may inspect any task
+
+    database/security/ui
+        -> must overlap task.responsible_roles
+
+This does not grant access to the global Admin audit feed.
 ========================================================= */
 
 export async function getAdminTaskEvents(
@@ -511,6 +576,10 @@ export async function getAdminTaskEvents(
         offset = 0
     } = {}
 ) {
+    /* -----------------------------------------------------
+    INPUT
+    ----------------------------------------------------- */
+
     const normalizedTaskCode =
         requireTaskCode(
             taskCode
@@ -526,10 +595,46 @@ export async function getAdminTaskEvents(
             offset
         );
 
-    await authorizeTaskRead(
-        request,
-        env
+    /* -----------------------------------------------------
+    OPERATION PERMISSION
+    ----------------------------------------------------- */
+
+    const authorization =
+        await authorizeTaskRead(
+            request,
+            env
+        );
+
+    /* -----------------------------------------------------
+    AUTHORITATIVE TASK
+    ----------------------------------------------------- */
+
+    const task =
+        await getAuthoritativeTask(
+            env,
+            normalizedTaskCode
+        );
+
+    /* -----------------------------------------------------
+    TASKBOARD RESPONSIBILITY
+
+    requireTaskResponsibility() loads the user's verified
+    Taskboard role context and compares it against the
+    persisted task assignment.
+
+    The returned context is not otherwise needed because
+    this operation is read-only.
+    ----------------------------------------------------- */
+
+    await requireTaskResponsibility(
+        env,
+        authorization,
+        task.responsible_roles
     );
+
+    /* -----------------------------------------------------
+    TASK HISTORY
+    ----------------------------------------------------- */
 
     return callAdminTaskRpc(
         env,
@@ -553,7 +658,11 @@ GLOBAL ACTIVITY
 Requires:
     AUDIT_READ
 
-Returns the unfiltered global task activity feed.
+This is an administrative audit capability rather than an
+assigned-task capability.
+
+Taskboard responsibility filtering is intentionally NOT
+applied here.
 ========================================================= */
 
 export async function getAdminTaskActivity(
@@ -604,6 +713,9 @@ Supported filters:
     eventType
     createdAfter
     createdBefore
+
+Taskboard responsibility filtering is intentionally NOT
+applied because AUDIT_READ represents global audit access.
 ========================================================= */
 
 export async function listAdminTaskActivity(
@@ -659,8 +771,7 @@ export function isAdminTaskActivityError(
     error
 ) {
     return (
-        error instanceof
-            AdminTaskActivityError
+        error instanceof AdminTaskActivityError
         || error?.name ===
             "AdminTaskActivityError"
     );

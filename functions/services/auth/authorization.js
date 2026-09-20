@@ -98,8 +98,6 @@ import {
     getProviderAuthorizationState
 } from "./providers/provider_auth_state.js";
 
-import { getCanonicalAccount } from "./account/get_session.js";
-
 /* =========================================================
 NORMALIZATION
 ========================================================= */
@@ -272,20 +270,11 @@ export async function getAuthorizationContext(
     request,
     env
 ) {
-    let sessionContext;
-    try {
-        sessionContext = await getSessionContext(request, env);
-        if (sessionContext.authenticated) {
-            const account = await getCanonicalAccount(env, sessionContext.userId);
-            if (!account) {
-                throw new AuthorizationError("ACCOUNT_INACTIVE", "The BPD account is unavailable.", 403);
-            }
-            sessionContext = { ...sessionContext, role: account.role, active: account.active };
-        }
-    } catch (error) {
-        if (isAuthorizationError(error)) throw error;
-        throw new AuthorizationError("AUTH_SERVICE_UNAVAILABLE", "Authentication service is unavailable.", 503);
-    }
+    const sessionContext =
+        await getSessionContext(
+            request,
+            env
+        );
 
     return createAuthorizationContext(
         sessionContext
@@ -901,30 +890,7 @@ export async function authorizeRequest(
             );
     }
 
-    // Account recovery/linking is deliberately exempt from provider freshness.
-    if ((requirements.account === true || role || requirements.profile === true)
-        && requirements.recovery !== true) {
-        authorization = await requireProfileProvider(authorization, env);
-    }
     return authorization;
-}
-
-export async function requireProfileProvider(authorization, env) {
-    requireActiveAccount(authorization);
-    let unavailable = null;
-    for (const provider of ["epic", "google", "discord"]) {
-        try {
-            const verified = await requireProvider(authorization, env, provider);
-            return { ...verified, provider: authorization.provider || verified.provider };
-        } catch (error) {
-            if (error.status >= 500) unavailable = error;
-            else if (!["PROVIDER_REQUIRED", "PROVIDER_REAUTHORIZATION_REQUIRED"].includes(error.code)) throw error;
-        }
-    }
-    if (unavailable) throw unavailable;
-    throw new AuthorizationError("PROFILE_PROVIDER_REAUTHORIZATION_REQUIRED",
-        "Verify an Epic, Google, or Discord provider to use your BPD profile.", 403,
-        { requiresReauthorization: true });
 }
 
 /* =========================================================

@@ -12,19 +12,47 @@ Route:
 
 Purpose:
     HTTP boundary for retrieving authoritative Admin
-    task-board assignees and assignable roles.
+    Taskboard assignment options and the authenticated
+    user's verified Taskboard role context.
 
 Description:
     - Requires TASKS_ASSIGN through the assignee service.
-    - Returns canonical BPD accounts eligible for task
-      assignment.
-    - Returns assignable application roles.
+    - Requires active Taskboard membership through the
+      assignee service.
+    - Returns authoritative assignable Taskboard roles.
+    - Returns the authenticated user's verified Taskboard
+      responsibility roles.
+    - Returns whether the authenticated user holds owner.
+    - Accepts no query parameters.
     - Does not mutate task state.
 
+Response:
+{
+    success: true,
+
+    availableRoles: [
+        "owner",
+        "database",
+        "security",
+        "ui"
+    ],
+
+    accounts: [],
+
+    userRoles: [
+        ...
+    ],
+
+    isOwner: boolean
+}
+
 Security:
-    - Authentication and Discord-backed permissions are
-      enforced by the Admin service layer.
+    - Authentication and Discord-backed operation
+      permissions are enforced by the Admin service layer.
+    - Taskboard responsibility roles are loaded
+      server-side from the canonical role source.
     - Browser-submitted permissions are never trusted.
+    - Browser-submitted Taskboard roles are never trusted.
     - Provider-specific identifiers are not accepted from
       the client.
     - Supabase service-role credentials remain server-side.
@@ -69,7 +97,9 @@ function jsonResponse(
     additionalHeaders = {}
 ) {
     return new Response(
-        JSON.stringify(body),
+        JSON.stringify(
+            body
+        ),
         {
             status,
 
@@ -79,6 +109,76 @@ function jsonResponse(
             }
         }
     );
+}
+
+/* =========================================================
+REQUEST ERROR
+========================================================= */
+
+function createRequestError(
+    code,
+    message,
+    status = 400,
+    details = null
+) {
+    const error =
+        new Error(
+            message
+        );
+
+    error.name =
+        "AdminTaskAssigneesApiRequestError";
+
+    error.code =
+        code;
+
+    error.status =
+        status;
+
+    error.details =
+        details;
+
+    return error;
+}
+
+/* =========================================================
+QUERY VALIDATION
+
+This endpoint accepts no query parameters.
+
+Assignment context is derived entirely from the
+authenticated account and authoritative server-side data.
+========================================================= */
+
+function validateQueryParameters(
+    request
+) {
+    const url =
+        new URL(
+            request.url
+        );
+
+    const parameters =
+        [
+            ...new Set(
+                [...url.searchParams.keys()]
+            )
+        ];
+
+    if (
+        parameters.length >
+        0
+    ) {
+        throw createRequestError(
+            "TASK_ASSIGNEES_QUERY_UNSUPPORTED",
+            "This endpoint does not accept query parameters.",
+            400,
+            {
+                invalidParameters:
+                    parameters
+            }
+        );
+    }
 }
 
 /* =========================================================
@@ -94,7 +194,9 @@ function getErrorStatus(
         );
 
     if (
-        Number.isInteger(status)
+        Number.isInteger(
+            status
+        )
         && status >= 400
         && status <= 599
     ) {
@@ -166,14 +268,22 @@ function handleApiError(
                     error?.message
                     ?? null,
 
+                databaseCode:
+                    error?.databaseCode
+                    ?? null,
+
                 details:
                     error?.details
+                    ?? null,
+
+                hint:
+                    error?.hint
                     ?? null
             }
         );
     }
 
-    const body = {
+    const responseBody = {
         success:
             false,
 
@@ -192,18 +302,24 @@ function handleApiError(
         && error?.details !== undefined
         && error?.details !== null
     ) {
-        body.details =
+        responseBody.details =
             error.details;
     }
 
     return jsonResponse(
-        body,
+        responseBody,
         status
     );
 }
 
 /* =========================================================
 GET /api/auth/admin/tasks/task-assignees
+
+Authorization and Taskboard membership are performed by
+getAdminTaskAssignees().
+
+No account ID, permissions, Discord roles, or Taskboard
+roles are supplied by the browser.
 ========================================================= */
 
 export async function onRequestGet(
@@ -215,6 +331,10 @@ export async function onRequestGet(
             env
         } =
             context;
+
+        validateQueryParameters(
+            request
+        );
 
         const result =
             await getAdminTaskAssignees(

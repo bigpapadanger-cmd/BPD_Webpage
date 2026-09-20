@@ -8,7 +8,23 @@ File:
     /Framework/Shell/JS/Admin/sidebar.js
 
 Purpose:
-    Initializes and manages the Admin-specific sidebar.
+    Initializes and manages the Admin-specific sidebar only
+    after server-side Admin access has been verified.
+
+Admin Access Requirements:
+    Every Admin page requires:
+
+    1. An authenticated BPD account.
+    2. An associated Discord identity.
+    3. Current Discord-backed Admin staff authorization.
+    4. At least one active responsibility role from:
+           owner
+           database
+           security
+           ui
+
+    The authoritative access decision is provided by:
+        GET /api/auth/admin/access
 
 Admin Navigation:
     - Dashboard
@@ -17,6 +33,10 @@ Admin Navigation:
     - Privacy Policy
 
 Initialization Priority:
+
+    ACCESS
+    - Verify server-side Admin access.
+    - Keep Admin navigation inaccessible until verified.
 
     CRITICAL
     - Apply saved sidebar state.
@@ -30,19 +50,33 @@ Initialization Priority:
     - Initialize resize handling.
 
 Description:
+    - Verifies Admin access before enabling navigation.
     - Maintains user-controlled sidebar state.
     - Supports collapsed and expanded modes.
     - Applies shared theme and animation preferences.
     - Marks the current Admin route active.
     - Manages collapsed-sidebar tooltips.
     - Supports disabled Admin navigation items.
-    - Does not perform public-site Admin-link visibility
-      checks because this module is only used by Admin pages.
 
 Security:
     - Admin authorization remains server-side.
-    - This module does not determine Admin permissions.
+    - Discord authorization is verified server-side.
+    - Responsibility roles are verified server-side.
+    - This module does not trust client-side role claims.
+    - This module does not determine operation permissions.
     - Admin API endpoints remain independently protected.
+    - Client-side sidebar protection is presentation only.
+========================================================= */
+
+/* =========================================================
+CONSTANTS
+========================================================= */
+
+const ADMIN_ACCESS_URL =
+    "/api/auth/admin/access";
+
+/* =========================================================
+INTERNAL STATE
 ========================================================= */
 
 let adminSidebarResizeInitialized =
@@ -51,39 +85,290 @@ let adminSidebarResizeInitialized =
 let adminSidebarDeferredInitialized =
     false;
 
+let adminSidebarAuthorized =
+    false;
+
+let adminSidebarAccessRequest =
+    null;
+
+/* =========================================================
+ADMIN SIDEBAR ELEMENT
+========================================================= */
+
+function getAdminSidebar() {
+    return document.getElementById(
+        "sidebar"
+    );
+}
+
+/* =========================================================
+ADMIN SIDEBAR ACCESS STATE
+========================================================= */
+
+function lockAdminSidebar() {
+    const sidebar =
+        getAdminSidebar();
+
+    adminSidebarAuthorized =
+        false;
+
+    hideAdminSidebarTooltip();
+
+    if (
+        !sidebar
+    ) {
+        return;
+    }
+
+    sidebar.hidden =
+        true;
+
+    sidebar.setAttribute(
+        "aria-hidden",
+        "true"
+    );
+
+    sidebar.dataset.adminAuthorized =
+        "false";
+}
+
+function unlockAdminSidebar() {
+    const sidebar =
+        getAdminSidebar();
+
+    adminSidebarAuthorized =
+        true;
+
+    if (
+        !sidebar
+    ) {
+        return;
+    }
+
+    sidebar.hidden =
+        false;
+
+    sidebar.setAttribute(
+        "aria-hidden",
+        "false"
+    );
+
+    sidebar.dataset.adminAuthorized =
+        "true";
+}
+
+/* =========================================================
+VERIFY ADMIN ACCESS
+
+/api/auth/admin/access is the canonical Admin entry gate.
+
+A successful response means the server has verified:
+    - authenticated BPD account
+    - Discord-backed Admin authorization
+    - active responsibility-role membership
+
+The browser does not independently determine these roles.
+========================================================= */
+
+async function verifyAdminSidebarAccess() {
+    const response =
+        await fetch(
+            ADMIN_ACCESS_URL,
+            {
+                method:
+                    "GET",
+
+                credentials:
+                    "same-origin",
+
+                headers: {
+                    "Accept":
+                        "application/json"
+                },
+
+                cache:
+                    "no-store"
+            }
+        );
+
+    let result =
+        null;
+
+    try {
+        result =
+            await response.json();
+    }
+    catch {
+        return {
+            authorized:
+                false,
+
+            status:
+                response.status,
+
+            reason:
+                "INVALID_RESPONSE"
+        };
+    }
+
+    const authorized =
+        response.ok
+        && result?.success ===
+            true
+        && result?.authorized ===
+            true
+        && result?.taskboard?.member ===
+            true
+        && Array.isArray(
+            result?.taskboard?.roles
+        )
+        && result.taskboard.roles.length >
+            0;
+
+    return {
+        authorized,
+
+        status:
+            response.status,
+
+        reason:
+            authorized
+                ? null
+                : result?.error
+                    || "ADMIN_ACCESS_DENIED"
+    };
+}
+
+/* =========================================================
+LOAD ADMIN ACCESS
+
+Deduplicates simultaneous Admin sidebar authorization
+requests.
+========================================================= */
+
+async function loadAdminSidebarAccess() {
+    if (
+        adminSidebarAccessRequest
+    ) {
+        return adminSidebarAccessRequest;
+    }
+
+    adminSidebarAccessRequest =
+        (
+            async () => {
+                try {
+                    return await verifyAdminSidebarAccess();
+                }
+                catch (
+                    error
+                ) {
+                    console.error(
+                        "ADMIN SIDEBAR ACCESS CHECK FAILED:",
+                        {
+                            name:
+                                error?.name
+                                || "Error",
+
+                            message:
+                                error?.message
+                                || "Unknown error"
+                        }
+                    );
+
+                    return {
+                        authorized:
+                            false,
+
+                        status:
+                            null,
+
+                        reason:
+                            "ADMIN_ACCESS_CHECK_FAILED"
+                    };
+                }
+                finally {
+                    adminSidebarAccessRequest =
+                        null;
+                }
+            }
+        )();
+
+    return adminSidebarAccessRequest;
+}
+
 /* =========================================================
 INITIALIZE ADMIN SIDEBAR
 
-Runs the critical sidebar behavior required for immediate
-interaction and correct initial rendering.
+The sidebar remains inaccessible until the canonical Admin
+access endpoint confirms authorization.
 ========================================================= */
 
-export function initializeAdminSidebar() {
+export async function initializeAdminSidebar() {
+    lockAdminSidebar();
+
+    const access =
+        await loadAdminSidebarAccess();
+
+    if (
+        !access.authorized
+    ) {
+        lockAdminSidebar();
+
+        return false;
+    }
+
     initializeAdminSidebarCritical();
+
+    unlockAdminSidebar();
+
+    return true;
 }
 
 /* =========================================================
 CRITICAL INITIALIZATION
+
+This function is exported for shell integration, but it
+still fails closed unless Admin access has already been
+verified by initializeAdminSidebar().
 ========================================================= */
 
 export function initializeAdminSidebarCritical() {
+    if (
+        adminSidebarAuthorized !==
+        true
+    ) {
+        return false;
+    }
+
     applyAdminGlobalSettings();
     setupAdminSidebarToggle();
     setupAdminActiveNavigation();
     setupAdminDisabledNavigation();
+
+    return true;
 }
 
 /* =========================================================
 DEFERRED INITIALIZATION
 
 Call after the sidebar hover HTML has been loaded.
+
+Deferred behavior is not initialized unless Admin access
+has already been verified.
 ========================================================= */
 
 export function initializeAdminSidebarDeferred() {
     if (
+        adminSidebarAuthorized !==
+        true
+    ) {
+        return false;
+    }
+
+    if (
         adminSidebarDeferredInitialized
     ) {
-        return;
+        return true;
     }
 
     adminSidebarDeferredInitialized =
@@ -91,15 +376,27 @@ export function initializeAdminSidebarDeferred() {
 
     setupAdminSidebarTooltips();
     setupAdminSidebarResize();
+
+    return true;
 }
 
 /* =========================================================
 LOAD ADMIN SIDEBAR HOVER TOOLTIP HTML
 
 The Admin sidebar uses the shared sidebar tooltip markup.
+
+Tooltip HTML is not loaded for an unauthorized Admin
+session.
 ========================================================= */
 
 export async function loadAdminSidebarHover() {
+    if (
+        adminSidebarAuthorized !==
+        true
+    ) {
+        return false;
+    }
+
     const hoverFile =
         "/Framework/Shell/HTML/Sidebar/hover.html";
 
@@ -175,9 +472,7 @@ does not unexpectedly change sidebar/theme behavior.
 
 function applyAdminGlobalSettings() {
     const sidebar =
-        document.getElementById(
-            "sidebar"
-        );
+        getAdminSidebar();
 
     const sidebarToggle =
         document.getElementById(
@@ -303,9 +598,7 @@ ADMIN SIDEBAR TOGGLE
 
 function setupAdminSidebarToggle() {
     const sidebar =
-        document.getElementById(
-            "sidebar"
-        );
+        getAdminSidebar();
 
     const sidebarToggle =
         document.getElementById(
@@ -330,6 +623,13 @@ function setupAdminSidebarToggle() {
     sidebarToggle.addEventListener(
         "click",
         function() {
+            if (
+                adminSidebarAuthorized !==
+                true
+            ) {
+                return;
+            }
+
             const isCollapsed =
                 sidebar.classList.contains(
                     "collapsed"
@@ -380,10 +680,15 @@ function setupAdminSidebarResize() {
 }
 
 function handleAdminSidebarResize() {
+    if (
+        adminSidebarAuthorized !==
+        true
+    ) {
+        return;
+    }
+
     const sidebar =
-        document.getElementById(
-            "sidebar"
-        );
+        getAdminSidebar();
 
     const sidebarToggle =
         document.getElementById(
@@ -425,10 +730,15 @@ ADMIN SIDEBAR TOOLTIPS
 ========================================================= */
 
 function setupAdminSidebarTooltips() {
+    if (
+        adminSidebarAuthorized !==
+        true
+    ) {
+        return;
+    }
+
     const sidebar =
-        document.getElementById(
-            "sidebar"
-        );
+        getAdminSidebar();
 
     const tooltip =
         document.getElementById(
@@ -471,7 +781,9 @@ function setupAdminSidebarTooltips() {
                     event
                 ) {
                     if (
-                        !sidebar.classList.contains(
+                        adminSidebarAuthorized !==
+                        true
+                        || !sidebar.classList.contains(
                             "collapsed"
                         )
                     ) {
@@ -504,7 +816,9 @@ function setupAdminSidebarTooltips() {
                     event
                 ) {
                     if (
-                        !sidebar.classList.contains(
+                        adminSidebarAuthorized !==
+                        true
+                        || !sidebar.classList.contains(
                             "collapsed"
                         )
                     ) {
@@ -570,6 +884,13 @@ function showAdminSidebarTooltip(
     event,
     text
 ) {
+    if (
+        adminSidebarAuthorized !==
+        true
+    ) {
+        return;
+    }
+
     tooltipText.textContent =
         text;
 
@@ -620,6 +941,13 @@ ADMIN ACTIVE NAVIGATION
 ========================================================= */
 
 function setupAdminActiveNavigation() {
+    if (
+        adminSidebarAuthorized !==
+        true
+    ) {
+        return;
+    }
+
     const currentPath =
         normalizeAdminPath(
             window.location.pathname
@@ -734,6 +1062,13 @@ DISABLED ADMIN NAVIGATION
 ========================================================= */
 
 function setupAdminDisabledNavigation() {
+    if (
+        adminSidebarAuthorized !==
+        true
+    ) {
+        return;
+    }
+
     const disabledItems =
         document.querySelectorAll(
             ".nav-item.disabled"

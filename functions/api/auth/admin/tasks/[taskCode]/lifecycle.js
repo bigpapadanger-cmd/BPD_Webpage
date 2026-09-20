@@ -15,6 +15,7 @@ Purpose:
     transitions.
 
 Supported Actions:
+    start
     complete
     reopen
     shelve
@@ -27,22 +28,27 @@ Supported Actions:
 Description:
     - Reads the authoritative task code from the route.
     - Requires expectedVersion for optimistic concurrency.
+    - Accepts only action and expectedVersion in the body.
     - Maps lifecycle action names to trusted server-side
       service functions.
     - Does not allow the browser to choose raw Supabase RPC
       names.
-    - Does not allow lifecycle timestamps to be submitted.
+    - Does not allow lifecycle metadata or timestamps to be
+      submitted by the browser.
 
 Security:
     - Authentication and Discord-backed permissions are
       enforced by the task lifecycle service.
     - Normal lifecycle actions require TASKS_UPDATE.
     - Delete and restore-delete require TASKS_DELETE.
+    - Taskboard responsibility is enforced by the lifecycle
+      service using persisted responsible_roles.
     - actor_account_id is derived server-side.
     - Supabase service-role credentials remain server-side.
 ========================================================= */
 
 import {
+    startAdminTask,
     completeAdminTask,
     reopenAdminTask,
     shelveAdminTask,
@@ -69,8 +75,17 @@ const JSON_HEADERS =
             "no-store"
     });
 
+const ALLOWED_BODY_FIELDS =
+    new Set([
+        "action",
+        "expectedVersion"
+    ]);
+
 const LIFECYCLE_ACTIONS =
     Object.freeze({
+        start:
+            startAdminTask,
+
         complete:
             completeAdminTask,
 
@@ -118,9 +133,12 @@ function jsonResponse(
     additionalHeaders = {}
 ) {
     return new Response(
-        JSON.stringify(body),
+        JSON.stringify(
+            body
+        ),
         {
             status,
+
             headers: {
                 ...JSON_HEADERS,
                 ...additionalHeaders
@@ -140,7 +158,9 @@ function createRequestError(
     details = null
 ) {
     const error =
-        new Error(message);
+        new Error(
+            message
+        );
 
     error.name =
         "AdminTaskLifecycleApiRequestError";
@@ -227,7 +247,9 @@ async function readJsonBody(
     if (
         !body
         || typeof body !== "object"
-        || Array.isArray(body)
+        || Array.isArray(
+            body
+        )
     ) {
         throw createRequestError(
             "REQUEST_BODY_INVALID",
@@ -240,6 +262,50 @@ async function readJsonBody(
 }
 
 /* =========================================================
+BODY VALIDATION
+
+Only:
+{
+    "action": "...",
+    "expectedVersion": 1
+}
+
+is accepted.
+
+All actor identity, lifecycle metadata, timestamps, RPC
+names, and task state are controlled server-side.
+========================================================= */
+
+function validateBodyFields(
+    body
+) {
+    const invalidFields =
+        Object.keys(
+            body
+        )
+            .filter(
+                field =>
+                    !ALLOWED_BODY_FIELDS.has(
+                        field
+                    )
+            );
+
+    if (
+        invalidFields.length >
+        0
+    ) {
+        throw createRequestError(
+            "TASK_LIFECYCLE_FIELDS_UNSUPPORTED",
+            "Unsupported lifecycle request fields were supplied.",
+            400,
+            {
+                invalidFields
+            }
+        );
+    }
+}
+
+/* =========================================================
 ACTION
 ========================================================= */
 
@@ -247,7 +313,9 @@ function getLifecycleAction(
     value
 ) {
     const action =
-        normalizeString(value);
+        normalizeString(
+            value
+        );
 
     if (
         !Object.prototype.hasOwnProperty.call(
@@ -273,10 +341,14 @@ function getExpectedVersion(
     value
 ) {
     const version =
-        Number(value);
+        Number(
+            value
+        );
 
     if (
-        !Number.isSafeInteger(version)
+        !Number.isSafeInteger(
+            version
+        )
         || version < 1
     ) {
         throw createRequestError(
@@ -287,54 +359,6 @@ function getExpectedVersion(
     }
 
     return version;
-}
-
-/* =========================================================
-SERVER-OWNED FIELD PROTECTION
-========================================================= */
-
-function rejectServerOwnedFields(
-    body
-) {
-    const prohibitedFields = [
-        "taskCode",
-        "task_code",
-        "actorAccountId",
-        "actor_account_id",
-        "completedAt",
-        "completed_at",
-        "shelvedAt",
-        "shelved_at",
-        "archivedAt",
-        "archived_at",
-        "deletedAt",
-        "deleted_at",
-        "rpc",
-        "rpcName"
-    ];
-
-    const suppliedFields =
-        prohibitedFields.filter(
-            field =>
-                Object.prototype.hasOwnProperty.call(
-                    body,
-                    field
-                )
-        );
-
-    if (
-        suppliedFields.length > 0
-    ) {
-        throw createRequestError(
-            "TASK_SERVER_FIELD_NOT_ALLOWED",
-            "One or more server-controlled task fields were supplied.",
-            400,
-            {
-                fields:
-                    suppliedFields
-            }
-        );
-    }
 }
 
 /* =========================================================
@@ -350,7 +374,9 @@ function getErrorStatus(
         );
 
     if (
-        Number.isInteger(status)
+        Number.isInteger(
+            status
+        )
         && status >= 400
         && status <= 599
     ) {
@@ -397,10 +423,14 @@ function handleApiError(
     error
 ) {
     const status =
-        getErrorStatus(error);
+        getErrorStatus(
+            error
+        );
 
     const code =
-        getErrorCode(error);
+        getErrorCode(
+            error
+        );
 
     if (
         status >= 500
@@ -418,14 +448,22 @@ function handleApiError(
                     error?.message
                     ?? null,
 
+                databaseCode:
+                    error?.databaseCode
+                    ?? null,
+
                 details:
                     error?.details
+                    ?? null,
+
+                hint:
+                    error?.hint
                     ?? null
             }
         );
     }
 
-    const body = {
+    const responseBody = {
         success:
             false,
 
@@ -444,12 +482,12 @@ function handleApiError(
         && error?.details !== undefined
         && error?.details !== null
     ) {
-        body.details =
+        responseBody.details =
             error.details;
     }
 
     return jsonResponse(
-        body,
+        responseBody,
         status
     );
 }
@@ -457,14 +495,20 @@ function handleApiError(
 /* =========================================================
 POST /api/auth/admin/tasks/:taskCode/lifecycle
 
-Expected Body:
+Example:
 {
-    "action": "complete",
+    "action": "start",
     "expectedVersion": 4
 }
 
-The browser selects a public lifecycle action name only.
-It cannot select a Supabase RPC directly.
+The browser selects a public lifecycle action only.
+
+It cannot provide:
+    - actor identity
+    - task status
+    - lifecycle timestamps
+    - lifecycle metadata
+    - Supabase RPC names
 ========================================================= */
 
 export async function onRequestPost(
@@ -487,7 +531,7 @@ export async function onRequestPost(
                 request
             );
 
-        rejectServerOwnedFields(
+        validateBodyFields(
             body
         );
 

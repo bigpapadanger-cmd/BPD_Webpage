@@ -13,14 +13,14 @@ Routes:
 
 Purpose:
     HTTP boundary for retrieving and updating one Admin
-    task-board record.
+    Taskboard record.
 
 Description:
     GET:
         - Retrieves one task by human-readable task code.
         - Deleted tasks are hidden by default.
-        - Explicit deleted-task access requires elevated
-          delete permission.
+        - Explicit deleted-task access is delegated to the
+          secured task service.
 
     PATCH:
         - Updates supported mutable task fields.
@@ -28,12 +28,17 @@ Description:
           expectedVersion.
         - Assignment changes automatically require
           TASKS_ASSIGN in addition to TASKS_UPDATE.
+        - Task responsibility is checked against the
+          authoritative persisted assignment before update.
 
 Security:
     - Authentication and Discord-backed authorization occur
       in the Admin permission/service layers.
+    - Taskboard responsibility is enforced by the task
+      service layer.
     - actor_account_id is never accepted from the browser.
     - Client role/permission claims are never trusted.
+    - Server-owned task fields are not accepted.
     - Supabase service-role credentials remain server-side.
 ========================================================= */
 
@@ -44,10 +49,6 @@ import {
 import {
     updateAdminTask
 } from "../../../../services/supabase/admin/tasks/update.js";
-
-import {
-    authorizeTaskDelete
-} from "../../../../services/admin/permissions.js";
 
 /* =========================================================
 CONSTANTS
@@ -65,6 +66,75 @@ const JSON_HEADERS =
             "no-store"
     });
 
+const ALLOWED_PATCH_TOP_LEVEL_FIELDS =
+    new Set([
+        "expectedVersion",
+        "changes"
+    ]);
+
+const SERVER_OWNED_CHANGE_FIELDS =
+    new Set([
+        "id",
+
+        "task_code",
+        "taskCode",
+
+        "status",
+        "previous_status",
+        "previousStatus",
+
+        "creator_account_id",
+        "creatorAccountId",
+
+        "created_by",
+        "createdBy",
+
+        "updated_by",
+        "updatedBy",
+
+        "actor_account_id",
+        "actorAccountId",
+
+        "created_at",
+        "createdAt",
+
+        "updated_at",
+        "updatedAt",
+
+        "completed_at",
+        "completedAt",
+
+        "shelved_until",
+        "shelvedUntil",
+
+        "shelved_reason",
+        "shelvedReason",
+
+        "shelved_by",
+        "shelvedBy",
+
+        "archived_at",
+        "archivedAt",
+
+        "archived_reason",
+        "archivedReason",
+
+        "archived_by",
+        "archivedBy",
+
+        "deleted_at",
+        "deletedAt",
+
+        "deleted_reason",
+        "deletedReason",
+
+        "deleted_by",
+        "deletedBy",
+
+        "deadline",
+        "version"
+    ]);
+
 /* =========================================================
 NORMALIZATION
 ========================================================= */
@@ -72,8 +142,7 @@ NORMALIZATION
 function normalizeString(
     value
 ) {
-    return typeof value ===
-        "string"
+    return typeof value === "string"
         ? value.trim()
         : "";
 }
@@ -142,8 +211,7 @@ function getTaskCode(
     const taskCode =
         normalizeString(
             context?.params?.taskCode
-        )
-            .toUpperCase();
+        ).toUpperCase();
 
     if (
         !TASK_CODE_PATTERN.test(
@@ -170,8 +238,7 @@ function parseBooleanQuery(
     const normalized =
         normalizeString(
             value
-        )
-            .toLowerCase();
+        ).toLowerCase();
 
     if (
         normalized === "true"
@@ -196,6 +263,67 @@ function parseBooleanQuery(
 }
 
 /* =========================================================
+GET QUERY
+
+Only:
+    includeDeleted
+
+is supported for this endpoint.
+========================================================= */
+
+function getIncludeDeleted(
+    request
+) {
+    const url =
+        new URL(
+            request.url
+        );
+
+    const searchParams =
+        url.searchParams;
+
+    const invalidParameters =
+        [
+            ...new Set(
+                [...searchParams.keys()]
+                    .filter(
+                        key =>
+                            key !==
+                            "includeDeleted"
+                    )
+            )
+        ];
+
+    if (
+        invalidParameters.length >
+        0
+    ) {
+        throw createRequestError(
+            "TASK_QUERY_UNSUPPORTED",
+            "Unsupported task query parameters were supplied.",
+            400,
+            {
+                invalidParameters
+            }
+        );
+    }
+
+    if (
+        !searchParams.has(
+            "includeDeleted"
+        )
+    ) {
+        return false;
+    }
+
+    return parseBooleanQuery(
+        searchParams.get(
+            "includeDeleted"
+        )
+    );
+}
+
+/* =========================================================
 JSON BODY
 ========================================================= */
 
@@ -207,8 +335,7 @@ async function readJsonBody(
             request.headers.get(
                 "content-type"
             )
-        )
-            .toLowerCase();
+        ).toLowerCase();
 
     if (
         !contentType.includes(
@@ -238,8 +365,7 @@ async function readJsonBody(
 
     if (
         !body
-        || typeof body !==
-            "object"
+        || typeof body !== "object"
         || Array.isArray(
             body
         )
@@ -255,6 +381,125 @@ async function readJsonBody(
 }
 
 /* =========================================================
+PATCH BODY
+
+Only:
+{
+    expectedVersion,
+    changes
+}
+
+is accepted at the top level.
+
+The update service remains authoritative for validating
+supported mutable task fields.
+========================================================= */
+
+function getPatchInput(
+    body
+) {
+    const invalidTopLevelFields =
+        Object.keys(
+            body
+        )
+            .filter(
+                field =>
+                    !ALLOWED_PATCH_TOP_LEVEL_FIELDS.has(
+                        field
+                    )
+            );
+
+    if (
+        invalidTopLevelFields.length >
+        0
+    ) {
+        throw createRequestError(
+            "TASK_REQUEST_FIELDS_UNSUPPORTED",
+            "Unsupported request fields were supplied.",
+            400,
+            {
+                invalidFields:
+                    invalidTopLevelFields
+            }
+        );
+    }
+
+    if (
+        !Object.prototype.hasOwnProperty.call(
+            body,
+            "expectedVersion"
+        )
+    ) {
+        throw createRequestError(
+            "TASK_VERSION_REQUIRED",
+            "expectedVersion is required.",
+            400
+        );
+    }
+
+    if (
+        !Object.prototype.hasOwnProperty.call(
+            body,
+            "changes"
+        )
+    ) {
+        throw createRequestError(
+            "TASK_CHANGES_REQUIRED",
+            "A changes object is required.",
+            400
+        );
+    }
+
+    if (
+        !body.changes
+        || typeof body.changes !== "object"
+        || Array.isArray(
+            body.changes
+        )
+    ) {
+        throw createRequestError(
+            "TASK_CHANGES_INVALID",
+            "changes must be a JSON object.",
+            400
+        );
+    }
+
+    const serverOwnedFields =
+        Object.keys(
+            body.changes
+        )
+            .filter(
+                field =>
+                    SERVER_OWNED_CHANGE_FIELDS.has(
+                        field
+                    )
+            );
+
+    if (
+        serverOwnedFields.length >
+        0
+    ) {
+        throw createRequestError(
+            "TASK_SERVER_FIELD_NOT_ALLOWED",
+            "One or more server-controlled task fields were supplied.",
+            400,
+            {
+                fields:
+                    serverOwnedFields
+            }
+        );
+    }
+
+    return {
+        expectedVersion:
+            body.expectedVersion,
+
+        changes:
+            body.changes
+    };
+}
+
+/* =========================================================
 ERROR RESPONSE
 ========================================================= */
 
@@ -266,15 +511,17 @@ function getErrorStatus(
             error?.status
         );
 
-    return (
+    if (
         Number.isInteger(
             status
         )
         && status >= 400
         && status <= 599
-    )
-        ? status
-        : 500;
+    ) {
+        return status;
+    }
+
+    return 500;
 }
 
 function getErrorCode(
@@ -335,14 +582,22 @@ function handleApiError(
                     error?.message
                     ?? null,
 
+                databaseCode:
+                    error?.databaseCode
+                    ?? null,
+
                 details:
                     error?.details
+                    ?? null,
+
+                hint:
+                    error?.hint
                     ?? null
             }
         );
     }
 
-    const body = {
+    const responseBody = {
         success:
             false,
 
@@ -358,17 +613,15 @@ function handleApiError(
 
     if (
         status < 500
-        && error?.details !==
-            undefined
-        && error?.details !==
-            null
+        && error?.details !== undefined
+        && error?.details !== null
     ) {
-        body.details =
+        responseBody.details =
             error.details;
     }
 
     return jsonResponse(
-        body,
+        responseBody,
         status
     );
 }
@@ -379,16 +632,18 @@ GET /api/auth/admin/tasks/:taskCode
 Optional Query:
     includeDeleted=true
 
-Security:
-    Normal task access:
-        TASKS_READ
+Authorization is performed by getAdminTask():
 
-    includeDeleted=true:
-        TASKS_DELETE
-        + TASKS_READ through getAdminTask()
+Normal task:
+    TASKS_READ
+    + Taskboard responsibility
 
-This intentionally prevents normal Moderator/League Staff
-accounts from retrieving deleted records.
+Deleted task:
+    TASKS_DELETE
+    + Taskboard responsibility
+
+The route deliberately does not perform a duplicate
+authorizeTaskDelete() call.
 ========================================================= */
 
 export async function onRequestGet(
@@ -406,40 +661,10 @@ export async function onRequestGet(
                 context
             );
 
-        const url =
-            new URL(
-                request.url
+        const includeDeleted =
+            getIncludeDeleted(
+                request
             );
-
-        let includeDeleted =
-            false;
-
-        if (
-            url.searchParams.has(
-                "includeDeleted"
-            )
-        ) {
-            includeDeleted =
-                parseBooleanQuery(
-                    url.searchParams.get(
-                        "includeDeleted"
-                    )
-                );
-        }
-
-        if (
-            includeDeleted ===
-            true
-        ) {
-            /*
-             * Deleted-task visibility is intentionally more
-             * privileged than ordinary task reads.
-             */
-            await authorizeTaskDelete(
-                request,
-                env
-            );
-        }
 
         const result =
             await getAdminTask(
@@ -471,20 +696,26 @@ PATCH /api/auth/admin/tasks/:taskCode
 Expected Body:
 {
     "expectedVersion": 4,
+
     "changes": {
         "title": "...",
-        "description": "...",
-        "priority": "...",
-        "timeline": "...",
-        "assigned_role": "...",
-        "assigned_account_id": "..."
+        "body": "...",
+        "priority": "High",
+        "timeline_days": 7,
+        "responsible_roles": [
+            "database",
+            "security"
+        ]
     }
 }
 
 Important:
     - taskCode comes from the route.
-    - actor_account_id is never accepted.
+    - actor identity is derived server-side.
+    - status changes use the lifecycle endpoint.
     - lifecycle timestamps cannot be changed here.
+    - deadline is controlled server-side.
+    - version is controlled server-side.
 ========================================================= */
 
 export async function onRequestPatch(
@@ -507,53 +738,13 @@ export async function onRequestPatch(
                 request
             );
 
-        if (
-            !Object.prototype.hasOwnProperty.call(
-                body,
-                "expectedVersion"
-            )
-        ) {
-            throw createRequestError(
-                "TASK_VERSION_REQUIRED",
-                "expectedVersion is required.",
-                400
+        const {
+            expectedVersion,
+            changes
+        } =
+            getPatchInput(
+                body
             );
-        }
-
-        if (
-            !Object.prototype.hasOwnProperty.call(
-                body,
-                "changes"
-            )
-        ) {
-            throw createRequestError(
-                "TASK_CHANGES_REQUIRED",
-                "A changes object is required.",
-                400
-            );
-        }
-
-        /*
-         * Explicitly reject authoritative/server-owned actor
-         * fields if somebody attempts to submit them at the
-         * HTTP boundary.
-         */
-        if (
-            Object.prototype.hasOwnProperty.call(
-                body,
-                "actor_account_id"
-            )
-            || Object.prototype.hasOwnProperty.call(
-                body,
-                "actorAccountId"
-            )
-        ) {
-            throw createRequestError(
-                "TASK_ACTOR_NOT_ALLOWED",
-                "Task actor information is determined by the server.",
-                400
-            );
-        }
 
         const result =
             await updateAdminTask(
@@ -561,12 +752,8 @@ export async function onRequestPatch(
                 env,
                 {
                     taskCode,
-
-                    expectedVersion:
-                        body.expectedVersion,
-
-                    changes:
-                        body.changes
+                    expectedVersion,
+                    changes
                 }
             );
 
@@ -594,8 +781,7 @@ export async function onRequest(
     const method =
         normalizeString(
             context?.request?.method
-        )
-            .toUpperCase();
+        ).toUpperCase();
 
     switch (
         method

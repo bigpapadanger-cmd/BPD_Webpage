@@ -12,6 +12,7 @@ Purpose:
     dedicated Supabase task RPCs.
 
 Supported Operations:
+    - start
     - complete
     - reopen
     - shelve
@@ -24,25 +25,37 @@ Supported Operations:
 Description:
     - Validates task code and expected version.
     - Uses optimistic concurrency for every mutation.
-    - Uses dedicated Supabase RPCs for each lifecycle action.
+    - Uses dedicated Supabase RPCs for lifecycle actions.
     - Requires TASKS_UPDATE for normal lifecycle actions.
     - Requires TASKS_DELETE for delete/restore-delete actions.
-    - Resolves the authoritative canonical BPD account ID
-      from the server-side authorization context.
+    - Loads the authoritative task before mutation.
+    - Enforces Taskboard responsibility server-side.
+    - owner may operate on any task.
+    - database/security/ui require responsible-role overlap.
+    - Uses the verified Taskboard context returned by the
+      responsibility check.
     - Injects p_actor_account_id server-side.
 
 Security:
     - Browser never supplies the authoritative actor account.
+    - Browser never supplies authoritative Taskboard roles.
     - Browser never supplies permissions or Discord roles.
+    - Browser never supplies responsible_roles for access
+      authorization.
+    - Responsibility is checked against persisted task data.
     - Delete privileges remain separate from update privileges.
     - Lifecycle timestamps cannot be supplied by the browser.
-    - Supabase remains authoritative for state-transition rules.
+    - Supabase remains authoritative for state transitions.
 ========================================================= */
 
 import {
     authorizeTaskUpdate,
     authorizeTaskDelete
 } from "../../../admin/permissions.js";
+
+import {
+    requireTaskResponsibility
+} from "../../../admin/taskboard_roles.js";
 
 import {
     ADMIN_TASK_RPCS,
@@ -94,6 +107,14 @@ const TASK_CODE_PATTERN =
 
 const LIFECYCLE_ACTIONS =
     Object.freeze({
+        start: {
+            rpc:
+                ADMIN_TASK_RPCS.START,
+
+            permission:
+                "update"
+        },
+
         complete: {
             rpc:
                 ADMIN_TASK_RPCS.COMPLETE,
@@ -166,8 +187,7 @@ NORMALIZATION
 function normalizeString(
     value
 ) {
-    return typeof value ===
-        "string"
+    return typeof value === "string"
         ? value.trim()
         : "";
 }
@@ -278,54 +298,6 @@ function requireLifecycleAction(
 }
 
 /* =========================================================
-AUTHORIZATION ACCOUNT ID
-
-The canonical account ID must originate from the trusted
-authorization context.
-
-Once the exact central authorization context shape is fixed,
-this may be reduced to one authoritative property.
-========================================================= */
-
-function getAuthorizedAccountId(
-    authorization
-) {
-    const candidates = [
-        authorization?.account?.id,
-        authorization?.accountId,
-        authorization?.account?.accountId,
-        authorization?.identity?.accountId
-    ];
-
-    for (
-        const candidate
-        of candidates
-    ) {
-        const normalized =
-            normalizeString(
-                candidate
-            );
-
-        if (
-            normalized
-        ) {
-            return normalized;
-        }
-    }
-
-    throw new AdminTaskLifecycleError(
-        "The authenticated account ID could not be resolved.",
-        {
-            code:
-                "ADMIN_ACCOUNT_ID_MISSING",
-
-            status:
-                500
-        }
-    );
-}
-
-/* =========================================================
 AUTHORIZATION
 
 Normal lifecycle actions:
@@ -333,6 +305,9 @@ Normal lifecycle actions:
 
 Delete lifecycle:
     TASKS_DELETE
+
+Task-specific responsibility is checked separately after
+the authoritative task has been loaded.
 ========================================================= */
 
 async function authorizeLifecycleAction(
@@ -370,6 +345,95 @@ async function authorizeLifecycleAction(
 }
 
 /* =========================================================
+LOAD AUTHORITATIVE TASK
+========================================================= */
+
+async function getAuthoritativeTask(
+    env,
+    taskCode,
+    includeDeleted = false
+) {
+    const result =
+        await callAdminTaskRpc(
+            env,
+            ADMIN_TASK_RPCS.GET,
+            {
+                p_task_code:
+                    taskCode,
+
+                p_include_deleted:
+                    includeDeleted === true
+            }
+        );
+
+    const task =
+        Array.isArray(
+            result
+        )
+            ? result[0]
+            : result;
+
+    if (
+        !task
+        || typeof task !== "object"
+    ) {
+        throw new AdminTaskLifecycleError(
+            "The requested task could not be loaded.",
+            {
+                code:
+                    "TASK_NOT_FOUND",
+
+                status:
+                    404
+            }
+        );
+    }
+
+    return task;
+}
+
+/* =========================================================
+AUTHORIZE TASK RESPONSIBILITY
+
+Loads the authoritative task first, then verifies the
+current account against that task's persisted assignment.
+
+Returns both:
+    - authoritative task
+    - verified Taskboard context
+========================================================= */
+
+async function authorizeTaskLifecycleResponsibility(
+    env,
+    authorization,
+    taskCode,
+    definition
+) {
+    const includeDeleted =
+        definition.rpc ===
+        ADMIN_TASK_RPCS.RESTORE_DELETED;
+
+    const task =
+        await getAuthoritativeTask(
+            env,
+            taskCode,
+            includeDeleted
+        );
+
+    const taskboardContext =
+        await requireTaskResponsibility(
+            env,
+            authorization,
+            task.responsible_roles
+        );
+
+    return {
+        task,
+        taskboardContext
+    };
+}
+
+/* =========================================================
 EXECUTE LIFECYCLE ACTION
 ========================================================= */
 
@@ -382,12 +446,20 @@ export async function performAdminTaskLifecycleAction(
         expectedVersion
     } = {}
 ) {
+    /* -----------------------------------------------------
+    ACTION
+    ----------------------------------------------------- */
+
     const {
         definition
     } =
         requireLifecycleAction(
             action
         );
+
+    /* -----------------------------------------------------
+    INPUT
+    ----------------------------------------------------- */
 
     const normalizedTaskCode =
         requireTaskCode(
@@ -399,6 +471,10 @@ export async function performAdminTaskLifecycleAction(
             expectedVersion
         );
 
+    /* -----------------------------------------------------
+    OPERATION PERMISSION
+    ----------------------------------------------------- */
+
     const authorization =
         await authorizeLifecycleAction(
             request,
@@ -406,10 +482,32 @@ export async function performAdminTaskLifecycleAction(
             definition
         );
 
-    const actorAccountId =
-        getAuthorizedAccountId(
-            authorization
+    /* -----------------------------------------------------
+    AUTHORITATIVE TASK + RESPONSIBILITY
+
+    The responsibility check uses the task's persisted
+    responsible_roles and returns the verified Taskboard
+    context.
+
+    No second account or role lookup is required.
+    ----------------------------------------------------- */
+
+    const {
+        taskboardContext
+    } =
+        await authorizeTaskLifecycleResponsibility(
+            env,
+            authorization,
+            normalizedTaskCode,
+            definition
         );
+
+    /* -----------------------------------------------------
+    MUTATION
+
+    The same verified Taskboard context that passed the
+    responsibility check supplies the actor account ID.
+    ----------------------------------------------------- */
 
     return callAdminTaskRpc(
         env,
@@ -422,7 +520,36 @@ export async function performAdminTaskLifecycleAction(
                 normalizedVersion,
 
             p_actor_account_id:
-                actorAccountId
+                taskboardContext.accountId
+        }
+    );
+}
+
+/* =========================================================
+START
+
+Transitions:
+    To Do -> In Progress
+========================================================= */
+
+export async function startAdminTask(
+    request,
+    env,
+    {
+        taskCode,
+        expectedVersion
+    } = {}
+) {
+    return performAdminTaskLifecycleAction(
+        request,
+        env,
+        {
+            action:
+                "start",
+
+            taskCode,
+
+            expectedVersion
         }
     );
 }
@@ -585,11 +712,6 @@ export async function restoreArchivedAdminTask(
 
 /* =========================================================
 DELETE
-
-This is a soft delete in Supabase.
-
-Requires:
-    TASKS_DELETE
 ========================================================= */
 
 export async function deleteAdminTask(
@@ -616,9 +738,6 @@ export async function deleteAdminTask(
 
 /* =========================================================
 RESTORE DELETED
-
-Restoring a deleted task also requires TASKS_DELETE because
-access to the deleted-task state remains privileged.
 ========================================================= */
 
 export async function restoreDeletedAdminTask(
@@ -651,8 +770,7 @@ export function isAdminTaskLifecycleError(
     error
 ) {
     return (
-        error instanceof
-            AdminTaskLifecycleError
+        error instanceof AdminTaskLifecycleError
         || error?.name ===
             "AdminTaskLifecycleError"
     );

@@ -6,7 +6,22 @@ File:
     public/admin/taskboard/index.html
 
 Purpose:
-    Initial Admin Taskboard integration test page.
+    Admin Taskboard management interface.
+
+Responsibilities:
+    - Display the authenticated administrator's verified roles.
+    - Provide Taskboard overview information.
+    - Provide task creation interface.
+    - Provide role-based "My Tasks" review interface.
+    - Provide task status management controls.
+    - Provide task questions/comments interface.
+    - Provide loading, denied, and error states.
+
+Important:
+    - CSS is injected by the global page/router system.
+    - JavaScript is loaded by the global page/router system.
+    - This document must not directly load CSS or JavaScript.
+    - Server-side authorization remains authoritative.
 ========================================================= -->
 
 <!DOCTYPE html>
@@ -19,103 +34,853 @@ Purpose:
         content="width=device-width, initial-scale=1.0"
     >
 
+    <meta
+        name="description"
+        content="BPD Gaming Network administrative Taskboard."
+    >
+
     <title>
         Taskboard | BPD Gaming Network Admin
     </title>
 </head>
 
 <body>
-    <aside
-        id="sidebar"
-        class="sidebar"
-    ></aside>
+    <!-- =====================================================
+    LOADING
+    ====================================================== -->
 
     <main
         id="taskboardLoading"
+        class="taskboard-page taskboard-state-page"
     >
-        <p>
-            Loading Taskboard...
-        </p>
-    </main>
-
-    <main
-        id="taskboardContent"
-        hidden
-    >
-        <header>
+        <section
+            class="taskboard-state-panel"
+            aria-live="polite"
+        >
             <h1>
                 Taskboard
             </h1>
 
-            <button
-                id="taskboardRefresh"
-                type="button"
-            >
-                Refresh
-            </button>
-
-            <p
-                id="taskboardStatus"
-                aria-live="polite"
-            >
-                Waiting for Taskboard data...
+            <p>
+                Loading Taskboard...
             </p>
-        </header>
-
-        <section>
-            <h2>
-                Task Summary
-            </h2>
-
-            <pre id="taskSummaryOutput"></pre>
-        </section>
-
-        <section>
-            <h2>
-                Tasks
-            </h2>
-
-            <pre id="taskListOutput"></pre>
-        </section>
-
-        <section>
-            <h2>
-                Assignees
-            </h2>
-
-            <pre id="taskAssigneesOutput"></pre>
         </section>
     </main>
+
+    <!-- =====================================================
+    TASKBOARD
+    ====================================================== -->
+
+    <main
+        id="taskboardContent"
+        class="taskboard-page"
+        hidden
+    >
+        <!-- =================================================
+        HEADER
+        ================================================== -->
+
+        <header class="taskboard-hero">
+            <div class="taskboard-hero-content">
+                <p class="taskboard-eyebrow">
+                    Admin Management
+                </p>
+
+                <h1>
+                    Taskboard
+                </h1>
+
+                <p class="taskboard-description">
+                    Create, review, update, and discuss
+                    administrative tasks.
+                </p>
+            </div>
+
+            <aside
+                class="taskboard-identity"
+                aria-label="Your Taskboard roles"
+            >
+                <span class="taskboard-identity-label">
+                    Your Role
+                </span>
+
+                <div
+                    id="taskboardRoleList"
+                    class="taskboard-role-list"
+                    aria-live="polite"
+                >
+                    <span class="taskboard-role">
+                        Loading...
+                    </span>
+                </div>
+            </aside>
+        </header>
+
+        <!-- =================================================
+        STATUS
+        ================================================== -->
+
+        <div
+            id="taskboardStatus"
+            class="taskboard-status"
+            aria-live="polite"
+            hidden
+        ></div>
+
+        <!-- =================================================
+        PRIMARY ACTIONS
+        ================================================== -->
+
+        <section
+            class="taskboard-actions"
+            aria-labelledby="taskboardActionsTitle"
+        >
+            <div class="taskboard-section-heading">
+                <div>
+                    <p class="taskboard-section-eyebrow">
+                        Task Management
+                    </p>
+
+                    <h2 id="taskboardActionsTitle">
+                        What would you like to do?
+                    </h2>
+                </div>
+            </div>
+
+            <div class="taskboard-action-grid">
+                <button
+                    id="taskboardCreateAction"
+                    class="taskboard-action-card"
+                    type="button"
+                >
+                    <span
+                        class="taskboard-action-icon"
+                        aria-hidden="true"
+                    >
+                        ＋
+                    </span>
+
+                    <span class="taskboard-action-content">
+                        <strong>
+                            Create New Task
+                        </strong>
+
+                        <span>
+                            Create a task and assign it to one
+                            or more administrative roles.
+                        </span>
+                    </span>
+                </button>
+
+                <button
+                    id="taskboardReviewAction"
+                    class="taskboard-action-card"
+                    type="button"
+                >
+                    <span
+                        class="taskboard-action-icon"
+                        aria-hidden="true"
+                    >
+                        ✓
+                    </span>
+
+                    <span class="taskboard-action-content">
+                        <strong>
+                            Review My Tasks
+                        </strong>
+
+                        <span>
+                            Review tasks assigned to your role,
+                            update progress, and participate in
+                            task discussions.
+                        </span>
+                    </span>
+
+                    <span
+                        id="taskboardMyTaskCount"
+                        class="taskboard-action-count"
+                        aria-label="Assigned tasks"
+                    >
+                        —
+                    </span>
+                </button>
+            </div>
+        </section>
+
+        <!-- =================================================
+        SUMMARY
+        ================================================== -->
+
+        <section
+            class="taskboard-summary"
+            aria-labelledby="taskboardSummaryTitle"
+        >
+            <div class="taskboard-section-heading">
+                <div>
+                    <p class="taskboard-section-eyebrow">
+                        Overview
+                    </p>
+
+                    <h2 id="taskboardSummaryTitle">
+                        Task Summary
+                    </h2>
+                </div>
+
+                <button
+                    id="taskboardRefresh"
+                    type="button"
+                >
+                    Refresh
+                </button>
+            </div>
+
+            <div class="taskboard-summary-grid">
+                <article class="taskboard-summary-card">
+                    <span>
+                        Active
+                    </span>
+
+                    <strong id="taskboardActiveCount">
+                        —
+                    </strong>
+                </article>
+
+                <article class="taskboard-summary-card">
+                    <span>
+                        Completed
+                    </span>
+
+                    <strong id="taskboardCompletedCount">
+                        —
+                    </strong>
+                </article>
+
+                <article class="taskboard-summary-card">
+                    <span>
+                        Shelved
+                    </span>
+
+                    <strong id="taskboardShelvedCount">
+                        —
+                    </strong>
+                </article>
+
+                <article class="taskboard-summary-card">
+                    <span>
+                        Late
+                    </span>
+
+                    <strong id="taskboardLateCount">
+                        —
+                    </strong>
+                </article>
+            </div>
+        </section>
+
+        <!-- =================================================
+        CREATE TASK
+        ================================================== -->
+
+        <section
+            id="taskboardCreateView"
+            class="taskboard-workspace"
+            aria-labelledby="taskboardCreateTitle"
+            hidden
+        >
+            <div class="taskboard-workspace-header">
+                <div>
+                    <p class="taskboard-section-eyebrow">
+                        New Task
+                    </p>
+
+                    <h2 id="taskboardCreateTitle">
+                        Create New Task
+                    </h2>
+                </div>
+
+                <button
+                    id="taskboardCreateClose"
+                    type="button"
+                    aria-label="Close task creation"
+                >
+                    Close
+                </button>
+            </div>
+
+            <form
+                id="taskboardCreateForm"
+                class="taskboard-form"
+            >
+                <div class="taskboard-field">
+                    <label for="taskTitle">
+                        Task Title
+                    </label>
+
+                    <input
+                        id="taskTitle"
+                        name="title"
+                        type="text"
+                        maxlength="160"
+                        required
+                    >
+                </div>
+
+                <div class="taskboard-field">
+                    <label for="taskBody">
+                        Description
+                    </label>
+
+                    <textarea
+                        id="taskBody"
+                        name="body"
+                        maxlength="10000"
+                        rows="7"
+                        required
+                    ></textarea>
+                </div>
+
+                <div class="taskboard-form-row">
+                    <div class="taskboard-field">
+                        <label for="taskPriority">
+                            Priority
+                        </label>
+
+                        <select
+                            id="taskPriority"
+                            name="priority"
+                            required
+                        >
+                            <option
+                                value=""
+                                selected
+                                disabled
+                            >
+                                Select priority
+                            </option>
+
+                            <option value="Low">
+                                Low
+                            </option>
+
+                            <option value="Medium">
+                                Medium
+                            </option>
+
+                            <option value="High">
+                                High
+                            </option>
+
+                            <option value="Critical">
+                                Critical
+                            </option>
+                        </select>
+                    </div>
+
+                    <div class="taskboard-field">
+                        <label for="taskTimelineDays">
+                            Timeline
+                        </label>
+
+                        <select
+                            id="taskTimelineDays"
+                            name="timeline_days"
+                            required
+                            disabled
+                        >
+                            <option
+                                value=""
+                                selected
+                            >
+                                Select priority first
+                            </option>
+                        </select>
+
+                        <small id="taskTimelineHelp">
+                            Timeline options depend on task
+                            priority.
+                        </small>
+                    </div>
+                </div>
+
+                <fieldset class="taskboard-role-fieldset">
+                    <legend>
+                        Responsible Roles
+                    </legend>
+
+                    <p>
+                        Select every role responsible for this
+                        task.
+                    </p>
+
+                    <div class="taskboard-role-options">
+                        <label>
+                            <input
+                                type="checkbox"
+                                name="responsible_roles"
+                                value="owner"
+                            >
+                            <span>
+                                Owner
+                            </span>
+                        </label>
+
+                        <label>
+                            <input
+                                type="checkbox"
+                                name="responsible_roles"
+                                value="database"
+                            >
+                            <span>
+                                Database
+                            </span>
+                        </label>
+
+                        <label>
+                            <input
+                                type="checkbox"
+                                name="responsible_roles"
+                                value="security"
+                            >
+                            <span>
+                                Security
+                            </span>
+                        </label>
+
+                        <label>
+                            <input
+                                type="checkbox"
+                                name="responsible_roles"
+                                value="ui"
+                            >
+                            <span>
+                                UI
+                            </span>
+                        </label>
+                    </div>
+                </fieldset>
+
+                <div
+                    id="taskboardCreateMessage"
+                    class="taskboard-form-message"
+                    aria-live="polite"
+                    hidden
+                ></div>
+
+                <div class="taskboard-form-actions">
+                    <button
+                        id="taskboardCreateCancel"
+                        type="button"
+                    >
+                        Cancel
+                    </button>
+
+                    <button
+                        id="taskboardCreateSubmit"
+                        type="submit"
+                    >
+                        Create Task
+                    </button>
+                </div>
+            </form>
+        </section>
+
+        <!-- =================================================
+        REVIEW MY TASKS
+        ================================================== -->
+
+        <section
+            id="taskboardReviewView"
+            class="taskboard-workspace"
+            aria-labelledby="taskboardReviewTitle"
+            hidden
+        >
+            <div class="taskboard-workspace-header">
+                <div>
+                    <p class="taskboard-section-eyebrow">
+                        Assigned Work
+                    </p>
+
+                    <h2 id="taskboardReviewTitle">
+                        Review My Tasks
+                    </h2>
+
+                    <p>
+                        Tasks assigned to one or more of your
+                        administrative roles.
+                    </p>
+                </div>
+
+                <button
+                    id="taskboardReviewClose"
+                    type="button"
+                    aria-label="Close task review"
+                >
+                    Close
+                </button>
+            </div>
+
+            <!-- =============================================
+            FILTERS
+            ============================================== -->
+
+            <div class="taskboard-filters">
+                <div class="taskboard-field">
+                    <label for="taskboardTaskSearch">
+                        Search
+                    </label>
+
+                    <input
+                        id="taskboardTaskSearch"
+                        type="search"
+                        placeholder="Search tasks..."
+                    >
+                </div>
+
+                <div class="taskboard-field">
+                    <label for="taskboardStatusFilter">
+                        Status
+                    </label>
+
+                    <select id="taskboardStatusFilter">
+                        <option value="active">
+                            Active
+                        </option>
+
+                        <option value="completed">
+                            Completed
+                        </option>
+
+                        <option value="shelved">
+                            Shelved
+                        </option>
+
+                        <option value="archived">
+                            Archived
+                        </option>
+
+                        <option value="all">
+                            All
+                        </option>
+                    </select>
+                </div>
+
+                <div class="taskboard-field">
+                    <label for="taskboardPriorityFilter">
+                        Priority
+                    </label>
+
+                    <select id="taskboardPriorityFilter">
+                        <option value="">
+                            All Priorities
+                        </option>
+
+                        <option value="Critical">
+                            Critical
+                        </option>
+
+                        <option value="High">
+                            High
+                        </option>
+
+                        <option value="Medium">
+                            Medium
+                        </option>
+
+                        <option value="Low">
+                            Low
+                        </option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- =============================================
+            TASK LIST
+            ============================================== -->
+
+            <div
+                id="taskboardTaskList"
+                class="taskboard-task-list"
+                aria-live="polite"
+            >
+                <p class="taskboard-empty-state">
+                    Loading your tasks...
+                </p>
+            </div>
+        </section>
+
+        <!-- =================================================
+        TASK DETAILS
+        ================================================== -->
+
+        <section
+            id="taskboardTaskDetail"
+            class="taskboard-workspace taskboard-detail"
+            aria-labelledby="taskboardTaskDetailTitle"
+            hidden
+        >
+            <div class="taskboard-workspace-header">
+                <div>
+                    <p
+                        id="taskboardTaskCode"
+                        class="taskboard-section-eyebrow"
+                    >
+                        Task
+                    </p>
+
+                    <h2 id="taskboardTaskDetailTitle">
+                        Task Details
+                    </h2>
+                </div>
+
+                <button
+                    id="taskboardTaskDetailClose"
+                    type="button"
+                    aria-label="Close task details"
+                >
+                    Close
+                </button>
+            </div>
+
+            <!-- =============================================
+            TASK METADATA
+            ============================================== -->
+
+            <div class="taskboard-task-metadata">
+                <div>
+                    <span>
+                        Status
+                    </span>
+
+                    <strong id="taskboardDetailStatus">
+                        —
+                    </strong>
+                </div>
+
+                <div>
+                    <span>
+                        Priority
+                    </span>
+
+                    <strong id="taskboardDetailPriority">
+                        —
+                    </strong>
+                </div>
+
+                <div>
+                    <span>
+                        Deadline
+                    </span>
+
+                    <strong id="taskboardDetailDeadline">
+                        —
+                    </strong>
+                </div>
+
+                <div>
+                    <span>
+                        Responsible
+                    </span>
+
+                    <strong id="taskboardDetailRoles">
+                        —
+                    </strong>
+                </div>
+            </div>
+
+            <div class="taskboard-task-description">
+                <h3>
+                    Description
+                </h3>
+
+                <p id="taskboardDetailBody"></p>
+            </div>
+
+            <!-- =============================================
+            STATUS MANAGEMENT
+            ============================================== -->
+
+            <section
+                id="taskboardStatusManagement"
+                class="taskboard-task-section"
+                aria-labelledby="taskboardStatusManagementTitle"
+            >
+                <h3 id="taskboardStatusManagementTitle">
+                    Update Status
+                </h3>
+
+                <p>
+                    Select an available action for this task.
+                </p>
+
+                <div
+                    id="taskboardStatusActions"
+                    class="taskboard-status-actions"
+                ></div>
+
+                <p
+                    id="taskboardStatusActionMessage"
+                    aria-live="polite"
+                    hidden
+                ></p>
+            </section>
+
+            <!-- =============================================
+            QUESTIONS / COMMENTS
+            ============================================== -->
+
+            <section
+                class="taskboard-task-section"
+                aria-labelledby="taskboardDiscussionTitle"
+            >
+                <div class="taskboard-task-section-heading">
+                    <div>
+                        <h3 id="taskboardDiscussionTitle">
+                            Questions &amp; Comments
+                        </h3>
+
+                        <p>
+                            Ask questions, provide updates, or
+                            leave information for other
+                            responsible administrators.
+                        </p>
+                    </div>
+                </div>
+
+                <div
+                    id="taskboardDiscussion"
+                    class="taskboard-discussion"
+                    aria-live="polite"
+                >
+                    <p class="taskboard-empty-state">
+                        No comments yet.
+                    </p>
+                </div>
+
+                <form
+                    id="taskboardCommentForm"
+                    class="taskboard-comment-form"
+                >
+                    <div class="taskboard-field">
+                        <label for="taskboardComment">
+                            Add a Question or Comment
+                        </label>
+
+                        <textarea
+                            id="taskboardComment"
+                            name="comment"
+                            rows="4"
+                            maxlength="5000"
+                            placeholder="Write a question, update, or comment..."
+                            required
+                        ></textarea>
+                    </div>
+
+                    <div class="taskboard-form-actions">
+                        <button
+                            id="taskboardCommentSubmit"
+                            type="submit"
+                        >
+                            Post Comment
+                        </button>
+                    </div>
+
+                    <p
+                        id="taskboardCommentMessage"
+                        aria-live="polite"
+                        hidden
+                    ></p>
+                </form>
+            </section>
+
+            <!-- =============================================
+            HISTORY
+            ============================================== -->
+
+            <section
+                class="taskboard-task-section"
+                aria-labelledby="taskboardHistoryTitle"
+            >
+                <h3 id="taskboardHistoryTitle">
+                    Task History
+                </h3>
+
+                <div
+                    id="taskboardHistory"
+                    class="taskboard-history"
+                    aria-live="polite"
+                >
+                    <p class="taskboard-empty-state">
+                        Loading task history...
+                    </p>
+                </div>
+            </section>
+        </section>
+    </main>
+
+    <!-- =====================================================
+    ACCESS DENIED
+    ====================================================== -->
 
     <main
         id="taskboardDenied"
+        class="taskboard-page taskboard-state-page"
         hidden
     >
-        <h1>
-            Access Denied
-        </h1>
+        <section class="taskboard-state-panel">
+            <p class="taskboard-state-eyebrow">
+                Admin Management
+            </p>
 
-        <p>
-            You are not authorized to access the Admin Taskboard.
-        </p>
+            <h1>
+                Access Denied
+            </h1>
+
+            <p>
+                You are not authorized to access the Admin
+                Taskboard.
+            </p>
+
+            <a
+                href="/Dashboard"
+                data-router-link
+            >
+                Return to Dashboard
+            </a>
+        </section>
     </main>
+
+    <!-- =====================================================
+    ERROR
+    ====================================================== -->
 
     <main
         id="taskboardError"
+        class="taskboard-page taskboard-state-page"
         hidden
     >
-        <h1>
-            Taskboard Unavailable
-        </h1>
+        <section class="taskboard-state-panel">
+            <p class="taskboard-state-eyebrow">
+                Admin Management
+            </p>
 
-        <p id="taskboardErrorMessage">
-            The Taskboard could not be loaded.
-        </p>
+            <h1>
+                Taskboard Unavailable
+            </h1>
+
+            <p
+                id="taskboardErrorMessage"
+                aria-live="polite"
+            >
+                The Taskboard could not be loaded.
+            </p>
+
+            <button
+                id="taskboardRetry"
+                type="button"
+            >
+                Try Again
+            </button>
+        </section>
     </main>
-
-    <script
-        type="module"
-        src="/admin/taskboard/taskboard.js"
-    ></script>
 </body>
 </html>

@@ -12,23 +12,29 @@ Routes:
     POST /api/auth/admin/tasks
 
 Purpose:
-    HTTP boundary for Admin task-board listing and task
+    HTTP boundary for Admin Taskboard listing and task
     creation.
 
 Description:
     GET:
         - Reads supported task filters from query parameters.
-        - Retrieves authorized task-board records.
+        - Rejects unsupported query parameters.
+        - Retrieves only tasks visible to the authenticated
+          user's verified Taskboard roles.
 
     POST:
         - Accepts a new task payload.
+        - Rejects server-owned task fields.
         - Creates the task through the secured task service.
 
 Security:
     - Authentication and Discord-backed permissions are
       handled by the Admin service layer.
+    - Taskboard responsibility is enforced by the task
+      service layer.
     - Browser-submitted permissions are never trusted.
     - Browser-submitted actor IDs are never accepted.
+    - Browser-submitted lifecycle/server fields are rejected.
     - Supabase service-role credentials remain server-side.
     - Assignment permission is enforced automatically by
       the task creation service.
@@ -55,6 +61,79 @@ const JSON_HEADERS =
             "no-store"
     });
 
+const ALLOWED_LIST_QUERY_PARAMETERS =
+    new Set([
+        "search",
+        "priority",
+        "timeline_days",
+        "responsibleRole",
+        "lifecycle",
+        "includeDeleted",
+        "limit",
+        "offset"
+    ]);
+
+const SERVER_OWNED_TASK_FIELDS =
+    new Set([
+        "id",
+        "task_code",
+        "taskCode",
+
+        "status",
+        "previous_status",
+
+        "creator_account_id",
+        "creatorAccountId",
+
+        "created_by",
+        "createdBy",
+
+        "updated_by",
+        "updatedBy",
+
+        "actor_account_id",
+        "actorAccountId",
+
+        "created_at",
+        "createdAt",
+
+        "updated_at",
+        "updatedAt",
+
+        "completed_at",
+        "completedAt",
+
+        "shelved_until",
+        "shelvedUntil",
+
+        "shelved_reason",
+        "shelvedReason",
+
+        "shelved_by",
+        "shelvedBy",
+
+        "archived_at",
+        "archivedAt",
+
+        "archived_reason",
+        "archivedReason",
+
+        "archived_by",
+        "archivedBy",
+
+        "deleted_at",
+        "deletedAt",
+
+        "deleted_reason",
+        "deletedReason",
+
+        "deleted_by",
+        "deletedBy",
+
+        "deadline",
+        "version"
+    ]);
+
 /* =========================================================
 NORMALIZATION
 ========================================================= */
@@ -62,8 +141,7 @@ NORMALIZATION
 function normalizeString(
     value
 ) {
-    return typeof value ===
-        "string"
+    return typeof value === "string"
         ? value.trim()
         : "";
 }
@@ -132,8 +210,7 @@ function parseBooleanQuery(
     const normalized =
         normalizeString(
             value
-        )
-            .toLowerCase();
+        ).toLowerCase();
 
     if (
         normalized === "true"
@@ -155,6 +232,41 @@ function parseBooleanQuery(
         "A boolean query parameter is invalid.",
         400
     );
+}
+
+/* =========================================================
+QUERY VALIDATION
+========================================================= */
+
+function validateListQueryParameters(
+    searchParams
+) {
+    const invalidParameters =
+        [
+            ...new Set(
+                [...searchParams.keys()]
+                    .filter(
+                        key =>
+                            !ALLOWED_LIST_QUERY_PARAMETERS.has(
+                                key
+                            )
+                    )
+            )
+        ];
+
+    if (
+        invalidParameters.length >
+        0
+    ) {
+        throw createRequestError(
+            "TASK_FILTERS_UNSUPPORTED",
+            "Unsupported task query parameters were supplied.",
+            400,
+            {
+                invalidParameters
+            }
+        );
+    }
 }
 
 /* =========================================================
@@ -195,6 +307,10 @@ function getListInput(
     const searchParams =
         url.searchParams;
 
+    validateListQueryParameters(
+        searchParams
+    );
+
     const filters = {};
 
     copyQueryParameter(
@@ -220,10 +336,6 @@ function getListInput(
         searchParams,
         "responsibleRole"
     );
-
-    for (const obsolete of ["assignedRole", "assignedAccountId", "timeline", "due_at", "description"]) {
-        if (searchParams.has(obsolete)) throw createRequestError("TASK_FILTERS_UNSUPPORTED", "Unsupported task filter.");
-    }
 
     copyQueryParameter(
         filters,
@@ -271,8 +383,7 @@ async function readJsonBody(
             request.headers.get(
                 "content-type"
             )
-        )
-            .toLowerCase();
+        ).toLowerCase();
 
     if (
         !contentType.includes(
@@ -302,8 +413,7 @@ async function readJsonBody(
 
     if (
         !body
-        || typeof body !==
-            "object"
+        || typeof body !== "object"
         || Array.isArray(
             body
         )
@@ -316,6 +426,100 @@ async function readJsonBody(
     }
 
     return body;
+}
+
+/* =========================================================
+CREATE BODY
+
+Only the top-level "task" field is accepted.
+
+The task service remains authoritative for validating the
+supported mutable task fields.
+========================================================= */
+
+function getCreateTaskPayload(
+    body
+) {
+    const topLevelFields =
+        Object.keys(
+            body
+        );
+
+    const invalidTopLevelFields =
+        topLevelFields.filter(
+            field =>
+                field !== "task"
+        );
+
+    if (
+        invalidTopLevelFields.length >
+        0
+    ) {
+        throw createRequestError(
+            "TASK_REQUEST_FIELDS_UNSUPPORTED",
+            "Unsupported request fields were supplied.",
+            400,
+            {
+                invalidFields:
+                    invalidTopLevelFields
+            }
+        );
+    }
+
+    if (
+        !Object.prototype.hasOwnProperty.call(
+            body,
+            "task"
+        )
+    ) {
+        throw createRequestError(
+            "TASK_PAYLOAD_REQUIRED",
+            "A task object is required.",
+            400
+        );
+    }
+
+    if (
+        !body.task
+        || typeof body.task !== "object"
+        || Array.isArray(
+            body.task
+        )
+    ) {
+        throw createRequestError(
+            "TASK_PAYLOAD_INVALID",
+            "The task payload must be a JSON object.",
+            400
+        );
+    }
+
+    const serverOwnedFields =
+        Object.keys(
+            body.task
+        )
+            .filter(
+                field =>
+                    SERVER_OWNED_TASK_FIELDS.has(
+                        field
+                    )
+            );
+
+    if (
+        serverOwnedFields.length >
+        0
+    ) {
+        throw createRequestError(
+            "TASK_SERVER_FIELD_NOT_ALLOWED",
+            "One or more server-controlled task fields were supplied.",
+            400,
+            {
+                fields:
+                    serverOwnedFields
+            }
+        );
+    }
+
+    return body.task;
 }
 
 /* =========================================================
@@ -413,14 +617,22 @@ function handleApiError(
                     error?.message
                     ?? null,
 
+                databaseCode:
+                    error?.databaseCode
+                    ?? null,
+
                 details:
                     error?.details
+                    ?? null,
+
+                hint:
+                    error?.hint
                     ?? null
             }
         );
     }
 
-    const body = {
+    const responseBody = {
         success:
             false,
 
@@ -436,23 +648,34 @@ function handleApiError(
 
     if (
         status < 500
-        && error?.details !==
-            undefined
-        && error?.details !==
-            null
+        && error?.details !== undefined
+        && error?.details !== null
     ) {
-        body.details =
+        responseBody.details =
             error.details;
     }
 
     return jsonResponse(
-        body,
+        responseBody,
         status
     );
 }
 
 /* =========================================================
 GET /api/auth/admin/tasks
+
+Supported Query Parameters:
+    search
+    priority
+    timeline_days
+    responsibleRole
+    lifecycle
+    includeDeleted
+    limit
+    offset
+
+Task visibility is enforced by listAdminTasks() using the
+authenticated account's verified Taskboard roles.
 ========================================================= */
 
 export async function onRequestGet(
@@ -498,16 +721,22 @@ Expected Body:
 {
     "task": {
         "title": "...",
-        "description": "...",
-        "priority": "...",
-        "timeline_days": "...",
-        "assigned_role": "...",
-        "assigned_account_id": "...",
-        "due_at": "..."
+        "body": "...",
+        "priority": "Low | Medium | High | Critical",
+        "timeline_days": 14,
+        "responsible_roles": [
+            "database",
+            "security"
+        ]
     }
 }
 
-actor_account_id is intentionally not accepted.
+Notes:
+    - deadline is calculated server-side.
+    - status is established server-side.
+    - task_code is generated server-side.
+    - version is established server-side.
+    - actor/creator identity is derived server-side.
 ========================================================= */
 
 export async function onRequestPost(
@@ -525,24 +754,16 @@ export async function onRequestPost(
                 request
             );
 
-        if (
-            !Object.prototype.hasOwnProperty.call(
-                body,
-                "task"
-            )
-        ) {
-            throw createRequestError(
-                "TASK_PAYLOAD_REQUIRED",
-                "A task object is required.",
-                400
+        const task =
+            getCreateTaskPayload(
+                body
             );
-        }
 
         const result =
             await createAdminTask(
                 request,
                 env,
-                body.task
+                task
             );
 
         return jsonResponse(
@@ -569,8 +790,7 @@ export async function onRequest(
     const method =
         normalizeString(
             context?.request?.method
-        )
-            .toUpperCase();
+        ).toUpperCase();
 
     switch (
         method

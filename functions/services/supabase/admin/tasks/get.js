@@ -8,28 +8,38 @@ File:
     functions/services/supabase/admin/tasks/get.js
 
 Purpose:
-    Securely retrieves one Admin task-board record through
+    Securely retrieves one Admin Taskboard record through
     the Supabase admin_get_task RPC.
 
 Description:
     - Requires TASKS_READ permission.
     - Validates the human-readable task code.
     - Hides deleted tasks by default.
-    - Supports explicit deleted-task inclusion for trusted
-      server-side callers.
-    - Calls the shared Admin task RPC transport.
+    - Requires TASKS_DELETE to include deleted tasks.
+    - Loads the authoritative task from Supabase.
+    - Enforces Taskboard responsibility before returning it.
+    - owner may read any task.
+    - database/security/ui require responsible-role overlap.
     - Does not mutate task state.
 
 Security:
     - Browser-submitted permissions are never trusted.
+    - Browser-submitted Taskboard roles are never trusted.
+    - Browser-submitted responsible_roles are never trusted.
     - Authorization is derived server-side.
+    - Task responsibility is checked against persisted data.
+    - Deleted-task visibility requires elevated permission.
     - Supabase service-role credentials remain server-side.
-    - Deleted-task visibility is opt-in.
 ========================================================= */
 
 import {
-    authorizeTaskRead
+    authorizeTaskRead,
+    authorizeTaskDelete
 } from "../../../admin/permissions.js";
+
+import {
+    requireTaskResponsibility
+} from "../../../admin/taskboard_roles.js";
 
 import {
     ADMIN_TASK_RPCS,
@@ -86,8 +96,7 @@ NORMALIZATION
 function normalizeString(
     value
 ) {
-    return typeof value ===
-        "string"
+    return typeof value === "string"
         ? value.trim()
         : "";
 }
@@ -126,12 +135,44 @@ function requireTaskCode(
 
 /* =========================================================
 BOOLEAN
+
+Security-relevant boolean values are parsed strictly.
+
+Missing/empty:
+    false
+
+Accepted true:
+    true
+    "true"
+    1
+    "1"
+
+Accepted false:
+    false
+    "false"
+    0
+    "0"
+
+Anything else:
+    rejected
 ========================================================= */
 
-function normalizeBoolean(
+function requireBoolean(
     value,
-    fallback = false
+    {
+        defaultValue = false,
+        code = "BOOLEAN_INVALID",
+        message = "A boolean value is invalid."
+    } = {}
 ) {
+    if (
+        value === null
+        || value === undefined
+        || value === ""
+    ) {
+        return defaultValue;
+    }
+
     if (
         value === true
         || value === "true"
@@ -146,34 +187,80 @@ function normalizeBoolean(
         || value === "false"
         || value === 0
         || value === "0"
-        || value === null
-        || value === undefined
-        || value === ""
     ) {
         return false;
     }
 
-    return fallback;
+    throw new AdminTaskGetError(
+        message,
+        {
+            code,
+            status:
+                400
+        }
+    );
+}
+
+/* =========================================================
+NORMALIZE TASK RESULT
+
+PostgREST may return a SETOF/table RPC as an array.
+
+Normalize that here so responsibility checks always operate
+on the actual persisted task object.
+========================================================= */
+
+function normalizeTaskResult(
+    result
+) {
+    const task =
+        Array.isArray(
+            result
+        )
+            ? result[0]
+            : result;
+
+    if (
+        !task
+        || typeof task !== "object"
+    ) {
+        throw new AdminTaskGetError(
+            "The requested task could not be found.",
+            {
+                code:
+                    "TASK_NOT_FOUND",
+
+                status:
+                    404
+            }
+        );
+    }
+
+    return task;
 }
 
 /* =========================================================
 GET TASK
 
-Expected caller input:
-{
-    taskCode,
-    includeDeleted?: false
-}
+Authorization sequence:
 
-Deleted tasks are hidden by default.
+    TASKS_READ
+        ↓
+    TASKS_DELETE if includeDeleted
+        ↓
+    load authoritative task
+        ↓
+    requireTaskResponsibility()
+        ↓
+    owner OR responsible_roles overlap
+        ↓
+    return task
 
 Important:
-    This service only checks TASKS_READ.
+    Responsibility is evaluated only after the authoritative
+    persisted task has been loaded.
 
-    If we decide deleted-task visibility should require
-    TASKS_DELETE or AUDIT_READ, enforce that at the API
-    endpoint before calling this service or extend this
-    service with that explicit rule.
+    Knowing a TASK-XXXXXX code alone does not grant access.
 ========================================================= */
 
 export async function getAdminTask(
@@ -185,33 +272,109 @@ export async function getAdminTask(
             false
     } = {}
 ) {
+    /* -----------------------------------------------------
+    INPUT
+    ----------------------------------------------------- */
+
     const normalizedTaskCode =
         requireTaskCode(
             taskCode
         );
 
     const normalizedIncludeDeleted =
-        normalizeBoolean(
+        requireBoolean(
             includeDeleted,
-            false
+            {
+                defaultValue:
+                    false,
+
+                code:
+                    "INCLUDE_DELETED_INVALID",
+
+                message:
+                    "includeDeleted must be a boolean."
+            }
         );
 
-    await authorizeTaskRead(
-        request,
-        env
-    );
+    /* -----------------------------------------------------
+    READ PERMISSION
+    ----------------------------------------------------- */
 
-    return callAdminTaskRpc(
+    let authorization =
+        await authorizeTaskRead(
+            request,
+            env
+        );
+
+    /* -----------------------------------------------------
+    DELETED-TASK VISIBILITY
+
+    Ordinary TASKS_READ permission does not grant access to
+    deleted task records.
+
+    includeDeleted=true requires TASKS_DELETE.
+    ----------------------------------------------------- */
+
+    if (
+        normalizedIncludeDeleted
+    ) {
+        authorization =
+            await authorizeTaskDelete(
+                request,
+                env
+            );
+    }
+
+    /* -----------------------------------------------------
+    LOAD AUTHORITATIVE TASK
+    ----------------------------------------------------- */
+
+    const result =
+        await callAdminTaskRpc(
+            env,
+            ADMIN_TASK_RPCS.GET,
+            {
+                p_task_code:
+                    normalizedTaskCode,
+
+                p_include_deleted:
+                    normalizedIncludeDeleted
+            }
+        );
+
+    const task =
+        normalizeTaskResult(
+            result
+        );
+
+    /* -----------------------------------------------------
+    TASKBOARD RESPONSIBILITY
+
+    requireTaskResponsibility() retrieves the authenticated
+    account's active Taskboard roles and compares them with
+    this task's persisted responsible_roles.
+
+    owner:
+        may read any task.
+
+    database/security/ui:
+        must overlap the task assignment.
+
+    The returned context is not otherwise needed because
+    this operation is read-only.
+    ----------------------------------------------------- */
+
+    await requireTaskResponsibility(
         env,
-        ADMIN_TASK_RPCS.GET,
-        {
-            p_task_code:
-                normalizedTaskCode,
-
-            p_include_deleted:
-                normalizedIncludeDeleted
-        }
+        authorization,
+        task.responsible_roles
     );
+
+    /* -----------------------------------------------------
+    RETURN
+    ----------------------------------------------------- */
+
+    return task;
 }
 
 /* =========================================================
@@ -222,8 +385,7 @@ export function isAdminTaskGetError(
     error
 ) {
     return (
-        error instanceof
-            AdminTaskGetError
+        error instanceof AdminTaskGetError
         || error?.name ===
             "AdminTaskGetError"
     );

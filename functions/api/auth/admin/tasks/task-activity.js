@@ -7,17 +7,18 @@ ADMIN TASK ACTIVITY API
 File:
     functions/api/auth/admin/tasks/task-activity.js
 
-Routes:
+Route:
     GET /api/auth/admin/tasks/task-activity
 
 Purpose:
-    HTTP boundary for retrieving global Admin task-board
+    HTTP boundary for retrieving global Admin Taskboard
     activity and audit history.
 
 Description:
     - Requires AUDIT_READ through the task activity service.
     - Supports bounded pagination.
-    - Supports optional activity filters.
+    - Supports controlled activity filters.
+    - Rejects unsupported query parameters.
     - Uses the authoritative Supabase task activity RPCs.
     - Does not mutate task state.
 
@@ -27,6 +28,8 @@ Security:
     - Browser-submitted permissions are never trusted.
     - Global audit data is not exposed through ordinary
       TASKS_READ access.
+    - Taskboard responsibility filtering is intentionally
+      not applied to this global audit endpoint.
     - Supabase service-role credentials remain server-side.
 ========================================================= */
 
@@ -47,6 +50,26 @@ const JSON_HEADERS =
         "Cache-Control":
             "no-store"
     });
+
+const ALLOWED_QUERY_PARAMETERS =
+    new Set([
+        "taskCode",
+        "actorAccountId",
+        "eventType",
+        "createdAfter",
+        "createdBefore",
+        "limit",
+        "offset"
+    ]);
+
+const ACTIVITY_FILTERS =
+    Object.freeze([
+        "taskCode",
+        "actorAccountId",
+        "eventType",
+        "createdAfter",
+        "createdBefore"
+    ]);
 
 /* =========================================================
 NORMALIZATION
@@ -70,7 +93,9 @@ function jsonResponse(
     additionalHeaders = {}
 ) {
     return new Response(
-        JSON.stringify(body),
+        JSON.stringify(
+            body
+        ),
         {
             status,
 
@@ -93,7 +118,9 @@ function createRequestError(
     details = null
 ) {
     const error =
-        new Error(message);
+        new Error(
+            message
+        );
 
     error.name =
         "AdminTaskActivityApiRequestError";
@@ -108,6 +135,41 @@ function createRequestError(
         details;
 
     return error;
+}
+
+/* =========================================================
+QUERY VALIDATION
+========================================================= */
+
+function validateQueryParameters(
+    searchParams
+) {
+    const invalidParameters =
+        [
+            ...new Set(
+                [...searchParams.keys()]
+                    .filter(
+                        key =>
+                            !ALLOWED_QUERY_PARAMETERS.has(
+                                key
+                            )
+                    )
+            )
+        ];
+
+    if (
+        invalidParameters.length >
+        0
+    ) {
+        throw createRequestError(
+            "TASK_ACTIVITY_QUERY_UNSUPPORTED",
+            "Unsupported task activity query parameters were supplied.",
+            400,
+            {
+                invalidParameters
+            }
+        );
+    }
 }
 
 /* =========================================================
@@ -126,10 +188,14 @@ function parseLimit(
     }
 
     const limit =
-        Number(value);
+        Number(
+            value
+        );
 
     if (
-        !Number.isSafeInteger(limit)
+        !Number.isSafeInteger(
+            limit
+        )
         || limit < 1
     ) {
         throw createRequestError(
@@ -157,10 +223,14 @@ function parseOffset(
     }
 
     const offset =
-        Number(value);
+        Number(
+            value
+        );
 
     if (
-        !Number.isSafeInteger(offset)
+        !Number.isSafeInteger(
+            offset
+        )
         || offset < 0
     ) {
         throw createRequestError(
@@ -182,17 +252,9 @@ function getActivityFilters(
 ) {
     const filters = {};
 
-    const supportedFilters = [
-        "taskCode",
-        "actorAccountId",
-        "eventType",
-        "createdAfter",
-        "createdBefore"
-    ];
-
     for (
         const filterName
-        of supportedFilters
+        of ACTIVITY_FILTERS
     ) {
         if (
             searchParams.has(
@@ -222,7 +284,9 @@ function getErrorStatus(
         );
 
     if (
-        Number.isInteger(status)
+        Number.isInteger(
+            status
+        )
         && status >= 400
         && status <= 599
     ) {
@@ -294,14 +358,22 @@ function handleApiError(
                     error?.message
                     ?? null,
 
+                databaseCode:
+                    error?.databaseCode
+                    ?? null,
+
                 details:
                     error?.details
+                    ?? null,
+
+                hint:
+                    error?.hint
                     ?? null
             }
         );
     }
 
-    const body = {
+    const responseBody = {
         success:
             false,
 
@@ -320,12 +392,12 @@ function handleApiError(
         && error?.details !== undefined
         && error?.details !== null
     ) {
-        body.details =
+        responseBody.details =
             error.details;
     }
 
     return jsonResponse(
-        body,
+        responseBody,
         status
     );
 }
@@ -333,7 +405,7 @@ function handleApiError(
 /* =========================================================
 GET /api/auth/admin/tasks/task-activity
 
-Query Parameters:
+Supported Query Parameters:
     taskCode
     actorAccountId
     eventType
@@ -343,14 +415,18 @@ Query Parameters:
     offset
 
 Behavior:
-    No activity filters:
-        getAdminTaskActivity()
 
-    One or more activity filters:
-        listAdminTaskActivity()
+No activity filters:
+    getAdminTaskActivity()
+
+One or more activity filters:
+    listAdminTaskActivity()
 
 Both require:
     AUDIT_READ
+
+This is the global Admin audit endpoint. Taskboard
+responsibility filtering is intentionally not applied here.
 ========================================================= */
 
 export async function onRequestGet(
@@ -370,6 +446,10 @@ export async function onRequestGet(
 
         const searchParams =
             url.searchParams;
+
+        validateQueryParameters(
+            searchParams
+        );
 
         const limit =
             parseLimit(
