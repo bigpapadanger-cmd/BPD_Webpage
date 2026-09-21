@@ -21,7 +21,16 @@ Important:
         --app-bottom-gap
         --app-content-height
 ========================================================= */
+/* =========================================================
+ROUTE DISPLAY GATE
+========================================================= */
 
+
+body.page-loading .site-content {
+    opacity: 0;
+
+    pointer-events: none;
+}
 /* =========================================================
 GLOBAL BOX MODEL
 ========================================================= */
@@ -139,7 +148,10 @@ SITE CONTENT
 
     background:
         transparent;
+    opacity: 1;
 
+    transition:
+        opacity 0.15s ease;
     transition:
         padding-left 0.25s ease;
 }

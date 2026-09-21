@@ -6,62 +6,57 @@ File:
     public/admin/index.html
 
 Purpose:
-    Main landing page for the BPD Gaming Network Admin
-    management system.
+    Admin Management route fragment rendered inside the
+    global BPD application shell.
+
+Route Structure:
+    Global Shell
+        └── siteContent
+            └── admin-shell
+                ├── loading state
+                ├── authorized state
+                │   └── admin-page
+                │       └── admin-panel
+                │           ├── page header
+                │           ├── global status
+                │           ├── overview
+                │           ├── management center
+                │           └── recent activity
+                ├── denied state
+                └── error state
 
 Responsibilities:
-    - Display current administrator responsibility roles.
+    - Display verified administrator responsibility roles.
     - Display administrative overview information.
     - Provide navigation to Admin management areas.
     - Display recent administrative activity.
     - Provide loading, denied, and error states.
 
-Layout Order:
-    1. Admin hero and responsibility roles.
-    2. Admin overview.
-    3. Management Center.
-    4. Recent Activity.
-
 Important:
-    - CSS is injected by the global page/router system.
-    - JavaScript is loaded by the global page/router system.
-    - This document must not directly load CSS or JavaScript.
+    - This file is injected into #siteContent by the SPA
+      router.
+    - It is intentionally a route fragment rather than a
+      complete HTML document.
+    - Do not include <html>, <head>, or <body>.
+    - CSS is injected by the global router/master stylesheet.
+    - JavaScript is initialized by the route module.
     - Server-side authorization remains authoritative.
 ========================================================= -->
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
-
-    <meta
-        name="description"
-        content="BPD Gaming Network administration and management dashboard."
-    >
-
-    <title>
-        Admin Management | BPD Gaming Network
-    </title>
-</head>
-
-<body>
+<section
+    class="admin-shell"
+    aria-label="Admin Management"
+>
     <!-- =====================================================
-    LOADING
+    ROUTE STATE: LOADING
     ====================================================== -->
 
-    <main
+    <section
         id="adminLoading"
         class="admin-state-page"
+        aria-live="polite"
     >
-        <section
-            class="admin-state-panel"
-            aria-live="polite"
-        >
+        <div class="admin-state-panel">
             <p class="admin-state-eyebrow">
                 BPD Gaming Network
             </p>
@@ -73,417 +68,473 @@ Important:
             <p>
                 Verifying administrator access...
             </p>
-        </section>
-    </main>
+        </div>
+    </section>
 
     <!-- =====================================================
-    AUTHORIZED ADMIN CONTENT
+    ROUTE STATE: AUTHORIZED
     ====================================================== -->
 
-    <main
+    <section
         id="adminContent"
+        class="admin-content"
         hidden
     >
+        <!-- =================================================
+        PAGE WIDTH CONTAINER
+        ================================================== -->
+
         <div class="admin-page">
             <!-- =============================================
-            HERO
+            PRIMARY PAGE PANEL
             ============================================== -->
 
-            <header class="admin-hero">
-                <div class="admin-hero-content">
-                    <p class="admin-eyebrow">
-                        BPD Gaming Network
-                    </p>
-
-                    <h1 class="admin-title">
-                        Admin Management
-                    </h1>
-
-                    <p class="admin-description">
-                        Manage network operations, users,
-                        administrative tasks, announcements,
-                        and system settings.
-                    </p>
-                </div>
-
+            <div class="admin-panel">
                 <!-- =========================================
-                RESPONSIBILITY ROLES
+                PAGE HEADER
                 ========================================== -->
 
-                <aside
-                    class="admin-identity"
-                    aria-label="Administrator responsibility roles"
-                >
-                    <span class="admin-identity-label">
-                        Your Role
-                    </span>
+                <header class="admin-hero">
+                    <!-- =====================================
+                    PAGE IDENTITY
+                    ====================================== -->
 
-                    <div
-                        id="adminRoleList"
-                        class="admin-role-list"
-                        aria-live="polite"
-                    >
-                        <span class="admin-role">
-                            Loading...
-                        </span>
-                    </div>
-                </aside>
-            </header>
-
-            <!-- =============================================
-            GLOBAL STATUS
-            ============================================== -->
-
-            <div
-                id="adminStatus"
-                class="admin-status"
-                aria-live="polite"
-                hidden
-            ></div>
-
-            <!-- =============================================
-            ADMIN OVERVIEW
-            ============================================== -->
-
-            <section
-                class="admin-dashboard"
-                aria-labelledby="adminDashboardTitle"
-            >
-                <div class="admin-section-heading">
-                    <div>
-                        <p class="admin-section-eyebrow">
-                            Overview
+                    <div class="admin-hero-content">
+                        <p class="admin-eyebrow">
+                            BPD Gaming Network
                         </p>
 
-                        <h2 id="adminDashboardTitle">
-                            Admin Overview
-                        </h2>
+                        <h1 class="admin-title">
+                            Admin Management
+                        </h1>
 
-                        <p>
-                            Current administrative workload and
-                            service information.
+                        <p class="admin-description">
+                            Manage network operations, users,
+                            administrative tasks,
+                            announcements, and system settings.
                         </p>
                     </div>
-                </div>
-
-                <div class="admin-stat-grid">
-                    <!-- =====================================
-                    ACTIVE TASKS
-                    ====================================== -->
-
-                    <article class="admin-stat-card">
-                        <span class="admin-stat-label">
-                            Active Tasks
-                        </span>
-
-                        <strong
-                            id="adminActiveTaskCount"
-                            class="admin-stat-value"
-                        >
-                            —
-                        </strong>
-
-                        <a
-                            href="/Admin/TaskBoard"
-                            data-router-link
-                        >
-                            Review Taskboard →
-                        </a>
-                    </article>
 
                     <!-- =====================================
-                    LATE TASKS
+                    VERIFIED RESPONSIBILITY ROLES
                     ====================================== -->
 
-                    <article class="admin-stat-card">
-                        <span class="admin-stat-label">
-                            Late Tasks
-                        </span>
-
-                        <strong
-                            id="adminLateTaskCount"
-                            class="admin-stat-value"
-                        >
-                            —
-                        </strong>
-
-                        <a
-                            href="/Admin/TaskBoard"
-                            data-router-link
-                        >
-                            Review Tasks →
-                        </a>
-                    </article>
-
-                    <!-- =====================================
-                    ADMIN USERS
-                    ====================================== -->
-
-                    <article class="admin-stat-card">
-                        <span class="admin-stat-label">
-                            Admin Users
-                        </span>
-
-                        <strong
-                            id="adminUserCount"
-                            class="admin-stat-value"
-                        >
-                            —
-                        </strong>
-
-                        <a
-                            href="/Admin/Users"
-                            data-router-link
-                        >
-                            Manage Users →
-                        </a>
-                    </article>
-
-                    <!-- =====================================
-                    SYSTEM STATUS
-                    ====================================== -->
-
-                    <article class="admin-stat-card">
-                        <span class="admin-stat-label">
-                            System Status
-                        </span>
-
-                        <strong
-                            id="adminSystemStatus"
-                            class="admin-stat-value admin-stat-status"
-                        >
-                            Checking
-                        </strong>
-
-                        <span>
-                            Administrative services
-                        </span>
-                    </article>
-                </div>
-            </section>
-
-            <!-- =============================================
-            MANAGEMENT CENTER
-            ============================================== -->
-
-            <section
-                class="admin-overview"
-                aria-labelledby="adminOverviewTitle"
-            >
-                <div class="admin-section-heading">
-                    <div>
-                        <p class="admin-section-eyebrow">
-                            Management
-                        </p>
-
-                        <h2 id="adminOverviewTitle">
-                            Management Center
-                        </h2>
-
-                        <p>
-                            Select an administrative area to
-                            continue.
-                        </p>
-                    </div>
-                </div>
-
-                <div class="admin-management-grid">
-                    <!-- =====================================
-                    USER MANAGEMENT
-                    ====================================== -->
-
-                    <a
-                        href="/Admin/Users"
-                        class="admin-management-card"
-                        data-router-link
+                    <aside
+                        class="admin-identity"
+                        aria-label="Administrator responsibility roles"
                     >
-                        <span
-                            class="admin-management-icon"
-                            aria-hidden="true"
-                        >
-                            👥
+                        <span class="admin-identity-label">
+                            Your Role
                         </span>
 
-                        <span class="admin-management-content">
-                            <strong>
-                                User Management
-                            </strong>
-
-                            <span>
-                                Review accounts, provider
-                                connections, responsibility
-                                roles, access, and account
-                                status.
+                        <div
+                            id="adminRoleList"
+                            class="admin-role-list"
+                            aria-live="polite"
+                        >
+                            <span class="admin-role">
+                                Loading...
                             </span>
-                        </span>
+                        </div>
+                    </aside>
+                </header>
 
-                        <span
-                            class="admin-management-arrow"
-                            aria-hidden="true"
-                        >
-                            →
-                        </span>
-                    </a>
-
-                    <!-- =====================================
-                    TASKBOARD
-                    ====================================== -->
-
-                    <a
-                        href="/Admin/TaskBoard"
-                        class="admin-management-card"
-                        data-router-link
-                    >
-                        <span
-                            class="admin-management-icon"
-                            aria-hidden="true"
-                        >
-                            📋
-                        </span>
-
-                        <span class="admin-management-content">
-                            <strong>
-                                Taskboard
-                            </strong>
-
-                            <span>
-                                Create tasks, review assigned
-                                work, update progress, and
-                                participate in task discussions.
-                            </span>
-                        </span>
-
-                        <span
-                            class="admin-management-arrow"
-                            aria-hidden="true"
-                        >
-                            →
-                        </span>
-                    </a>
-
-                    <!-- =====================================
-                    ANNOUNCEMENTS
-                    ====================================== -->
-
-                    <a
-                        href="/Admin/Announcements"
-                        class="admin-management-card"
-                        data-router-link
-                    >
-                        <span
-                            class="admin-management-icon"
-                            aria-hidden="true"
-                        >
-                            📣
-                        </span>
-
-                        <span class="admin-management-content">
-                            <strong>
-                                Announcements
-                            </strong>
-
-                            <span>
-                                Prepare and distribute
-                                administrative announcements
-                                across connected communities.
-                            </span>
-                        </span>
-
-                        <span
-                            class="admin-management-arrow"
-                            aria-hidden="true"
-                        >
-                            →
-                        </span>
-                    </a>
-
-                    <!-- =====================================
-                    ADMIN SETTINGS
-                    ====================================== -->
-
-                    <a
-                        href="/Admin/Settings"
-                        class="admin-management-card"
-                        data-router-link
-                    >
-                        <span
-                            class="admin-management-icon"
-                            aria-hidden="true"
-                        >
-                            ⚙️
-                        </span>
-
-                        <span class="admin-management-content">
-                            <strong>
-                                Admin Settings
-                            </strong>
-
-                            <span>
-                                Configure administrative
-                                services, permissions, and
-                                management options.
-                            </span>
-                        </span>
-
-                        <span
-                            class="admin-management-arrow"
-                            aria-hidden="true"
-                        >
-                            →
-                        </span>
-                    </a>
-                </div>
-            </section>
-
-            <!-- =============================================
-            RECENT ACTIVITY
-            ============================================== -->
-
-            <section
-                class="admin-activity"
-                aria-labelledby="adminActivityTitle"
-            >
-                <div class="admin-section-heading">
-                    <div>
-                        <p class="admin-section-eyebrow">
-                            Recent Activity
-                        </p>
-
-                        <h2 id="adminActivityTitle">
-                            Management Activity
-                        </h2>
-
-                        <p>
-                            Recent administrative changes,
-                            Taskboard events, and management
-                            activity.
-                        </p>
-                    </div>
-                </div>
+                <!-- =========================================
+                GLOBAL ADMIN STATUS
+                ========================================== -->
 
                 <div
-                    id="adminActivityList"
-                    class="admin-activity-list"
+                    id="adminStatus"
+                    class="admin-status"
+                    role="status"
                     aria-live="polite"
-                >
-                    <p class="admin-empty-state">
-                        Loading recent administrative activity...
-                    </p>
+                    hidden
+                ></div>
+
+                <!-- =========================================
+                DASHBOARD REGION
+                ========================================== -->
+
+                <div class="admin-dashboard-region">
+                    <!-- =====================================
+                    ADMIN OVERVIEW
+                    ====================================== -->
+
+                    <section
+                        class="admin-dashboard"
+                        aria-labelledby="adminDashboardTitle"
+                    >
+                        <!-- =================================
+                        OVERVIEW HEADING
+                        ================================== -->
+
+                        <header class="admin-section-heading">
+                            <div>
+                                <p class="admin-section-eyebrow">
+                                    Overview
+                                </p>
+
+                                <h2 id="adminDashboardTitle">
+                                    Admin Overview
+                                </h2>
+
+                                <p>
+                                    Current administrative
+                                    workload and service
+                                    information.
+                                </p>
+                            </div>
+                        </header>
+
+                        <!-- =================================
+                        STAT CARDS
+                        ================================== -->
+
+                        <div class="admin-stat-grid">
+                            <!-- =============================
+                            ACTIVE TASKS
+                            ============================== -->
+
+                            <article class="admin-stat-card">
+                                <span class="admin-stat-label">
+                                    Active Tasks
+                                </span>
+
+                                <strong
+                                    id="adminActiveTaskCount"
+                                    class="admin-stat-value"
+                                >
+                                    —
+                                </strong>
+
+                                <a
+                                    href="/Admin/TaskBoard"
+                                    data-router-link
+                                >
+                                    Review Taskboard →
+                                </a>
+                            </article>
+
+                            <!-- =============================
+                            LATE TASKS
+                            ============================== -->
+
+                            <article class="admin-stat-card">
+                                <span class="admin-stat-label">
+                                    Late Tasks
+                                </span>
+
+                                <strong
+                                    id="adminLateTaskCount"
+                                    class="admin-stat-value"
+                                >
+                                    —
+                                </strong>
+
+                                <a
+                                    href="/Admin/TaskBoard"
+                                    data-router-link
+                                >
+                                    Review Tasks →
+                                </a>
+                            </article>
+
+                            <!-- =============================
+                            ADMIN USERS
+                            ============================== -->
+
+                            <article class="admin-stat-card">
+                                <span class="admin-stat-label">
+                                    Admin Users
+                                </span>
+
+                                <strong
+                                    id="adminUserCount"
+                                    class="admin-stat-value"
+                                >
+                                    —
+                                </strong>
+
+                                <a
+                                    href="/Admin/Users"
+                                    data-router-link
+                                >
+                                    Manage Users →
+                                </a>
+                            </article>
+
+                            <!-- =============================
+                            SYSTEM STATUS
+                            ============================== -->
+
+                            <article class="admin-stat-card">
+                                <span class="admin-stat-label">
+                                    System Status
+                                </span>
+
+                                <strong
+                                    id="adminSystemStatus"
+                                    class="admin-stat-value admin-stat-status"
+                                >
+                                    Checking
+                                </strong>
+
+                                <span>
+                                    Administrative services
+                                </span>
+                            </article>
+                        </div>
+                    </section>
+
+                    <!-- =====================================
+                    MANAGEMENT CENTER
+                    ====================================== -->
+
+                    <section
+                        class="admin-overview"
+                        aria-labelledby="adminOverviewTitle"
+                    >
+                        <!-- =================================
+                        MANAGEMENT HEADING
+                        ================================== -->
+
+                        <header class="admin-section-heading">
+                            <div>
+                                <p class="admin-section-eyebrow">
+                                    Management
+                                </p>
+
+                                <h2 id="adminOverviewTitle">
+                                    Management Center
+                                </h2>
+
+                                <p>
+                                    Select an administrative
+                                    area to continue.
+                                </p>
+                            </div>
+                        </header>
+
+                        <!-- =================================
+                        MANAGEMENT NAVIGATION
+                        ================================== -->
+
+                        <nav
+                            class="admin-management-grid"
+                            aria-label="Admin management areas"
+                        >
+                            <!-- =============================
+                            USER MANAGEMENT
+                            ============================== -->
+
+                            <a
+                                href="/Admin/Users"
+                                class="admin-management-card"
+                                data-router-link
+                            >
+                                <span
+                                    class="admin-management-icon"
+                                    aria-hidden="true"
+                                >
+                                    👥
+                                </span>
+
+                                <span class="admin-management-content">
+                                    <strong>
+                                        User Management
+                                    </strong>
+
+                                    <span>
+                                        Review accounts,
+                                        provider connections,
+                                        responsibility roles,
+                                        access, and account
+                                        status.
+                                    </span>
+                                </span>
+
+                                <span
+                                    class="admin-management-arrow"
+                                    aria-hidden="true"
+                                >
+                                    →
+                                </span>
+                            </a>
+
+                            <!-- =============================
+                            TASKBOARD
+                            ============================== -->
+
+                            <a
+                                href="/Admin/TaskBoard"
+                                class="admin-management-card"
+                                data-router-link
+                            >
+                                <span
+                                    class="admin-management-icon"
+                                    aria-hidden="true"
+                                >
+                                    📋
+                                </span>
+
+                                <span class="admin-management-content">
+                                    <strong>
+                                        Taskboard
+                                    </strong>
+
+                                    <span>
+                                        Create tasks, review
+                                        assigned work, update
+                                        progress, and
+                                        participate in task
+                                        discussions.
+                                    </span>
+                                </span>
+
+                                <span
+                                    class="admin-management-arrow"
+                                    aria-hidden="true"
+                                >
+                                    →
+                                </span>
+                            </a>
+
+                            <!-- =============================
+                            ANNOUNCEMENTS
+                            ============================== -->
+
+                            <a
+                                href="/Admin/Announcements"
+                                class="admin-management-card"
+                                data-router-link
+                            >
+                                <span
+                                    class="admin-management-icon"
+                                    aria-hidden="true"
+                                >
+                                    📣
+                                </span>
+
+                                <span class="admin-management-content">
+                                    <strong>
+                                        Announcements
+                                    </strong>
+
+                                    <span>
+                                        Prepare and distribute
+                                        administrative
+                                        announcements across
+                                        connected communities.
+                                    </span>
+                                </span>
+
+                                <span
+                                    class="admin-management-arrow"
+                                    aria-hidden="true"
+                                >
+                                    →
+                                </span>
+                            </a>
+
+                            <!-- =============================
+                            ADMIN SETTINGS
+                            ============================== -->
+
+                            <a
+                                href="/Admin/Settings"
+                                class="admin-management-card"
+                                data-router-link
+                            >
+                                <span
+                                    class="admin-management-icon"
+                                    aria-hidden="true"
+                                >
+                                    ⚙️
+                                </span>
+
+                                <span class="admin-management-content">
+                                    <strong>
+                                        Admin Settings
+                                    </strong>
+
+                                    <span>
+                                        Configure
+                                        administrative
+                                        services, permissions,
+                                        and management options.
+                                    </span>
+                                </span>
+
+                                <span
+                                    class="admin-management-arrow"
+                                    aria-hidden="true"
+                                >
+                                    →
+                                </span>
+                            </a>
+                        </nav>
+                    </section>
+
+                    <!-- =====================================
+                    RECENT ACTIVITY
+                    ====================================== -->
+
+                    <section
+                        class="admin-activity"
+                        aria-labelledby="adminActivityTitle"
+                    >
+                        <!-- =================================
+                        ACTIVITY HEADING
+                        ================================== -->
+
+                        <header class="admin-section-heading">
+                            <div>
+                                <p class="admin-section-eyebrow">
+                                    Recent Activity
+                                </p>
+
+                                <h2 id="adminActivityTitle">
+                                    Management Activity
+                                </h2>
+
+                                <p>
+                                    Recent administrative
+                                    changes, Taskboard events,
+                                    and management activity.
+                                </p>
+                            </div>
+                        </header>
+
+                        <!-- =================================
+                        ACTIVITY FEED
+                        ================================== -->
+
+                        <div
+                            id="adminActivityList"
+                            class="admin-activity-list"
+                            aria-live="polite"
+                        >
+                            <p class="admin-empty-state">
+                                Loading recent administrative
+                                activity...
+                            </p>
+                        </div>
+                    </section>
                 </div>
-            </section>
+            </div>
         </div>
-    </main>
+    </section>
 
     <!-- =====================================================
-    ACCESS DENIED
+    ROUTE STATE: ACCESS DENIED
     ====================================================== -->
 
-    <main
+    <section
         id="adminDenied"
         class="admin-state-page"
         hidden
     >
-        <section class="admin-state-panel">
+        <div class="admin-state-panel">
             <p class="admin-state-eyebrow">
                 Admin Management
             </p>
@@ -503,19 +554,19 @@ Important:
             >
                 Return to Dashboard
             </a>
-        </section>
-    </main>
+        </div>
+    </section>
 
     <!-- =====================================================
-    ERROR
+    ROUTE STATE: ERROR
     ====================================================== -->
 
-    <main
+    <section
         id="adminError"
         class="admin-state-page"
         hidden
     >
-        <section class="admin-state-panel">
+        <div class="admin-state-panel">
             <p class="admin-state-eyebrow">
                 Admin Management
             </p>
@@ -526,6 +577,7 @@ Important:
 
             <p
                 id="adminErrorMessage"
+                role="status"
                 aria-live="polite"
             >
                 Admin Management could not be loaded.
@@ -537,7 +589,6 @@ Important:
             >
                 Try Again
             </button>
-        </section>
-    </main>
-</body>
-</html>
+        </div>
+    </section>
+</section>

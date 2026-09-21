@@ -150,23 +150,40 @@ function handleMainRocketLeagueAction(
 
     const action =
         button?.dataset?.action
-        || "epic-login";
+        || "validating";
 
-    if (action === "epic-reauthorize") {
-        void handleEpicLogin(event);
+    if (
+        button?.disabled
+        || action ===
+            "validating"
+    ) {
         return;
     }
+
     if (
-        action === "create-profile"
+        action ===
+        "epic-reauthorize"
+    ) {
+        void handleEpicLogin(
+            event
+        );
+
+        return;
+    }
+
+    if (
+        action ===
+        "create-profile"
     ) {
         handleCreateProfile();
 
         return;
     }
 
-    void handleEpicLogin(event);
+    void handleEpicLogin(
+        event
+    );
 }
-
 /* =========================================================
 LOGOUT
 ========================================================= */
@@ -240,6 +257,58 @@ async function handleLogout() {
         logoutButton.disabled =
             false;
     }
+}
+
+/* =========================================================
+MAIN CTA VALIDATION STATE
+========================================================= */
+
+export function setMainRocketLeagueActionValidating() {
+    const button =
+        document.getElementById(
+            "mainRLLoginButton"
+        );
+
+    if (
+        !button
+    ) {
+        return;
+    }
+
+    button.disabled =
+        true;
+
+    button.dataset.action =
+        "validating";
+
+    button.textContent =
+        "Validating...";
+}
+
+export function releaseMainRocketLeagueAction() {
+    const button =
+        document.getElementById(
+            "mainRLLoginButton"
+        );
+
+    if (
+        !button
+    ) {
+        return;
+    }
+
+    /*
+     * auth.js is responsible for setting the final:
+     *
+     *     textContent
+     *     data-action
+     *
+     * once authentication/profile validation has completed.
+     *
+     * This function only releases the button.
+     */
+    button.disabled =
+        false;
 }
 
 /* =========================================================

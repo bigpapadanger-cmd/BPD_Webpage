@@ -6,21 +6,35 @@ File:
     public/Global/Admin/TaskBoard/CSS/index.css
 
 Purpose:
-    Main styling for the Admin Taskboard page.
+    Styles the Admin Taskboard route fragment.
 
-Design Goals:
-    - Never exceed the routed-content width.
-    - Remain centered inside the global shell.
-    - Prevent horizontal overflow.
-    - Keep form controls readable in dark mode.
-    - Collapse cleanly on tablets and mobile.
-    - Keep cards, filters, metadata, and task content
-      contained regardless of dynamic content length.
+Layout Contract:
+    - /Framework/Shell/CSS/General/body.css owns:
+          account-banner spacing
+          sidebar spacing
+          routed-content width
+          viewport-height calculations
+    - .taskboard-shell is the route root.
+    - .taskboard-content is the authorized route state.
+    - .taskboard-page controls centered page width.
+    - .taskboard-panel is the primary visual surface.
+    - .taskboard-dashboard contains persistent overview and
+      management sections.
+    - .taskboard-workspaces contains dynamic task workspaces.
+    - No sidebar offsets belong in this stylesheet.
 
-Important:
-    - Global shell owns sidebar positioning.
-    - Do not add sidebar offsets here.
-    - Overlay styling belongs in overlays.css.
+Responsibilities:
+    - Route states.
+    - Main Taskboard panel.
+    - Taskboard hero and identity.
+    - Summary cards.
+    - Management actions.
+    - Create / review / detail workspaces.
+    - Forms and filters.
+    - Task cards.
+    - Task metadata.
+    - Discussion and history.
+    - Responsive layout.
 ========================================================= */
 
 /* =========================================================
@@ -32,99 +46,153 @@ HIDDEN
 }
 
 /* =========================================================
-DOCUMENT / BOX MODEL
+BOX MODEL
 ========================================================= */
 
-html,
-body {
-    margin: 0;
-    min-height: 100%;
-}
-
-body {
-    min-height: 100vh;
-}
-
-#taskboardContent,
-#taskboardContent *,
-.taskboard-state-page,
-.taskboard-state-page * {
+.taskboard-shell,
+.taskboard-shell *,
+.taskboard-shell *::before,
+.taskboard-shell *::after {
     box-sizing: border-box;
 }
 
 /* =========================================================
-HARD WIDTH CONTAINMENT
+ROUTE ROOT
 ========================================================= */
 
-#taskboardContent,
-#taskboardLoading,
-#taskboardDenied,
-#taskboardError,
-.taskboard-page {
+.taskboard-shell {
+    display: block;
+
     width: 100%;
-    min-width: 0;
     max-width: 100%;
+
+    min-width: 0;
+
+    overflow-x: hidden;
 }
 
-#taskboardContent {
-    min-height: 100%;
+/* =========================================================
+AUTHORIZED CONTENT
+========================================================= */
+
+.taskboard-content {
+    display: block;
+
+    width: 100%;
+    max-width: 100%;
+
+    min-width: 0;
+
+    overflow-x: hidden;
+}
+
+/* =========================================================
+PAGE WIDTH CONTAINER
+========================================================= */
+
+.taskboard-page {
+    width:
+        min(
+            1240px,
+            calc(
+                100%
+                -
+                32px
+            )
+        );
+
+    max-width: 100%;
+    min-width: 0;
+
+    margin:
+        0 auto;
 
     padding:
-        24px
-        24px
-        40px;
-
-    overflow-x: hidden;
+        32px
+        0
+        48px;
 }
 
-.taskboard-page {
+/* =========================================================
+PRIMARY PANEL
+========================================================= */
+
+.taskboard-panel {
     width: 100%;
-    max-width: 1100px;
 
-    margin-inline: auto;
+    min-width: 0;
+
+    padding: 24px;
+
+    border:
+        1px solid
+        rgba(
+            255,
+            255,
+            255,
+            0.10
+        );
+
+    border-radius: 16px;
+
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            0.035
+        );
 
     overflow-x: hidden;
 }
 
-.taskboard-page > *,
-.taskboard-workspace > *,
-.taskboard-task-section > *,
-.taskboard-task-card > *,
-.taskboard-action-card > *,
+/* =========================================================
+GLOBAL CHILD CONTAINMENT
+========================================================= */
+
+.taskboard-panel > *,
+.taskboard-hero > *,
+.taskboard-dashboard > *,
 .taskboard-section-heading > *,
+.taskboard-workspaces > *,
+.taskboard-workspace > *,
 .taskboard-workspace-header > *,
+.taskboard-task-card > *,
+.taskboard-task-section > *,
 .taskboard-task-section-heading > * {
     min-width: 0;
     max-width: 100%;
 }
 
-.taskboard-page img,
-.taskboard-page svg,
-.taskboard-page video,
-.taskboard-page canvas,
-.taskboard-page iframe {
+.taskboard-shell img,
+.taskboard-shell svg,
+.taskboard-shell canvas,
+.taskboard-shell video,
+.taskboard-shell iframe {
     max-width: 100%;
 }
 
-.taskboard-page input,
-.taskboard-page textarea,
-.taskboard-page select,
-.taskboard-page button {
-    min-width: 0;
+.taskboard-shell input,
+.taskboard-shell select,
+.taskboard-shell textarea,
+.taskboard-shell button {
     max-width: 100%;
+
+    font: inherit;
 }
 
-.taskboard-page pre,
-.taskboard-page code {
+.taskboard-shell pre,
+.taskboard-shell code {
     max-width: 100%;
 
     white-space: pre-wrap;
+
     overflow-wrap: anywhere;
     word-break: break-word;
 }
 
 /* =========================================================
-HERO
+PAGE HEADER / HERO
 ========================================================= */
 
 .taskboard-hero {
@@ -133,120 +201,111 @@ HERO
     align-items: flex-start;
     justify-content: space-between;
 
-    width: 100%;
-
     gap: 24px;
 
-    margin-bottom: 28px;
+    width: 100%;
 
-    padding: 24px;
-
-    border:
-        1px solid
-        rgba(255, 255, 255, 0.12);
-
-    border-radius: 14px;
-
-    background:
-        rgba(255, 255, 255, 0.035);
+    margin-bottom: 24px;
 }
 
 .taskboard-hero-content {
-    flex: 1 1 auto;
+    flex:
+        1 1 auto;
 
     min-width: 0;
 }
 
-.taskboard-eyebrow,
-.taskboard-section-eyebrow,
-.taskboard-state-eyebrow {
+.taskboard-eyebrow {
     margin:
         0
         0
-        7px;
+        6px;
 
     color:
-        rgba(255, 255, 255, 0.62);
+        #38bdf8;
 
-    font-size: 0.76rem;
-    font-weight: 700;
-    letter-spacing: 0.09em;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 1px;
 
     text-transform: uppercase;
 }
 
 .taskboard-hero h1 {
-    margin: 0;
+    margin:
+        0
+        0
+        8px;
 
-    color: #ffffff;
+    color:
+        #ffffff;
 
-    font-size:
-        clamp(
-            1.8rem,
-            4vw,
-            2.6rem
-        );
-
-    line-height: 1.08;
+    font-size: 30px;
+    line-height: 1.2;
 
     overflow-wrap: anywhere;
 }
 
 .taskboard-description {
     width: 100%;
-    max-width: 700px;
+    max-width: 760px;
 
-    margin:
-        12px
-        0
-        0;
+    margin: 0;
 
     color:
-        rgba(255, 255, 255, 0.74);
+        #9aa4b2;
 
+    font-size: 14px;
     line-height: 1.55;
 
     overflow-wrap: anywhere;
 }
 
 /* =========================================================
-IDENTITY / ROLES
+IDENTITY / RESPONSIBILITY ROLES
 ========================================================= */
 
 .taskboard-identity {
     flex:
-        0 1 250px;
+        0 0 240px;
 
-    width:
-        min(100%, 250px);
+    width: 240px;
 
     min-width: 0;
 
-    padding:
-        16px
-        18px;
+    padding: 14px;
 
     border:
         1px solid
-        rgba(255, 255, 255, 0.12);
+        rgba(
+            255,
+            255,
+            255,
+            0.09
+        );
 
-    border-radius: 10px;
+    border-radius: 12px;
 
     background:
-        rgba(0, 0, 0, 0.16);
+        rgba(
+            0,
+            0,
+            0,
+            0.18
+        );
 }
 
 .taskboard-identity-label {
     display: block;
 
-    margin-bottom: 10px;
+    margin-bottom: 8px;
 
     color:
-        rgba(255, 255, 255, 0.62);
+        #64748b;
 
-    font-size: 0.78rem;
-    font-weight: 700;
-    letter-spacing: 0.06em;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.9px;
 
     text-transform: uppercase;
 }
@@ -265,6 +324,7 @@ IDENTITY / ROLES
     display: inline-flex;
 
     align-items: center;
+    justify-content: center;
 
     max-width: 100%;
     min-height: 28px;
@@ -275,20 +335,115 @@ IDENTITY / ROLES
 
     border:
         1px solid
-        rgba(129, 174, 255, 0.55);
+        rgba(
+            56,
+            189,
+            248,
+            0.35
+        );
 
     border-radius: 999px;
 
     background:
-        rgba(83, 137, 255, 0.12);
+        rgba(
+            56,
+            189,
+            248,
+            0.08
+        );
 
-    color: #a9caff;
+    color:
+        #bae6fd;
 
-    font-size: 0.78rem;
+    font-size: 0.76rem;
     font-weight: 700;
-    line-height: 1;
+    line-height: 1.1;
 
     overflow-wrap: anywhere;
+}
+
+.taskboard-role[data-role="owner"] {
+    border-color:
+        rgba(
+            245,
+            158,
+            11,
+            0.4
+        );
+
+    background:
+        rgba(
+            245,
+            158,
+            11,
+            0.08
+        );
+
+    color:
+        #fbbf24;
+}
+
+.taskboard-role[data-role="database"] {
+    border-color:
+        rgba(
+            59,
+            130,
+            246,
+            0.4
+        );
+
+    background:
+        rgba(
+            59,
+            130,
+            246,
+            0.08
+        );
+
+    color:
+        #93c5fd;
+}
+
+.taskboard-role[data-role="security"] {
+    border-color:
+        rgba(
+            34,
+            197,
+            94,
+            0.4
+        );
+
+    background:
+        rgba(
+            34,
+            197,
+            94,
+            0.08
+        );
+
+    color:
+        #86efac;
+}
+
+.taskboard-role[data-role="ui"] {
+    border-color:
+        rgba(
+            168,
+            85,
+            247,
+            0.4
+        );
+
+    background:
+        rgba(
+            168,
+            85,
+            247,
+            0.08
+        );
+
+    color:
+        #d8b4fe;
 }
 
 /* =========================================================
@@ -298,24 +453,38 @@ GLOBAL STATUS
 .taskboard-status {
     width: 100%;
 
-    margin-bottom: 22px;
+    margin:
+        0
+        0
+        22px;
 
     padding:
         12px
-        15px;
+        14px;
 
     border:
         1px solid
-        rgba(255, 255, 255, 0.14);
+        rgba(
+            255,
+            255,
+            255,
+            0.08
+        );
 
-    border-radius: 8px;
+    border-radius: 10px;
 
     background:
-        rgba(255, 255, 255, 0.03);
+        rgba(
+            255,
+            255,
+            255,
+            0.035
+        );
 
     color:
-        rgba(255, 255, 255, 0.84);
+        #cbd5e1;
 
+    font-size: 13px;
     line-height: 1.45;
 
     overflow-wrap: anywhere;
@@ -323,44 +492,95 @@ GLOBAL STATUS
 
 .taskboard-status[data-state="success"] {
     border-color:
-        rgba(70, 200, 120, 0.55);
+        rgba(
+            34,
+            197,
+            94,
+            0.35
+        );
 
     background:
-        rgba(70, 200, 120, 0.08);
+        rgba(
+            34,
+            197,
+            94,
+            0.06
+        );
 
-    color: #8de3b0;
+    color:
+        #86efac;
 }
 
 .taskboard-status[data-state="warning"] {
     border-color:
-        rgba(240, 180, 60, 0.6);
+        rgba(
+            245,
+            158,
+            11,
+            0.35
+        );
 
     background:
-        rgba(240, 180, 60, 0.08);
+        rgba(
+            245,
+            158,
+            11,
+            0.06
+        );
 
-    color: #ffd277;
+    color:
+        #fbbf24;
 }
 
 .taskboard-status[data-state="error"] {
     border-color:
-        rgba(230, 80, 80, 0.65);
+        rgba(
+            239,
+            68,
+            68,
+            0.4
+        );
 
     background:
-        rgba(230, 80, 80, 0.08);
+        rgba(
+            239,
+            68,
+            68,
+            0.06
+        );
 
-    color: #ff9ca6;
+    color:
+        #fca5a5;
 }
 
 /* =========================================================
-SECTIONS
+DASHBOARD REGION
 ========================================================= */
+
+.taskboard-dashboard {
+    display: block;
+
+    width: 100%;
+
+    min-width: 0;
+}
 
 .taskboard-summary,
 .taskboard-actions {
     width: 100%;
-
-    margin-bottom: 28px;
 }
+
+.taskboard-summary {
+    margin-bottom: 26px;
+}
+
+.taskboard-actions {
+    margin-bottom: 0;
+}
+
+/* =========================================================
+SECTION HEADINGS
+========================================================= */
 
 .taskboard-section-heading,
 .taskboard-workspace-header,
@@ -370,13 +590,35 @@ SECTIONS
     align-items: flex-start;
     justify-content: space-between;
 
-    gap: 20px;
+    gap: 16px;
 
     width: 100%;
 }
 
 .taskboard-section-heading {
-    margin-bottom: 16px;
+    margin-bottom: 14px;
+}
+
+.taskboard-section-heading > div,
+.taskboard-workspace-header > div,
+.taskboard-task-section-heading > div {
+    min-width: 0;
+}
+
+.taskboard-section-eyebrow {
+    margin:
+        0
+        0
+        4px;
+
+    color:
+        #64748b;
+
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.9px;
+
+    text-transform: uppercase;
 }
 
 .taskboard-section-heading h2,
@@ -384,29 +626,42 @@ SECTIONS
 .taskboard-task-section-heading h3 {
     margin: 0;
 
-    color: #ffffff;
+    color:
+        #ffffff;
+
+    line-height: 1.25;
 
     overflow-wrap: anywhere;
+}
+
+.taskboard-section-heading h2,
+.taskboard-workspace-header h2 {
+    font-size: 18px;
+}
+
+.taskboard-task-section-heading h3 {
+    font-size: 16px;
 }
 
 .taskboard-section-heading p,
 .taskboard-workspace-header p,
 .taskboard-task-section-heading p {
     margin:
-        7px
+        6px
         0
         0;
 
     color:
-        rgba(255, 255, 255, 0.7);
+        #7f8b9d;
 
+    font-size: 13px;
     line-height: 1.5;
 
     overflow-wrap: anywhere;
 }
 
 /* =========================================================
-SUMMARY
+SUMMARY GRID
 ========================================================= */
 
 .taskboard-summary-grid {
@@ -415,44 +670,60 @@ SUMMARY
     grid-template-columns:
         repeat(
             4,
-            minmax(0, 1fr)
+            minmax(
+                0,
+                1fr
+            )
         );
 
-    gap: 14px;
+    gap: 12px;
 
     width: 100%;
-
-    overflow-x: hidden;
 }
+
+/* =========================================================
+SUMMARY CARDS
+========================================================= */
 
 .taskboard-summary-card {
     min-width: 0;
-    min-height: 105px;
+    min-height: 88px;
 
-    padding: 18px;
+    padding: 14px;
 
     border:
         1px solid
-        rgba(255, 255, 255, 0.12);
+        rgba(
+            255,
+            255,
+            255,
+            0.08
+        );
 
     border-radius: 10px;
 
     background:
-        rgba(255, 255, 255, 0.03);
-
-    overflow: hidden;
+        rgba(
+            255,
+            255,
+            255,
+            0.025
+        );
 }
 
 .taskboard-summary-card span {
     display: block;
 
-    margin-bottom: 9px;
+    margin-bottom: 8px;
 
     color:
-        rgba(255, 255, 255, 0.66);
+        #7f8b9d;
 
-    font-size: 0.82rem;
-    font-weight: 600;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+
+    text-transform: uppercase;
 
     overflow-wrap: anywhere;
 }
@@ -460,16 +731,17 @@ SUMMARY
 .taskboard-summary-card strong {
     display: block;
 
-    color: #ffffff;
+    color:
+        #ffffff;
 
-    font-size: 1.8rem;
+    font-size: 1.55rem;
     line-height: 1;
 
     overflow-wrap: anywhere;
 }
 
 /* =========================================================
-PRIMARY ACTIONS
+ACTION GRID
 ========================================================= */
 
 .taskboard-action-grid {
@@ -478,15 +750,20 @@ PRIMARY ACTIONS
     grid-template-columns:
         repeat(
             2,
-            minmax(0, 1fr)
+            minmax(
+                0,
+                1fr
+            )
         );
 
-    gap: 18px;
+    gap: 14px;
 
     width: 100%;
-
-    overflow-x: hidden;
 }
+
+/* =========================================================
+ACTION CARDS
+========================================================= */
 
 .taskboard-action-card {
     position: relative;
@@ -495,77 +772,114 @@ PRIMARY ACTIONS
 
     align-items: center;
 
-    gap: 18px;
+    gap: 14px;
 
     width: 100%;
-    min-height: 130px;
 
-    padding: 22px;
+    min-width: 0;
+    min-height: 104px;
+
+    padding: 16px;
 
     border:
         1px solid
-        rgba(255, 255, 255, 0.14);
+        rgba(
+            255,
+            255,
+            255,
+            0.09
+        );
 
-    border-radius: 12px;
+    border-radius: 11px;
 
     background:
-        rgba(255, 255, 255, 0.035);
+        rgba(
+            255,
+            255,
+            255,
+            0.025
+        );
 
-    color: #ffffff;
-
-    font: inherit;
+    color:
+        inherit;
 
     text-align: left;
 
     cursor: pointer;
 
     transition:
-        border-color 160ms ease,
-        background-color 160ms ease,
-        transform 160ms ease;
+        border-color 0.15s ease,
+        background 0.15s ease,
+        transform 0.15s ease;
 }
 
 .taskboard-action-card:hover,
 .taskboard-action-card:focus-visible {
     transform:
-        translateY(-2px);
+        translateY(
+            -1px
+        );
 
     border-color:
-        rgba(115, 165, 255, 0.45);
+        rgba(
+            56,
+            189,
+            248,
+            0.32
+        );
 
     background:
-        rgba(255, 255, 255, 0.065);
+        rgba(
+            56,
+            189,
+            248,
+            0.045
+        );
 }
 
 .taskboard-action-card:focus-visible {
     outline:
         2px solid
-        #8b5cf6;
+        #38bdf8;
 
-    outline-offset: 3px;
+    outline-offset: 2px;
 }
 
 .taskboard-action-icon {
     display: grid;
 
     flex:
-        0 0 54px;
+        0 0 46px;
 
-    width: 54px;
-    height: 54px;
+    width: 46px;
+    height: 46px;
 
     place-items: center;
 
     border:
         1px solid
-        rgba(255, 255, 255, 0.16);
+        rgba(
+            56,
+            189,
+            248,
+            0.25
+        );
 
-    border-radius: 12px;
+    border-radius: 10px;
 
     background:
-        rgba(77, 127, 255, 0.12);
+        rgba(
+            56,
+            189,
+            248,
+            0.08
+        );
 
-    font-size: 1.7rem;
+    color:
+        #38bdf8;
+
+    font-size: 1.45rem;
+    line-height: 1;
 }
 
 .taskboard-action-content {
@@ -576,21 +890,25 @@ PRIMARY ACTIONS
 
     flex-direction: column;
 
-    gap: 7px;
+    gap: 5px;
 
     min-width: 0;
 }
 
 .taskboard-action-content strong {
-    font-size: 1.05rem;
+    color:
+        #ffffff;
+
+    font-size: 0.98rem;
 
     overflow-wrap: anywhere;
 }
 
 .taskboard-action-content > span {
     color:
-        rgba(255, 255, 255, 0.7);
+        #7f8b9d;
 
+    font-size: 12px;
     line-height: 1.45;
 
     overflow-wrap: anywhere;
@@ -602,8 +920,8 @@ PRIMARY ACTIONS
     flex:
         0 0 auto;
 
-    min-width: 40px;
-    height: 40px;
+    min-width: 34px;
+    height: 34px;
 
     place-items: center;
 
@@ -613,62 +931,92 @@ PRIMARY ACTIONS
 
     border:
         1px solid
-        rgba(255, 255, 255, 0.25);
+        rgba(
+            255,
+            255,
+            255,
+            0.14
+        );
 
     border-radius: 999px;
 
-    font-weight: 700;
+    color:
+        #cbd5e1;
+
+    font-size: 12px;
+    font-weight: 800;
 }
 
 /* =========================================================
-BUTTONS
+GENERIC BUTTONS
 ========================================================= */
 
 #taskboardContent button:not(.taskboard-action-card),
-#taskboardError button {
-    min-height: 38px;
+#taskboardError button,
+#taskboardDenied a {
+    min-height: 40px;
 
     padding:
-        8px
-        14px;
+        9px
+        13px;
 
     border:
         1px solid
-        rgba(255, 255, 255, 0.2);
+        rgba(
+            255,
+            255,
+            255,
+            0.14
+        );
 
-    border-radius: 7px;
+    border-radius: 9px;
 
     background:
-        rgba(255, 255, 255, 0.06);
+        #151923;
 
-    color: #f5f7fb;
+    color:
+        #ffffff;
 
-    font: inherit;
-    font-weight: 600;
+    font:
+        inherit;
 
-    white-space: normal;
+    font-size: 13px;
+    font-weight: 700;
 
-    overflow-wrap: anywhere;
+    text-decoration: none;
 
     cursor: pointer;
+
+    transition:
+        border-color 0.15s ease,
+        background 0.15s ease,
+        opacity 0.15s ease;
 }
 
 #taskboardContent button:not(.taskboard-action-card):hover,
 #taskboardContent button:not(.taskboard-action-card):focus-visible,
 #taskboardError button:hover,
-#taskboardError button:focus-visible {
+#taskboardError button:focus-visible,
+#taskboardDenied a:hover,
+#taskboardDenied a:focus-visible {
     border-color:
-        rgba(125, 169, 255, 0.6);
+        rgba(
+            56,
+            189,
+            248,
+            0.45
+        );
 
     background:
-        rgba(255, 255, 255, 0.1);
+        #1d2330;
 }
 
 #taskboardContent button:focus-visible,
-#taskboardError button:focus-visible {
+#taskboardError button:focus-visible,
+#taskboardDenied a:focus-visible {
     outline:
         2px solid
-        #8b5cf6;
+        #38bdf8;
 
     outline-offset: 2px;
 }
@@ -676,7 +1024,19 @@ BUTTONS
 #taskboardContent button:disabled {
     cursor: not-allowed;
 
-    opacity: 0.5;
+    opacity: 0.45;
+}
+
+/* =========================================================
+WORKSPACE REGION
+========================================================= */
+
+.taskboard-workspaces {
+    display: block;
+
+    width: 100%;
+
+    min-width: 0;
 }
 
 /* =========================================================
@@ -686,32 +1046,47 @@ WORKSPACES
 .taskboard-workspace {
     width: 100%;
 
-    margin:
-        28px
-        0;
+    min-width: 0;
 
-    padding: 24px;
+    margin-top: 24px;
+
+    padding: 18px;
 
     border:
         1px solid
-        rgba(255, 255, 255, 0.14);
+        rgba(
+            255,
+            255,
+            255,
+            0.08
+        );
 
-    border-radius: 14px;
+    border-radius: 12px;
 
     background:
-        rgba(255, 255, 255, 0.025);
+        rgba(
+            0,
+            0,
+            0,
+            0.16
+        );
 
     overflow-x: hidden;
 }
 
 .taskboard-workspace-header {
-    margin-bottom: 24px;
+    margin-bottom: 18px;
 
-    padding-bottom: 18px;
+    padding-bottom: 14px;
 
     border-bottom:
         1px solid
-        rgba(255, 255, 255, 0.1);
+        rgba(
+            255,
+            255,
+            255,
+            0.07
+        );
 }
 
 /* =========================================================
@@ -723,9 +1098,24 @@ FORM LAYOUT
 
     flex-direction: column;
 
-    gap: 20px;
+    gap: 16px;
 
     width: 100%;
+
+    min-width: 0;
+}
+
+.taskboard-form-section {
+    display: block;
+
+    width: 100%;
+
+    min-width: 0;
+}
+
+.taskboard-form-section
++ .taskboard-form-section {
+    padding-top: 2px;
 }
 
 .taskboard-form-row {
@@ -734,15 +1124,20 @@ FORM LAYOUT
     grid-template-columns:
         repeat(
             2,
-            minmax(0, 1fr)
+            minmax(
+                0,
+                1fr
+            )
         );
 
-    gap: 18px;
+    gap: 14px;
 
     width: 100%;
-
-    overflow-x: hidden;
 }
+
+/* =========================================================
+FIELDS
+========================================================= */
 
 .taskboard-field {
     display: flex;
@@ -754,11 +1149,25 @@ FORM LAYOUT
     min-width: 0;
 }
 
+.taskboard-field
++ .taskboard-field {
+    margin-top: 14px;
+}
+
+.taskboard-form-row
+.taskboard-field
++ .taskboard-field {
+    margin-top: 0;
+}
+
 .taskboard-field label,
 .taskboard-role-fieldset legend {
-    color: #f5f7fb;
+    color:
+        #cbd5e1;
 
-    font-weight: 700;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
 }
 
 /* =========================================================
@@ -771,6 +1180,7 @@ FORM CONTROLS
     display: block;
 
     width: 100%;
+
     min-width: 0;
     max-width: 100%;
 
@@ -782,17 +1192,29 @@ FORM CONTROLS
 
     border:
         1px solid
-        rgba(255, 255, 255, 0.2);
+        rgba(
+            255,
+            255,
+            255,
+            0.14
+        );
 
-    border-radius: 7px;
+    border-radius: 9px;
 
-    background: #0f131a;
+    outline: none;
 
-    color: #f5f7fb;
+    background:
+        #151923;
 
-    font: inherit;
+    color:
+        #ffffff;
 
     color-scheme: dark;
+
+    transition:
+        border-color 0.15s ease,
+        background 0.15s ease,
+        box-shadow 0.15s ease;
 }
 
 .taskboard-field textarea {
@@ -800,57 +1222,65 @@ FORM CONTROLS
 
     resize: vertical;
 
-    line-height: 1.45;
+    line-height: 1.5;
 }
 
 .taskboard-field input::placeholder,
 .taskboard-field textarea::placeholder {
-    color: #818a99;
+    color:
+        #64748b;
 }
 
 .taskboard-field select {
     cursor: pointer;
 }
 
-.taskboard-field select option {
-    background-color: #151a23;
+.taskboard-field select option,
+.taskboard-field select optgroup {
+    background:
+        #151923;
 
-    color: #f5f7fb;
+    color:
+        #ffffff;
 }
 
 .taskboard-field select option:disabled {
-    color: #8a93a1;
+    color:
+        #64748b;
 }
 
 .taskboard-field input:focus,
 .taskboard-field textarea:focus,
 .taskboard-field select:focus {
     border-color:
-        rgba(122, 168, 255, 0.75);
+        #38bdf8;
 
-    outline:
-        2px solid
-        rgba(122, 168, 255, 0.35);
-
-    outline-offset: 1px;
+    box-shadow:
+        0
+        0
+        0
+        3px
+        rgba(
+            56,
+            189,
+            248,
+            0.12
+        );
 }
 
 .taskboard-field input:disabled,
 .taskboard-field textarea:disabled,
 .taskboard-field select:disabled {
-    background: #151922;
-
-    color: #8f98a8;
-
     cursor: not-allowed;
 
-    opacity: 0.75;
+    opacity: 0.55;
 }
 
 .taskboard-field small {
     color:
-        rgba(255, 255, 255, 0.58);
+        #64748b;
 
+    font-size: 12px;
     line-height: 1.4;
 
     overflow-wrap: anywhere;
@@ -862,39 +1292,56 @@ ROLE FIELDSET
 
 .taskboard-role-fieldset {
     min-width: 0;
-    max-width: 100%;
 
     margin: 0;
 
-    padding: 16px;
+    padding: 14px;
 
     border:
         1px solid
-        rgba(255, 255, 255, 0.14);
+        rgba(
+            255,
+            255,
+            255,
+            0.08
+        );
 
-    border-radius: 9px;
+    border-radius: 10px;
+
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            0.015
+        );
 }
 
 .taskboard-role-fieldset > p {
     margin:
-        7px
+        6px
         0
-        14px;
+        12px;
 
     color:
-        rgba(255, 255, 255, 0.68);
+        #7f8b9d;
 
+    font-size: 12px;
     line-height: 1.45;
 
     overflow-wrap: anywhere;
 }
+
+/* =========================================================
+ROLE OPTIONS
+========================================================= */
 
 .taskboard-role-options {
     display: flex;
 
     flex-wrap: wrap;
 
-    gap: 10px;
+    gap: 8px;
 
     min-width: 0;
 }
@@ -904,31 +1351,49 @@ ROLE FIELDSET
 
     align-items: center;
 
-    gap: 8px;
+    gap: 7px;
 
     max-width: 100%;
 
     padding:
-        9px
-        12px;
+        8px
+        10px;
 
     border:
         1px solid
-        rgba(255, 255, 255, 0.14);
+        rgba(
+            255,
+            255,
+            255,
+            0.09
+        );
 
     border-radius: 8px;
 
     background:
-        rgba(255, 255, 255, 0.025);
+        rgba(
+            255,
+            255,
+            255,
+            0.02
+        );
 
-    overflow-wrap: anywhere;
+    color:
+        #cbd5e1;
+
+    font-size: 12px;
 
     cursor: pointer;
 }
 
 .taskboard-role-options label:hover {
     border-color:
-        rgba(119, 168, 255, 0.45);
+        rgba(
+            56,
+            189,
+            248,
+            0.3
+        );
 }
 
 .taskboard-role-options input {
@@ -939,7 +1404,7 @@ ROLE FIELDSET
 }
 
 /* =========================================================
-FORM ACTIONS / MESSAGES
+FORM ACTIONS
 ========================================================= */
 
 .taskboard-form-actions {
@@ -949,44 +1414,123 @@ FORM ACTIONS / MESSAGES
 
     flex-wrap: wrap;
 
-    gap: 10px;
+    gap: 9px;
+
+    width: 100%;
 }
+
+/* =========================================================
+FORM MESSAGE
+========================================================= */
 
 .taskboard-form-message {
     width: 100%;
 
     padding:
-        11px
-        13px;
+        10px
+        12px;
 
     border:
         1px solid
-        rgba(255, 255, 255, 0.14);
+        rgba(
+            255,
+            255,
+            255,
+            0.09
+        );
 
-    border-radius: 7px;
+    border-radius: 8px;
+
+    color:
+        #cbd5e1;
+
+    font-size: 12px;
+    line-height: 1.45;
 
     overflow-wrap: anywhere;
 }
 
+.taskboard-form-message[data-state="success"] {
+    border-color:
+        rgba(
+            34,
+            197,
+            94,
+            0.35
+        );
+
+    color:
+        #86efac;
+}
+
+.taskboard-form-message[data-state="warning"] {
+    border-color:
+        rgba(
+            245,
+            158,
+            11,
+            0.35
+        );
+
+    color:
+        #fbbf24;
+}
+
+.taskboard-form-message[data-state="error"] {
+    border-color:
+        rgba(
+            239,
+            68,
+            68,
+            0.4
+        );
+
+    color:
+        #fca5a5;
+}
+
 /* =========================================================
-FILTERS
+REVIEW CONTROLS
 ========================================================= */
+
+.taskboard-review-controls {
+    width: 100%;
+
+    min-width: 0;
+}
 
 .taskboard-filters {
     display: grid;
 
     grid-template-columns:
-        minmax(0, 2fr)
-        minmax(0, 1fr)
-        minmax(0, 1fr);
+        minmax(
+            0,
+            2fr
+        )
+        minmax(
+            0,
+            1fr
+        )
+        minmax(
+            0,
+            1fr
+        );
 
-    gap: 14px;
+    gap: 12px;
 
     width: 100%;
 
-    margin-bottom: 20px;
+    margin-bottom: 14px;
+}
 
-    overflow-x: hidden;
+/* =========================================================
+REVIEW RESULTS
+========================================================= */
+
+.taskboard-review-results {
+    width: 100%;
+
+    min-width: 0;
 }
 
 /* =========================================================
@@ -998,43 +1542,82 @@ TASK LIST
 
     flex-direction: column;
 
-    gap: 12px;
+    gap: 10px;
 
     width: 100%;
 
-    overflow-x: hidden;
+    margin-top: 14px;
+
+    min-width: 0;
 }
+
+/* =========================================================
+TASK CARD
+========================================================= */
 
 .taskboard-task-card {
     display: grid;
 
     grid-template-columns:
-        minmax(0, 1fr)
+        minmax(
+            0,
+            1fr
+        )
         auto;
 
-    gap: 18px;
+    gap: 14px;
 
     width: 100%;
 
-    padding: 18px;
+    min-width: 0;
+
+    padding: 14px;
 
     border:
         1px solid
-        rgba(255, 255, 255, 0.12);
+        rgba(
+            255,
+            255,
+            255,
+            0.08
+        );
 
     border-radius: 10px;
 
     background:
-        rgba(255, 255, 255, 0.025);
+        rgba(
+            255,
+            255,
+            255,
+            0.02
+        );
 
     overflow: hidden;
+
     overflow-wrap: anywhere;
     word-break: break-word;
+
+    transition:
+        border-color 0.15s ease,
+        background 0.15s ease;
 }
 
 .taskboard-task-card:hover {
     border-color:
-        rgba(255, 255, 255, 0.3);
+        rgba(
+            56,
+            189,
+            248,
+            0.2
+        );
+
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            0.03
+        );
 }
 
 .taskboard-task-card-main {
@@ -1048,22 +1631,22 @@ TASK LIST
 
     flex-wrap: wrap;
 
-    gap: 8px;
+    gap: 7px;
 
     min-width: 0;
 
-    margin-bottom: 8px;
+    margin-bottom: 7px;
 }
 
 .taskboard-task-code {
-    max-width: 100%;
-
     color:
-        rgba(255, 255, 255, 0.58);
+        #64748b;
 
-    font-size: 0.75rem;
-    font-weight: 700;
-    letter-spacing: 0.05em;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.7px;
+
+    text-transform: uppercase;
 
     overflow-wrap: anywhere;
 }
@@ -1072,11 +1655,12 @@ TASK LIST
     margin:
         0
         0
-        8px;
+        7px;
 
-    color: #ffffff;
+    color:
+        #ffffff;
 
-    font-size: 1rem;
+    font-size: 15px;
 
     overflow-wrap: anywhere;
 }
@@ -1085,8 +1669,9 @@ TASK LIST
     margin: 0;
 
     color:
-        rgba(255, 255, 255, 0.7);
+        #7f8b9d;
 
+    font-size: 12px;
     line-height: 1.45;
 
     overflow-wrap: anywhere;
@@ -1097,9 +1682,9 @@ TASK LIST
 
     flex-wrap: wrap;
 
-    gap: 8px;
+    gap: 7px;
 
-    margin-top: 13px;
+    margin-top: 11px;
 }
 
 .taskboard-task-badge {
@@ -1108,20 +1693,28 @@ TASK LIST
     align-items: center;
 
     max-width: 100%;
-    min-height: 25px;
+    min-height: 24px;
 
     padding:
-        4px
+        3px
         8px;
 
     border:
         1px solid
-        rgba(255, 255, 255, 0.18);
+        rgba(
+            255,
+            255,
+            255,
+            0.11
+        );
 
     border-radius: 999px;
 
-    font-size: 0.73rem;
-    font-weight: 600;
+    color:
+        #94a3b8;
+
+    font-size: 10px;
+    font-weight: 700;
 
     overflow-wrap: anywhere;
 }
@@ -1135,7 +1728,17 @@ TASK LIST
 }
 
 /* =========================================================
-TASK METADATA
+DETAIL OVERVIEW
+========================================================= */
+
+.taskboard-detail-overview {
+    width: 100%;
+
+    min-width: 0;
+}
+
+/* =========================================================
+TASK DETAIL METADATA
 ========================================================= */
 
 .taskboard-task-metadata {
@@ -1144,90 +1747,127 @@ TASK METADATA
     grid-template-columns:
         repeat(
             4,
-            minmax(0, 1fr)
+            minmax(
+                0,
+                1fr
+            )
         );
 
-    gap: 12px;
+    gap: 10px;
 
     width: 100%;
 
-    margin-bottom: 24px;
-
-    overflow-x: hidden;
+    margin-bottom: 18px;
 }
 
 .taskboard-task-metadata > div {
     min-width: 0;
 
-    padding: 14px;
+    padding: 12px;
 
     border:
         1px solid
-        rgba(255, 255, 255, 0.11);
+        rgba(
+            255,
+            255,
+            255,
+            0.075
+        );
 
-    border-radius: 8px;
+    border-radius: 9px;
 
     background:
-        rgba(255, 255, 255, 0.02);
+        rgba(
+            255,
+            255,
+            255,
+            0.018
+        );
 
     overflow-wrap: anywhere;
-    word-break: break-word;
 }
 
 .taskboard-task-metadata span {
     display: block;
 
-    margin-bottom: 6px;
+    margin-bottom: 5px;
 
     color:
-        rgba(255, 255, 255, 0.58);
+        #64748b;
 
-    font-size: 0.76rem;
-    font-weight: 600;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+
+    text-transform: uppercase;
 }
 
 .taskboard-task-metadata strong {
     display: block;
 
-    color: #ffffff;
+    color:
+        #e2e8f0;
+
+    font-size: 12px;
 
     overflow-wrap: anywhere;
 }
 
 /* =========================================================
-DESCRIPTION
+TASK DESCRIPTION
 ========================================================= */
 
 .taskboard-task-description {
     width: 100%;
 
-    margin-bottom: 24px;
+    margin-bottom: 18px;
 
-    padding: 18px;
+    padding: 14px;
 
     border:
         1px solid
-        rgba(255, 255, 255, 0.11);
+        rgba(
+            255,
+            255,
+            255,
+            0.075
+        );
 
     border-radius: 9px;
 
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            0.018
+        );
+
     overflow-wrap: anywhere;
-    word-break: break-word;
 }
 
 .taskboard-task-description h3 {
     margin:
         0
         0
-        10px;
+        8px;
+
+    color:
+        #ffffff;
+
+    font-size: 15px;
 }
 
 .taskboard-task-description p {
     margin: 0;
 
-    white-space: pre-wrap;
+    color:
+        #cbd5e1;
 
+    font-size: 13px;
     line-height: 1.55;
+
+    white-space: pre-wrap;
 
     overflow-wrap: anywhere;
 }
@@ -1239,37 +1879,34 @@ TASK SUBSECTIONS
 .taskboard-task-section {
     width: 100%;
 
-    margin-top: 20px;
+    margin-top: 16px;
 
-    padding: 18px;
+    padding: 14px;
 
     border:
         1px solid
-        rgba(255, 255, 255, 0.11);
+        rgba(
+            255,
+            255,
+            255,
+            0.075
+        );
 
     border-radius: 9px;
 
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            0.015
+        );
+
     overflow-x: hidden;
-    overflow-wrap: anywhere;
 }
 
-.taskboard-task-section > h3 {
-    margin:
-        0
-        0
-        8px;
-}
-
-.taskboard-task-section > p {
-    margin:
-        0
-        0
-        14px;
-
-    color:
-        rgba(255, 255, 255, 0.68);
-
-    line-height: 1.45;
+.taskboard-task-section-heading {
+    margin-bottom: 12px;
 }
 
 /* =========================================================
@@ -1281,11 +1918,11 @@ STATUS ACTIONS
 
     flex-wrap: wrap;
 
-    gap: 9px;
+    gap: 8px;
 
     min-width: 0;
 
-    margin-top: 14px;
+    margin-top: 12px;
 }
 
 /* =========================================================
@@ -1297,12 +1934,12 @@ DISCUSSION
 
     flex-direction: column;
 
-    gap: 10px;
+    gap: 8px;
 
     width: 100%;
 
     margin:
-        18px
+        14px
         0;
 }
 
@@ -1310,17 +1947,27 @@ DISCUSSION
     min-width: 0;
 
     padding:
-        13px
-        15px;
+        11px
+        13px;
 
     border:
         1px solid
-        rgba(255, 255, 255, 0.11);
+        rgba(
+            255,
+            255,
+            255,
+            0.075
+        );
 
     border-radius: 8px;
 
     background:
-        rgba(255, 255, 255, 0.02);
+        rgba(
+            0,
+            0,
+            0,
+            0.14
+        );
 
     overflow-wrap: anywhere;
 }
@@ -1333,31 +1980,36 @@ DISCUSSION
     flex-wrap: wrap;
 
     gap:
-        8px
+        6px
         12px;
 
-    margin-bottom: 7px;
+    margin-bottom: 6px;
 
-    font-size: 0.8rem;
+    color:
+        #64748b;
+
+    font-size: 11px;
 }
 
 .taskboard-comment-author {
+    color:
+        #cbd5e1;
+
     font-weight: 700;
 
     overflow-wrap: anywhere;
 }
 
-.taskboard-comment-time {
-    color:
-        rgba(255, 255, 255, 0.55);
-}
-
 .taskboard-comment-body {
     margin: 0;
 
-    white-space: pre-wrap;
+    color:
+        #cbd5e1;
 
+    font-size: 12px;
     line-height: 1.5;
+
+    white-space: pre-wrap;
 
     overflow-wrap: anywhere;
 }
@@ -1365,7 +2017,7 @@ DISCUSSION
 .taskboard-comment-form {
     width: 100%;
 
-    margin-top: 16px;
+    margin-top: 14px;
 }
 
 /* =========================================================
@@ -1377,25 +2029,30 @@ HISTORY
 
     flex-direction: column;
 
-    gap: 9px;
+    gap: 8px;
 
     width: 100%;
 
-    margin-top: 14px;
+    margin-top: 12px;
 }
 
 .taskboard-history-item {
     min-width: 0;
 
     padding:
+        10px
         12px
-        14px
-        12px
-        20px;
+        10px
+        16px;
 
     border-left:
         2px solid
-        rgba(255, 255, 255, 0.2);
+        rgba(
+            56,
+            189,
+            248,
+            0.22
+        );
 
     overflow-wrap: anywhere;
 }
@@ -1403,18 +2060,22 @@ HISTORY
 .taskboard-history-item p {
     margin: 0;
 
+    color:
+        #cbd5e1;
+
+    font-size: 12px;
     line-height: 1.45;
 }
 
 .taskboard-history-item time {
     display: block;
 
-    margin-top: 5px;
+    margin-top: 4px;
 
     color:
-        rgba(255, 255, 255, 0.52);
+        #64748b;
 
-    font-size: 0.75rem;
+    font-size: 10px;
 }
 
 /* =========================================================
@@ -1426,16 +2087,26 @@ EMPTY STATE
 
     margin: 0;
 
-    padding: 24px;
+    padding:
+        20px
+        14px;
 
     border:
         1px dashed
-        rgba(255, 255, 255, 0.18);
+        rgba(
+            255,
+            255,
+            255,
+            0.12
+        );
 
-    border-radius: 8px;
+    border-radius: 9px;
 
     color:
-        rgba(255, 255, 255, 0.62);
+        #64748b;
+
+    font-size: 12px;
+    line-height: 1.45;
 
     text-align: center;
 
@@ -1443,18 +2114,19 @@ EMPTY STATE
 }
 
 /* =========================================================
-LOADING / DENIED / ERROR
+ROUTE STATE PAGES
 ========================================================= */
 
-#taskboardLoading,
-#taskboardDenied,
-#taskboardError {
-    min-height: 100%;
+.taskboard-state-page {
+    width: 100%;
+    max-width: 100%;
+
+    min-width: 0;
 
     padding:
-        24px
-        24px
-        40px;
+        32px
+        16px
+        48px;
 
     overflow-x: hidden;
 }
@@ -1462,49 +2134,81 @@ LOADING / DENIED / ERROR
 .taskboard-state-panel {
     width:
         min(
-            100%,
-            600px
+            600px,
+            calc(
+                100%
+                -
+                20px
+            )
         );
 
     margin:
-        80px
+        48px
         auto
         0;
 
-    padding: 28px;
+    padding: 24px;
 
     border:
         1px solid
-        rgba(255, 255, 255, 0.14);
+        rgba(
+            255,
+            255,
+            255,
+            0.10
+        );
 
-    border-radius: 12px;
+    border-radius: 14px;
 
     background:
-        rgba(255, 255, 255, 0.025);
+        rgba(
+            255,
+            255,
+            255,
+            0.035
+        );
 
     text-align: center;
+}
+
+.taskboard-state-eyebrow {
+    margin:
+        0
+        0
+        6px;
+
+    color:
+        #38bdf8;
+
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.9px;
+
+    text-transform: uppercase;
 }
 
 .taskboard-state-panel h1 {
     margin:
         0
         0
-        12px;
+        10px;
 
-    color: #ffffff;
+    color:
+        #ffffff;
 
-    overflow-wrap: anywhere;
+    font-size: 24px;
 }
 
 .taskboard-state-panel p {
     margin:
         0
         auto
-        18px;
+        16px;
 
     color:
-        rgba(255, 255, 255, 0.7);
+        #7f8b9d;
 
+    font-size: 13px;
     line-height: 1.5;
 
     overflow-wrap: anywhere;
@@ -1520,7 +2224,10 @@ RESPONSIVE - MEDIUM
         grid-template-columns:
             repeat(
                 2,
-                minmax(0, 1fr)
+                minmax(
+                    0,
+                    1fr
+                )
             );
     }
 
@@ -1528,7 +2235,10 @@ RESPONSIVE - MEDIUM
         grid-template-columns:
             repeat(
                 2,
-                minmax(0, 1fr)
+                minmax(
+                    0,
+                    1fr
+                )
             );
     }
 
@@ -1565,20 +2275,34 @@ RESPONSIVE - TABLET
 RESPONSIVE - MOBILE
 ========================================================= */
 
-@media (max-width: 700px) {
-    #taskboardContent,
-    #taskboardLoading,
-    #taskboardDenied,
-    #taskboardError {
+@media (max-width: 760px) {
+    .taskboard-page {
+        width:
+            min(
+                calc(
+                    100%
+                    -
+                    20px
+                ),
+                1240px
+            );
+
         padding:
-            16px
-            14px
-            28px;
+            20px
+            0
+            32px;
     }
 
-    .taskboard-hero,
-    .taskboard-workspace {
+    .taskboard-panel {
         padding: 18px;
+    }
+
+    .taskboard-hero {
+        gap: 18px;
+    }
+
+    .taskboard-hero h1 {
+        font-size: 25px;
     }
 
     .taskboard-summary-grid,
@@ -1599,12 +2323,19 @@ RESPONSIVE - MOBILE
         flex-direction: column;
     }
 
+    .taskboard-workspace {
+        padding: 16px;
+    }
+
     .taskboard-task-card {
         grid-template-columns:
             1fr;
     }
 
-    .taskboard-task-card-actions,
+    .taskboard-task-card-actions {
+        width: 100%;
+    }
+
     .taskboard-task-card-actions button {
         width: 100%;
     }
@@ -1617,10 +2348,17 @@ RESPONSIVE - MOBILE
         width: 100%;
     }
 
-    .taskboard-state-panel {
-        margin-top: 40px;
+    .taskboard-state-page {
+        padding:
+            20px
+            10px
+            32px;
+    }
 
-        padding: 22px;
+    .taskboard-state-panel {
+        margin-top: 30px;
+
+        padding: 20px;
     }
 }
 
@@ -1629,56 +2367,74 @@ RESPONSIVE - SMALL MOBILE
 ========================================================= */
 
 @media (max-width: 480px) {
-    .taskboard-hero {
-        gap: 18px;
-
-        margin-bottom: 20px;
-
-        padding: 16px;
+    .taskboard-page {
+        width:
+            min(
+                calc(
+                    100%
+                    -
+                    14px
+                ),
+                1240px
+            );
     }
 
-    .taskboard-workspace {
-        margin:
-            20px
-            0;
+    .taskboard-panel {
+        padding: 14px;
 
-        padding: 16px;
+        border-radius: 12px;
+    }
+
+    .taskboard-hero {
+        gap: 16px;
+
+        margin-bottom: 20px;
+    }
+
+    .taskboard-identity {
+        padding: 12px;
     }
 
     .taskboard-action-card {
         align-items: flex-start;
 
-        gap: 14px;
+        gap: 12px;
 
         min-height: 0;
 
-        padding: 16px;
+        padding: 14px;
     }
 
     .taskboard-action-icon {
-        flex-basis: 42px;
+        flex-basis: 40px;
 
-        width: 42px;
-        height: 42px;
+        width: 40px;
+        height: 40px;
 
-        font-size: 1.3rem;
+        font-size: 1.2rem;
     }
 
     .taskboard-action-count {
-        min-width: 34px;
-        height: 34px;
+        min-width: 30px;
+        height: 30px;
     }
 
     .taskboard-summary-card {
         min-height: 0;
 
-        padding: 16px;
+        padding: 13px;
+    }
+
+    .taskboard-workspace {
+        margin-top: 18px;
+
+        padding: 14px;
     }
 
     .taskboard-task-card,
     .taskboard-task-description,
     .taskboard-task-section {
-        padding: 15px;
+        padding: 13px;
     }
 
     .taskboard-role-options {
@@ -1702,9 +2458,27 @@ RESPONSIVE - SMALL MOBILE
     }
 
     .taskboard-state-panel {
-        margin-top: 24px;
+        margin-top: 20px;
 
+        padding: 16px;
+    }
+}
+
+/* =========================================================
+SHORT VIEWPORTS
+========================================================= */
+
+@media (max-height: 600px) {
+    .taskboard-page {
+        padding-top: 18px;
+    }
+
+    .taskboard-panel {
         padding: 18px;
+    }
+
+    .taskboard-hero {
+        margin-bottom: 20px;
     }
 }
 
@@ -1716,8 +2490,7 @@ REDUCED MOTION
     .taskboard-action-card,
     .taskboard-task-card,
     #taskboardContent button {
-        transition:
-            none !important;
+        transition: none !important;
     }
 
     .taskboard-action-card:hover,
