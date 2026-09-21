@@ -13,8 +13,11 @@ Purpose:
 Responsibilities:
     - Render lifecycle actions for the current task status.
     - Respect client-visible Admin permissions for UI display.
-    - Use the shared Taskboard confirmation overlay.
+    - Dynamically load the shared Taskboard confirmation
+      overlay when needed.
+    - Collect lifecycle reasons when required.
     - Submit lifecycle actions to the protected Task API.
+    - Use optimistic concurrency through task versioning.
     - Display lifecycle success and failure messages.
     - Notify Task Detail after a successful state change.
     - Prevent duplicate lifecycle submissions.
@@ -27,17 +30,10 @@ Security:
           task responsibility
           allowed transitions
           task state
+          reason validation
           audit/event creation
           archive/delete permissions
 ========================================================= */
-
-/* =========================================================
-IMPORTS
-========================================================= */
-
-import {
-    openTaskConfirm
-} from "/Global/Admin/TaskBoard/JS/task_confirm.js";
 
 /* =========================================================
 PERMISSIONS
@@ -76,7 +72,14 @@ const TASK_STATUS = {
 /* =========================================================
 LIFECYCLE ACTIONS
 
-The server remains authoritative for transition validation.
+Public action names must match the lifecycle API.
+
+Reasons are required by the interface for:
+    shelve
+    archive
+    delete
+
+The server remains authoritative for final validation.
 ========================================================= */
 
 const LIFECYCLE_ACTIONS = {
@@ -178,9 +181,9 @@ const LIFECYCLE_ACTIONS = {
             false
     },
 
-    RESTORE: {
+    UNSHELVE: {
         action:
-            "restore",
+            "unshelve",
 
         label:
             "Restore Task",
@@ -230,6 +233,29 @@ const LIFECYCLE_ACTIONS = {
             false
     },
 
+    RESTORE_ARCHIVED: {
+        action:
+            "restoreArchived",
+
+        label:
+            "Restore Task",
+
+        permission:
+            TASK_UPDATE_PERMISSION,
+
+        confirmationTitle:
+            "Restore Archived Task",
+
+        confirmationMessage:
+            "Restore this archived task?",
+
+        requireReason:
+            false,
+
+        danger:
+            false
+    },
+
     DELETE: {
         action:
             "delete",
@@ -244,7 +270,7 @@ const LIFECYCLE_ACTIONS = {
             "Delete Task",
 
         confirmationMessage:
-            "This task will be marked as deleted and the action will be recorded in task history.",
+            "Mark this task as deleted? The reason and action will be recorded in task history.",
 
         requireReason:
             true,
@@ -257,6 +283,29 @@ const LIFECYCLE_ACTIONS = {
 
         danger:
             true
+    },
+
+    RESTORE_DELETED: {
+        action:
+            "restoreDeleted",
+
+        label:
+            "Restore Deleted Task",
+
+        permission:
+            TASK_DELETE_PERMISSION,
+
+        confirmationTitle:
+            "Restore Deleted Task",
+
+        confirmationMessage:
+            "Restore this deleted task?",
+
+        requireReason:
+            false,
+
+        danger:
+            false
     }
 };
 
@@ -280,6 +329,70 @@ let lifecycleState = {
     submitting:
         false
 };
+
+let taskConfirmModule =
+    null;
+
+/* =========================================================
+DYNAMIC MODULE LOADING
+
+Sibling modules are resolved relative to this module.
+
+If this file is loaded as:
+    task_lifecycle.js?v=123
+
+task_confirm.js will also be loaded as:
+    task_confirm.js?v=123
+========================================================= */
+
+function getSiblingModuleUrl(
+    fileName
+) {
+    const currentModuleUrl =
+        new URL(
+            import.meta.url
+        );
+
+    const moduleUrl =
+        new URL(
+            fileName,
+            currentModuleUrl
+        );
+
+    moduleUrl.search =
+        currentModuleUrl.search;
+
+    return moduleUrl.href;
+}
+
+async function loadTaskConfirmModule() {
+    if (
+        taskConfirmModule
+    ) {
+        return taskConfirmModule;
+    }
+
+    const module =
+        await import(
+            getSiblingModuleUrl(
+                "task_confirm.js"
+            )
+        );
+
+    if (
+        typeof module.openTaskConfirm !==
+            "function"
+    ) {
+        throw new Error(
+            "Task Confirmation module is invalid."
+        );
+    }
+
+    taskConfirmModule =
+        module;
+
+    return module;
+}
 
 /* =========================================================
 NORMALIZATION
@@ -352,6 +465,23 @@ function getTaskStatus(
     );
 }
 
+function getTaskVersion(
+    task
+) {
+    const version =
+        Number(
+            task?.version
+        );
+
+    return Number.isSafeInteger(
+        version
+    )
+    && version >=
+        1
+        ? version
+        : null;
+}
+
 /* =========================================================
 ELEMENT LOOKUP
 ========================================================= */
@@ -402,9 +532,9 @@ function hasPermission(
 /* =========================================================
 TRANSITIONS
 
-These determine what the browser offers.
+These determine which actions the browser offers.
 
-The API still decides whether the transition is valid.
+The lifecycle API remains authoritative.
 ========================================================= */
 
 function getAvailableActions(
@@ -443,18 +573,21 @@ function getAvailableActions(
 
         case TASK_STATUS.SHELVED:
             return [
-                LIFECYCLE_ACTIONS.RESTORE,
+                LIFECYCLE_ACTIONS.UNSHELVE,
                 LIFECYCLE_ACTIONS.ARCHIVE,
                 LIFECYCLE_ACTIONS.DELETE
             ];
 
         case TASK_STATUS.ARCHIVED:
             return [
+                LIFECYCLE_ACTIONS.RESTORE_ARCHIVED,
                 LIFECYCLE_ACTIONS.DELETE
             ];
 
         case TASK_STATUS.DELETED:
-            return [];
+            return [
+                LIFECYCLE_ACTIONS.RESTORE_DELETED
+            ];
 
         default:
             return [];
@@ -701,8 +834,11 @@ CONFIRM ACTION
 async function confirmLifecycleAction(
     definition
 ) {
+    const confirmModule =
+        await loadTaskConfirmModule();
+
     const result =
-        await openTaskConfirm({
+        await confirmModule.openTaskConfirm({
             title:
                 definition.confirmationTitle
                 || definition.label,
@@ -734,7 +870,7 @@ async function confirmLifecycleAction(
     return {
         confirmed:
             result?.confirmed ===
-            true,
+                true,
 
         reason:
             normalizeString(
@@ -784,10 +920,23 @@ function createLifecycleError(
 
 /* =========================================================
 LIFECYCLE API
+
+Expected Body:
+{
+    action,
+    expectedVersion,
+    reason?
+}
+
+The browser may provide a lifecycle reason where supported.
+
+Actor identity, task state, timestamps, and lifecycle
+ownership metadata remain server-controlled.
 ========================================================= */
 
 async function submitLifecycleAction(
     action,
+    expectedVersion,
     reason =
         ""
 ) {
@@ -804,18 +953,51 @@ async function submitLifecycleAction(
         );
     }
 
+    if (
+        !Number.isSafeInteger(
+            expectedVersion
+        )
+        || expectedVersion <
+            1
+    ) {
+        throw new Error(
+            "A valid task version is required."
+        );
+    }
+
+    const normalizedAction =
+        normalizeString(
+            action
+        );
+
+    if (
+        !normalizedAction
+    ) {
+        throw new Error(
+            "A lifecycle action is required."
+        );
+    }
+
+    const normalizedReason =
+        normalizeString(
+            reason
+        );
+
     const url =
         `/api/auth/admin/tasks/${encodeURIComponent(taskCode)}/lifecycle`;
 
     const payload = {
-        action
+        action:
+            normalizedAction,
+
+        expectedVersion
     };
 
     if (
-        reason
+        normalizedReason
     ) {
         payload.reason =
-            reason;
+            normalizedReason;
     }
 
     let response;
@@ -978,6 +1160,29 @@ async function handleLifecycleAction(
             return;
         }
 
+        if (
+            definition.requireReason ===
+                true
+            && !confirmation.reason
+        ) {
+            throw new Error(
+                "A reason is required for this action."
+            );
+        }
+
+        const expectedVersion =
+            getTaskVersion(
+                lifecycleState.task
+            );
+
+        if (
+            !expectedVersion
+        ) {
+            throw new Error(
+                "The current task version is unavailable. Refresh the task and try again."
+            );
+        }
+
         setLifecycleSubmitting(
             true
         );
@@ -989,6 +1194,7 @@ async function handleLifecycleAction(
         const result =
             await submitLifecycleAction(
                 definition.action,
+                expectedVersion,
                 confirmation.reason
             );
 
@@ -1002,11 +1208,23 @@ async function handleLifecycleAction(
         ) {
             lifecycleState.task =
                 updatedTask;
+
+            const updatedTaskCode =
+                getTaskCode(
+                    updatedTask
+                );
+
+            if (
+                updatedTaskCode
+            ) {
+                lifecycleState.taskCode =
+                    updatedTaskCode;
+            }
         }
 
         if (
             typeof lifecycleState.onUpdated ===
-            "function"
+                "function"
         ) {
             await lifecycleState.onUpdated(
                 updatedTask,
@@ -1015,8 +1233,8 @@ async function handleLifecycleAction(
         }
 
         /*
-         * Re-render after the callback because the parent
-         * may have refreshed the authoritative task record.
+         * The parent may refresh the authoritative task after
+         * the callback. Re-render using the latest state.
          */
         renderLifecycleActions();
 

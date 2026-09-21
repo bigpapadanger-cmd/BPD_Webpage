@@ -38,11 +38,43 @@ Security:
 ========================================================= */
 
 /* =========================================================
-PATHS
+RESOURCE RESOLUTION
+
+The confirmation template is resolved relative to this module
+instead of using a hardcoded site-root path.
+
+If this module is loaded as:
+    task_confirm.js?v=123
+
+the template will be requested as:
+    ../HTML/task_confirm.html?v=123
 ========================================================= */
 
-const TASK_CONFIRM_TEMPLATE_URL =
-    "/Global/Admin/TaskBoard/HTML/task_confirm.html";
+function getRelativeResourceUrl(
+    path
+) {
+    const currentModuleUrl =
+        new URL(
+            import.meta.url
+        );
+
+    const resourceUrl =
+        new URL(
+            path,
+            currentModuleUrl
+        );
+
+    resourceUrl.search =
+        currentModuleUrl.search;
+
+    return resourceUrl.href;
+}
+
+function getTaskConfirmTemplateUrl() {
+    return getRelativeResourceUrl(
+        "../HTML/task_confirm.html"
+    );
+}
 
 /* =========================================================
 MODULE STATE
@@ -193,7 +225,7 @@ async function loadTaskConfirmTemplate() {
     try {
         response =
             await fetch(
-                TASK_CONFIRM_TEMPLATE_URL,
+                getTaskConfirmTemplateUrl(),
                 {
                     method:
                         "GET",

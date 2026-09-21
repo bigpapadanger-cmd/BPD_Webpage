@@ -15,11 +15,11 @@ Responsibilities:
     - Open and close the Task Detail overlay.
     - Load the authoritative task record by task code.
     - Render task metadata and description.
-    - Mount Task Lifecycle.
-    - Mount Task Comments.
-    - Mount Task History.
-    - Open the Edit Task overlay.
-    - Refresh all dependent Taskboard systems after changes.
+    - Dynamically load Task Lifecycle.
+    - Dynamically load Task Comments.
+    - Dynamically load Task History.
+    - Dynamically load the Edit Task overlay.
+    - Refresh dependent Taskboard systems after changes.
     - Notify the parent Taskboard after task updates.
 
 Integrated Modules:
@@ -35,36 +35,8 @@ Security:
 ========================================================= */
 
 /* =========================================================
-IMPORTS
+ENDPOINTS
 ========================================================= */
-
-import {
-    mountTaskLifecycle,
-    clearTaskLifecycle
-} from "/Global/Admin/TaskBoard/JS/task_lifecycle.js";
-
-import {
-    mountTaskComments,
-    clearTaskComments,
-    refreshTaskComments
-} from "/Global/Admin/TaskBoard/JS/task_comments.js";
-
-import {
-    mountTaskHistory,
-    clearTaskHistory,
-    refreshTaskHistory
-} from "/Global/Admin/TaskBoard/JS/task_history.js";
-
-import {
-    openTaskEdit
-} from "/Global/Admin/TaskBoard/JS/task_edit.js";
-
-/* =========================================================
-PATHS
-========================================================= */
-
-const TASK_DETAIL_TEMPLATE_URL =
-    "/Global/Admin/TaskBoard/HTML/task_detail.html";
 
 const TASKS_API_URL =
     "/api/auth/admin/tasks";
@@ -107,6 +79,201 @@ let taskDetailState = {
     loading:
         false
 };
+
+/*
+ * Dynamically loaded child modules are cached here after
+ * their first successful import.
+ *
+ * Native ES module caching still applies as well. This local
+ * cache simply avoids repeatedly resolving the same module.
+ */
+const taskDetailModules = {
+    lifecycle:
+        null,
+
+    comments:
+        null,
+
+    history:
+        null,
+
+    edit:
+        null
+};
+
+/* =========================================================
+RESOURCE RESOLUTION
+
+All Task Detail resources are resolved relative to this
+module instead of using hardcoded site-root paths.
+
+If this module is loaded as:
+    task_detail.js?v=123
+
+child JS modules and HTML assets receive:
+    ?v=123
+
+This keeps the Taskboard resource tree on the same deployed
+asset version.
+========================================================= */
+
+function getRelativeResourceUrl(
+    path
+) {
+    const currentModuleUrl =
+        new URL(
+            import.meta.url
+        );
+
+    const resourceUrl =
+        new URL(
+            path,
+            currentModuleUrl
+        );
+
+    resourceUrl.search =
+        currentModuleUrl.search;
+
+    return resourceUrl.href;
+}
+
+function importSiblingModule(
+    fileName
+) {
+    return import(
+        getRelativeResourceUrl(
+            fileName
+        )
+    );
+}
+
+function getTaskDetailTemplateUrl() {
+    return getRelativeResourceUrl(
+        "../HTML/task_detail.html"
+    );
+}
+
+/* =========================================================
+CHILD MODULE LOADING
+========================================================= */
+
+async function loadLifecycleModule() {
+    if (
+        taskDetailModules.lifecycle
+    ) {
+        return taskDetailModules.lifecycle;
+    }
+
+    const module =
+        await importSiblingModule(
+            "task_lifecycle.js"
+        );
+
+    if (
+        typeof module.mountTaskLifecycle !==
+            "function"
+        || typeof module.clearTaskLifecycle !==
+            "function"
+    ) {
+        throw new Error(
+            "Task Lifecycle module is invalid."
+        );
+    }
+
+    taskDetailModules.lifecycle =
+        module;
+
+    return module;
+}
+
+async function loadCommentsModule() {
+    if (
+        taskDetailModules.comments
+    ) {
+        return taskDetailModules.comments;
+    }
+
+    const module =
+        await importSiblingModule(
+            "task_comments.js"
+        );
+
+    if (
+        typeof module.mountTaskComments !==
+            "function"
+        || typeof module.clearTaskComments !==
+            "function"
+        || typeof module.refreshTaskComments !==
+            "function"
+    ) {
+        throw new Error(
+            "Task Comments module is invalid."
+        );
+    }
+
+    taskDetailModules.comments =
+        module;
+
+    return module;
+}
+
+async function loadHistoryModule() {
+    if (
+        taskDetailModules.history
+    ) {
+        return taskDetailModules.history;
+    }
+
+    const module =
+        await importSiblingModule(
+            "task_history.js"
+        );
+
+    if (
+        typeof module.mountTaskHistory !==
+            "function"
+        || typeof module.clearTaskHistory !==
+            "function"
+        || typeof module.refreshTaskHistory !==
+            "function"
+    ) {
+        throw new Error(
+            "Task History module is invalid."
+        );
+    }
+
+    taskDetailModules.history =
+        module;
+
+    return module;
+}
+
+async function loadEditModule() {
+    if (
+        taskDetailModules.edit
+    ) {
+        return taskDetailModules.edit;
+    }
+
+    const module =
+        await importSiblingModule(
+            "task_edit.js"
+        );
+
+    if (
+        typeof module.openTaskEdit !==
+            "function"
+    ) {
+        throw new Error(
+            "Task Edit module is invalid."
+        );
+    }
+
+    taskDetailModules.edit =
+        module;
+
+    return module;
+}
 
 /* =========================================================
 NORMALIZATION
@@ -311,7 +478,7 @@ async function loadTaskDetailTemplate() {
     try {
         response =
             await fetch(
-                TASK_DETAIL_TEMPLATE_URL,
+                getTaskDetailTemplateUrl(),
                 {
                     method:
                         "GET",
@@ -394,10 +561,6 @@ async function loadTaskDetailTemplate() {
 
 /* =========================================================
 EDIT BUTTON
-
-The current task_detail.html does not require another rewrite.
-
-This button is inserted dynamically into the existing header.
 ========================================================= */
 
 function ensureTaskEditButton() {
@@ -981,11 +1144,50 @@ CLEAR SUBSYSTEMS
 ========================================================= */
 
 function clearTaskSubsystems() {
-    clearTaskLifecycle();
+    try {
+        taskDetailModules
+            .lifecycle
+            ?.clearTaskLifecycle
+            ?.();
+    }
+    catch (
+        error
+    ) {
+        console.warn(
+            "[TASK DETAIL LIFECYCLE CLEAR FAILED]",
+            error
+        );
+    }
 
-    clearTaskComments();
+    try {
+        taskDetailModules
+            .comments
+            ?.clearTaskComments
+            ?.();
+    }
+    catch (
+        error
+    ) {
+        console.warn(
+            "[TASK DETAIL COMMENTS CLEAR FAILED]",
+            error
+        );
+    }
 
-    clearTaskHistory();
+    try {
+        taskDetailModules
+            .history
+            ?.clearTaskHistory
+            ?.();
+    }
+    catch (
+        error
+    ) {
+        console.warn(
+            "[TASK DETAIL HISTORY CLEAR FAILED]",
+            error
+        );
+    }
 }
 
 /* =========================================================
@@ -1006,10 +1208,22 @@ async function mountTaskSubsystems(
         return;
     }
 
+    const [
+        lifecycleModule,
+        commentsModule,
+        historyModule
+    ] =
+        await Promise.all([
+            loadLifecycleModule(),
+            loadCommentsModule(),
+            loadHistoryModule()
+        ]);
+
     /*
-     * Lifecycle renders synchronously.
+     * Lifecycle renders synchronously after its module has
+     * loaded.
      */
-    mountTaskLifecycle({
+    lifecycleModule.mountTaskLifecycle({
         task,
 
         taskCode,
@@ -1022,18 +1236,18 @@ async function mountTaskSubsystems(
     });
 
     /*
-     * Comments and history both load task events.
-     * They can load concurrently.
+     * Comments and history both request task events and may
+     * load concurrently.
      */
     await Promise.allSettled([
-        mountTaskComments({
+        commentsModule.mountTaskComments({
             taskCode,
 
             onUpdated:
                 handleCommentsUpdated
         }),
 
-        mountTaskHistory({
+        historyModule.mountTaskHistory({
             taskCode
         })
     ]);
@@ -1186,14 +1400,6 @@ async function refreshTaskDetail(
 
 /* =========================================================
 LIFECYCLE UPDATED
-
-Lifecycle changes can affect:
-    status
-    completed_at
-    shelving metadata
-    archive/delete metadata
-    task history
-    Taskboard summary/list
 ========================================================= */
 
 async function handleLifecycleUpdated(
@@ -1225,13 +1431,27 @@ async function handleLifecycleUpdated(
 
 /* =========================================================
 COMMENTS UPDATED
-
-A new comment changes task event history but does not require
-reloading the primary task record.
 ========================================================= */
 
 async function handleCommentsUpdated() {
-    await refreshTaskHistory();
+    try {
+        const historyModule =
+            await loadHistoryModule();
+
+        await historyModule.refreshTaskHistory();
+    }
+    catch (
+        error
+    ) {
+        console.error(
+            "[TASK DETAIL HISTORY REFRESH FAILED]",
+            {
+                message:
+                    error?.message
+                    || "Unknown error"
+            }
+        );
+    }
 }
 
 /* =========================================================
@@ -1249,7 +1469,10 @@ async function handleEditTask() {
     }
 
     try {
-        await openTaskEdit(
+        const editModule =
+            await loadEditModule();
+
+        await editModule.openTaskEdit(
             task,
             {
                 onUpdated:
@@ -1273,16 +1496,6 @@ async function handleEditTask() {
 
 /* =========================================================
 EDIT UPDATED
-
-Editing can affect:
-    title
-    body
-    priority
-    timeline
-    deadline
-    responsible roles
-    task history
-    Taskboard list/summary
 ========================================================= */
 
 async function handleEditUpdated(

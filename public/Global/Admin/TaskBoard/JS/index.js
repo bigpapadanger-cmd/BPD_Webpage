@@ -18,24 +18,21 @@ Responsibilities:
     - Load Taskboard assignee information.
     - Render summary information and responsibility roles.
     - Render and filter accessible tasks.
-    - Open the modular Create Task interface.
-    - Open the modular Task Detail interface.
+    - Dynamically load the Create Task interface.
+    - Dynamically load the Task Detail interface.
     - Refresh dashboard data after task changes.
     - Handle manual refresh and retry.
 
 Modular Interfaces:
-    Create Task:
-        /Global/Admin/TaskBoard/JS/create_task.js
+    create_task.js
+    task_detail.js
 
-    Task Detail:
-        /Global/Admin/TaskBoard/JS/task_detail.js
-
-    Task Detail internally coordinates:
-        task_lifecycle.js
-        task_comments.js
-        task_history.js
-        task_edit.js
-        task_confirm.js
+Task Detail coordinates:
+    task_lifecycle.js
+    task_comments.js
+    task_history.js
+    task_edit.js
+    task_confirm.js
 
 Security:
     - This module is NOT a security boundary.
@@ -73,16 +70,6 @@ const TASK_SUMMARY_URL =
 
 const TASK_ASSIGNEES_URL =
     "/api/auth/admin/tasks/task-assignees";
-
-/* =========================================================
-MODULAR CLIENT PATHS
-========================================================= */
-
-const CREATE_TASK_MODULE_URL =
-    "/Global/Admin/TaskBoard/JS/create_task.js";
-
-const TASK_DETAIL_MODULE_URL =
-    "/Global/Admin/TaskBoard/JS/task_detail.js";
 
 /* =========================================================
 TASKBOARD ROLES
@@ -130,6 +117,56 @@ const taskboardState = {
             ""
     }
 };
+
+/* =========================================================
+DYNAMIC MODULE LOADING
+
+Taskboard child modules are resolved relative to this file.
+
+Example:
+    index.js?v=123
+        ->
+    create_task.js?v=123
+    task_detail.js?v=123
+
+This avoids hardcoded Taskboard JS directory paths while
+keeping all child modules on the same deployed asset version.
+========================================================= */
+
+function getSiblingModuleUrl(
+    fileName
+) {
+    const currentModuleUrl =
+        new URL(
+            import.meta.url
+        );
+
+    const moduleUrl =
+        new URL(
+            fileName,
+            currentModuleUrl
+        );
+
+    /*
+     * new URL("child.js", import.meta.url) resolves the
+     * directory correctly but does not carry the query
+     * string from the parent module automatically.
+     */
+    moduleUrl.search =
+        currentModuleUrl.search;
+
+    return moduleUrl.href;
+}
+
+function importSiblingModule(
+    fileName
+) {
+    return import(
+        getSiblingModuleUrl(
+            fileName
+        )
+    );
+}
 
 /* =========================================================
 ELEMENT LOOKUP
@@ -1390,8 +1427,8 @@ async function openTaskDetailModule(
 
     try {
         const module =
-            await import(
-                TASK_DETAIL_MODULE_URL
+            await importSiblingModule(
+                "task_detail.js"
             );
 
         if (
@@ -1707,8 +1744,8 @@ async function openCreateTaskModule() {
 
     try {
         const module =
-            await import(
-                CREATE_TASK_MODULE_URL
+            await importSiblingModule(
+                "create_task.js"
             );
 
         if (

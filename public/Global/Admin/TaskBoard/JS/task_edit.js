@@ -16,6 +16,7 @@ Responsibilities:
     - Validate editable task fields.
     - Enforce client-side priority/timeline rules.
     - Submit task updates to the protected Admin Task API.
+    - Use optimistic concurrency through task versioning.
     - Notify Task Detail after a successful update.
     - Cleanly open, close, and reset the overlay.
 
@@ -27,14 +28,50 @@ Security:
 ========================================================= */
 
 /* =========================================================
-PATHS
+ENDPOINTS
 ========================================================= */
-
-const TASK_EDIT_TEMPLATE_URL =
-    "/Global/Admin/TaskBoard/HTML/task_edit.html";
 
 const TASKS_API_URL =
     "/api/auth/admin/tasks";
+
+/* =========================================================
+RESOURCE RESOLUTION
+
+The Edit Task template is resolved relative to this module
+instead of using a hardcoded site-root path.
+
+If this module is loaded as:
+    task_edit.js?v=123
+
+the template will be requested as:
+    ../HTML/task_edit.html?v=123
+========================================================= */
+
+function getRelativeResourceUrl(
+    path
+) {
+    const currentModuleUrl =
+        new URL(
+            import.meta.url
+        );
+
+    const resourceUrl =
+        new URL(
+            path,
+            currentModuleUrl
+        );
+
+    resourceUrl.search =
+        currentModuleUrl.search;
+
+    return resourceUrl.href;
+}
+
+function getTaskEditTemplateUrl() {
+    return getRelativeResourceUrl(
+        "../HTML/task_edit.html"
+    );
+}
 
 /* =========================================================
 SUPPORTED ROLES
@@ -227,6 +264,23 @@ function getTaskRoles(
     );
 }
 
+function getTaskVersion(
+    task
+) {
+    const version =
+        Number(
+            task?.version
+        );
+
+    return Number.isSafeInteger(
+        version
+    )
+    && version >=
+        1
+        ? version
+        : null;
+}
+
 /* =========================================================
 ELEMENT LOOKUP
 ========================================================= */
@@ -324,7 +378,7 @@ async function loadTaskEditTemplate() {
     try {
         response =
             await fetch(
-                TASK_EDIT_TEMPLATE_URL,
+                getTaskEditTemplateUrl(),
                 {
                     method:
                         "GET",
@@ -886,22 +940,73 @@ function createTaskEditError(
 /* =========================================================
 UPDATE API
 
-This is intentionally isolated.
+Expected Body:
+{
+    expectedVersion,
+    changes
+}
 
-During final integration we should compare this with the
-existing:
-    functions/api/auth/admin/tasks/[taskCode].js
+The task code comes from the route.
 
-If that route uses a different HTTP method or request wrapper,
-only this function needs to change.
+The server remains authoritative for:
+    - mutable field validation
+    - assignment authorization
+    - optimistic concurrency
+    - deadline recalculation
+    - version increments
 ========================================================= */
 
 async function updateTask(
     taskCode,
-    payload
+    expectedVersion,
+    changes
 ) {
+    const normalizedTaskCode =
+        normalizeString(
+            taskCode
+        );
+
+    if (
+        !normalizedTaskCode
+    ) {
+        throw new Error(
+            "A task code is required."
+        );
+    }
+
+    if (
+        !Number.isSafeInteger(
+            expectedVersion
+        )
+        || expectedVersion <
+            1
+    ) {
+        throw new Error(
+            "A valid task version is required."
+        );
+    }
+
+    if (
+        !changes
+        || typeof changes !==
+            "object"
+        || Array.isArray(
+            changes
+        )
+    ) {
+        throw new Error(
+            "Valid task changes are required."
+        );
+    }
+
     const url =
-        `${TASKS_API_URL}/${encodeURIComponent(taskCode)}`;
+        `${TASKS_API_URL}/${encodeURIComponent(normalizedTaskCode)}`;
+
+    const requestBody = {
+        expectedVersion,
+
+        changes
+    };
 
     let response;
 
@@ -929,7 +1034,7 @@ async function updateTask(
 
                     body:
                         JSON.stringify(
-                            payload
+                            requestBody
                         )
                 }
             );
@@ -1202,8 +1307,21 @@ async function handleTaskEditSubmit(
     clearTaskEditMessage();
 
     try {
-        const payload =
+        const changes =
             getTaskEditPayload();
+
+        const expectedVersion =
+            getTaskVersion(
+                taskEditState.task
+            );
+
+        if (
+            !expectedVersion
+        ) {
+            throw new Error(
+                "The current task version is unavailable. Refresh the task and try again."
+            );
+        }
 
         setSubmitting(
             true
@@ -1212,13 +1330,21 @@ async function handleTaskEditSubmit(
         const result =
             await updateTask(
                 taskEditState.taskCode,
-                payload
+                expectedVersion,
+                changes
             );
 
         const updatedTask =
             extractUpdatedTask(
                 result
             );
+
+        if (
+            updatedTask
+        ) {
+            taskEditState.task =
+                updatedTask;
+        }
 
         setTaskEditMessage(
             "Task updated successfully.",
@@ -1227,7 +1353,7 @@ async function handleTaskEditSubmit(
 
         if (
             typeof taskEditState.onUpdated ===
-            "function"
+                "function"
         ) {
             await taskEditState.onUpdated(
                 updatedTask,

@@ -2,13 +2,13 @@
 
 /* =========================================================
 BPD GAMING NETWORK
-ROCKET LEAGUE BACKGROUND WORKER
+BACKGROUND AUTOMATION WORKER
 
 File:
     workers/rl-presence-monitor/src/index.js
 
 Purpose:
-    Entry point for Rocket League background automation.
+    Entry point for BPD background automation.
 
 Routes:
     GET  /health
@@ -16,10 +16,13 @@ Routes:
 
 Schedules:
     - Every 15 minutes:
-        Rocket League presence monitoring.
+          Rocket League presence monitoring.
 
     - Every Saturday:
-        Inactive-player MMR refresh.
+          Inactive-player MMR refresh.
+
+    - Once per day:
+          Admin Taskboard aggregate summary.
 
 Important:
     - /wake requires PRESENCE_TRIGGER_KEY.
@@ -34,6 +37,31 @@ import {
     runScheduledMmrRefresh
 } from "./scheduled_mmr.js";
 
+import {
+    runTaskboardSummary
+} from "./taskboard_summary.js";
+
+/* =========================================================
+CRON DEFINITIONS
+========================================================= */
+
+const PRESENCE_CRON =
+    "*/15 * * * *";
+
+const MMR_REFRESH_CRON =
+    "5 11 * * SAT";
+
+/*
+Set this to the single UTC time you want the Taskboard
+summary delivered each day.
+
+Example:
+    "0 12 * * *"
+        12:00 UTC daily.
+*/
+const TASKBOARD_SUMMARY_CRON =
+    "0 12 * * *";
+
 /* =========================================================
 NORMALIZATION
 ========================================================= */
@@ -41,7 +69,8 @@ NORMALIZATION
 function normalizeString(
     value
 ) {
-    return typeof value === "string"
+    return typeof value ===
+        "string"
         ? value.trim()
         : "";
 }
@@ -173,7 +202,7 @@ async function handleScheduled(
 ) {
     if (
         controller.cron ===
-        "*/15 * * * *"
+        PRESENCE_CRON
     ) {
         ctx.waitUntil(
             runPresenceCycle(
@@ -186,7 +215,7 @@ async function handleScheduled(
 
     if (
         controller.cron ===
-        "5 11 * * SAT"
+        MMR_REFRESH_CRON
     ) {
         ctx.waitUntil(
             runScheduledMmrRefresh(
@@ -197,8 +226,21 @@ async function handleScheduled(
         return;
     }
 
+    if (
+        controller.cron ===
+        TASKBOARD_SUMMARY_CRON
+    ) {
+        ctx.waitUntil(
+            runTaskboardSummary(
+                env
+            )
+        );
+
+        return;
+    }
+
     console.warn(
-        "RL BACKGROUND WORKER: Unknown cron trigger.",
+        "BPD BACKGROUND WORKER: Unknown cron trigger.",
         {
             cron:
                 controller.cron

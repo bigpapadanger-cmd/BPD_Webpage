@@ -33,14 +33,50 @@ Security:
 ========================================================= */
 
 /* =========================================================
-PATHS
+ENDPOINTS
 ========================================================= */
-
-const CREATE_TASK_TEMPLATE_URL =
-    "/Global/Admin/TaskBoard/HTML/create_task.html";
 
 const CREATE_TASK_API_URL =
     "/api/auth/admin/tasks";
+
+/* =========================================================
+RESOURCE RESOLUTION
+
+The Create Task template is resolved relative to this module
+instead of using a hardcoded site-root path.
+
+If this module is loaded as:
+    create_task.js?v=123
+
+the template will be requested as:
+    ../HTML/create_task.html?v=123
+========================================================= */
+
+function getRelativeResourceUrl(
+    path
+) {
+    const currentModuleUrl =
+        new URL(
+            import.meta.url
+        );
+
+    const resourceUrl =
+        new URL(
+            path,
+            currentModuleUrl
+        );
+
+    resourceUrl.search =
+        currentModuleUrl.search;
+
+    return resourceUrl.href;
+}
+
+function getCreateTaskTemplateUrl() {
+    return getRelativeResourceUrl(
+        "../HTML/create_task.html"
+    );
+}
 
 /* =========================================================
 SUPPORTED RESPONSIBILITY ROLES
@@ -262,7 +298,7 @@ async function loadCreateTaskTemplate() {
     try {
         response =
             await fetch(
-                CREATE_TASK_TEMPLATE_URL,
+                getCreateTaskTemplateUrl(),
                 {
                     method:
                         "GET",
@@ -559,11 +595,6 @@ function populateTimelineOptions() {
 
 /* =========================================================
 AVAILABLE RESPONSIBILITY ROLES
-
-The server still validates assignments.
-
-This client-side filtering only prevents showing roles that
-the current interface was not told about.
 ========================================================= */
 
 function applyAvailableRoles() {
@@ -591,13 +622,6 @@ function applyAvailableRoles() {
                 "label"
             );
 
-        /*
-         * All valid Taskboard responsibility roles may be
-         * assignment targets according to the current server
-         * design. Keep them enabled.
-         *
-         * Unknown values are disabled defensively.
-         */
         const supported =
             TASKBOARD_ROLES.has(
                 role
@@ -614,11 +638,6 @@ function applyAvailableRoles() {
         }
     }
 
-    /*
-     * Context roles are retained for future UI hints and
-     * auditing/debug information but do not restrict valid
-     * assignment targets here.
-     */
     return roles;
 }
 
@@ -794,6 +813,9 @@ function createApiError(
 
 /* =========================================================
 CREATE TASK API
+
+The route requires the mutable task fields inside a single
+top-level "task" object.
 ========================================================= */
 
 async function createTask(
@@ -903,9 +925,6 @@ async function createTask(
 
 /* =========================================================
 CREATED TASK EXTRACTION
-
-Supports several common response wrappers until the exact
-route response contract is confirmed.
 ========================================================= */
 
 function extractCreatedTask(

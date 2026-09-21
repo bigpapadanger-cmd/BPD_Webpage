@@ -35,6 +35,21 @@ Description:
     - Uses the verified Taskboard context returned by the
       responsibility check.
     - Injects p_actor_account_id server-side.
+    - Requires lifecycle reasons for shelve, archive,
+      and delete.
+    - Passes p_reason only to RPCs that support reasons.
+    - Sends Discord summaries after successful complete
+      and shelve actions.
+
+Discord:
+    - Completed tasks are sent through:
+          TASKBOARD_SUMMARY_DISCORD
+    - Shelved tasks are sent through:
+          TASKBOARD_SUMMARY_DISCORD
+    - Discord delivery occurs only after Supabase confirms
+      a successful lifecycle mutation.
+    - Discord failure does not fail or roll back the
+      lifecycle mutation.
 
 Security:
     - Browser never supplies the authoritative actor account.
@@ -45,6 +60,8 @@ Security:
     - Responsibility is checked against persisted task data.
     - Delete privileges remain separate from update privileges.
     - Lifecycle timestamps cannot be supplied by the browser.
+    - Lifecycle reasons are validated server-side.
+    - Discord webhook URLs remain server-side secrets.
     - Supabase remains authoritative for state transitions.
 ========================================================= */
 
@@ -56,6 +73,11 @@ import {
 import {
     requireTaskResponsibility
 } from "../../../admin/taskboard_roles.js";
+
+import {
+    sendTaskCompletedDiscordNotification,
+    sendTaskShelvedDiscordNotification
+} from "../../../admin/taskboard_discord.js";
 
 import {
     ADMIN_TASK_RPCS,
@@ -105,6 +127,9 @@ CONSTANTS
 const TASK_CODE_PATTERN =
     /^TASK-[A-HJ-NP-Z2-9]{6}$/;
 
+const MAX_REASON_LENGTH =
+    10000;
+
 const LIFECYCLE_ACTIONS =
     Object.freeze({
         start: {
@@ -112,7 +137,10 @@ const LIFECYCLE_ACTIONS =
                 ADMIN_TASK_RPCS.START,
 
             permission:
-                "update"
+                "update",
+
+            requiresReason:
+                false
         },
 
         complete: {
@@ -120,7 +148,10 @@ const LIFECYCLE_ACTIONS =
                 ADMIN_TASK_RPCS.COMPLETE,
 
             permission:
-                "update"
+                "update",
+
+            requiresReason:
+                false
         },
 
         reopen: {
@@ -128,7 +159,10 @@ const LIFECYCLE_ACTIONS =
                 ADMIN_TASK_RPCS.REOPEN,
 
             permission:
-                "update"
+                "update",
+
+            requiresReason:
+                false
         },
 
         shelve: {
@@ -136,7 +170,10 @@ const LIFECYCLE_ACTIONS =
                 ADMIN_TASK_RPCS.SHELVE,
 
             permission:
-                "update"
+                "update",
+
+            requiresReason:
+                true
         },
 
         unshelve: {
@@ -144,7 +181,10 @@ const LIFECYCLE_ACTIONS =
                 ADMIN_TASK_RPCS.UNSHELVE,
 
             permission:
-                "update"
+                "update",
+
+            requiresReason:
+                false
         },
 
         archive: {
@@ -152,7 +192,10 @@ const LIFECYCLE_ACTIONS =
                 ADMIN_TASK_RPCS.ARCHIVE,
 
             permission:
-                "update"
+                "update",
+
+            requiresReason:
+                true
         },
 
         restoreArchived: {
@@ -160,7 +203,10 @@ const LIFECYCLE_ACTIONS =
                 ADMIN_TASK_RPCS.RESTORE_ARCHIVED,
 
             permission:
-                "update"
+                "update",
+
+            requiresReason:
+                false
         },
 
         delete: {
@@ -168,7 +214,10 @@ const LIFECYCLE_ACTIONS =
                 ADMIN_TASK_RPCS.DELETE,
 
             permission:
-                "delete"
+                "delete",
+
+            requiresReason:
+                true
         },
 
         restoreDeleted: {
@@ -176,7 +225,10 @@ const LIFECYCLE_ACTIONS =
                 ADMIN_TASK_RPCS.RESTORE_DELETED,
 
             permission:
-                "delete"
+                "delete",
+
+            requiresReason:
+                false
         }
     });
 
@@ -187,7 +239,8 @@ NORMALIZATION
 function normalizeString(
     value
 ) {
-    return typeof value === "string"
+    return typeof value ===
+        "string"
         ? value.trim()
         : "";
 }
@@ -202,7 +255,8 @@ function requireTaskCode(
     const taskCode =
         normalizeString(
             value
-        ).toUpperCase();
+        )
+            .toUpperCase();
 
     if (
         !TASK_CODE_PATTERN.test(
@@ -240,7 +294,8 @@ function requireExpectedVersion(
         !Number.isSafeInteger(
             version
         )
-        || version < 1
+        || version <
+            1
     ) {
         throw new AdminTaskLifecycleError(
             "A valid expected task version is required.",
@@ -298,6 +353,71 @@ function requireLifecycleAction(
 }
 
 /* =========================================================
+REASON
+
+Reasons are required for:
+    shelve
+    archive
+    delete
+
+Other lifecycle operations do not pass p_reason to their
+Supabase RPCs.
+========================================================= */
+
+function requireLifecycleReason(
+    value,
+    definition
+) {
+    const reason =
+        normalizeString(
+            value
+        );
+
+    if (
+        definition.requiresReason ===
+            true
+        && !reason
+    ) {
+        throw new AdminTaskLifecycleError(
+            "A reason is required for this lifecycle action.",
+            {
+                code:
+                    "TASK_LIFECYCLE_REASON_REQUIRED",
+
+                status:
+                    400
+            }
+        );
+    }
+
+    if (
+        reason.length >
+        MAX_REASON_LENGTH
+    ) {
+        throw new AdminTaskLifecycleError(
+            `Lifecycle reasons cannot exceed ${MAX_REASON_LENGTH.toLocaleString()} characters.`,
+            {
+                code:
+                    "TASK_LIFECYCLE_REASON_TOO_LONG",
+
+                status:
+                    400,
+
+                details: {
+                    maxLength:
+                        MAX_REASON_LENGTH
+                }
+            }
+        );
+    }
+
+    return definition.requiresReason ===
+        true
+        ? reason
+        : "";
+}
+
+/* =========================================================
 AUTHORIZATION
 
 Normal lifecycle actions:
@@ -351,7 +471,8 @@ LOAD AUTHORITATIVE TASK
 async function getAuthoritativeTask(
     env,
     taskCode,
-    includeDeleted = false
+    includeDeleted =
+        false
 ) {
     const result =
         await callAdminTaskRpc(
@@ -362,7 +483,8 @@ async function getAuthoritativeTask(
                     taskCode,
 
                 p_include_deleted:
-                    includeDeleted === true
+                    includeDeleted ===
+                    true
             }
         );
 
@@ -375,7 +497,8 @@ async function getAuthoritativeTask(
 
     if (
         !task
-        || typeof task !== "object"
+        || typeof task !==
+            "object"
     ) {
         throw new AdminTaskLifecycleError(
             "The requested task could not be loaded.",
@@ -398,7 +521,7 @@ AUTHORIZE TASK RESPONSIBILITY
 Loads the authoritative task first, then verifies the
 current account against that task's persisted assignment.
 
-Returns both:
+Returns:
     - authoritative task
     - verified Taskboard context
 ========================================================= */
@@ -434,6 +557,221 @@ async function authorizeTaskLifecycleResponsibility(
 }
 
 /* =========================================================
+RPC PAYLOAD
+
+Only the reason-enabled Supabase RPCs receive p_reason.
+
+Reason-enabled:
+    admin_shelve_task
+    admin_archive_task
+    admin_delete_task
+========================================================= */
+
+function createLifecycleRpcPayload(
+    definition,
+    taskCode,
+    expectedVersion,
+    actorAccountId,
+    reason
+) {
+    const payload = {
+        p_task_code:
+            taskCode,
+
+        p_expected_version:
+            expectedVersion,
+
+        p_actor_account_id:
+            actorAccountId
+    };
+
+    if (
+        definition.requiresReason ===
+        true
+    ) {
+        payload.p_reason =
+            reason;
+    }
+
+    return payload;
+}
+
+/* =========================================================
+UPDATED TASK EXTRACTION
+
+Lifecycle RPCs return authoritative task data after the
+mutation.
+
+Discord notifications must use that authoritative record
+rather than the pre-mutation task or browser input.
+========================================================= */
+
+function extractUpdatedTask(
+    result
+) {
+    if (
+        result?.task
+        && typeof result.task ===
+            "object"
+        && !Array.isArray(
+            result.task
+        )
+    ) {
+        return result.task;
+    }
+
+    if (
+        result?.data?.task
+        && typeof result.data.task ===
+            "object"
+        && !Array.isArray(
+            result.data.task
+        )
+    ) {
+        return result.data.task;
+    }
+
+    if (
+        result?.data
+        && typeof result.data ===
+            "object"
+        && !Array.isArray(
+            result.data
+        )
+    ) {
+        return result.data;
+    }
+
+    if (
+        Array.isArray(
+            result
+        )
+        && result.length >
+            0
+        && result[0]
+        && typeof result[0] ===
+            "object"
+        && !Array.isArray(
+            result[0]
+        )
+    ) {
+        return result[0];
+    }
+
+    return null;
+}
+
+/* =========================================================
+DISCORD LIFECYCLE NOTIFICATION
+
+Notifications are currently sent for:
+    complete
+    shelve
+
+Destination:
+    TASKBOARD_SUMMARY_DISCORD
+
+Discord is intentionally outside the lifecycle mutation.
+
+If Discord fails, the successful Supabase mutation remains
+successful.
+========================================================= */
+
+async function notifyLifecycleDiscord(
+    env,
+    action,
+    result
+) {
+    if (
+        action !==
+            "complete"
+        && action !==
+            "shelve"
+    ) {
+        return;
+    }
+
+    const task =
+        extractUpdatedTask(
+            result
+        );
+
+    if (
+        !task
+    ) {
+        console.error(
+            "[TASKBOARD DISCORD LIFECYCLE NOTIFICATION SKIPPED]",
+            {
+                action,
+
+                code:
+                    "TASKBOARD_UPDATED_TASK_MISSING",
+
+                message:
+                    "The authoritative updated task could not be extracted from the lifecycle RPC response."
+            }
+        );
+
+        return;
+    }
+
+    try {
+        switch (
+            action
+        ) {
+            case "complete":
+                await sendTaskCompletedDiscordNotification(
+                    env,
+                    task
+                );
+
+                break;
+
+            case "shelve":
+                await sendTaskShelvedDiscordNotification(
+                    env,
+                    task
+                );
+
+                break;
+
+            default:
+                break;
+        }
+    }
+    catch (
+        error
+    ) {
+        console.error(
+            "[TASKBOARD DISCORD LIFECYCLE NOTIFICATION FAILED]",
+            {
+                action,
+
+                name:
+                    error?.name
+                    || null,
+
+                code:
+                    error?.code
+                    || null,
+
+                status:
+                    error?.status
+                    || null,
+
+                message:
+                    error?.message
+                    || "Unknown Discord notification error",
+
+                details:
+                    error?.details
+                    || null
+            }
+        );
+    }
+}
+
+/* =========================================================
 EXECUTE LIFECYCLE ACTION
 ========================================================= */
 
@@ -443,7 +781,9 @@ export async function performAdminTaskLifecycleAction(
     {
         action,
         taskCode,
-        expectedVersion
+        expectedVersion,
+        reason =
+            ""
     } = {}
 ) {
     /* -----------------------------------------------------
@@ -451,6 +791,9 @@ export async function performAdminTaskLifecycleAction(
     ----------------------------------------------------- */
 
     const {
+        action:
+            normalizedAction,
+
         definition
     } =
         requireLifecycleAction(
@@ -471,6 +814,12 @@ export async function performAdminTaskLifecycleAction(
             expectedVersion
         );
 
+    const normalizedReason =
+        requireLifecycleReason(
+            reason,
+            definition
+        );
+
     /* -----------------------------------------------------
     OPERATION PERMISSION
     ----------------------------------------------------- */
@@ -485,11 +834,10 @@ export async function performAdminTaskLifecycleAction(
     /* -----------------------------------------------------
     AUTHORITATIVE TASK + RESPONSIBILITY
 
-    The responsibility check uses the task's persisted
-    responsible_roles and returns the verified Taskboard
-    context.
+    Responsibility uses the persisted responsible_roles.
 
-    No second account or role lookup is required.
+    The verified Taskboard context supplies the actor account
+    ID for the mutation.
     ----------------------------------------------------- */
 
     const {
@@ -503,32 +851,61 @@ export async function performAdminTaskLifecycleAction(
         );
 
     /* -----------------------------------------------------
-    MUTATION
-
-    The same verified Taskboard context that passed the
-    responsibility check supplies the actor account ID.
+    RPC PAYLOAD
     ----------------------------------------------------- */
 
-    return callAdminTaskRpc(
+    const rpcPayload =
+        createLifecycleRpcPayload(
+            definition,
+            normalizedTaskCode,
+            normalizedVersion,
+            taskboardContext.accountId,
+            normalizedReason
+        );
+
+    /* -----------------------------------------------------
+    MUTATION
+    ----------------------------------------------------- */
+
+    const result =
+        await callAdminTaskRpc(
+            env,
+            definition.rpc,
+            rpcPayload
+        );
+
+    /* -----------------------------------------------------
+    DISCORD
+
+    Supabase mutation has already succeeded.
+
+    complete:
+        TASKBOARD_SUMMARY_DISCORD
+
+    shelve:
+        TASKBOARD_SUMMARY_DISCORD
+
+    Discord failures are logged but never convert a
+    successful lifecycle mutation into an API failure.
+    ----------------------------------------------------- */
+
+    await notifyLifecycleDiscord(
         env,
-        definition.rpc,
-        {
-            p_task_code:
-                normalizedTaskCode,
-
-            p_expected_version:
-                normalizedVersion,
-
-            p_actor_account_id:
-                taskboardContext.accountId
-        }
+        normalizedAction,
+        result
     );
+
+    /* -----------------------------------------------------
+    RESPONSE
+    ----------------------------------------------------- */
+
+    return result;
 }
 
 /* =========================================================
 START
 
-Transitions:
+Transition:
     To Do -> In Progress
 ========================================================= */
 
@@ -608,6 +985,9 @@ export async function reopenAdminTask(
 
 /* =========================================================
 SHELVE
+
+Requires:
+    reason
 ========================================================= */
 
 export async function shelveAdminTask(
@@ -615,7 +995,8 @@ export async function shelveAdminTask(
     env,
     {
         taskCode,
-        expectedVersion
+        expectedVersion,
+        reason
     } = {}
 ) {
     return performAdminTaskLifecycleAction(
@@ -627,7 +1008,9 @@ export async function shelveAdminTask(
 
             taskCode,
 
-            expectedVersion
+            expectedVersion,
+
+            reason
         }
     );
 }
@@ -660,6 +1043,9 @@ export async function unshelveAdminTask(
 
 /* =========================================================
 ARCHIVE
+
+Requires:
+    reason
 ========================================================= */
 
 export async function archiveAdminTask(
@@ -667,7 +1053,8 @@ export async function archiveAdminTask(
     env,
     {
         taskCode,
-        expectedVersion
+        expectedVersion,
+        reason
     } = {}
 ) {
     return performAdminTaskLifecycleAction(
@@ -679,7 +1066,9 @@ export async function archiveAdminTask(
 
             taskCode,
 
-            expectedVersion
+            expectedVersion,
+
+            reason
         }
     );
 }
@@ -712,6 +1101,9 @@ export async function restoreArchivedAdminTask(
 
 /* =========================================================
 DELETE
+
+Requires:
+    reason
 ========================================================= */
 
 export async function deleteAdminTask(
@@ -719,7 +1111,8 @@ export async function deleteAdminTask(
     env,
     {
         taskCode,
-        expectedVersion
+        expectedVersion,
+        reason
     } = {}
 ) {
     return performAdminTaskLifecycleAction(
@@ -731,7 +1124,9 @@ export async function deleteAdminTask(
 
             taskCode,
 
-            expectedVersion
+            expectedVersion,
+
+            reason
         }
     );
 }
@@ -770,7 +1165,8 @@ export function isAdminTaskLifecycleError(
     error
 ) {
     return (
-        error instanceof AdminTaskLifecycleError
+        error instanceof
+            AdminTaskLifecycleError
         || error?.name ===
             "AdminTaskLifecycleError"
     );

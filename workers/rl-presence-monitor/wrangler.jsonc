@@ -1,37 +1,43 @@
 {
-  "name": "bpd-rl-presence-monitor",
-  "main": "src/index.js",
-  "compatibility_date": "2026-09-16",
-  "workers_dev": false,
-  "preview_urls": false,
+    "name": "bpd-rl-presence-monitor",
+    "main": "src/index.js",
+    "compatibility_date": "2026-09-16",
+    "workers_dev": false,
+    "preview_urls": false,
 
-  "routes": [
-    {
-      "pattern": "status.bpd-gaming-network.com",
-      "custom_domain": true
+    "routes": [
+        {
+            "pattern": "status.bpd-gaming-network.com",
+            "custom_domain": true
+        }
+    ],
+
+    "kv_namespaces": [
+        {
+            "binding": "AUTH_SESSIONS",
+            "id": "941c19ab958e498a9846b80cfd3f6525"
+        }
+    ],
+
+    "triggers": {
+        "crons": [
+            "*/15 * * * *",
+            "5 11 * * SAT",
+            "0 0 * * *"
+        ]
+    },
+
+    "vars": {
+        "SUPABASE_URL": "https://xslrwamnfqgoziaczgsn.supabase.co/rest/v1/",
+        "MMR_API_URL": "https://mmr.bpd-gaming-network.com"
+    },
+
+    "observability": {
+        "logs": {
+            "enabled": true,
+            "head_sampling_rate": 0.25,
+            "invocation_logs": true,
+            "persist": true
+        }
     }
-  ],
-
-  "kv_namespaces": [{ "binding": "AUTH_SESSIONS", "id": "941c19ab958e498a9846b80cfd3f6525" }],
-
-  "triggers": {
-    "crons": [
-      "*/15 * * * *",
-      "5 11 * * SAT"
-    ]
-  },
-
-  "vars": {
-    "SUPABASE_URL": "https://xslrwamnfqgoziaczgsn.supabase.co/rest/v1/",
-    "MMR_API_URL": "https://mmr.bpd-gaming-network.com"
-  },
-
-  "observability": {
-    "logs": {
-      "enabled": true,
-      "head_sampling_rate": 1,
-      "invocation_logs": true,
-      "persist": true
-    }
-  }
 }

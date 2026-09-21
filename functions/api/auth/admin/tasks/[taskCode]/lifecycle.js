@@ -28,7 +28,9 @@ Supported Actions:
 Description:
     - Reads the authoritative task code from the route.
     - Requires expectedVersion for optimistic concurrency.
-    - Accepts only action and expectedVersion in the body.
+    - Accepts action, expectedVersion, and a lifecycle reason
+      where required.
+    - Requires reasons for shelve, archive, and delete.
     - Maps lifecycle action names to trusted server-side
       service functions.
     - Does not allow the browser to choose raw Supabase RPC
@@ -78,7 +80,15 @@ const JSON_HEADERS =
 const ALLOWED_BODY_FIELDS =
     new Set([
         "action",
-        "expectedVersion"
+        "expectedVersion",
+        "reason"
+    ]);
+
+const REASON_REQUIRED_ACTIONS =
+    new Set([
+        "shelve",
+        "archive",
+        "delete"
     ]);
 
 const LIFECYCLE_ACTIONS =
@@ -118,7 +128,8 @@ NORMALIZATION
 function normalizeString(
     value
 ) {
-    return typeof value === "string"
+    return typeof value ===
+        "string"
         ? value.trim()
         : "";
 }
@@ -187,7 +198,8 @@ function getTaskCode(
     const taskCode =
         normalizeString(
             context?.params?.taskCode
-        ).toUpperCase();
+        )
+            .toUpperCase();
 
     if (
         !TASK_CODE_PATTERN.test(
@@ -216,7 +228,8 @@ async function readJsonBody(
             request.headers.get(
                 "content-type"
             )
-        ).toLowerCase();
+        )
+            .toLowerCase();
 
     if (
         !contentType.includes(
@@ -246,7 +259,8 @@ async function readJsonBody(
 
     if (
         !body
-        || typeof body !== "object"
+        || typeof body !==
+            "object"
         || Array.isArray(
             body
         )
@@ -264,16 +278,20 @@ async function readJsonBody(
 /* =========================================================
 BODY VALIDATION
 
-Only:
+Accepted:
 {
     "action": "...",
-    "expectedVersion": 1
+    "expectedVersion": 1,
+    "reason": "..."
 }
 
-is accepted.
+reason is required only for:
+    shelve
+    archive
+    delete
 
-All actor identity, lifecycle metadata, timestamps, RPC
-names, and task state are controlled server-side.
+Actor identity, lifecycle metadata, timestamps, RPC names,
+and task state remain controlled server-side.
 ========================================================= */
 
 function validateBodyFields(
@@ -349,7 +367,8 @@ function getExpectedVersion(
         !Number.isSafeInteger(
             version
         )
-        || version < 1
+        || version <
+            1
     ) {
         throw createRequestError(
             "TASK_VERSION_INVALID",
@@ -359,6 +378,71 @@ function getExpectedVersion(
     }
 
     return version;
+}
+
+/* =========================================================
+LIFECYCLE REASON
+
+Reasons are intentionally accepted only for lifecycle
+operations where an audit explanation is required.
+
+Required:
+    shelve
+    archive
+    delete
+
+Unsupported for all other lifecycle actions.
+========================================================= */
+
+function getLifecycleReason(
+    body,
+    action
+) {
+    const reason =
+        normalizeString(
+            body?.reason
+        );
+
+    const requiresReason =
+        REASON_REQUIRED_ACTIONS.has(
+            action
+        );
+
+    if (
+        requiresReason
+        && !reason
+    ) {
+        throw createRequestError(
+            "TASK_LIFECYCLE_REASON_REQUIRED",
+            "A reason is required for this lifecycle action.",
+            400,
+            {
+                action
+            }
+        );
+    }
+
+    if (
+        !requiresReason
+        && Object.prototype.hasOwnProperty.call(
+            body,
+            "reason"
+        )
+        && reason
+    ) {
+        throw createRequestError(
+            "TASK_LIFECYCLE_REASON_UNSUPPORTED",
+            "A reason is not supported for this lifecycle action.",
+            400,
+            {
+                action
+            }
+        );
+    }
+
+    return requiresReason
+        ? reason
+        : "";
 }
 
 /* =========================================================
@@ -377,8 +461,10 @@ function getErrorStatus(
         Number.isInteger(
             status
         )
-        && status >= 400
-        && status <= 599
+        && status >=
+            400
+        && status <=
+            599
     ) {
         return status;
     }
@@ -402,7 +488,8 @@ function getErrorMessage(
     status
 ) {
     if (
-        status >= 500
+        status >=
+        500
     ) {
         return "The task lifecycle request could not be completed.";
     }
@@ -433,7 +520,8 @@ function handleApiError(
         );
 
     if (
-        status >= 500
+        status >=
+        500
     ) {
         console.error(
             "[ADMIN TASK LIFECYCLE API]",
@@ -478,9 +566,12 @@ function handleApiError(
     };
 
     if (
-        status < 500
-        && error?.details !== undefined
-        && error?.details !== null
+        status <
+            500
+        && error?.details !==
+            undefined
+        && error?.details !==
+            null
     ) {
         responseBody.details =
             error.details;
@@ -495,19 +586,29 @@ function handleApiError(
 /* =========================================================
 POST /api/auth/admin/tasks/:taskCode/lifecycle
 
-Example:
+Normal Example:
 {
     "action": "start",
     "expectedVersion": 4
 }
 
-The browser selects a public lifecycle action only.
+Reason Example:
+{
+    "action": "archive",
+    "expectedVersion": 4,
+    "reason": "Superseded by the replacement implementation."
+}
+
+The browser may provide:
+    - public lifecycle action
+    - expected task version
+    - required audit reason where supported
 
 It cannot provide:
     - actor identity
     - task status
     - lifecycle timestamps
-    - lifecycle metadata
+    - lifecycle ownership metadata
     - Supabase RPC names
 ========================================================= */
 
@@ -571,19 +672,35 @@ export async function onRequestPost(
                 body.expectedVersion
             );
 
+        const reason =
+            getLifecycleReason(
+                body,
+                action
+            );
+
         const lifecycleFunction =
             LIFECYCLE_ACTIONS[
                 action
             ];
 
+        const lifecycleInput = {
+            taskCode,
+
+            expectedVersion
+        };
+
+        if (
+            reason
+        ) {
+            lifecycleInput.reason =
+                reason;
+        }
+
         const result =
             await lifecycleFunction(
                 request,
                 env,
-                {
-                    taskCode,
-                    expectedVersion
-                }
+                lifecycleInput
             );
 
         return jsonResponse(
@@ -610,10 +727,12 @@ export async function onRequest(
     const method =
         normalizeString(
             context?.request?.method
-        ).toUpperCase();
+        )
+            .toUpperCase();
 
     if (
-        method === "POST"
+        method ===
+        "POST"
     ) {
         return onRequestPost(
             context
