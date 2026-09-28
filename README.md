@@ -56,4 +56,4 @@ PROJECT SETUP & DEVELOPMENT GUIDE
                 kv_namespaces.json      ← Optional reference file
             public/                     ← Static assets (CSS, JS, images)
             .env.example                ← Environment variable names only
-            wrangler.toml               ← KV bindings + Worker configuration
+            wrangler.jsonc              ← Cloudflare Pages Functions configuration
