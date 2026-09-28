@@ -8,7 +8,8 @@
         "build": "npm run cache:ids && wrangler pages functions build functions --outdir=.wrangler/pages-build",
         "build:check": "wrangler pages functions build functions --outdir=.wrangler/pages-build",
         "dev": "npm run cache:ids && wrangler pages dev",
-        "test": "npm run build:check"
+        "test": "npm run test:ocr && npm run build:check",
+        "test:ocr": "node --test tests/ocr/*.test.mjs"
     },
     "devDependencies": {
         "wrangler": "^4"

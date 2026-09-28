@@ -38,6 +38,11 @@ import {
     getProviderContext
 } from "../../../services/auth/sessions/session_context.js";
 
+import {
+    normalizeOcrDisposition,
+    sanitizeOcrRejectionDetail
+} from "../../../services/ocr/contracts.js";
+
 /* =========================================================
 VERSION
 ========================================================= */
@@ -59,7 +64,9 @@ const ALLOWED_STATUSES =
     new Set([
         "created",
         "uploading",
+        "uploaded",
         "queued",
+        "dispatching",
         "processing",
         "completed",
         "failed"
@@ -70,6 +77,18 @@ const MAX_MESSAGE_LENGTH =
 
 const MAX_STAGE_LENGTH =
     64;
+
+const ALLOWED_SCOREBOARD_FIELDS =
+    new Set([
+        "score",
+        "goals",
+        "assists",
+        "demos",
+        "saves",
+        "shots",
+        "damage",
+        "ping"
+    ]);
 
 /* =========================================================
 MAIN
@@ -929,7 +948,7 @@ async function mergeCloudProgress(
 SAFE JOB RESPONSE
 ========================================================= */
 
-function sanitizeJobResponse(
+export function sanitizeJobResponse(
     statusData
 ) {
     const status =
@@ -944,6 +963,41 @@ function sanitizeJobResponse(
             : normalizeProgress(
                 statusData?.progress
             );
+
+    const confirmationStatus =
+        normalizeConfirmationStatus(
+            statusData?.confirmationStatus
+        );
+
+    let reviewRequired = (
+        statusData?.reviewRequired ===
+        true
+        || statusData?.requiresPlayerReview ===
+            true
+        || confirmationStatus ===
+            "pending_review"
+    );
+
+    const disposition =
+        normalizeOcrDisposition(
+            statusData?.disposition,
+            confirmationStatus,
+            reviewRequired
+        );
+
+    const rejection =
+        sanitizeJobRejection(
+            statusData,
+            disposition
+        );
+
+    reviewRequired = (
+        reviewRequired
+        || disposition ===
+            "needs_review"
+        || rejection?.reviewRequired ===
+            true
+    );
 
     return {
         jobId:
@@ -1007,19 +1061,24 @@ function sanitizeJobResponse(
                 statusData?.work
             ),
 
-        reviewRequired:
-            statusData?.reviewRequired ===
-                true
-            || statusData?.requiresPlayerReview ===
-                true
-            || normalizeConfirmationStatus(
-                statusData?.confirmationStatus
-            ) ===
-                "pending_review",
+        reviewRequired,
 
         confirmationStatus:
-            normalizeConfirmationStatus(
-                statusData?.confirmationStatus
+            confirmationStatus,
+
+        disposition,
+
+        rejection,
+
+        editDeadlineAt:
+            normalizeTimestamp(
+                statusData?.editDeadlineAt
+            ),
+
+        columns:
+            sanitizePublicColumns(
+                statusData?.columns
+                || statusData?.activeFields
             ),
 
         error:
@@ -1038,6 +1097,112 @@ function sanitizeJobResponse(
                 )
                 : null
     };
+}
+
+function sanitizeJobRejection(
+    statusData,
+    disposition
+) {
+    const rawDetail =
+        statusData?.rejection
+        || statusData?.rejectionDetail
+        || (
+            statusData?.rejectionCode
+            || statusData?.reviewReason
+                ? {
+                    code:
+                        statusData.rejectionCode
+                        || statusData.reviewReason
+                }
+                : null
+        );
+
+    const detail =
+        typeof rawDetail ===
+            "string"
+            ? {
+                code:
+                    rawDetail
+            }
+            : rawDetail;
+
+    if (!detail || typeof detail !== "object" || Array.isArray(detail)) {
+        return null;
+    }
+
+    const rejection =
+        sanitizeOcrRejectionDetail(
+            detail
+        );
+
+    if (
+        disposition
+        && rejection.disposition
+        && rejection.disposition !==
+            disposition
+    ) {
+        return null;
+    }
+
+    return rejection;
+}
+
+function sanitizePublicColumns(
+    value
+) {
+    const rawColumns =
+        Array.isArray(
+            value
+        )
+            ? value
+            : value
+            && typeof value ===
+                "object"
+            && !Array.isArray(
+                value
+            )
+                ? Object.keys(
+                    value
+                )
+                : [];
+
+    const columns = [];
+
+    for (
+        const rawColumn
+        of rawColumns
+    ) {
+        const column =
+            String(
+                typeof rawColumn ===
+                    "object"
+                    ? (
+                        rawColumn?.field
+                        || rawColumn?.name
+                        || rawColumn?.key
+                        || ""
+                    )
+                    : rawColumn
+                    || ""
+            )
+                .trim()
+                .toLowerCase();
+
+        if (
+            ALLOWED_SCOREBOARD_FIELDS.has(
+                column
+            )
+            && !columns.includes(
+                column
+            )
+        ) {
+            columns.push(
+                column
+            );
+        }
+    }
+
+    return columns;
 }
 
 /* =========================================================
@@ -1219,36 +1384,23 @@ function sanitizeError(
         return null;
     }
 
-    const code =
-        String(
-            error.code
-            || "OCR_FAILED"
-        )
-            .trim()
-            .toUpperCase()
-            .slice(
-                0,
-                80
-            );
-
-    const message =
-        String(
-            error.message
-            || "The image could not be processed."
-        )
-            .replace(
-                /\s+/g,
-                " "
-            )
-            .trim()
-            .slice(
-                0,
-                MAX_MESSAGE_LENGTH
-            );
+    const safe =
+        sanitizeOcrRejectionDetail({
+            code:
+                error.code
+        });
 
     return {
-        code,
-        message
+        code:
+            safe.code,
+        message:
+            "The scoreboard could not be processed.",
+        userMessage:
+            "The scoreboard could not be processed.",
+        messageKey:
+            safe.messageKey,
+        retryable:
+            safe.retryable
     };
 }
 

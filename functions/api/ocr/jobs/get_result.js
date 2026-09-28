@@ -41,6 +41,11 @@ import {
     getCurrentMatchReport
 } from "../../../services/ocr/storage.js";
 
+import {
+    normalizeOcrDisposition,
+    sanitizeOcrRejectionDetail
+} from "../../../services/ocr/contracts.js";
+
 /* =========================================================
 VERSION
 ========================================================= */
@@ -440,7 +445,7 @@ export async function onRequestGet(
                     ?.confirmationStatus
             );
 
-        const requiresPlayerReview = (
+        let requiresPlayerReview = (
             matchReport
                 ?.requiresPlayerReview ===
                 true
@@ -449,6 +454,27 @@ export async function onRequestGet(
                 true
             || confirmationStatus ===
                 "pending_review"
+        );
+
+        const disposition =
+            normalizeOcrDisposition(
+                matchReport?.disposition,
+                confirmationStatus,
+                requiresPlayerReview
+            );
+
+        const rejection =
+            sanitizePublicRejection(
+                matchReport,
+                disposition
+            );
+
+        requiresPlayerReview = (
+            requiresPlayerReview
+            || disposition ===
+                "needs_review"
+            || rejection?.reviewRequired ===
+                true
         );
 
         /* =================================================
@@ -461,27 +487,13 @@ export async function onRequestGet(
                     ?.editDeadlineAt
             );
 
-        if (
-            !editDeadlineAt
-        ) {
-            return jsonResponse(
-                {
-                    success:
-                        false,
-                    code:
-                        "EDIT_DEADLINE_MISSING",
-                    message:
-                        "Stored match report does not contain a valid edit deadline."
-                },
-                409
-            );
-        }
-
         const editWindowOpen =
-            Date.now() <
-            Date.parse(
-                editDeadlineAt
-            );
+            editDeadlineAt
+                ? Date.now() <
+                    Date.parse(
+                        editDeadlineAt
+                    )
+                : false;
 
         /* =================================================
         SANITIZE SCOREBOARD
@@ -534,6 +546,8 @@ export async function onRequestGet(
                 requiresPlayerReview,
                 reviewRequired:
                     requiresPlayerReview,
+                disposition,
+                rejection,
                 editDeadlineAt,
                 editWindowOpen,
                 hasDisputes:
@@ -942,7 +956,7 @@ async function readStoredJson(
 PUBLIC SCOREBOARD
 ========================================================= */
 
-function sanitizePublicScoreboard(
+export function sanitizePublicScoreboard(
     matchReport,
     {
         includeReviewEvidence = false,
@@ -950,45 +964,21 @@ function sanitizePublicScoreboard(
     } = {}
 ) {
     const teams =
-        Array.isArray(
-            matchReport?.teams
-        )
-            ? matchReport.teams
-            : [];
+        getStoredTeams(
+            matchReport
+        );
 
     const publicTeams =
         [];
 
-    const storedActiveFields =
-        Array.isArray(
-            matchReport?.activeFields
-        )
-            ? matchReport.activeFields
-            : [];
-
-    const activeFields =
-        storedActiveFields
-            .map(
-                function(
-                    field
-                ) {
-                    return String(
-                        field
-                        || ""
-                    )
-                        .trim()
-                        .toLowerCase();
-                }
-            )
-            .filter(
-                function(
-                    field
-                ) {
-                    return ALLOWED_SCOREBOARD_FIELDS.has(
-                        field
-                    );
-                }
-            );
+    const {
+        activeFields,
+        columns
+    } =
+        resolvePublicColumns(
+            matchReport,
+            teams
+        );
 
     const activeFieldSet =
         new Set(
@@ -1046,16 +1036,40 @@ function sanitizePublicScoreboard(
                 )
                     .trim();
 
-            if (
-                !playerName
-            ) {
-                continue;
-            }
-
             const publicPlayer = {
                 player:
                     playerName
+                    || `Unknown Player ${Number.isSafeInteger(Number(player?.teamPlayerIndex)) && Number(player.teamPlayerIndex) > 0 ? Number(player.teamPlayerIndex) : publicPlayers.length + 1}`
             };
+
+            if (player?.nameEvidence && typeof player.nameEvidence === "object") {
+                const observedName = sanitizeText(player.nameEvidence.raw);
+                const matchStatus = String(player?.matchStatus || "")
+                    .trim()
+                    .toUpperCase();
+
+                if (observedName) {
+                    publicPlayer.observedName = observedName;
+                }
+
+                if (["NAME_MATCHED", "NAME_REVIEW_REQUIRED", "NAME_UNVERIFIED"].includes(matchStatus)) {
+                    publicPlayer.nameMatchStatus = matchStatus;
+                }
+
+                publicPlayer.nameConfidence = sanitizeConfidence(
+                    player.nameEvidence.confidence
+                );
+            }
+
+            if (typeof player?.overallConfidence !== "undefined") {
+                publicPlayer.overallConfidence = sanitizeConfidence(
+                    player.overallConfidence
+                );
+            }
+
+            if (player?.requiresVerification === true) {
+                publicPlayer.requiresVerification = true;
+            }
 
             const publicReviewFields =
                 {};
@@ -1142,12 +1156,25 @@ function sanitizePublicScoreboard(
             publicPlayers.length >
                 0
         ) {
-            publicTeams.push({
+            const publicTeam = {
                 team:
                     teamIndex,
                 players:
                     publicPlayers
-            });
+            };
+
+            if (Object.hasOwn(team, "totalGoals")) {
+                publicTeam.totalGoals = sanitizeScoreboardValue(
+                    team.totalGoals
+                );
+                publicTeam.totalGoalsConfidence = sanitizeConfidence(
+                    team.totalGoalsConfidence
+                );
+                publicTeam.totalGoalsRequiresVerification =
+                    team.totalGoalsRequiresVerification === true;
+            }
+
+            publicTeams.push(publicTeam);
         }
     }
 
@@ -1160,15 +1187,300 @@ function sanitizePublicScoreboard(
             sanitizeText(
                 matchReport?.matchType
             ),
+        sourceMode:
+            ["automatic", "manual"].includes(
+                String(matchReport?.sourceMode || "").trim().toLowerCase()
+            )
+                ? String(matchReport.sourceMode).trim().toLowerCase()
+                : null,
         middleStat:
             sanitizeMiddleStat(
                 matchReport?.middleStat
             ),
         activeFields,
+        columns,
+        confidenceSummary:
+            sanitizePublicConfidenceSummary(
+                matchReport?.confidenceSummary
+            ),
+        columnDescriptors:
+            buildPublicColumnDescriptors(
+                columns
+            ),
         editDeadlineAt,
         teams:
             publicTeams
     };
+}
+
+function buildPublicColumnDescriptors(fields) {
+    const labels = {
+        score: "Score",
+        goals: "Goals",
+        assists: "Assists",
+        demos: "Demos",
+        saves: "Saves",
+        shots: "Shots",
+        damage: "Damage",
+        ping: "Ping"
+    };
+
+    return fields.map((key, order) => ({
+        key,
+        label: labels[key] || key,
+        semantic: key === "score"
+            ? "player_score"
+            : key === "ping"
+                ? "network_latency"
+                : "player_stat",
+        editable: true,
+        order
+    }));
+}
+
+/* =========================================================
+LEGACY TEAM / COLUMN COMPATIBILITY
+========================================================= */
+
+function getStoredTeams(
+    matchReport
+) {
+    if (
+        Array.isArray(
+            matchReport?.teams
+        )
+        && matchReport.teams.length >
+            0
+    ) {
+        return matchReport.teams;
+    }
+
+    return [
+        1,
+        2
+    ]
+        .map(
+            function(
+                teamIndex
+            ) {
+                const legacyTeam =
+                    matchReport?.[
+                        `team${teamIndex}`
+                    ];
+
+                const players =
+                    Array.isArray(
+                        legacyTeam
+                    )
+                        ? legacyTeam
+                        : Array.isArray(
+                            legacyTeam?.players
+                        )
+                            ? legacyTeam.players
+                            : [];
+
+                return {
+                    team:
+                        teamIndex,
+                    players
+                };
+            }
+        )
+        .filter(
+            function(
+                team
+            ) {
+                return team.players.length >
+                    0;
+            }
+        );
+}
+
+function resolvePublicColumns(
+    matchReport,
+    teams
+) {
+    const storedActiveFields =
+        sanitizePublicFieldList(
+            matchReport?.activeFields
+        );
+
+    const storedColumns =
+        sanitizePublicFieldList(
+            matchReport?.columns
+        );
+
+    const observedPlayerFields =
+        collectObservedPlayerFields(
+            teams
+        );
+
+    const activeFields =
+        storedActiveFields.length >
+            0
+            ? storedActiveFields
+            : storedColumns.length >
+                0
+                ? storedColumns
+                : observedPlayerFields;
+
+    return {
+        activeFields,
+        columns:
+            storedColumns.length >
+                0
+                ? storedColumns
+                : activeFields
+    };
+}
+
+function sanitizePublicFieldList(
+    value
+) {
+    const rawFields =
+        Array.isArray(
+            value
+        )
+            ? value
+            : value
+            && typeof value ===
+                "object"
+            && !Array.isArray(
+                value
+            )
+                ? Object.keys(
+                    value
+                )
+                : [];
+
+    const fields = [];
+
+    for (
+        const rawField
+        of rawFields
+    ) {
+        const field =
+            String(
+                typeof rawField ===
+                    "object"
+                    ? (
+                        rawField?.field
+                        || rawField?.name
+                        || rawField?.key
+                        || ""
+                    )
+                    : rawField
+                    || ""
+            )
+                .trim()
+                .toLowerCase();
+
+        if (
+            ALLOWED_SCOREBOARD_FIELDS.has(
+                field
+            )
+            && !fields.includes(
+                field
+            )
+        ) {
+            fields.push(
+                field
+            );
+        }
+    }
+
+    return fields;
+}
+
+function collectObservedPlayerFields(
+    teams
+) {
+    const fields = [];
+
+    for (
+        const team
+        of teams
+    ) {
+        const players =
+            Array.isArray(
+                team?.players
+            )
+                ? team.players
+                : [];
+
+        for (
+            const player
+            of players
+        ) {
+            for (
+                const field
+                of ALLOWED_SCOREBOARD_FIELDS
+            ) {
+                if (
+                    !fields.includes(
+                        field
+                    )
+                    && sanitizeScoreboardValue(
+                        player?.[field]
+                    ) !== null
+                ) {
+                    fields.push(
+                        field
+                    );
+                }
+            }
+        }
+    }
+
+    return fields;
+}
+
+function sanitizePublicRejection(
+    matchReport,
+    disposition
+) {
+    const rawDetail =
+        matchReport?.rejection
+        || matchReport?.rejectionDetail
+        || (
+            matchReport?.rejectionCode
+            || matchReport?.reviewReason
+                ? {
+                    code:
+                        matchReport.rejectionCode
+                        || matchReport.reviewReason
+                }
+                : null
+        );
+
+    const detail =
+        typeof rawDetail ===
+            "string"
+            ? {
+                code:
+                    rawDetail
+            }
+            : rawDetail;
+
+    if (!detail || typeof detail !== "object" || Array.isArray(detail)) {
+        return null;
+    }
+
+    const rejection =
+        sanitizeOcrRejectionDetail(
+            detail
+        );
+
+    if (
+        disposition
+        && rejection.disposition
+        && rejection.disposition !==
+            disposition
+    ) {
+        return null;
+    }
+
+    return rejection;
 }
 
 /* =========================================================
@@ -1205,6 +1517,14 @@ function sanitizeReviewField(
             sanitizeConfidence(
                 reviewField?.confidence
             ),
+        weightedConfidence:
+            sanitizeConfidence(
+                reviewField?.weightedConfidence
+            ),
+        confidenceComponents:
+            sanitizeConfidenceComponents(
+                reviewField?.confidenceComponents
+            ),
         template:
             sanitizeEngineEvidence(
                 reviewField?.template
@@ -1213,10 +1533,46 @@ function sanitizeReviewField(
             sanitizeEngineEvidence(
                 reviewField?.tesseract
             ),
-        paddle:
-            sanitizeEngineEvidence(
-                reviewField?.paddle
-            )
+    };
+}
+
+function sanitizeConfidenceComponents(components) {
+    if (!components || typeof components !== "object" || Array.isArray(components)) {
+        return {};
+    }
+
+    const allowed = ["ocr", "engineAgreement", "rowGeometry", "validation"];
+    return Object.fromEntries(
+        allowed
+            .filter((key) => Object.hasOwn(components, key))
+            .map((key) => [key, sanitizeConfidence(components[key])])
+    );
+}
+
+function sanitizePublicConfidenceSummary(summary) {
+    if (!summary || typeof summary !== "object" || Array.isArray(summary)) {
+        return null;
+    }
+
+    const allowed = ["playerScore", "playerNames", "teamHeaderGoals"];
+    const components = {};
+    const weights = {};
+    for (const key of allowed) {
+        if (Object.hasOwn(summary.components || {}, key)) {
+            components[key] = sanitizeConfidence(summary.components[key]);
+        }
+        if (Object.hasOwn(summary.weights || {}, key)) {
+            weights[key] = sanitizeConfidence(summary.weights[key]);
+        }
+    }
+
+    const band = String(summary.band || "").trim().toLowerCase();
+    return {
+        overall: sanitizeConfidence(summary.overall),
+        band: ["low", "medium", "high"].includes(band) ? band : "low",
+        components,
+        weights,
+        requiresReview: summary.requiresReview === true
     };
 }
 

@@ -1,0 +1,104 @@
+SUPPORT, DATA, DEPENDENCIES, CACHES, AND GENERATED TREES
+Snapshot: 2026-09-26
+
+ROLE
+
+These directories are part of the inspected current working tree but are not the
+primary browser/API/worker source hierarchy. They contain project reference
+material, installed runtimes, repository metadata, local state, caches, training
+data, or generated output.
+
+NOTES/
+
+Notes/
++-- _addSecretToCloudflare
++-- _General_Notes
++-- _RocketLeague
++-- _stepsToUploadNewVersions
++-- -bpd-gaming-network.thebruckdanger.txt
++-- jpbDESIGN_DECISIONS.md
++-- jpbleague_schema_sample_data.xlsx
++-- sql base/
+    +-- 00_schemas.sql
+    +-- 01_core.sql
+    +-- 02_sched.sql
+    +-- 03_play.sql
+    +-- 04_audit.sql
+    +-- 05_derived.sql
+    +-- 06_functions.sql
+    +-- 07_rls.sql
+    +-- 08_scheduling.sql
+    +-- 09_seed.sql
+    +-- 10_scheduling_fix.sql
+    +-- 11_fixes.sql
+    +-- full sql.txt
+
+This is operational/design/database reference material. No runtime source file
+imports this directory directly in the inspected application structure.
+
+DEPENDENCY ENVIRONMENTS
+
+node_modules/
+    Installed Node dependency tree used by Wrangler and its transitive packages.
+    At inspection time: 257 descendant directories and 1,710 files.
+
+.venv/
+    Local Python virtual environment for OCR/Python tooling.
+    At inspection time: 5,256 descendant directories and 29,987 files.
+
+These trees are dependency-managed rather than project-authored module layouts.
+
+CLOUDFLARE LOCAL/BUILD STATE
+
+.wrangler/
+    Root Wrangler build/cache state, including the Pages Functions build output.
+    At inspection time: 13 descendant directories and 18 files.
+
+workers/rl-presence-monitor/.wrangler/
+    Local Miniflare state. Contains cache metadata and SQLite databases/WAL/SHM
+    files for cache, D1, KV, observability, and R2 emulation.
+
+_worker.bundle
+    Root generated/bundled worker artifact.
+
+PYTHON CACHES
+
+.ruff_cache/
+ocr_cloudData/.ruff_cache/
+    Ruff lint/analysis cache data.
+
+ocr_cloudData/__pycache__/
+ocr_cloudData/debug/__pycache__/
+ocr_cloudData/ocr/**/__pycache__/
+    Compiled Python bytecode caches corresponding to OCR modules.
+
+OCR DATA/OUTPUT
+
+ocr_cloudData/training/
+    Source/reference PNG datasets grouped by digit class 0-9, bar, and
+    undetermined. See 02_ocr_cloudData.txt for per-class counts.
+
+ocr_cloudData/output/
+    Generated diagnostic artifacts. Timestamped debug runs contain pipeline
+    stage images, JSON reports, and per-cell crops; ocr_debug contains manual-run
+    comparison images and result JSON.
+
+REPOSITORY METADATA
+
+.git/
+    Git object database, refs, logs, hooks, worktree index, and repository state.
+    At inspection time: 202 descendant directories and 385 files.
+
+LOCAL/UNTRACKED ROOT FILES
+
+.env
+.dev.vars
+    Local environment values used by development/runtime tooling.
+
+package.backup.json
+package-lock.backup.json
+    Local backup copies of package metadata/lock data.
+
+These files were present in the current working directory but were not returned
+by the current Git tracked-file listing.
+

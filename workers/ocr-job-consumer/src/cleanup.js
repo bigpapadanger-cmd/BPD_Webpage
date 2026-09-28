@@ -64,11 +64,8 @@ export async function cleanupStaleOcrJobs(
     const now =
         Date.now();
 
-    await cleanupDurableJobs(
-        env,
-        now
-    );
-
+    // Durable OCR inputs, job records, results, and review evidence are
+    // intentionally preserved. Cleanup is limited to transient progress.
     await cleanupOrphanedProgress(
         env,
         now
@@ -953,15 +950,23 @@ async function cleanupOneProgressObject(
         return;
     }
 
-    const durableStatus =
+    const durableStatusObject =
         await env.OCR_STORAGE.get(
             `ocr-jobs/${jobId}/status.json`
         );
 
-    if (
-        durableStatus
-    ) {
-        return;
+    if (durableStatusObject) {
+        try {
+            const durableStatus = await durableStatusObject.json();
+            const state = String(durableStatus?.status || "").trim().toLowerCase();
+
+            if (state !== "completed" && state !== "failed") {
+                return;
+            }
+        }
+        catch {
+            return;
+        }
     }
 
     const uploadedAt =

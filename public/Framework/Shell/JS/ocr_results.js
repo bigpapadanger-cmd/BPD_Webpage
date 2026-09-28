@@ -779,9 +779,6 @@ function getOcrFieldReviewState(
             ?? null,
         tesseract:
             reviewField?.tesseract
-            ?? null,
-        paddle:
-            reviewField?.paddle
             ?? null
     };
 }
@@ -1390,24 +1387,16 @@ function createOcrResultImage() {
 function getScoreboardFields(
     result
 ) {
-    const activeFields =
-        Array.isArray(
-            result?.activeFields
-        )
-            ? result.activeFields
-            : [];
+    const columns = getScoreboardColumns(result);
 
     const normalizedFields =
         new Set(
-            activeFields
+            columns
                 .map(
                     function(
-                        fieldName
+                        column
                     ) {
-                        return String(
-                            fieldName
-                            || ""
-                        )
+                        return String(column?.key || column || "")
                             .trim()
                             .toLowerCase();
                     }
@@ -1432,6 +1421,26 @@ function getScoreboardFields(
             );
         }
     );
+}
+
+function getScoreboardColumns(result) {
+    const descriptors = Array.isArray(result?.columnDescriptors)
+        ? result.columnDescriptors
+        : [];
+
+    if (descriptors.length > 0) {
+        return descriptors.filter(
+            (column) => OCR_RESULT_FIELD_ORDER.includes(
+                String(column?.key || "").trim().toLowerCase()
+            )
+        );
+    }
+
+    const legacyFields = Array.isArray(result?.activeFields)
+        ? result.activeFields
+        : [];
+
+    return legacyFields.map((key) => ({ key }));
 }
 
 function formatScoreboardHeader(
@@ -1724,7 +1733,7 @@ function createScoreboardTeamTable(
 
     const teamHeader =
         document.createElement(
-            "div"
+            "h3"
         );
 
     teamHeader.className =
@@ -1736,6 +1745,19 @@ function createScoreboardTeamTable(
     section.appendChild(
         teamHeader
     );
+
+    const totalGoals = team?.totalGoals !== null
+        && typeof team?.totalGoals !== "undefined"
+        && String(team.totalGoals).trim() !== ""
+        && Number.isInteger(Number(team.totalGoals))
+        ? Number(team.totalGoals)
+        : null;
+    const teamSummary = document.createElement("p");
+    teamSummary.className = "ocr-scoreboard-team-summary";
+    teamSummary.textContent = totalGoals === null
+        ? `Authoritative team goals: Unavailable${team?.totalGoalsRequiresVerification ? " (verification required)" : ""}`
+        : `Authoritative team goals: ${totalGoals}${team?.totalGoalsRequiresVerification ? " (verification required)" : ""}`;
+    section.appendChild(teamSummary);
 
     if (
         players.length === 0
@@ -1782,6 +1804,10 @@ function createScoreboardTeamTable(
             + "ocr-scoreboard-table"
         );
 
+    const caption = document.createElement("caption");
+    caption.textContent = `Team ${teamIndex} player scoreboard`;
+    table.appendChild(caption);
+
     const head =
         document.createElement(
             "thead"
@@ -1799,6 +1825,7 @@ function createScoreboardTeamTable(
 
     playerHeader.textContent =
         "Player";
+    playerHeader.scope = "col";
 
     headRow.appendChild(
         playerHeader
@@ -1817,6 +1844,7 @@ function createScoreboardTeamTable(
                 formatScoreboardHeader(
                     fieldName
                 );
+            header.scope = "col";
 
             headRow.appendChild(
                 header
@@ -3039,6 +3067,54 @@ function openFailureModal(
     openDialog();
 }
 
+function openOutcomeModal(detail) {
+    const disposition = String(detail?.disposition || "needs_review").toLowerCase();
+    const isRejected = disposition === "rejected";
+    const rejection = detail?.rejection || {};
+    const messages = {
+        "ocr.rejection.roster_uncertain": "The player roster could not be read confidently. Review the image or submit it again.",
+        "ocr.rejection.scoreboard_not_found": "A scoreboard could not be identified in this image.",
+        "ocr.rejection.layout_unsupported": "This scoreboard layout needs manual review.",
+        "ocr.rejection.processing_unavailable": "OCR could not finish. You can submit the image again."
+    };
+    const content = getDialogElements().content;
+    const primary = getDialogElements().primary;
+    const secondary = getDialogElements().secondary;
+
+    OCR_RESULTS_CURRENT_MODE = "outcome";
+    OCR_RESULTS_CURRENT_JOB_ID = validJobId(detail?.jobId)
+        ? normalizeId(detail.jobId)
+        : "";
+    OCR_RESULTS_CURRENT_MATCH_ID = "";
+    OCR_RESULTS_CURRENT_RESULT = null;
+    OCR_RESULTS_CURRENT_RESPONSE = null;
+    OCR_RESULTS_CURRENT_EDIT_DEADLINE_AT = null;
+
+    content.replaceChildren();
+    setDialogError();
+    setDialogText({
+        title: isRejected ? "Scoreboard Rejected" : "Scoreboard Needs Review",
+        subtitle: "OCR result",
+        message: messages[rejection.messageKey]
+            || "This OCR result needs attention before it can be used."
+    });
+
+    secondary.hidden = true;
+    primary.hidden = false;
+    primary.disabled = false;
+    primary.textContent = rejection.retryable === true
+        ? "Submit another image"
+        : "Close";
+    primary.onclick = function() {
+        closeDialog();
+        if (rejection.retryable === true) {
+            window.location.assign("/rocketleague/ocr/");
+        }
+    };
+
+    openDialog();
+}
+
 /* =========================================================
    RESULT MODAL
    ========================================================= */
@@ -3464,6 +3540,13 @@ export function initializeOcrResults() {
     document.addEventListener(
         "ocr:failure-open",
         handleFailureOpen
+    );
+
+    document.addEventListener(
+        "ocr:outcome-open",
+        function(event) {
+            openOutcomeModal(event?.detail || {});
+        }
     );
 
     OCR_RESULTS_READY =

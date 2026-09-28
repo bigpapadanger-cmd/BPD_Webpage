@@ -35,7 +35,12 @@
         "DISCORD_MATCHBOT_INSTALL_URL":"https://discord.com/oauth2/authorize?client_id=1549606323249877034",
         "DISCORD_MATCHBOT_PUBLIC_KEY":"6a1a6c317812b984de29ed9dc09c3dc9d5e83c81accd5e710a7d68737f666097",
         "MMR_API_URL":"https://mmr.bpd-gaming-network.com",
-        "RL_PRESENCE_MONITOR_URL":"https://status.bpd-gaming-network.com"
+        "RL_PRESENCE_MONITOR_URL":"https://status.bpd-gaming-network.com",
+        
+        "OCR_GCP_PROJECT_NUMBER":"1094994524157",
+        "OCR_GCP_WORKLOAD_IDENTITY_POOL_ID": "ocr-cloudflare-transfer-handle",
+        "OCR_GCP_WORKLOAD_IDENTITY_PROVIDER_ID":"bpd-ocr-cloudflare-x509",
+        "OCR_GCP_SERVICE_ACCOUNT_EMAIL":"ocr-cloudflare-handler@project-95bc2520-286c-45bf-9cb.iam.gserviceaccount.com"
     },
 
     "r2_buckets": [
@@ -60,5 +65,12 @@
                 "binding": "OCR_JOB_QUEUE"
             }
         ]
-    }
+    },
+
+    "mtls_certificates": [
+        {
+            "binding": "OCR_GCP_MTLS",
+            "certificate_id": "3e548c5b-b4e6-4a00-bc90-582b8c8e7fd3"
+        }
+    ]
 }

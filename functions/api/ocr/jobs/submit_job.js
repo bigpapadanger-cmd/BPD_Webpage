@@ -50,6 +50,14 @@ import {
     getProviderContext
 } from "../../../services/auth/sessions/session_context.js";
 
+import {
+    OCR_SOURCE_MODES,
+    normalizeOcrImageSourceMode,
+    normalizeOcrRosterContract,
+    normalizeOcrRosterSize,
+    normalizeOcrSourceMode
+} from "../../../services/ocr/contracts.js";
+
 /* =========================================================
 VERSION
 ========================================================= */
@@ -62,6 +70,25 @@ const OWNER_TYPE =
 
 const OWNER_VERSION =
     2;
+
+const MAX_IMAGE_BYTES =
+    10
+    * 1024
+    * 1024;
+
+const MAX_MATCH_METADATA_BYTES =
+    16
+    * 1024;
+
+const MAX_ROSTER_NAME_BYTES =
+    64;
+
+const ALLOWED_IMAGE_CONTENT_TYPES =
+    new Set([
+        "image/png",
+        "image/jpeg",
+        "image/webp"
+    ]);
 
 /* =========================================================
 PROGRESS
@@ -311,119 +338,115 @@ export async function onRequestPost(
             );
         }
 
-        /* =================================================
-        PLAYERS PER TEAM
-        ================================================= */
+        const hasSourceMode = formData.has("sourceMode");
+        const sourceMode = hasSourceMode
+            ? normalizeOcrSourceMode(formData.get("sourceMode"))
+            : null;
+        const submissionMode = normalizeOcrImageSourceMode(
+            formData.get("submissionMode")
+        );
 
-        const playersPerTeam =
-            Number(
-                formData.get(
-                    "playersPerTeam"
-                )
+        if ((hasSourceMode && !sourceMode) || !submissionMode) {
+            return jsonResponse({
+                success: false,
+                message: "Invalid OCR submission mode.",
+                version: SUBMIT_JOB_VERSION
+            }, 400);
+        }
+
+        const rawMatchMetadata =
+            formData.get(
+                "matchMetadata"
             );
 
         if (
-            ![
-                1,
-                2,
-                3,
-                4
-            ].includes(
-                playersPerTeam
+            formData.has(
+                "matchMetadata"
             )
+            && getUtf8ByteLength(
+                rawMatchMetadata
+            ) > MAX_MATCH_METADATA_BYTES
         ) {
-            return jsonResponse(
-                {
-                    success:
-                        false,
+            return jsonResponse({
+                success: false,
+                message: "OCR match metadata is too large.",
+                version: SUBMIT_JOB_VERSION
+            }, 413);
+        }
 
-                    message:
-                        "playersPerTeam must be 1, 2, 3, or 4.",
+        let playersPerTeam = normalizeOcrRosterSize(
+            formData.get("playersPerTeam")
+        );
+        let expectedPlayerNames = parseJsonArray(
+            formData.get("expectedPlayerNames")
+        );
+        let matchMetadata = parseMatchMetadata(
+            rawMatchMetadata
+        );
 
-                    version:
-                        SUBMIT_JOB_VERSION
-                },
-                400
+        if (formData.has("matchMetadata") && matchMetadata === null) {
+            return jsonResponse({
+                success: false,
+                message: "Invalid OCR match metadata.",
+                version: SUBMIT_JOB_VERSION
+            }, 400);
+        }
+
+        if (!hasSourceMode) {
+            const legacyValidation = validateLegacyRoster(
+                playersPerTeam,
+                expectedPlayerNames
             );
+
+            if (!legacyValidation.valid) {
+                return jsonResponse({
+                    success: false,
+                    message: legacyValidation.message,
+                    version: SUBMIT_JOB_VERSION
+                }, 400);
+            }
+
+            expectedPlayerNames = legacyValidation.expectedPlayerNames;
         }
+        else {
+            const team1Roster = matchMetadata?.teams?.find(
+                (team) => team.team === 1
+            )?.roster ?? null;
+            const team2Roster = matchMetadata?.teams?.find(
+                (team) => team.team === 2
+            )?.roster ?? null;
+            const rosterContract = normalizeOcrRosterContract({
+                sourceMode,
+                playersPerTeam: formData.has("playersPerTeam")
+                    ? formData.get("playersPerTeam")
+                    : null,
+                team1Roster,
+                team2Roster
+            });
 
-        /* =================================================
-        EXPECTED PLAYER NAMES
-        ================================================= */
+            if (!rosterContract) {
+                return jsonResponse({
+                    success: false,
+                    message: "Invalid OCR roster metadata.",
+                    version: SUBMIT_JOB_VERSION
+                }, 400);
+            }
 
-        let expectedPlayerNames;
+            playersPerTeam = rosterContract.playersPerTeam;
 
-        try {
-            expectedPlayerNames =
-                JSON.parse(
-                    String(
-                        formData.get(
-                            "expectedPlayerNames"
-                        )
-                        || "[]"
-                    )
-                );
-        }
-        catch {
-            expectedPlayerNames =
-                [];
-        }
-
-        if (
-            Array.isArray(
-                expectedPlayerNames
-            )
-        ) {
-            expectedPlayerNames =
-                expectedPlayerNames.map(
-                    function(
-                        value
-                    ) {
-                        return String(
-                            value
-                            || ""
-                        )
-                            .trim()
-                            .toUpperCase();
-                    }
-                );
-        }
-
-        const expectedCount =
-            playersPerTeam
-            * 2;
-
-        if (
-            !Array.isArray(
-                expectedPlayerNames
-            )
-            || expectedPlayerNames.length !==
-                expectedCount
-            || expectedPlayerNames.some(
-                function(
-                    name
-                ) {
-                    return !name;
-                }
-            )
-            || new Set(
-                expectedPlayerNames
-            ).size !==
-                expectedCount
-        ) {
-            return jsonResponse(
-                {
-                    success:
-                        false,
-
-                    message:
-                        `Player Names Must Contain Exactly ${expectedCount} Unique Names.`,
-
-                    version:
-                        SUBMIT_JOB_VERSION
-                },
-                400
-            );
+            if (sourceMode === OCR_SOURCE_MODES.MANUAL) {
+                expectedPlayerNames = [
+                    ...rosterContract.team1Roster,
+                    ...rosterContract.team2Roster
+                ].map((name) => name.toUpperCase());
+            }
+            else if (expectedPlayerNames.length > 0) {
+                return jsonResponse({
+                    success: false,
+                    message: "Automatic OCR cannot accept unstructured player names.",
+                    version: SUBMIT_JOB_VERSION
+                }, 400);
+            }
         }
 
         /* =================================================
@@ -458,15 +481,13 @@ export async function onRequestPost(
             );
         }
 
+        const imageValidation =
+            validateOcrImageMetadata(
+                image
+            );
+
         if (
-            Number.isFinite(
-                Number(
-                    image.size
-                )
-            )
-            && Number(
-                image.size
-            ) <= 0
+            !imageValidation.valid
         ) {
             return jsonResponse(
                 {
@@ -474,12 +495,12 @@ export async function onRequestPost(
                         false,
 
                     message:
-                        "Uploaded image is empty.",
+                        imageValidation.message,
 
                     version:
                         SUBMIT_JOB_VERSION
                 },
-                400
+                imageValidation.status
             );
         }
 
@@ -505,23 +526,44 @@ export async function onRequestPost(
             );
         }
 
+        if (
+            imageBytes.byteLength >
+            MAX_IMAGE_BYTES
+        ) {
+            return jsonResponse(
+                {
+                    success:
+                        false,
+
+                    message:
+                        "Uploaded image is too large.",
+
+                    version:
+                        SUBMIT_JOB_VERSION
+                },
+                413
+            );
+        }
+
         /* =================================================
         NORMALIZE REQUEST FIELDS
         ================================================= */
 
-        formData.set(
-            "playersPerTeam",
-            String(
-                playersPerTeam
-            )
-        );
+        formData.set("submissionMode", submissionMode);
 
-        formData.set(
-            "expectedPlayerNames",
-            JSON.stringify(
-                expectedPlayerNames
-            )
-        );
+        if (hasSourceMode) {
+            formData.set("sourceMode", sourceMode);
+            formData.set("matchMetadata", JSON.stringify(matchMetadata));
+        }
+
+        if (playersPerTeam === null) {
+            formData.delete("playersPerTeam");
+            formData.delete("expectedPlayerNames");
+        }
+        else {
+            formData.set("playersPerTeam", String(playersPerTeam));
+            formData.set("expectedPlayerNames", JSON.stringify(expectedPlayerNames));
+        }
 
         /* =================================================
         JOB
@@ -550,6 +592,9 @@ export async function onRequestPost(
             buildRequestFields(
                 formData
             );
+
+        fields.imageContentType =
+            imageValidation.contentType;
 
         /* =================================================
         TRUSTED SERVER-DERIVED OWNERSHIP
@@ -697,8 +742,7 @@ export async function onRequestPost(
                     httpMetadata: {
                         contentType:
                             String(
-                                image.type
-                                || "image/png"
+                                imageValidation.contentType
                             )
                     },
 
@@ -978,6 +1022,224 @@ function normalizeString(
     }
 
     return value.trim();
+}
+
+function parseJsonArray(value) {
+    if (typeof value !== "string") {
+        return [];
+    }
+
+    try {
+        const parsed = JSON.parse(value || "[]");
+
+        return Array.isArray(parsed) ? parsed : [];
+    }
+    catch {
+        return [];
+    }
+}
+
+function sanitizeOptionalMetadataValue(value) {
+    if (value == null) {
+        return null;
+    }
+
+    if (typeof value !== "string") {
+        return null;
+    }
+
+    const normalized = value.trim();
+
+    return normalized ? normalized.slice(0, 160) : null;
+}
+
+function getUtf8ByteLength(value) {
+    return new TextEncoder().encode(
+        typeof value === "string"
+            ? value
+            : ""
+    ).byteLength;
+}
+
+export function parseMatchMetadata(value) {
+    let parsed = {};
+
+    if (value != null && typeof value !== "string") {
+        return null;
+    }
+
+    if (typeof value === "string" && value.trim()) {
+        try {
+            parsed = JSON.parse(value);
+        }
+        catch {
+            return null;
+        }
+    }
+
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        return null;
+    }
+
+    const rawTeams = Array.isArray(parsed.teams) ? parsed.teams : [];
+
+    if (
+        rawTeams.length > 2
+        || rawTeams.some(
+            (team) => ![1, 2].includes(
+                Number(team?.team)
+            )
+        )
+        || new Set(
+            rawTeams.map(
+                (team) => Number(team?.team)
+            )
+        ).size !== rawTeams.length
+    ) {
+        return null;
+    }
+
+    const teams = [1, 2].map((teamNumber) => {
+        const source = rawTeams.find(
+            (team) => Number(team?.team) === teamNumber
+        );
+        const roster = normalizeRosterMetadata(
+            source?.roster
+        );
+
+        return {
+            team: teamNumber,
+            roster
+        };
+    });
+
+    if (teams.some((team) => team.roster === undefined)) {
+        return null;
+    }
+
+    return {
+        name: sanitizeOptionalMetadataValue(parsed.name),
+        id: sanitizeOptionalMetadataValue(parsed.id),
+        season: sanitizeOptionalMetadataValue(parsed.season),
+        date: sanitizeOptionalMetadataValue(parsed.date),
+        teams
+    };
+}
+
+function normalizeRosterMetadata(value) {
+    if (value == null) {
+        return null;
+    }
+
+    if (
+        !Array.isArray(value)
+        || value.length > 16
+    ) {
+        return undefined;
+    }
+
+    const roster = [];
+
+    for (
+        const name
+        of value
+    ) {
+        if (typeof name !== "string") {
+            return undefined;
+        }
+
+        const normalized = name.trim();
+
+        if (
+            !normalized
+            || getUtf8ByteLength(
+                normalized
+            ) > MAX_ROSTER_NAME_BYTES
+        ) {
+            return undefined;
+        }
+
+        roster.push(
+            normalized
+        );
+    }
+
+    return roster;
+}
+
+export function validateLegacyRoster(playersPerTeam, expectedPlayerNames) {
+    if (playersPerTeam === null) {
+        return {
+            valid: false,
+            message: "playersPerTeam must be an integer from 1 through 16."
+        };
+    }
+
+    const normalizedNames = Array.isArray(expectedPlayerNames)
+        ? expectedPlayerNames.map(
+            (value) => typeof value === "string"
+                ? value.trim().toUpperCase()
+                : ""
+        )
+        : [];
+    const expectedCount = playersPerTeam * 2;
+    const valid = normalizedNames.length === expectedCount
+        && normalizedNames.every(Boolean)
+        && normalizedNames.every(
+            (name) => getUtf8ByteLength(
+                name
+            ) <= MAX_ROSTER_NAME_BYTES
+        )
+        && new Set(normalizedNames).size === expectedCount;
+
+    return {
+        valid,
+        expectedPlayerNames: normalizedNames,
+        message: valid
+            ? ""
+            : `Player Names Must Contain Exactly ${expectedCount} Unique Names.`
+    };
+}
+
+export function validateOcrImageMetadata(image) {
+    const contentType = String(
+        image?.type
+        || ""
+    )
+        .split(";", 1)[0]
+        .trim()
+        .toLowerCase();
+
+    if (!ALLOWED_IMAGE_CONTENT_TYPES.has(contentType)) {
+        return {
+            valid: false,
+            status: 415,
+            message: "Uploaded image must be PNG, JPEG, or WebP."
+        };
+    }
+
+    const size = Number(image?.size);
+
+    if (!Number.isSafeInteger(size) || size <= 0) {
+        return {
+            valid: false,
+            status: 400,
+            message: "Uploaded image is empty."
+        };
+    }
+
+    if (size > MAX_IMAGE_BYTES) {
+        return {
+            valid: false,
+            status: 413,
+            message: "Uploaded image is too large."
+        };
+    }
+
+    return {
+        valid: true,
+        contentType
+    };
 }
 
 /* =========================================================

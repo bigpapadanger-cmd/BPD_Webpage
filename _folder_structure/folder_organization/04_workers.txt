@@ -1,0 +1,101 @@
+WORKERS/: INDEPENDENT CLOUDFLARE WORKERS
+Snapshot: 2026-09-26
+
+ROLE
+
+workers/ contains two separately configured Worker deployments. They do not use
+the root Pages wrangler.jsonc at deployment time; each child owns its entrypoint,
+bindings, routes, triggers, and observability settings.
+
+HIERARCHY
+
+workers/
++-- ocr-job-consumer/
+|   +-- wrangler.jsonc
+|   +-- src/
+|       +-- index.js       HTTP, queue, and scheduled-event entrypoint.
+|       +-- cleanup.js     Transient progress cleanup and edit-window sealing.
+|       +-- debug.js       Sanitized OCR trace creation/storage.
+|
++-- rl-presence-monitor/
+    +-- wrangler.jsonc
+    +-- src/
+    |   +-- index.js             /health, authorized /wake, and cron dispatcher.
+    |   +-- presence_cycle.js    Candidate selection, presence fetch/save cycle.
+    |   +-- scheduled_mmr.js     Scheduled MMR candidate refresh and persistence.
+    |   +-- taskboard_summary.js Taskboard aggregate load and Discord delivery.
+    +-- tests/
+    |   +-- account_mutations.test.mjs
+    |   +-- epic_entry_paths.test.mjs
+    |   +-- oauth_navigation.test.mjs
+    |   +-- oauth_provider_flows.test.mjs
+    |   +-- provider_authorization.test.mjs
+    |   +-- task_rpc_contract.test.mjs
+    |   +-- task_service_contract.test.mjs
+    |   +-- taskboard_sql_validation.mjs
+    |   +-- fixtures/taskboard_schema.sql
+    +-- .wrangler/
+        +-- cache/ and state/v3/
+            Local Miniflare/Worker cache plus SQLite state for cache, D1, KV,
+            observability, and R2 emulation.
+
+OCR JOB CONSUMER
+
+Configuration
+    Worker name       bpd-ocr-job-consumer
+    Entry             src/index.js
+    Custom domain     ocr.bpd-gaming-network.com (HTTP fetch returns 404; no
+                      unauthenticated health response is exposed)
+    Queue consumer    bpd-ocr-jobs; batch size 1; concurrency 2; two retries
+    Schedule          every 30 minutes for cleanup
+    R2 bindings       OCR_STORAGE and OCR_PROGRESS
+    External callback configured to the Pages process_job API
+
+Runtime relationships
+    root Pages wrangler.jsonc produces OCR_JOB_QUEUE messages
+        -> src/index.js consumes each message
+        -> reads/writes job state and progress in R2
+        -> calls the configured OCR processor (ocr_cloudData service)
+        -> sends processor results to functions/api/ocr/jobs/process_job.js
+        -> acknowledges, retries, or records failure
+    scheduled event
+        -> cleanup.js removes aged transient progress only; OCR inputs, job
+           records, reports, images, and review artifacts are retained
+    debug tracing
+        -> debug.js writes sanitized diagnostic traces when enabled
+
+ROCKET LEAGUE PRESENCE MONITOR
+
+Configuration
+    Worker name       bpd-rl-presence-monitor
+    Entry             src/index.js
+    Custom domain     status.bpd-gaming-network.com
+    KV binding        AUTH_SESSIONS
+    Schedules         every 15 minutes, weekly Saturday MMR refresh,
+                      and a daily trigger
+    External systems  Supabase and the configured MMR API
+
+Runtime relationships
+    GET /health
+        -> Worker health response
+    POST /wake
+        -> authorized on-demand presence cycle
+    15-minute cron
+        -> presence_cycle.js
+        -> Supabase RPC candidate/state operations
+        -> external presence lookup
+        -> saves presence and completes the cycle
+    weekly cron
+        -> scheduled_mmr.js
+        -> selects eligible candidates, calls MMR API, saves snapshots/state
+    daily cron
+        -> taskboard_summary.js
+        -> loads Supabase Taskboard aggregates and sends Discord summary output
+
+TEST OWNERSHIP
+
+The tests stored under rl-presence-monitor/tests cover both Worker behavior and
+contracts shared with root application code: account mutations, Epic/OAuth entry
+paths, provider authorization, Taskboard service/RPC contracts, and SQL schema
+validation. fixtures/taskboard_schema.sql supplies the schema validation fixture.
+

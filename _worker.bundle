@@ -1893,8 +1893,7 @@ async function handleOcrConfirmation({
           selectedEngine: reviewField.engine ?? null,
           confidence: reviewField.confidence ?? null,
           template: reviewField.template ?? null,
-          tesseract: reviewField.tesseract ?? null,
-          paddle: reviewField.paddle ?? null
+          tesseract: reviewField.tesseract ?? null
         }
       };
       authoritativeFields.push(

@@ -1,0 +1,72 @@
+PROJECT ROOT: CURRENT STRUCTURE
+Snapshot: 2026-09-26
+
+DomainData/  (saved in Codex as the RLFolderStructuring project)
+|
++-- functions/           Cloudflare Pages API handlers and server services.
++-- ocr_cloudData/       Python/Flask OCR processor, OCR source, and OCR datasets.
++-- public/              Static site output, client router, pages, and assets.
++-- workers/             Independently deployed Cloudflare Workers.
++-- Notes/               Operational notes, schema scripts, and design material.
+|
++-- .git/                Git repository metadata.
++-- .ruff_cache/         Root Python lint cache.
++-- .venv/               Local Python virtual environment.
++-- .wrangler/           Cloudflare local/build artifacts.
++-- node_modules/        Installed JavaScript dependencies.
+|
++-- wrangler.jsonc       Main Cloudflare Pages configuration.
++-- package.json         Node package metadata and project scripts.
++-- package-lock.json    Locked Node dependency graph.
++-- package-lock.backup.json / package.backup.json
+|                       Local backup copies; present but not tracked by Git.
++-- README.md            Development and deployment setup guide.
++-- _README              Additional project note file.
++-- CNAME                Custom domain declaration.
++-- eng.traineddata      Tesseract English OCR language data.
++-- _worker.bundle       Generated/bundled worker artifact.
++-- .gitignore           Git ignore rules.
++-- .env / .dev.vars     Local environment-variable files; present but untracked.
+
+MAIN CONFIGURATION RELATIONSHIPS
+
+package.json
+    cache:ids   -> public/scripts/generate-cache-ids.js
+    build       -> cache IDs, then build Pages Functions into .wrangler/pages-build
+    build:check -> build Pages Functions without cache-ID generation
+    dev         -> cache IDs, then start Wrangler Pages development
+    test        -> build:check
+
+wrangler.jsonc
+    pages_build_output_dir -> ./public
+    KV bindings            -> AUTH_SESSIONS, RL_STATS_CACHE
+    R2 bindings            -> OCR_TRAINING, OCR_STORAGE, OCR_PROGRESS
+    queue producer         -> OCR_JOB_QUEUE on bpd-ocr-jobs
+    service URLs           -> OCR processor, OCR job callbacks, Supabase,
+                              MMR API, and Rocket League presence monitor
+    public identity/config -> OAuth and authorization identifiers used by runtime
+
+ROOT-LEVEL RUNTIME BOUNDARIES
+
+    public/ + functions/
+        One Cloudflare Pages application. The browser assets and file-based
+        functions share wrangler.jsonc bindings.
+
+    workers/*
+        Separate Worker deployments. Each child has its own wrangler.jsonc.
+
+    ocr_cloudData/
+        Separate containerized Python service. Cloudflare code reaches it through
+        the configured OCR_API_URL / processor URL rather than importing Python.
+
+    Notes/
+        Support/reference material, not a runtime import boundary.
+
+VERSION-CONTROL SNAPSHOT
+
+Tracked application areas include functions (126 files), public (173 files),
+workers (9 files), the root Wrangler/package configuration, static domain/OCR
+files, and a tracked .wrangler subset. ocr_cloudData, Notes, local environments,
+and several backup/local-secret files are present in the working directory but
+are not listed as tracked files in the current Git index.
+

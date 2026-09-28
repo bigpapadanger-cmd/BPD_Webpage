@@ -1,0 +1,158 @@
+PUBLIC/: BROWSER APPLICATION, PAGES, AND STATIC ASSETS
+Snapshot: 2026-09-26
+
+ROLE
+
+public/ is the Cloudflare Pages build output configured by root wrangler.jsonc.
+It is a client-rendered site shell: index.html starts the application, routes.js
+describes pages, and Framework/Shell/JS/router.js loads shared and page-specific
+fragments/modules without separate full-page HTML documents.
+
+ROOT FILES
+
+public/
++-- index.html       Application shell/entry document.
++-- routes.js        Route-to-title/body/module/sidebar/header/footer map.
++-- _redirects       Clean-route rewrites into the shell.
++-- _headers         Static response-header rules.
++-- sitemap.xml      Search-engine route listing.
++-- robots.txt       Crawler policy.
++-- ads.txt          Advertising declaration.
++-- .assetsignore    Asset handling exclusions.
+
+SHARED FRAMEWORK
+
+public/Framework/
++-- Auth/
+|   +-- auth.js, oauthErrors.js
++-- Banner/
+|   +-- CSS/account_banner.css
+|   +-- HTML/account_banner.html
+|   +-- JS/account_banner.js
++-- Shell/
+    +-- CSS/
+    |   +-- Callers/
+    |   |   +-- master.css, master_admin.css, master_ark.css
+    |   |   +-- master_mc.css, master_rl.css
+    |   +-- General/
+    |   |   +-- body.css, footer.css, header.css, ocr_popup.css, shell.css
+    |   +-- Sidebar/
+    |       +-- hover.css, rl_AuthSidebar.css, sidebar.css
+    +-- HTML/
+    |   +-- Body/body.html
+    |   +-- Footer/footer.html
+    |   +-- Header/header.html
+    |   +-- Sidebar/
+    |       +-- admin.html, dashboard.html, hover.html, mainmenu.html, rl_menu.html
+    +-- JS/
+        +-- initialization.js       Shared shell initialization.
+        +-- router.js               Auth-aware fragment/module route loader.
+        +-- renderHeader.js         Header rendering.
+        +-- ocr_runtime.js          Persistent OCR client runtime.
+        +-- ocr_job_monitor.js      Job progress monitoring.
+        +-- ocr_notifications.js    OCR user notifications.
+        +-- ocr_results.js          OCR result handling.
+        +-- ocr_review_policy.js    OCR review decision policy.
+        +-- Admin/sidebar.js
+        +-- Sidebar/admin_navigation.js, sidebar.js, submenu.js
+        +-- Sidebar/RocketLeague/sidebar_auth.js
+
+PAGE GROUPS
+
+public/Global/
++-- 404/                 CSS/404.css, HTML/404.html, JS/404.js
++-- Account/             CSS/index.css, HTML/index.html, JS/index.js
++-- Admin/
+|   +-- Home/            CSS/index.css, HTML/index.html, JS/index.js
+|   +-- TaskBoard/
+|       +-- CSS/index.css, overlay.css
+|       +-- HTML/index.html, create_task.html, task_confirm.html,
+|       |        task_detail.html, task_edit.html, task_history.html
+|       +-- JS/index.js, create_task.js, task_comments.js, task_confirm.js,
+|                task_detail.js, task_edit.js, task_history.js, task_lifecycle.js
++-- Ads/                 CSS/ads.css, HTML/ads.html, JS/ads.js
++-- Index/               CSS/index.css, HTML/home.html, JS/index.js
++-- Links/               links.css, links.html, links.js
++-- Login/               CSS/index.css, HTML/index.html, JS/index.js
++-- Settings/            CSS/settings.css, HTML/settings.html, JS/settings.js
++-- Suggestions/         CSS/index.css, HTML/index.html, JS/index.js
+
+public/Required/
++-- About/               CSS/index.css, HTML/index.html, JS/index.js
++-- FAQ/                 CSS/index.css, HTML/index.html, JS/index.js
++-- PrivacyPolicy/       CSS/index.css, HTML/index.html, JS/index.js
++-- Suggestions/         CSS/index.css, HTML/index.html, JS/index.js
++-- TOS/                 CSS/index.css, HTML/index.html, JS/index.js
+
+public/Tabs/
++-- Ark/
+|   +-- CSS/index.css
+|   +-- HTML/index.html, mods.html, announcements.html
+|   +-- JS/index.js, mods.js, announcements.js
++-- Minecraft/
+|   +-- CSS/index.css
+|   +-- HTML/index.html, mods.html, announcements.html
+|   +-- JS/index.js, mods.js, announcements.js
++-- RocketLeague/
+|   +-- Index/
+|   |   +-- CSS/index.css
+|   |   +-- HTML/index.html
+|   |   +-- JS/index.js, auth.js, connect_epic.js, profile.js, ranks.js,
+|   |           submenu.js
+|   +-- Registration/    CSS/index.css, HTML/index.html, JS/index.js, timezone.js
+|   +-- MatchResults/    CSS/index.css, HTML/index.html, JS/index.js
+|   +-- FindPlayers/     CSS/index.css, HTML/index.html, JS/index.js
+|   +-- PrivateMatches/  CSS/index.css, HTML/index.html, JS/index.js
+|   +-- WeeklyMatches/   CSS/index.css, HTML/index.html, JS/index.js
++-- Future/              Present empty placeholder directory.
+
+OCR PAGE
+
+public/ocr/
++-- CSS/submitimg.css, disputes.css
++-- HTML/submitimg.html
++-- JS/index.js                Page-module entrypoint.
+    JS/submit_core.js          Shared submission coordination.
+    JS/submit_img.js           Image submission behavior.
+    JS/submit_onpage_items.js  Page element/state handling.
+    JS/submit_testing.js       Submission test support.
+
+SHARED SCRIPTS
+
+public/scripts/
++-- apiConnection.js          Global API connection monitoring.
++-- apiRoutes.js              Browser API route definitions/helpers.
++-- cacheHandler.js           Client cache/version handling.
++-- generate-cache-ids.js     Build-time cache ID generation.
++-- repopulate_sitemap.js     Sitemap maintenance utility.
+
+ASSETS
+
+public/Assets/
++-- images/
+|   +-- bad_image/fallback.png
+|   +-- framework_icons/      Discord, Epic, and Google icons.
+|   +-- submit_img_samples/   Five OCR submission sample images.
++-- logo/
+|   +-- gaming_network_logo*  PNG/JPG logo variants.
+|   +-- Banner/gaming_network_banner.png
++-- audio/                    Present empty directory.
++-- fonts/                    Present empty directory.
++-- videos/                   Present empty directory.
+
+ROUTE-TO-FOLDER MAP
+
+    /, /Dashboard         -> Framework shell and Global/Index
+    /Account, /Login      -> Global/Account and Global/Login
+    /Admin*               -> Global/Admin/Home and Global/Admin/TaskBoard
+    /RocketLeague*        -> Tabs/RocketLeague plus public/ocr for submission
+    /Minecraft*           -> Tabs/Minecraft
+    /Ark*                 -> Tabs/Ark
+    /About, /FAQ,
+    /Privacy, /TOS        -> Required/*
+    /Error                -> Global/404
+
+The router loads the selected HTML body and JavaScript module, applies a master
+CSS bundle selected by route family, injects the shared header/sidebar/footer,
+enforces route authentication, and initializes the page module.
+

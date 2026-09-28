@@ -1,0 +1,148 @@
+OCR_CLOUDDATA/: PYTHON OCR SERVICE AND DATA
+Snapshot: 2026-09-27
+
+ROLE
+
+ocr_cloudData/ is a separately deployable Python/Flask OCR processor. It accepts
+image-processing requests from the Cloudflare OCR job path, runs the Rocket
+League scoreboard pipeline, reports progress, and returns structured results.
+It also contains local training samples and generated diagnostic output.
+
+SOURCE AND DEPLOYMENT HIERARCHY
+
+ocr_cloudData/
++-- ocr_servercall.py       Flask service entrypoint, health/OCR routes,
+|                           runtime initialization, request validation, progress,
+|                           pipeline execution, and training-sample sending.
++-- Dockerfile              Container build definition.
++-- deploy.ps1              Deployment helper.
++-- requirements.txt        Python dependency manifest.
++-- .dockerignore           Container build exclusions.
++-- .gcloudignore           Google Cloud deployment exclusions.
+|
++-- ocr/
+|   +-- config.py           Environment/runtime constants and summaries.
+|   +-- fields.py           OCR field definitions and field classification.
+|   +-- pipeline.py         Production pipeline orchestration; ONNX numeric route and legacy fallback.
+|   +-- rules.py            Numeric-field validation rules.
+|   +-- layout/
+|   |   +-- headers.py      Scoreboard header detection.
+|   |   +-- cells.py        Scoreboard cell geometry and crop construction.
+|   +-- preparation/
+|   |   +-- normalization.py       Image normalization.
+|   |   +-- scoreboard_locator.py  Scoreboard location/cropping.
+|   |   +-- anchors.py             Row-anchor detection.
+|   |   +-- rows.py                Player-row reconstruction.
+|   +-- readers/
+|   |   +-- player_name.py         OCR player names and one-to-one roster matching.
+|   |   +-- numeric.py             Digit segmentation and deprecated template reader.
+|   |   +-- numeric_onnx.py        Cached CPU model session, shared preprocessing, and batch classification.
+|   |   +-- numeric_tesseract.py   Tesseract numeric reader.
+|   |   +-- numeric_router.py      ONNX-primary routing and deprecated template/Tesseract fallback.
+|   |   +-- team_score.py          Team-header geometry, ONNX classification, and legacy fallback.
+|   |   +-- candidate_collection.py Bounded review-only crop and provenance response builder.
+|   |   +-- training_capture.py    Unique training-image capture.
+|   +-- runtime/
+|       +-- scheduler.py           Bounded CPU work scheduling.
+|       +-- progress_store.py      Job progress reporting/storage client.
+|
++-- debug/
+|   +-- debug_ocr.py         Local pipeline diagnostic runner and artifact writer.
+|   +-- test_ocr.ps1         Local OCR test wrapper; snapshots can be disabled.
+|
++-- tests/
+|   +-- test_*.py            Python OCR unit and regression tests.
+|   +-- test_numeric_onnx.py ONNX contract, score-band, and fallback routing tests.
+|
++-- models/
+|   +-- prototype_digit_model.py  Offline dataset audit, grouped split, CNN train,
+|   |                             ONNX export/parity validation, and CPU benchmark.
+|   +-- import_approved_candidates.py  Explicit offline import of human-approved R2 exports.
+|   +-- provenance/candidates.jsonl  Imported-candidate provenance ledger (created by importer).
+|   +-- digit_training_manifest.json  Seeded source hashes and train/validation split.
+|   +-- digit_dataset_quality_audit.json  Dataset and duplicate/suspicion audit.
+|   +-- digit_model_metrics.json  Holdout evaluation, parity, and CPU timings.
+|   +-- digit_classifier.onnx  ONNX-primary numeric model artifact; hash identified at runtime.
+|   +-- digit_classifier_training_only.pt  Framework checkpoint for retraining.
+|   +-- contact_sheets/  Per-digit local visual review sheets.
+|
++-- training/
+|   +-- sender.py            Training sample upload/sending logic.
+|   +-- 0/ through 9/        Digit-class reference/training PNG files.
+|   +-- bar/                 Non-digit bar/reference samples.
+|   +-- undetermined/        Placeholder/uncategorized sample location.
+|
++-- output/
+|   +-- debug/               Timestamped pipeline stage images, reports, and
+|   |   +-- <run>/cells/     per-player/per-field cell crops.
+|   +-- ocr_debug/           Manual diagnostic run images and result JSON.
+|   +-- test_runs/           Timestamped local test reports/crops; optional
+|       +-- <run>/digit_crops/ Per-component classifier crops and predictions.
+|       +-- <run>/review_candidates/ Provenance-preserving, human-review-only crops.
+|
++-- .ruff_cache/             Ruff analysis cache.
++-- __pycache__/             Root Python bytecode cache.
++-- ocr/**/__pycache__/      Package-level Python bytecode caches.
+
+PIPELINE RELATIONSHIP
+
+ocr_servercall.py
+    -> initializes the bounded scheduler and template cache
+    -> calls ocr.pipeline.read_scoreboard_image
+        -> preparation.scoreboard_locator locates/crops the scoreboard
+        -> preparation.normalization normalizes the image
+        -> layout.headers detects column/header geometry
+        -> preparation.anchors and preparation.rows reconstruct player rows
+        -> layout.cells creates field cells
+        -> readers.player_name reads names and matches supplied rosters
+        -> readers.numeric_router runs ONNX first, with legacy readers for uncertainty
+        -> readers.team_score preserves header geometry and classifies isolated candidates
+        -> rules validates resolved field values
+        -> readers.candidate_collection builds bounded crops/evidence for review-only archival
+    -> progress_store reports job progress to the configured Cloudflare endpoint
+    -> returns structured OCR output to the queue consumer/callback flow
+
+The Cloud Run process never writes to Cloudflare R2 and never inserts OCR
+predictions into numeric training classes. The Pages `process_job` route uses
+its existing `OCR_TRAINING` R2 binding to archive candidate crops under
+`ocr-training-candidates/YYYY/MM/DD/{jobId}/`; the queue consumer only calls
+that Pages route and continues to use `OCR_STORAGE` for job data. Candidate
+approval is manual and training import is an explicit local command.
+
+ROSTER AND TEAM TOTAL BEHAVIOR
+
+Manual source mode requires a complete, unique roster and retains legacy
+validation. Automatic mode probes symmetric visible row evidence from 1v1
+through 16v16, leaves names unassigned when evidence is uncertain, and marks
+roster/name uncertainty for review. Player-name reading uses Tesseract. Player
+SCORE is the only required displayed numeric player statistic; PING is optional.
+Only explicitly detected known headers create player-stat cells. Inferred
+lattice positions may support row geometry, but remain unnamed and do not map
+to GOALS/ASSISTS/SAVES/SHOTS in output. A genuinely detected GOALS header is
+read only to corroborate the large team-header total.
+
+The large team-header OCR value is authoritative. A detected player GOALS column
+can validate it; disagreement retains the header value and requests review.
+Team-header OCR uses a far-left ROI bounded by player-name geometry, not SCORE
+or custom-stat columns; local diagnostic step 09 outlines each ROI and digit.
+
+CURRENT DATA SNAPSHOT
+
+training/ contains class folders 0-9, bar, and undetermined. At inspection time:
+    0: 26 files     1: 29 files     2: 25 files     3: 16 files
+    4: 13 files     5: 11 files     6: 13 files     7: 5 files
+    8: 9 files      9: 5 files      bar: 12 files   undetermined: 2 files
+
+output/debug contains timestamped img_sample2 runs with pipeline stage/report
+files and per-player/per-field cell crops.
+output/ocr_debug contains one manual run with thirteen diagnostic/result files.
+models/ contains the ONNX digit classifier and reproducible offline training
+artifacts. Production OCR lazily loads the ONNX Runtime session once per process.
+
+BOUNDARY WITH THE REST OF THE PROJECT
+
+This folder is not imported by the JavaScript application. The integration is
+over HTTP: the Pages configuration and OCR queue consumer identify the processor
+URL, while OCR progress/results travel through Cloudflare endpoints and R2-backed
+job data. Root eng.traineddata supplies Tesseract language data used by OCR.
+

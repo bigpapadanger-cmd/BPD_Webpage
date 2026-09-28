@@ -70,6 +70,9 @@ const OCR_NORMALIZED_JPEG_QUALITY =
 
 let imageInput = null;
 let matchSize = null;
+let manualMetadataToggle = null;
+let manualMetadataFields = null;
+let automaticMetadataPreview = null;
 let resetCropBtn = null;
 let submitBtn = null;
 let canvas = null;
@@ -121,6 +124,21 @@ function resolveOcrCoreElements() {
     matchSize =
         document.getElementById(
             "matchSize"
+        );
+
+    manualMetadataToggle =
+        document.getElementById(
+            "manualMetadataToggle"
+        );
+
+    manualMetadataFields =
+        document.getElementById(
+            "manualMetadataFields"
+        );
+
+    automaticMetadataPreview =
+        document.getElementById(
+            "automaticMetadataPreview"
         );
 
     resetCropBtn =
@@ -198,6 +216,104 @@ function setStatus(message) {
 }
 
 /* =========================================================
+   METADATA MODE
+   ========================================================= */
+
+function getOcrSourceMode() {
+    return manualMetadataToggle?.checked ===
+        true
+        ? "manual"
+        : "automatic";
+}
+
+function resolveSavedSourceMode(
+    state
+) {
+    const sourceMode =
+        String(
+            state?.sourceMode
+            || ""
+        )
+            .trim()
+            .toLowerCase();
+
+    if (
+        sourceMode === "manual" ||
+        sourceMode === "automatic"
+    ) {
+        return sourceMode;
+    }
+
+    const savedNames =
+        Array.isArray(
+            state?.playerNames
+        )
+            ? state.playerNames
+            : [];
+
+    return savedNames.some(
+        function(name) {
+            return Boolean(
+                String(name || "")
+                    .trim()
+            );
+        }
+    )
+        ? "manual"
+        : "automatic";
+}
+
+function configureMetadataMode() {
+    const manual =
+        getOcrSourceMode() ===
+        "manual";
+
+    if (
+        manualMetadataToggle
+    ) {
+        manualMetadataToggle.setAttribute(
+            "aria-expanded",
+            String(manual)
+        );
+    }
+
+    if (
+        manualMetadataFields
+    ) {
+        manualMetadataFields.hidden =
+            !manual;
+
+        manualMetadataFields.setAttribute(
+            "aria-hidden",
+            String(!manual)
+        );
+    }
+
+    if (
+        automaticMetadataPreview
+    ) {
+        automaticMetadataPreview.hidden =
+            manual;
+    }
+
+    if (
+        matchSize
+    ) {
+        matchSize.disabled =
+            ocrControlsLocked ||
+            !manual;
+    }
+
+    getPlayerNameInputs().forEach(
+        function(input) {
+            input.disabled =
+                ocrControlsLocked ||
+                !manual;
+        }
+    );
+}
+
+/* =========================================================
    PLAYER NAMES
    ========================================================= */
 
@@ -222,17 +338,12 @@ function setOcrControlsLocked(locked) {
             ocrControlsLocked;
     }
 
-    if (matchSize) {
-        matchSize.disabled =
+    if (manualMetadataToggle) {
+        manualMetadataToggle.disabled =
             ocrControlsLocked;
     }
 
-    getPlayerNameInputs().forEach(
-        function(input) {
-            input.disabled =
-                ocrControlsLocked;
-        }
-    );
+    configureMetadataMode();
 
     if (resetCropBtn) {
         resetCropBtn.disabled =
@@ -292,6 +403,16 @@ function buildPlayerNameInputs(
     const playersPerTeam =
         Number(matchSize.value);
 
+    if (
+        !Number.isInteger(
+            playersPerTeam
+        ) ||
+        playersPerTeam < 1 ||
+        playersPerTeam > 16
+    ) {
+        return;
+    }
+
     const previousNames =
         Array.isArray(savedNames)
             ? savedNames
@@ -347,7 +468,9 @@ function buildPlayerNameInputs(
                 "player-name-input";
 
             input.disabled =
-                ocrControlsLocked;
+                ocrControlsLocked ||
+                getOcrSourceMode() !==
+                    "manual";
 
             input.placeholder =
                 `Player ${playerIndex} username`;
@@ -484,12 +607,114 @@ function validateExpectedPlayerNames() {
     };
 }
 
+function validateOcrSubmissionMetadata() {
+    const sourceMode =
+        getOcrSourceMode();
+
+    if (
+        sourceMode ===
+        "automatic"
+    ) {
+        return {
+            valid: true,
+            sourceMode,
+            playersPerTeam: null,
+            names: [],
+            matchMetadata: {
+                name: null,
+                id: null,
+                season: null,
+                date: null,
+                teams: [
+                    {
+                        team: 1,
+                        roster: []
+                    },
+                    {
+                        team: 2,
+                        roster: []
+                    }
+                ]
+            }
+        };
+    }
+
+    const playersPerTeam =
+        Number(
+            matchSize?.value
+        );
+
+    if (
+        !Number.isInteger(
+            playersPerTeam
+        ) ||
+        playersPerTeam < 1 ||
+        playersPerTeam > 16
+    ) {
+        return {
+            valid: false,
+            sourceMode,
+            playersPerTeam: null,
+            names: [],
+            message:
+                "Match size must be a whole number from 1 through 16."
+        };
+    }
+
+    const validation =
+        validateExpectedPlayerNames();
+
+    if (
+        !validation.valid
+    ) {
+        return {
+            ...validation,
+            sourceMode,
+            playersPerTeam
+        };
+    }
+
+    return {
+        valid: true,
+        sourceMode,
+        playersPerTeam,
+        names:
+            validation.names,
+        matchMetadata: {
+            name: null,
+            id: null,
+            season: null,
+            date: null,
+            teams: [
+                {
+                    team: 1,
+                    roster:
+                        validation.names.slice(
+                            0,
+                            playersPerTeam
+                        )
+                },
+                {
+                    team: 2,
+                    roster:
+                        validation.names.slice(
+                            playersPerTeam
+                        )
+                }
+            ]
+        }
+    };
+}
+
 /* =========================================================
    DURABLE FORM STATE
    ========================================================= */
 
 function saveOcrFormState() {
     const state = {
+        sourceMode:
+            getOcrSourceMode(),
+
         matchSize:
             matchSize?.value
             || "3",
@@ -1326,6 +1551,9 @@ function savePageState() {
 
         sourceFileName,
 
+        sourceMode:
+            getOcrSourceMode(),
+
         matchSize:
             matchSize?.value
             || "3",
@@ -1467,10 +1695,22 @@ function restorePageState() {
             );
     }
 
+    if (
+        manualMetadataToggle
+    ) {
+        manualMetadataToggle.checked =
+            resolveSavedSourceMode(
+                state
+            ) ===
+            "manual";
+    }
+
     buildPlayerNameInputs(
         state.playerNames
         || null
     );
+
+    configureMetadataMode();
 
     sourceFileName =
         state.sourceFileName
@@ -2931,6 +3171,17 @@ function handleMatchSizeChange() {
     savePageState();
 }
 
+function handleMetadataModeChange() {
+    if (
+        ocrControlsLocked
+    ) {
+        return;
+    }
+
+    configureMetadataMode();
+    savePageState();
+}
+
 function handleResetCropClick(
     event
 ) {
@@ -3059,6 +3310,13 @@ function bindCoreEvents() {
     );
 
     bindElementEventOnce(
+        manualMetadataToggle,
+        "change",
+        handleMetadataModeChange,
+        "MetadataModeChange"
+    );
+
+    bindElementEventOnce(
         resetCropBtn,
         "click",
         handleResetCropClick,
@@ -3083,6 +3341,9 @@ function initializeOcrCore() {
     const requiredElements = {
         imageInput,
         matchSize,
+        manualMetadataToggle,
+        manualMetadataFields,
+        automaticMetadataPreview,
         resetCropBtn,
         submitBtn,
         canvas,
@@ -3165,6 +3426,16 @@ function initializeOcrCore() {
             readOcrFormState();
 
         if (
+            manualMetadataToggle
+        ) {
+            manualMetadataToggle.checked =
+                resolveSavedSourceMode(
+                    savedFormState
+                ) ===
+                "manual";
+        }
+
+        if (
             savedFormState?.matchSize
             && matchSize
         ) {
@@ -3178,6 +3449,8 @@ function initializeOcrCore() {
             savedFormState?.playerNames
             || null
         );
+
+        configureMetadataMode();
 
         setOcrControlsLocked(
             false

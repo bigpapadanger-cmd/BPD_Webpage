@@ -1269,8 +1269,6 @@ function buildOcrEvidence(
             template:
                 null,
             tesseract:
-                null,
-            paddle:
                 null
         };
     }
@@ -1290,9 +1288,6 @@ function buildOcrEvidence(
             ?? null,
         tesseract:
             reviewField.tesseract
-            ?? null,
-        paddle:
-            reviewField.paddle
             ?? null
     };
 }

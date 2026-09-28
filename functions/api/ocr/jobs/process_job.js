@@ -5,6 +5,19 @@ import {
     putMatchReport
 } from "../../../services/ocr/storage.js";
 
+import {
+    sanitizeOcrRejectionDetail,
+    validateOcrTerminalOutcome
+} from "../../../services/ocr/contracts.js";
+
+import {
+    getGoogleCloudRunIdToken
+} from "../../../services/ocr/googleCloudAuth.js";
+
+import {
+    persistOcrCandidateArchive
+} from "../../../services/ocr/trainingCandidates.js";
+
 const PROCESS_JOB_VERSION =
     "ocr-process-job-2.2";
 
@@ -25,6 +38,11 @@ const PROCESSING_LEASE_MS =
 
 const OCR_PROVIDER_TIMEOUT_MS =
     295000;
+
+const MAX_PROVIDER_RESPONSE_BYTES =
+    2
+    * 1024
+    * 1024;
 
 const JOB_PROGRESS = Object.freeze({
     STARTING:
@@ -416,11 +434,103 @@ function jsonResponse(
     );
 }
 
-async function readJsonResponse(
+export async function readJsonResponse(
     response
 ) {
+    const contentLength =
+        Number(
+            response.headers.get(
+                "Content-Length"
+            )
+        );
+
+    if (
+        Number.isFinite(
+            contentLength
+        )
+        && contentLength >
+            MAX_PROVIDER_RESPONSE_BYTES
+    ) {
+        const error =
+            new Error(
+                "OCR provider response exceeded the allowed size."
+            );
+
+        error.code =
+            "OCR_PROVIDER_RESPONSE_TOO_LARGE";
+
+        throw error;
+    }
+
+    if (!response.body) {
+        return null;
+    }
+
+    const reader =
+        response.body.getReader();
+
+    const chunks = [];
+    let byteLength = 0;
+
+    while (true) {
+        const {
+            done,
+            value
+        } = await reader.read();
+
+        if (done) {
+            break;
+        }
+
+        byteLength += value.byteLength;
+
+        if (
+            byteLength >
+            MAX_PROVIDER_RESPONSE_BYTES
+        ) {
+            await reader.cancel();
+
+            const error =
+                new Error(
+                    "OCR provider response exceeded the allowed size."
+                );
+
+            error.code =
+                "OCR_PROVIDER_RESPONSE_TOO_LARGE";
+
+            throw error;
+        }
+
+        chunks.push(value);
+    }
+
+    if (byteLength === 0) {
+        return null;
+    }
+
+    const bytes =
+        new Uint8Array(
+            byteLength
+        );
+
+    let offset = 0;
+
+    for (
+        const chunk
+        of chunks
+    ) {
+        bytes.set(
+            chunk,
+            offset
+        );
+
+        offset += chunk.byteLength;
+    }
+
     const text =
-        await response.text();
+        new TextDecoder().decode(
+            bytes
+        );
 
     if (
         !text
@@ -442,7 +552,7 @@ async function readJsonResponse(
    AUTH
    ========================================================= */
 
-function requestAuthorized(
+async function requestAuthorized(
     request,
     env
 ) {
@@ -465,8 +575,55 @@ function requestAuthorized(
     return Boolean(
         expected
         && received
-        && expected === received
+        && await secureStringEquals(
+            expected,
+            received
+        )
     );
+}
+
+async function secureStringEquals(
+    left,
+    right
+) {
+    const encoder =
+        new TextEncoder();
+
+    const [
+        leftDigest,
+        rightDigest
+    ] = await Promise.all([
+        crypto.subtle.digest(
+            "SHA-256",
+            encoder.encode(left)
+        ),
+        crypto.subtle.digest(
+            "SHA-256",
+            encoder.encode(right)
+        )
+    ]);
+
+    const leftBytes =
+        new Uint8Array(leftDigest);
+
+    const rightBytes =
+        new Uint8Array(rightDigest);
+
+    let difference =
+        leftBytes.length
+        ^ rightBytes.length;
+
+    for (
+        let index = 0;
+        index < leftBytes.length;
+        index += 1
+    ) {
+        difference |=
+            leftBytes[index]
+            ^ rightBytes[index];
+    }
+
+    return difference === 0;
 }
 
 /* =========================================================
@@ -977,10 +1134,16 @@ async function fetchWithTimeout(
     }
 }
 
-function buildProviderHeaders(
+async function buildProviderHeaders(
     env,
     jobId
 ) {
+    const idToken =
+        await getGoogleCloudRunIdToken(
+            env,
+            env.OCR_API_URL
+        );
+
     const headers =
         new Headers();
 
@@ -995,6 +1158,11 @@ function buildProviderHeaders(
             env.OCR_API_KEY
             || ""
         )
+    );
+
+    headers.set(
+        "Authorization",
+        "Bearer " + idToken
     );
 
     headers.set(
@@ -1119,6 +1287,19 @@ async function callOcrProvider(
         }
     }
 
+    for (
+        const fieldName
+        of [
+            "playersPerTeam",
+            "sourceMode",
+            "matchMetadata"
+        ]
+    ) {
+        if (fields?.[fieldName] !== undefined) {
+            formData.set(fieldName, String(fields[fieldName]));
+        }
+    }
+
     if (
         fields?.matchType
     ) {
@@ -1170,7 +1351,7 @@ async function callOcrProvider(
                 method:
                     "POST",
                 headers:
-                    buildProviderHeaders(
+                    await buildProviderHeaders(
                         env,
                         jobId
                     ),
@@ -1277,6 +1458,13 @@ function resultRequiresReview(
         return true;
     }
 
+    if (
+        result?.rosterEvidence?.status === "needs_review"
+        || result?.rosterEvidence?.status === "rejected"
+    ) {
+        return true;
+    }
+
     const teams =
         Array.isArray(
             result?.teams
@@ -1299,6 +1487,14 @@ function resultRequiresReview(
             const player
             of players
         ) {
+            if (
+                player?.matchStatus === "NAME_REVIEW_REQUIRED"
+                || player?.matchStatus === "NAME_UNVERIFIED"
+                || !String(player?.player || player?.matchedName || "").trim()
+            ) {
+                return true;
+            }
+
             const reviewFields =
                 player?.reviewFields;
 
@@ -1426,6 +1622,9 @@ async function persistResult(
         requiresPlayerReview
             ? "pending_review"
             : "auto_accepted";
+    const disposition = requiresPlayerReview
+        ? "needs_review"
+        : "accepted";
 
     const storedAt =
         new Date()
@@ -1438,8 +1637,11 @@ async function persistResult(
             )
         );
 
+    const safeProviderData = { ...providerData };
+    delete safeProviderData.candidateArchive;
+
     const storedResult = {
-        ...providerData,
+        ...safeProviderData,
 
         jobId,
 
@@ -1447,7 +1649,15 @@ async function persistResult(
 
         submittedBy,
 
+        sourceMode:
+            fields?.sourceMode === "automatic"
+                || fields?.sourceMode === "manual"
+                ? fields.sourceMode
+                : null,
+
         requiresPlayerReview,
+
+        disposition,
 
         reviewRequired:
             requiresPlayerReview,
@@ -1476,7 +1686,15 @@ async function persistResult(
 
         submittedBy,
 
+        sourceMode:
+            fields?.sourceMode === "automatic"
+                || fields?.sourceMode === "manual"
+                ? fields.sourceMode
+                : null,
+
         requiresPlayerReview,
+
+        disposition,
 
         reviewRequired:
             requiresPlayerReview,
@@ -1496,6 +1714,36 @@ async function persistResult(
 
         storedAt
     };
+
+    let candidateArchiveStatus = {
+        saved: false,
+        reason: "no_candidates"
+    };
+    if ((Array.isArray(providerData?.candidateArchive?.candidates)
+        && providerData.candidateArchive.candidates.length > 0)
+        || Number(providerData?.candidateArchive?.candidateCountFound) > 0) {
+        try {
+            candidateArchiveStatus = await persistOcrCandidateArchive({
+                bucket: env.OCR_TRAINING,
+                jobId,
+                createdAt: requestData?.createdAt,
+                sourceImage: imageBytes,
+                sourceContentType: fields?.imageContentType,
+                originalSourceImageKey: getInputKey(jobId),
+                canonicalResult: matchReport,
+                candidateArchive: providerData.candidateArchive
+            });
+        } catch (error) {
+            candidateArchiveStatus = {
+                saved: false,
+                reason: "candidate_archive_write_failed"
+            };
+            console.warn("[OCR PROCESS] Review-candidate archive write failed.", {
+                jobId,
+                message: normalizeErrorMessage(error)
+            });
+        }
+    }
 
     await putMatchImage(
         env.OCR_STORAGE,
@@ -1535,6 +1783,8 @@ async function persistResult(
 
         requiresPlayerReview,
 
+        disposition,
+
         confirmationStatus,
 
         editDeadlineAt,
@@ -1548,7 +1798,8 @@ async function persistResult(
             matchReportStorage.currentKey,
 
         originalReportKey:
-            matchReportStorage.originalKey
+            matchReportStorage.originalKey,
+        candidateArchiveStatus
     };
 }
 
@@ -1760,6 +2011,76 @@ async function markFailed(
     return nextStatus;
 }
 
+function getProviderFailureStage(error) {
+    const provider = error?.providerData;
+
+    return String(
+        provider?.failureStage
+        || provider?.ocr?.failureStage
+        || provider?.result?.failureStage
+        || provider?.matchReport?.failureStage
+        || ""
+    ).trim().toLowerCase();
+}
+
+function isRosterUncertainty(error) {
+    return getProviderFailureStage(error) === "roster_inference"
+        || error?.providerData?.ocr?.rosterEvidence?.status === "needs_review";
+}
+
+async function markNeedsReviewWithoutMatch(env, jobId, currentStatus) {
+    const completedAt = new Date().toISOString();
+    const reviewObjectKey = `ocr/review/needs-review/${jobId}/1.json`;
+    const rejection = sanitizeOcrRejectionDetail({
+        code: "ROSTER_UNCERTAIN"
+    });
+    const outcome = {
+        state: "completed",
+        disposition: "needs_review",
+        reviewObjectKey,
+        reviewReason: rejection.code
+    };
+    const validation = validateOcrTerminalOutcome(outcome);
+
+    if (!validation.valid) {
+        throw new Error("OCR review outcome did not satisfy its contract.");
+    }
+
+    await writeR2Json(env.OCR_STORAGE, reviewObjectKey, {
+        version: "ocr-review-1.0",
+        jobId,
+        disposition: "needs_review",
+        rejection,
+        inputKey: getInputKey(jobId),
+        requestKey: getRequestKey(jobId),
+        createdAt: completedAt
+    });
+
+    const status = {
+        ...currentStatus,
+        status: "completed",
+        stage: "needs_review",
+        progress: JOB_PROGRESS.COMPLETED,
+        progressSource: "cloudflare",
+        message: "OCR could not confidently identify the roster. Review is required.",
+        matchId: null,
+        disposition: "needs_review",
+        rejection,
+        reviewObjectKey,
+        requiresPlayerReview: true,
+        reviewRequired: true,
+        confirmationStatus: "pending_review",
+        error: null,
+        updatedAt: completedAt,
+        heartbeatAt: completedAt,
+        completedAt
+    };
+
+    await writeJobStatus(env, jobId, status);
+    await deleteProgressObject(env, jobId);
+    return status;
+}
+
 /* =========================================================
    MAIN PROCESS
    ========================================================= */
@@ -1784,7 +2105,7 @@ async function processJob(
     }
 
     if (
-        !requestAuthorized(
+        !await requestAuthorized(
             request,
             env
         )
@@ -2156,6 +2477,9 @@ async function processJob(
             originalReportKey:
                 persisted.originalReportKey,
 
+            candidateArchiveStatus:
+                persisted.candidateArchiveStatus,
+
             requiresPlayerReview:
                 persisted.requiresPlayerReview,
 
@@ -2164,6 +2488,9 @@ async function processJob(
 
             confirmationStatus:
                 persisted.confirmationStatus,
+
+            disposition:
+                persisted.disposition,
 
             editDeadlineAt:
                 persisted.editDeadlineAt,
@@ -2252,6 +2579,34 @@ async function processJob(
                     )
             }
         );
+
+        if (isRosterUncertainty(error)) {
+            try {
+                const reviewStatus = await markNeedsReviewWithoutMatch(
+                    env,
+                    jobId,
+                    currentStatus
+                );
+
+                return jsonResponse({
+                    success: true,
+                    jobId,
+                    matchId: null,
+                    status: "completed",
+                    disposition: "needs_review",
+                    rejection: reviewStatus.rejection,
+                    reviewRequired: true,
+                    reviewObjectKey: reviewStatus.reviewObjectKey,
+                    version: PROCESS_JOB_VERSION
+                }, 200);
+            }
+            catch (reviewError) {
+                console.error("[OCR PROCESS] Could not persist roster review outcome.", {
+                    jobId,
+                    message: normalizeErrorMessage(reviewError)
+                });
+            }
+        }
 
         try {
             await markFailed(

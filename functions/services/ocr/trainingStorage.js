@@ -635,6 +635,14 @@ function buildTrainingMetadata({
 
     approval = null,
     ocrVersion = null,
+    candidateId = null,
+    jobId = null,
+    sourceImageKey = null,
+    approvedLabel = null,
+    approvalStatus = null,
+    approvalTimestamp = null,
+    reviewer = null,
+    approvalSource = null,
 
     additionalMetadata = null
 }) {
@@ -737,6 +745,17 @@ function buildTrainingMetadata({
                 );
         }
     }
+
+    Object.assign(metadata, {
+        candidateId: normalizeMetadataValue(candidateId),
+        jobId: normalizeMetadataValue(jobId),
+        sourceImageKey: normalizeMetadataValue(sourceImageKey),
+        approvedLabel: normalizeMetadataValue(approvedLabel),
+        approvalStatus: normalizeMetadataValue(approvalStatus),
+        approvalTimestamp: normalizeMetadataValue(approvalTimestamp),
+        reviewer: normalizeMetadataValue(reviewer),
+        approvalSource: normalizeMetadataValue(approvalSource)
+    });
 
     return metadata;
 }
@@ -942,6 +961,30 @@ export async function putTrainingImage(
         ocrVersion =
             null,
 
+        candidateId =
+            null,
+
+        jobId =
+            null,
+
+        sourceImageKey =
+            null,
+
+        approvedLabel =
+            null,
+
+        approvalStatus =
+            null,
+
+        approvalTimestamp =
+            null,
+
+        reviewer =
+            null,
+
+        approvalSource =
+            null,
+
         additionalMetadata =
             null
     }
@@ -977,18 +1020,33 @@ export async function putTrainingImage(
         );
     }
 
+    const normalizedApprovedLabel = String(approvedLabel ?? "").trim();
+    if (
+        approvalStatus !== "approved"
+        || approvalSource !== "human_review"
+        || !/^[0-9]$/.test(normalizedApprovedLabel)
+        || !String(candidateId || "").trim()
+        || !/^[A-Z0-9]{16}$/.test(String(jobId || "").trim().toUpperCase())
+        || !String(sourceImageKey || "").trim()
+        || !String(approvalTimestamp || "").trim()
+        || !String(reviewer || "").trim()
+    ) {
+        throw new Error("An explicitly human-approved candidate is required for training storage.");
+    }
+
     // ========================================================
-    // DETERMINE TRUSTED DESTINATION
+    // HUMAN-APPROVED DESTINATION
     // ========================================================
 
-    const routing =
-        resolveTrainingCategory(
-            category,
-            confidence
-        );
-
-    const normalizedCategory =
-        routing.category;
+    const normalizedCategory = normalizedApprovedLabel;
+    const routing = {
+        requestedCategory: normalizedCategory,
+        category: normalizedCategory,
+        highConfidence: false,
+        confidence: normalizeConfidence(confidence),
+        threshold: null,
+        reason: "human_approved_label"
+    };
 
     // ========================================================
     // RESERVE UNIQUE FINGERPRINT
@@ -1155,6 +1213,22 @@ export async function putTrainingImage(
                 approval,
 
                 ocrVersion,
+
+                candidateId,
+
+                jobId,
+
+                sourceImageKey,
+
+                approvedLabel,
+
+                approvalStatus,
+
+                approvalTimestamp,
+
+                reviewer,
+
+                approvalSource,
 
                 additionalMetadata
             });

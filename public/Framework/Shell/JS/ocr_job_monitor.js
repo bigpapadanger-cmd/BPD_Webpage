@@ -37,7 +37,7 @@ const OCR_INITIAL_CHECK_SCHEDULE_MS = [
 ];
 
 const OCR_TAIL_POLL_MS =
-    15000;
+    60000;
 
 const OCR_QUEUE_STALE_MS =
     120000;
@@ -164,6 +164,14 @@ function normalizeConfirmationStatus(
     )
         ? status
         : "";
+}
+
+function normalizeDisposition(value) {
+    const disposition = String(value || "").trim().toLowerCase();
+
+    return ["accepted", "needs_review", "rejected"].includes(disposition)
+        ? disposition
+        : null;
 }
 
 function normalizeStatus(
@@ -823,6 +831,10 @@ function dispatchProgress(
                         job.reviewRequired,
                     confirmationStatus:
                         job.confirmationStatus,
+                    disposition:
+                        normalizeDisposition(job.disposition),
+                    rejection:
+                        job.rejection || null,
                     version:
                         OCR_JOB_MONITOR_VERSION
                 }
@@ -845,6 +857,10 @@ function dispatchCompleted(
                         job.matchId,
                     reviewRequired:
                         job.reviewRequired,
+                    disposition:
+                        normalizeDisposition(job.disposition),
+                    rejection:
+                        job.rejection || null,
                     confirmationStatus:
                         job.confirmationStatus
                         || (
@@ -1022,11 +1038,35 @@ function handleCompletedJob(
         return;
     }
 
+    const disposition = normalizeDisposition(job.disposition)
+        || (
+            job.reviewRequired
+                ? "needs_review"
+                : "accepted"
+        );
+
     if (
-        !validMatchId(
-            job.matchId
-        )
+        !validMatchId(job.matchId)
+        && (disposition === "needs_review" || disposition === "rejected")
     ) {
+        document.dispatchEvent(
+            new CustomEvent("ocr:job-completed", {
+                detail: {
+                    jobId: job.jobId,
+                    matchId: null,
+                    reviewRequired: disposition === "needs_review",
+                    confirmationStatus: job.confirmationStatus,
+                    disposition,
+                    rejection: job.rejection || null,
+                    sourceRoute,
+                    completedAt: job?.completedAt || job?.updatedAt || new Date().toISOString()
+                }
+            })
+        );
+        return;
+    }
+
+    if (!validMatchId(job.matchId)) {
         dispatchFailure({
             jobId:
                 job.jobId,
@@ -1064,6 +1104,9 @@ function handleCompletedJob(
                                 ? "pending_review"
                                 : "auto_accepted"
                         ),
+                    disposition,
+                    rejection:
+                        job.rejection || null,
                     sourceRoute,
                     completedAt:
                         job?.completedAt
@@ -1074,6 +1117,27 @@ function handleCompletedJob(
             }
         )
     );
+}
+
+function pauseMonitorForStaleJob(
+    jobId,
+    reason,
+    message
+) {
+    document.dispatchEvent(
+        new CustomEvent(
+            "ocr:job-monitor-paused",
+            {
+                detail: {
+                    jobId,
+                    reason,
+                    message
+                }
+            }
+        )
+    );
+
+    scheduleNextCheck(jobId);
 }
 
 function handleFailedJob(
@@ -1302,17 +1366,10 @@ async function checkActiveJob() {
                 job
             )
         ) {
-            failActiveJob(
+            pauseMonitorForStaleJob(
                 jobId,
-                job,
-                {
-                    stage:
-                        "client_job_timeout",
-                    errorCode:
-                        "CLIENT_JOB_TIMEOUT",
-                    message:
-                        "Scoreboard processing exceeded the allowed processing window. Please submit the image again."
-                }
+                "CLIENT_WAIT_LIMIT_REACHED",
+                "This job is taking longer than usual. We’ll continue checking for a result."
             );
 
             return;
@@ -1325,17 +1382,10 @@ async function checkActiveJob() {
                 job
             )
         ) {
-            failActiveJob(
+            pauseMonitorForStaleJob(
                 jobId,
-                job,
-                {
-                    stage:
-                        "queue_stalled",
-                    errorCode:
-                        "QUEUE_STALLED",
-                    message:
-                        "The scoreboard remained queued for more than two minutes. Please submit the image again."
-                }
+                "QUEUE_WAITING",
+                "This job is still waiting to start. We’ll continue checking."
             );
 
             return;
@@ -1352,17 +1402,10 @@ async function checkActiveJob() {
                 job
             )
         ) {
-            failActiveJob(
+            pauseMonitorForStaleJob(
                 jobId,
-                job,
-                {
-                    stage:
-                        "processing_stalled",
-                    errorCode:
-                        "PROCESSING_STALLED",
-                    message:
-                        "The scoreboard reader stopped reporting progress. Please submit the image again."
-                }
+                "PROCESSING_WAITING",
+                "This job has not reported recent progress. We’ll continue checking for a result."
             );
 
             return;
@@ -1410,17 +1453,10 @@ async function checkActiveJob() {
         if (
             status === 404
         ) {
-            failActiveJob(
+            pauseMonitorForStaleJob(
                 jobId,
-                null,
-                {
-                    stage:
-                        "job_unavailable",
-                    errorCode:
-                        "JOB_NOT_FOUND",
-                    message:
-                        "The previous scoreboard job could not be found. You can submit another image."
-                }
+                "JOB_STATUS_UNAVAILABLE",
+                "OCR status is temporarily unavailable. We’ll keep checking."
             );
 
             return;
@@ -1429,18 +1465,10 @@ async function checkActiveJob() {
         if (
             status === 409
         ) {
-            failActiveJob(
+            pauseMonitorForStaleJob(
                 jobId,
-                null,
-                {
-                    stage:
-                        "job_invalid",
-                    errorCode:
-                        error?.code
-                        || "JOB_INVALID",
-                    message:
-                        "The previous scoreboard job is no longer valid. You can submit another image."
-                }
+                "JOB_STATUS_CONFLICT",
+                "OCR status could not be confirmed. We’ll keep checking."
             );
 
             return;

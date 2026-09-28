@@ -15,11 +15,9 @@
 
                 <p class="page-subtitle">
                     Upload a Rocket League scoreboard screenshot,
-                    choose the match size, and enter the expected
-                    players. The first scan uses the full uploaded
-                    image. If the scoreboard cannot be located
-                    reliably, you will be asked to crop the image
-                    and retry.
+                    then let automatic mode detect the match details.
+                    Manual match details remain available when you
+                    need to provide the expected rosters yourself.
                 </p>
 
             </div>
@@ -47,31 +45,108 @@
 
             <div class="controls">
 
+                <div class="field metadata-mode-field">
+
+                    <div class="metadata-mode-heading">
+
+                        <div>
+
+                            <label for="manualMetadataToggle">
+                                Submission Mode
+                            </label>
+
+                            <div
+                                class="metadata-mode-help"
+                                id="metadataModeHelp">
+                                Automatic mode detects match details
+                                from the uploaded scoreboard. Turn on
+                                manual details to provide both rosters.
+                            </div>
+
+                        </div>
+
+                        <label class="metadata-mode-toggle">
+                            <input
+                                id="manualMetadataToggle"
+                                type="checkbox"
+                                aria-describedby="metadataModeHelp"
+                                aria-controls="manualMetadataFields"
+                                aria-expanded="false">
+
+                            <span>
+                                Enter match details manually
+                            </span>
+                        </label>
+
+                    </div>
+
+                    <dl
+                        class="automatic-metadata-preview"
+                        id="automaticMetadataPreview"
+                        aria-label="Automatic match metadata">
+
+                        <div>
+                            <dt>Match Name</dt>
+                            <dd>Pending automatic detection</dd>
+                        </div>
+
+                        <div>
+                            <dt>Match ID</dt>
+                            <dd>Pending automatic detection</dd>
+                        </div>
+
+                        <div>
+                            <dt>Season</dt>
+                            <dd>Pending automatic detection</dd>
+                        </div>
+
+                        <div>
+                            <dt>Date</dt>
+                            <dd>Pending automatic detection</dd>
+                        </div>
+
+                        <div>
+                            <dt>Team 1 Roster</dt>
+                            <dd>Pending automatic detection</dd>
+                        </div>
+
+                        <div>
+                            <dt>Team 2 Roster</dt>
+                            <dd>Pending automatic detection</dd>
+                        </div>
+
+                    </dl>
+
+                </div>
+
+                <div
+                    class="manual-metadata-fields"
+                    id="manualMetadataFields"
+                    aria-label="Manual match details"
+                    aria-hidden="true"
+                    hidden>
+
                 <div class="field">
 
                     <label for="matchSize">
                         Match Size
                     </label>
 
-                    <select id="matchSize">
-                        <option value="1">
-                            1v1
-                        </option>
+                    <input
+                        id="matchSize"
+                        type="number"
+                        min="1"
+                        max="16"
+                        step="1"
+                        inputmode="numeric"
+                        value="3"
+                        aria-describedby="matchSizeHelp">
 
-                        <option value="2">
-                            2v2
-                        </option>
-
-                        <option
-                            value="3"
-                            selected>
-                            3v3
-                        </option>
-
-                        <option value="4">
-                            4v4
-                        </option>
-                    </select>
+                    <div
+                        class="match-size-help"
+                        id="matchSizeHelp">
+                        Enter the players per team, from 1 through 16.
+                    </div>
 
                 </div>
 
@@ -95,6 +170,8 @@
                         class="player-names-grid"
                         id="playerNamesContainer">
                     </div>
+
+                </div>
 
                 </div>
 
@@ -272,7 +349,14 @@
 
                 </div>
 
-                <div class="loading-bar">
+                <div
+                    class="loading-bar"
+                    id="loadingBar"
+                    role="progressbar"
+                    aria-label="Scoreboard processing progress"
+                    aria-valuemin="0"
+                    aria-valuemax="100"
+                    aria-valuenow="0">
                     <div
                         class="loading-fill"
                         id="loadingFill">
@@ -372,7 +456,7 @@
                         Highlighted values need additional review.
                         Any value you change will be recorded as
                         disputed while preserving the original OCR,
-                        Template, Tesseract, and Paddle results.
+                        Template and Tesseract evidence.
                     </p>
 
                     <div

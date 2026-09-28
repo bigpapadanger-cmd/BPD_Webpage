@@ -22,6 +22,54 @@ const TRAINING_BATCH_MAX_SIZE =
 const TRAINING_STORAGE_CONCURRENCY =
     4;
 
+const APPROVAL_STATUSES = new Set([
+    "approved"
+]);
+
+function normalizeApprovedLabel(value) {
+    const normalized = String(value ?? "").trim();
+    return /^[0-9]$/.test(normalized)
+        ? normalized
+        : null;
+}
+
+function validateHumanApproval(sample) {
+    const approvedLabel = normalizeApprovedLabel(sample?.approvedLabel);
+    const approvalStatus = normalizeText(sample?.approvalStatus).toLowerCase();
+    const candidateId = normalizeText(sample?.candidateId);
+    const jobId = normalizeText(sample?.jobId).toUpperCase();
+    const sourceImageKey = normalizeText(sample?.sourceImageKey);
+    const reviewer = normalizeText(sample?.reviewer);
+    const approvalSource = normalizeText(sample?.approvalSource).toLowerCase();
+
+    if (approvedLabel === null) {
+        return { valid: false, reason: "explicit_approved_label_required" };
+    }
+    if (!APPROVAL_STATUSES.has(approvalStatus)) {
+        return { valid: false, reason: "human_approval_required" };
+    }
+    if (!candidateId || !/^[A-Z0-9_-]{1,96}$/i.test(candidateId)) {
+        return { valid: false, reason: "candidate_id_required" };
+    }
+    if (!/^[A-Z0-9]{16}$/.test(jobId) || !sourceImageKey) {
+        return { valid: false, reason: "candidate_provenance_required" };
+    }
+    if (!reviewer || approvalSource !== "human_review") {
+        return { valid: false, reason: "human_reviewer_provenance_required" };
+    }
+
+    return {
+        valid: true,
+        approvedLabel,
+        approvalStatus,
+        candidateId,
+        jobId,
+        sourceImageKey,
+        reviewer,
+        approvalSource
+    };
+}
+
 // ============================================================
 // RESPONSE
 // ============================================================
@@ -135,7 +183,7 @@ function validateInternalRequest(
 ) {
     const expectedToken =
         String(
-            env.OCR_STORAGE_TOKEN
+            env.OCR_TRAINING_REVIEW_TOKEN
             || ""
         )
             .trim();
@@ -149,7 +197,7 @@ function validateInternalRequest(
             status:
                 503,
             reason:
-                "OCR training authentication is not configured."
+                "OCR training review authentication is not configured."
         };
     }
 
@@ -513,10 +561,17 @@ async function processTrainingSample(
     bucket,
     sample
 ) {
-    const requestedCategory =
-        normalizeTrainingCategory(
-            sample?.category
+    const approval =
+        validateHumanApproval(sample);
+
+    if (!approval.valid) {
+        return buildSampleFailure(
+            approval.reason
         );
+    }
+
+    const requestedCategory =
+        approval.approvedLabel;
 
     const confidence =
         normalizeNumber(
@@ -651,11 +706,6 @@ async function processTrainingSample(
             sample?.engine
         );
 
-    const approval =
-        normalizeNullableText(
-            sample?.approval
-        );
-
     const ocrVersion =
         normalizeNullableText(
             sample?.ocrVersion
@@ -665,6 +715,8 @@ async function processTrainingSample(
         normalizeAdditionalMetadata(
             sample?.additionalMetadata
         );
+    const approvalTimestamp =
+        new Date().toISOString();
 
     try {
         const result =
@@ -682,8 +734,24 @@ async function processTrainingSample(
                     playerIndex,
                     confidence,
                     engine,
-                    approval,
+                    approval:
+                        "human_approved",
                     ocrVersion,
+                    candidateId:
+                        approval.candidateId,
+                    jobId:
+                        approval.jobId,
+                    sourceImageKey:
+                        approval.sourceImageKey,
+                    approvedLabel:
+                        Number(approval.approvedLabel),
+                    approvalStatus:
+                        approval.approvalStatus,
+                    approvalTimestamp,
+                    reviewer:
+                        approval.reviewer,
+                    approvalSource:
+                        approval.approvalSource,
                     additionalMetadata
                 }
             );
@@ -740,8 +808,8 @@ function getTrainingStorageLane(
 ) {
     const routing =
         resolveTrainingCategory(
-            sample?.category,
-            sample?.confidence
+            sample?.approvedLabel,
+            1
         );
 
     const finalCategory =
@@ -1009,7 +1077,7 @@ async function handleSingleTrainingUpload(
                 fingerprint,
                 category:
                     formData.get(
-                        "category"
+                        "approvedLabel"
                     ),
                 field:
                     formData.get(
@@ -1031,9 +1099,33 @@ async function handleSingleTrainingUpload(
                     formData.get(
                         "engine"
                     ),
-                approval:
+                approvalStatus:
                     formData.get(
-                        "approval"
+                        "approvalStatus"
+                    ),
+                approvedLabel:
+                    formData.get(
+                        "approvedLabel"
+                    ),
+                candidateId:
+                    formData.get(
+                        "candidateId"
+                    ),
+                jobId:
+                    formData.get(
+                        "jobId"
+                    ),
+                sourceImageKey:
+                    formData.get(
+                        "sourceImageKey"
+                    ),
+                reviewer:
+                    formData.get(
+                        "reviewer"
+                    ),
+                approvalSource:
+                    formData.get(
+                        "approvalSource"
                     ),
                 ocrVersion:
                     formData.get(
@@ -1257,7 +1349,7 @@ async function handleBatchTrainingUpload(
             fingerprint:
                 metadata.fingerprint,
             category:
-                metadata.category,
+                metadata.approvedLabel,
             field:
                 metadata.field,
             team:
@@ -1268,8 +1360,20 @@ async function handleBatchTrainingUpload(
                 metadata.confidence,
             engine:
                 metadata.engine,
-            approval:
-                metadata.approval,
+            approvalStatus:
+                metadata.approvalStatus,
+            approvedLabel:
+                metadata.approvedLabel,
+            candidateId:
+                metadata.candidateId,
+            jobId:
+                metadata.jobId,
+            sourceImageKey:
+                metadata.sourceImageKey,
+            reviewer:
+                metadata.reviewer,
+            approvalSource:
+                metadata.approvalSource,
             ocrVersion,
             additionalMetadata:
                 metadata.metadata

@@ -1,0 +1,153 @@
+RLFOLDERSTRUCTURING CURRENT-STATE ORGANIZATION MAP
+Snapshot: 2026-09-26
+Project directory on disk: DomainData
+Purpose: Codex navigation and orientation. This is descriptive only.
+
+SYSTEM AT A GLANCE
+
+Browser / public site
+    public/index.html
+        -> public/routes.js defines client-side page routes
+        -> public/Framework/ supplies the shared shell, auth, layout, and router
+        -> public/Global/, public/Required/, public/Tabs/, and public/ocr/
+           supply route-specific HTML, CSS, and JavaScript
+        -> browser code calls /api/* endpoints
+
+Cloudflare Pages application
+    wrangler.jsonc
+        -> publishes public/ as the Pages output
+        -> binds AUTH_SESSIONS and RL_STATS_CACHE (KV)
+        -> binds OCR_TRAINING, OCR_STORAGE, and OCR_PROGRESS (R2)
+        -> binds OCR_JOB_QUEUE as a queue producer
+    functions/api/
+        -> file-based /api/* request handlers
+        -> delegates reusable work to functions/services/
+
+OCR job path
+    public/ocr/ and shell OCR modules
+        -> functions/api/ocr/jobs/submit_job.js
+        -> OCR_STORAGE / OCR_PROGRESS and OCR_JOB_QUEUE
+        -> workers/ocr-job-consumer/
+        -> configured OCR processor URL
+        -> ocr_cloudData/ Flask service and OCR pipeline
+        -> result/progress endpoints in functions/api/ocr/jobs/
+        -> browser OCR monitor/results modules
+
+Rocket League background path
+    Pages functions and site UI
+        <-> Supabase, external MMR service, and AUTH_SESSIONS
+        <-> workers/rl-presence-monitor/
+            - scheduled presence checks
+            - scheduled MMR refresh
+            - scheduled Taskboard summary
+            - /health and authorized /wake endpoints
+
+PRIMARY NAVIGATION INDEX
+
+1. public/ - browser-delivered site
+    Assets/       Images, logos, and currently empty media/font holders.
+    Framework/    Shared authentication, banner, shell fragments, routing,
+                  navigation, master CSS, and global OCR runtime modules.
+    Global/       Site-wide pages: home/dashboard, account, login, settings,
+                  links, suggestions, ads, errors, and admin pages.
+    Required/     About, FAQ, Privacy Policy, Suggestions, and Terms pages.
+    Tabs/         Game sections for Rocket League, Minecraft, and Ark.
+    ocr/          Submit-match-image page and its browser-side workflow.
+    scripts/      Shared API routing/connection and cache/sitemap utilities.
+
+2. functions/ - Cloudflare Pages server-side API
+    api/          Route handlers whose paths map to /api/* URLs.
+    services/     Reusable business, provider, storage, and integration logic.
+
+3. ocr_cloudData/ - deployable Python OCR processor and local OCR data
+    ocr/          Production OCR pipeline by configuration, preparation,
+                  layout, readers, rules, and runtime support.
+    debug/        Local diagnostic entrypoint.
+    training/     Digit/bar reference images grouped by class.
+    output/       Generated diagnostic images and JSON reports.
+    root files    Flask entrypoint, container and deployment configuration,
+                  and Python requirements.
+
+4. workers/ - independently deployed Cloudflare Workers
+    ocr-job-consumer/     Consumes queued OCR jobs and performs cleanup.
+    rl-presence-monitor/  Runs Rocket League and Taskboard automation.
+
+5. Root configuration and support
+    wrangler.jsonc        Pages deployment and resource bindings.
+    package.json          Build, development, cache-ID, and build-check scripts.
+    public/_redirects     Clean-route handling for the single-page shell.
+    public/_headers       Static response-header rules.
+    README.md, _README    Project/development notes.
+    CNAME                 Custom-domain declaration.
+    eng.traineddata       Tesseract English-language OCR data.
+    Notes/                Operational notes and SQL/schema working material.
+
+6. Local/generated infrastructure
+    node_modules/         Installed JavaScript packages.
+    .venv/                Local Python environment.
+    .wrangler/            Local/generated Cloudflare build and state data.
+    .ruff_cache/          Python lint cache.
+    **/__pycache__/       Python bytecode caches.
+    .git/                 Git repository metadata.
+
+PAGE ROUTE ORGANIZATION
+
+Every route is rendered through the shared shell in public/index.html and
+public/Framework/Shell/JS/router.js. public/routes.js selects a body fragment,
+page module, sidebar, header/footer behavior, and route metadata.
+
+Main/global routes
+    /                         Shared shell body / main menu.
+    /Dashboard                Global/Index home dashboard.
+    /Account                  Global/Account account management.
+    /Login                    Global/Login authentication page.
+    /About                    Required/About.
+    /FAQ                      Required/FAQ.
+    /Privacy                  Required/PrivacyPolicy.
+    /TOS                      Required/TOS.
+    /Error                    Global/404.
+
+Rocket League routes
+    /RocketLeague             Tabs/RocketLeague/Index.
+    /RocketLeague/Profile     Tabs/RocketLeague/Registration.
+    /RocketLeague/SubmitMatchResults
+                              public/ocr submission workflow.
+    /RocketLeague/ImageScanning
+                              Rocket League index shell with authenticated sidebar.
+    /RocketLeague/Leaderboards
+                              Rocket League index shell with authenticated sidebar.
+    /RocketLeague/MatchResults
+                              Tabs/RocketLeague/MatchResults.
+
+Other game routes
+    /Minecraft                Minecraft landing page.
+    /Minecraft/Mods           Minecraft mods page.
+    /Minecraft/Announcements  Minecraft announcements page.
+    /Ark                      Ark landing page.
+    /Ark/Mods                 Ark mods page.
+    /Ark/Announcements        Ark announcements page.
+
+Administration routes
+    /Admin                    Global/Admin/Home.
+    /Admin/Taskboard          Global/Admin/TaskBoard and its multi-view modules.
+
+DETAIL FILE INDEX
+
+    folder_organization/00_project_root.txt
+        Complete top-level inventory and deployment/configuration ownership.
+
+    folder_organization/01_functions.txt
+        Pages API route hierarchy and reusable server-service hierarchy.
+
+    folder_organization/02_ocr_cloudData.txt
+        Python OCR service, pipeline, training data, outputs, and local caches.
+
+    folder_organization/03_public.txt
+        Browser shell, routes, pages, assets, and page-level file groupings.
+
+    folder_organization/04_workers.txt
+        Queue consumer and scheduled/background worker organization.
+
+    folder_organization/05_support_and_generated.txt
+        Notes, dependency trees, caches, repository metadata, and generated data.
+

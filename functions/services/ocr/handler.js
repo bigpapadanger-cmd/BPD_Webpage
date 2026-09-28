@@ -50,6 +50,10 @@ import {
     getProviderContext
 } from "../auth/sessions/session_context.js";
 
+import {
+    getGoogleCloudRunIdToken
+} from "./googleCloudAuth.js";
+
 /* =========================================================
 VERSION
 ========================================================= */
@@ -581,6 +585,17 @@ export async function handleOCRRequest(
         upstreamHeaders.set(
             "X-API-Key",
             env.OCR_API_KEY
+        );
+
+        const cloudRunIdToken =
+            await getGoogleCloudRunIdToken(
+                env,
+                env.OCR_API_URL
+            );
+
+        upstreamHeaders.set(
+            "Authorization",
+            "Bearer " + cloudRunIdToken
         );
 
         upstreamHeaders.set(

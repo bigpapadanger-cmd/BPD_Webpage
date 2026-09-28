@@ -270,9 +270,6 @@
             case "numeric_resolution":
                 return "Resolving scoreboard values...";
 
-            case "numeric_paddle":
-                return "Resolving the tricky values...";
-
             case "validation":
                 return "Double-checking the numbers...";
 
@@ -352,6 +349,11 @@
                 "loadingFill"
             );
 
+        const loadingBar =
+            document.getElementById(
+                "loadingBar"
+            );
+
         const loadingPercent =
             document.getElementById(
                 "loadingPercent"
@@ -364,6 +366,7 @@
 
         if (
             !loadingWrap
+            || !loadingBar
             || !loadingFill
             || !loadingPercent
             || !loadingText
@@ -384,6 +387,15 @@
 
         loadingFill.style.width =
             `${normalizedProgress}%`;
+
+        loadingBar.setAttribute(
+            "aria-valuenow",
+            String(
+                Math.round(
+                    normalizedProgress
+                )
+            )
+        );
 
         loadingPercent.textContent =
             `${Math.round(
@@ -1307,52 +1319,29 @@
             "Reviewing image..."
         );
 
-        const playerNameValidation =
-            validateExpectedPlayerNames();
+        const metadataValidation =
+            validateOcrSubmissionMetadata();
 
         if (
-            !playerNameValidation.valid
+            !metadataValidation.valid
         ) {
             setStatus(
                 "FAIL: "
-                + playerNameValidation
+                + metadataValidation
                     .message
             );
 
             return;
         }
 
-        if (
-            !matchSize
-        ) {
-            setStatus(
-                "FAIL: Match size is unavailable."
-            );
-
-            return;
-        }
+        const sourceMode =
+            metadataValidation.sourceMode;
 
         const playersPerTeam =
-            Number(
-                matchSize.value
-            );
-
-        if (
-            !Number.isInteger(
-                playersPerTeam
-            )
-            || playersPerTeam < 1
-            || playersPerTeam > 3
-        ) {
-            setStatus(
-                "FAIL: Match size is invalid."
-            );
-
-            return;
-        }
+            metadataValidation.playersPerTeam;
 
         const expectedPlayerNames =
-            playerNameValidation.names;
+            metadataValidation.names;
 
         const usingCrop =
             cropFallbackVisible;
@@ -1431,23 +1420,41 @@
             );
 
             formData.set(
-                "playersPerTeam",
-                String(
-                    playersPerTeam
-                )
+                "sourceMode",
+                sourceMode
             );
 
             formData.set(
-                "expectedPlayerNames",
+                "matchMetadata",
                 JSON.stringify(
-                    expectedPlayerNames
+                    metadataValidation
+                        .matchMetadata
                 )
             );
 
-            formData.set(
-                "matchType",
-                `${playersPerTeam}v${playersPerTeam}`
-            );
+            if (
+                sourceMode ===
+                "manual"
+            ) {
+                formData.set(
+                    "playersPerTeam",
+                    String(
+                        playersPerTeam
+                    )
+                );
+
+                formData.set(
+                    "expectedPlayerNames",
+                    JSON.stringify(
+                        expectedPlayerNames
+                    )
+                );
+
+                formData.set(
+                    "matchType",
+                    `${playersPerTeam}v${playersPerTeam}`
+                );
+            }
 
             formData.set(
                 "submissionMode",

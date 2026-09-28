@@ -30,7 +30,6 @@
             "*/30 * * * *"
         ]
     },
-
     "vars": {
         "OCR_JOB_PROCESS_URL": "https://bpd-gaming-network.com/api/ocr/jobs/process_job",
         "OCR_DEBUG_TRACE_ENABLED": "true"

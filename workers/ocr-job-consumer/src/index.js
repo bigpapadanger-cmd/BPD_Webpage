@@ -1649,53 +1649,10 @@ async function handleScheduledCleanup(
 
 export default {
     async fetch(
-        request
+        _request
     ) {
-        const url =
-            new URL(
-                request.url
-            );
-
-        if (
-            request.method ===
-                "GET"
-            && url.pathname ===
-                "/health"
-        ) {
-            return Response.json(
-                {
-                    success:
-                        true,
-
-                    service:
-                        "bpd-ocr-job-consumer",
-
-                    version:
-                        CONSUMER_VERSION
-                },
-                {
-                    status:
-                        200,
-
-                    headers: {
-                        "Cache-Control":
-                            "no-store"
-                    }
-                }
-            );
-        }
-
-        return Response.json(
-            {
-                success:
-                    false,
-
-                code:
-                    "NOT_FOUND",
-
-                message:
-                    "Route not found."
-            },
+        return new Response(
+            null,
             {
                 status:
                     404,

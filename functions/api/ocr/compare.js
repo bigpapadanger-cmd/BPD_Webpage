@@ -1,5 +1,25 @@
+import {
+    authorizeRocketLeagueRequest,
+    authorizationErrorResponse
+} from "../../services/rl/authorization.js";
+
+import {
+    getGoogleCloudRunIdToken
+} from "../../services/ocr/googleCloudAuth.js";
+
 export async function onRequestPost(context) {
     const { request, env } = context;
+
+    try {
+        await authorizeRocketLeagueRequest(
+            request,
+            env
+        );
+    }
+    catch (error) {
+        return authorizationErrorResponse(error);
+    }
+
     if (!env.OCR_API_URL) {
         return jsonResponse({
             success: false,
@@ -34,6 +54,36 @@ export async function onRequestPost(context) {
             message: "Missing OCR image."
         }, 400);
     }
+    if (file.size <= 0 || file.size > 10 * 1024 * 1024) {
+        return jsonResponse({
+            success: false,
+            message: "OCR image size is invalid."
+        }, 413);
+    }
+
+    let productionIdToken;
+    let testIdToken;
+
+    try {
+        [productionIdToken, testIdToken] =
+            await Promise.all([
+                getGoogleCloudRunIdToken(
+                    env,
+                    env.OCR_API_URL
+                ),
+                getGoogleCloudRunIdToken(
+                    env,
+                    env.OCR_API_TEST_URL
+                )
+            ]);
+    }
+    catch {
+        return jsonResponse({
+            success: false,
+            message: "OCR service authentication is unavailable."
+        }, 503);
+    }
+
     const imageBytes = await file.arrayBuffer();
     const productionForm = buildOcrForm(
         incomingForm,
@@ -52,6 +102,7 @@ export async function onRequestPost(context) {
             method: "POST",
             headers: {
                 "X-API-Key": env.OCR_API_KEY,
+                "Authorization": "Bearer " + productionIdToken,
                 "X-BPD-OCR-Benchmark-Target": "production"
             },
             body: productionForm
@@ -73,6 +124,7 @@ export async function onRequestPost(context) {
             method: "POST",
             headers: {
                 "X-API-Key": env.OCR_API_KEY,
+                "Authorization": "Bearer " + testIdToken,
                 "X-BPD-OCR-Benchmark-Target": "variant-a"
             },
             body: testForm

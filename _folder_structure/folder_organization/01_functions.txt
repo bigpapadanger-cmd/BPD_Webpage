@@ -1,0 +1,152 @@
+FUNCTIONS/: CLOUDFLARE PAGES API AND SERVICES
+Snapshot: 2026-09-26
+
+ROLE
+
+functions/ contains the Cloudflare Pages server-side layer. Files under api/
+provide file-based request routes; files under services/ contain reusable logic,
+provider clients, authorization, storage, and database operations. The normal
+dependency direction is api/* -> services/* -> Cloudflare bindings/external APIs.
+
+HIERARCHY
+
+functions/
++-- api/
+|   +-- auth/
+|   |   +-- link.js, logout.js, session.js, unlink.js
+|   |   +-- _oauth/callback.js
+|   |   +-- account/
+|   |   |   +-- deactivate.js, index.js, last_login.js, profile.js
+|   |   +-- admin/
+|   |   |   +-- access.js
+|   |   |   +-- tasks/
+|   |   |       +-- index.js
+|   |   |       +-- task-activity.js, task-assignees.js, task-summary.js
+|   |   |       +-- [taskCode].js
+|   |   |       +-- [taskCode]/events.js, lifecycle.js
+|   |   +-- discord/
+|   |   |   +-- callback.js, login.js
+|   |   |   +-- matchbot/
+|   |   |       +-- channels.js, events.js, guilds.js, install.js
+|   |   |       +-- interactions.js, permission.js, test_message.js
+|   |   +-- epic/callback.js, login.js
+|   |   +-- google/login.js
+|   |   +-- rocketleague/
+|   |   |   +-- discord-notifications.js, profile.js, session.js
+|   |   +-- steam/callback.js, login.js
+|   +-- curseforge/mods.js
+|   +-- health/apihealth.js
+|   +-- ocr/
+|       +-- compare.js, confirm.js, index.js, localize.js
+|       +-- localTracking.js, storeMatch.js, training.js
+|       +-- jobs/
+|           +-- get_job.js, get_result.js, image.js
+|           +-- process_job.js, progress.js, submit_job.js
+|
++-- services/
+    +-- admin/
+    |   +-- permissions.js, taskboard_discord.js, taskboard_roles.js
+    +-- auth/
+    |   +-- authentication.js, authorization.js
+    |   +-- account/
+    |   |   +-- get_session.js, last_login.js, link_provider.js
+    |   |   +-- logout.js, mutations.js, unlink_provider.js
+    |   +-- oauth/
+    |   |   +-- callback.js, callback_response.js, provider_helpers.js, state.js
+    |   +-- providers/
+    |   |   +-- provider_auth_state.js
+    |   |   +-- provider_authentication.js
+    |   |   +-- provider_identity.js
+    |   |   +-- discord/
+    |   |   |   +-- authorization.js, guild_roles.js, login.js, role_sync.js
+    |   |   +-- discord_matchbot/
+    |   |   |   +-- channels.js, client.js, eligibility.js, events.js
+    |   |   |   +-- guilds.js, interactions.js, members.js, messages.js
+    |   |   |   +-- permissions.js
+    |   |   +-- epic/callback.js, login.js
+    |   |   +-- google/login.js
+    |   |   +-- steam/callback.js, login.js
+    |   +-- sessions/session.js, session_context.js
+    +-- common_helpers/responses.js
+    +-- config/api_vars.js
+    +-- http/responses.js
+    +-- ocr/
+    |   +-- confirm.js, handler.js, localize.js, storage.js
+    |   +-- storeMatch.js, training.js, trainingCandidates.js, trainingStorage.js
+    +-- rl/
+    |   +-- authorization.js, profile.js, session.js
+    |   +-- presence/fetch_presence.js, wake_monitor.js
+    |   +-- stats/
+    |       +-- fetch_mmr.js, latest_cache.js, latest_mmr.js
+    |       +-- refresh.js, refresh_gate.js, refresh_state.js
+    |       +-- refresh_with_gate.js, save_mmr.js
+    +-- security/turnstile.js
+    +-- supabase/
+        +-- rocketleague/
+        |   +-- ensure_player.js, get_latest_mmr.js
+        |   +-- rocketleague_profile.js, save_profile.js
+        +-- admin/tasks/
+            +-- activity.js, assignees.js, comments.js, create.js, get.js
+            +-- lifecycle.js, list.js, payload.js, rpc.js, summary.js, update.js
+            +-- sql/README.md, taskboard_schema_repair.sql,
+                taskboard_verify.sql
+
+SUBCATEGORY RESPONSIBILITIES
+
+api/auth
+    HTTP entrypoints for sessions, account/provider linking, OAuth callbacks,
+    provider-specific login/callback flows, Rocket League account data, admin
+    authorization, Taskboard APIs, and Discord Matchbot operations.
+
+api/ocr
+    Synchronous OCR-facing endpoints plus the queued-job lifecycle. jobs/
+    submits work, exposes stored image/job/progress/result data, and accepts the
+    processor callback used by the queue consumer.
+
+      Queued submissions accept legacy roster fields or the additive
+      sourceMode/submissionMode contract. Automatic roster metadata may be absent;
+      manual metadata remains strictly validated. Result readers accept current
+      and historical team/field shapes. Team totals are exposed only when
+      explicitly stored.
+
+services/auth
+    Shared request authentication/authorization, session context, account
+    mutations, generic OAuth flow, and provider-specific implementations.
+
+services/rl
+    Rocket League authorization/profile/session logic, presence-monitor calls,
+    and MMR fetch/cache/refresh/save flow.
+
+services/ocr
+    Request handling, image/training storage, OCR service calls, localization,
+    confirmation, and match persistence support.
+
+services/supabase
+    Direct persistence boundary for Rocket League profiles/MMR and admin
+    Taskboard activity, assignment, comments, lifecycle, list/get/create/update,
+    summaries, payloads, and RPCs.
+
+services/admin, services/security, services/config, response helpers
+    Cross-cutting permissions/Discord roles, Turnstile validation, environment
+    configuration access, and consistent HTTP response construction.
+
+KEY CROSS-FOLDER CONNECTIONS
+
+    public/* browser modules
+        -> /api/*
+        -> functions/api/*
+        -> functions/services/*
+
+    functions/api/ocr/jobs/submit_job.js
+        -> OCR storage/progress bindings and OCR_JOB_QUEUE
+        -> workers/ocr-job-consumer
+
+    functions/services/ocr handler/localize
+        -> configured ocr_cloudData service URL
+
+    functions/services/rl/presence/wake_monitor.js
+        -> workers/rl-presence-monitor /wake
+
+    functions/services/supabase/*
+        -> Supabase REST/RPC persistence boundary
+

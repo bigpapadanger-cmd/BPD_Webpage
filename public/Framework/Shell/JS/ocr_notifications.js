@@ -671,6 +671,10 @@ function ensureNotificationContainer() {
     container.className =
         "ocr-notification-container";
 
+    container.setAttribute("role", "status");
+    container.setAttribute("aria-live", "polite");
+    container.setAttribute("aria-relevant", "additions");
+
     document.body.appendChild(
         container
     );
@@ -744,7 +748,8 @@ function createNotification(
         type,
         title,
         description,
-        onClick
+        onClick,
+        persistent = type === "review" || type === "failure"
     }
 ) {
     const normalizedId =
@@ -901,8 +906,9 @@ function createNotification(
             notification
         );
 
-    const timer =
-        setTimeout(
+    if (!persistent) {
+        const timer =
+            setTimeout(
             function() {
                 OCR_NOTIFICATION_TIMERS.delete(
                     normalizedId
@@ -912,13 +918,14 @@ function createNotification(
                     normalizedId
                 );
             },
-            OCR_NOTIFICATION_DURATION_MS
-        );
+                OCR_NOTIFICATION_DURATION_MS
+            );
 
-    OCR_NOTIFICATION_TIMERS.set(
-        normalizedId,
-        timer
-    );
+        OCR_NOTIFICATION_TIMERS.set(
+            normalizedId,
+            timer
+        );
+    }
 
     return notification;
 }
@@ -1002,6 +1009,42 @@ function showReviewNotification(
                     pending
                 );
             }
+    });
+}
+
+function showOutcomeWithoutMatchNotification(detail) {
+    const jobId = normalizeId(detail?.jobId);
+    const disposition = String(detail?.disposition || "needs_review").toLowerCase();
+    const isRejected = disposition === "rejected";
+
+    if (!validJobId(jobId) || isJobAcknowledged(jobId)) {
+        return null;
+    }
+
+    const messages = {
+        "ocr.rejection.roster_uncertain": "The player roster could not be read confidently. Review the image or submit it again.",
+        "ocr.rejection.scoreboard_not_found": "A scoreboard could not be identified in this image.",
+        "ocr.rejection.layout_unsupported": "This scoreboard layout needs manual review.",
+        "ocr.rejection.processing_unavailable": "OCR could not finish. You can submit the image again."
+    };
+    const messageKey = detail?.rejection?.messageKey;
+
+    return createNotification({
+        id: `OCR-${jobId}`,
+        type: "review",
+        title: isRejected ? "Scoreboard Rejected" : "Scoreboard Needs Review",
+        description: messages[messageKey]
+            || "This OCR result needs attention before it can be used.",
+        onClick: function() {
+            document.dispatchEvent(new CustomEvent("ocr:outcome-open", {
+                detail: {
+                    jobId,
+                    disposition,
+                    rejection: detail?.rejection || null
+                }
+            }));
+        },
+        persistent: true
     });
 }
 
@@ -1187,17 +1230,20 @@ function handleJobCompleted(
             detail?.matchId
         );
 
-    if (
-        !validJobId(
-            jobId
-        )
-        || !validMatchId(
-            matchId
-        )
-        || isJobAcknowledged(
-            jobId
-        )
-    ) {
+    if (!validJobId(jobId) || isJobAcknowledged(jobId)) {
+        return;
+    }
+
+    const disposition = String(detail?.disposition || "").toLowerCase();
+
+    if (!validMatchId(matchId)) {
+        if (disposition === "needs_review" || disposition === "rejected") {
+            showOutcomeWithoutMatchNotification({
+                ...detail,
+                jobId,
+                disposition
+            });
+        }
         return;
     }
 

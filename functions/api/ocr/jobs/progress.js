@@ -147,14 +147,6 @@ const OCR_PROGRESS_TIMELINE =
         },
         {
             fraction:
-                0.92,
-            progress:
-                82,
-            stage:
-                "numeric_paddle"
-        },
-        {
-            fraction:
                 0.95,
             progress:
                 86,

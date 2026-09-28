@@ -237,6 +237,112 @@ button:hover:not(:disabled) {
 
 
 /* =========================================================
+   METADATA MODE
+   ========================================================= */
+
+.metadata-mode-field,
+.manual-metadata-fields {
+    grid-column: 1 / -1;
+}
+
+.metadata-mode-field {
+    padding: 16px;
+    border: 1px solid rgba(56, 189, 248, 0.18);
+    border-radius: 12px;
+    background: rgba(56, 189, 248, 0.035);
+}
+
+.metadata-mode-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 18px;
+}
+
+.metadata-mode-help,
+.match-size-help {
+    margin-top: 6px;
+    color: #7f8b9d;
+    font-size: 12px;
+    line-height: 1.45;
+}
+
+.metadata-mode-toggle {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    min-height: 44px;
+    padding: 9px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.18);
+    cursor: pointer;
+}
+
+.metadata-mode-toggle input {
+    width: 18px;
+    height: 18px;
+    margin: 0;
+    accent-color: #38bdf8;
+}
+
+.metadata-mode-toggle:focus-within {
+    border-color: #38bdf8;
+    box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.12);
+}
+
+.metadata-mode-toggle span {
+    color: #e2e8f0;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0;
+    text-transform: none;
+}
+
+.automatic-metadata-preview {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    margin: 8px 0 0;
+}
+
+.automatic-metadata-preview[hidden],
+.manual-metadata-fields[hidden] {
+    display: none;
+}
+
+.automatic-metadata-preview > div {
+    min-width: 0;
+    padding: 10px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 9px;
+    background: rgba(0, 0, 0, 0.16);
+}
+
+.automatic-metadata-preview dt {
+    color: #94a3b8;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+}
+
+.automatic-metadata-preview dd {
+    margin: 5px 0 0;
+    color: #cbd5e1;
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.manual-metadata-fields {
+    display: grid;
+    grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);
+    gap: 16px;
+    align-items: start;
+}
+
+
+/* =========================================================
    PLAYER NAMES
    ========================================================= */
 
@@ -867,6 +973,19 @@ button:hover:not(:disabled) {
 
     .player-names-field {
         padding: 14px;
+    }
+
+    .metadata-mode-heading {
+        flex-direction: column;
+    }
+
+    .metadata-mode-toggle {
+        width: 100%;
+    }
+
+    .automatic-metadata-preview,
+    .manual-metadata-fields {
+        grid-template-columns: 1fr;
     }
 
     .player-names-grid {
