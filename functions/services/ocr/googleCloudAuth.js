@@ -348,6 +348,28 @@ function logGoogleHttpFailure(
     );
 }
 
+function logMtlsStsDiagnostic(
+    context,
+    response,
+    parsedResponse,
+    secrets
+) {
+    console.error(
+        "[OCR GOOGLE AUTH] Temporary mTLS STS diagnostic.",
+        {
+            bindingExists: context?.bindingExists === true,
+            bindingFetchIsFunction: context?.bindingFetchIsFunction === true,
+            destinationHostname: context?.destinationHostname || null,
+            returnedHttpStatus: Number(response.status) || 0,
+            googleError: sanitizeDiagnosticText(parsedResponse?.error, secrets),
+            googleErrorDescription: sanitizeDiagnosticText(
+                parsedResponse?.error_description,
+                secrets
+            )
+        }
+    );
+}
+
 function buildGoogleAuthDiagnosticContext(
     config,
     authStage,
@@ -361,6 +383,12 @@ function buildGoogleAuthDiagnosticContext(
         mtlsBindingPresent: Boolean(config.certificateBinding),
         certificateChainEntryCount: config.certificateChain.length,
         serviceAccountEmail: config.serviceAccountEmail,
+        bindingExists: Boolean(config.certificateBinding),
+        bindingFetchIsFunction:
+            typeof config.certificateBinding?.fetch === "function",
+        destinationHostname: authStage === "sts_exchange"
+            ? new URL(GOOGLE_STS_URL).hostname
+            : null,
         redactionValues: [
             ...config.diagnosticRedactionValues,
             ...additionalRedactions
@@ -448,15 +476,34 @@ async function fetchJson(
             catch {
                 // The HTTP status and safe request context remain useful without a body.
             }
-            logGoogleHttpFailure(
-                diagnosticContext,
-                response,
-                parsedError,
-                diagnosticContext?.redactionValues
-            );
+            if (diagnosticContext?.authStage === "sts_exchange") {
+                logMtlsStsDiagnostic(
+                    diagnosticContext,
+                    response,
+                    parsedError,
+                    diagnosticContext?.redactionValues
+                );
+            }
+            else {
+                logGoogleHttpFailure(
+                    diagnosticContext,
+                    response,
+                    parsedError,
+                    diagnosticContext?.redactionValues
+                );
+            }
             throw createAuthError(
                 failureCode,
                 "Google authentication could not be completed."
+            );
+        }
+
+        if (diagnosticContext?.authStage === "sts_exchange") {
+            logMtlsStsDiagnostic(
+                diagnosticContext,
+                response,
+                null,
+                diagnosticContext?.redactionValues
             );
         }
 
@@ -623,7 +670,8 @@ function readJwtExpiry(
 
 async function getFederatedAccessToken(
     config,
-    certificateFingerprint
+    certificateFingerprint,
+    env
 ) {
     const cacheKey =
         config.providerResource
@@ -637,7 +685,8 @@ async function getFederatedAccessToken(
             const response =
                 await fetchJson(
                     function(url, options) {
-                        return config.certificateBinding.fetch(
+                        return fetchStsWithMtlsBinding(
+                            env,
                             url,
                             options
                         );
@@ -696,6 +745,17 @@ async function getFederatedAccessToken(
     );
 }
 
+function fetchStsWithMtlsBinding(
+    env,
+    url,
+    options
+) {
+    return env.OCR_GCP_MTLS.fetch(
+        url,
+        options
+    );
+}
+
 function buildCloudRunAudience(
     serviceUrl
 ) {
@@ -750,7 +810,8 @@ export async function getGoogleCloudRunIdToken(
             const federatedAccessToken =
                 await getFederatedAccessToken(
                     config,
-                    certificateFingerprint
+                    certificateFingerprint,
+                    env
                 );
 
             const endpoint =

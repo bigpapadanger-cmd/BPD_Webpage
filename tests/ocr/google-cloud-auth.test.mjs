@@ -39,7 +39,7 @@ function captureConsoleError(run) {
         .then(result => ({ result, calls }));
 }
 
-test("STS rejection logs useful allow-listed diagnostics and redacts credential material", async () => {
+test("STS rejection logs only temporary mTLS diagnostics and redacts credential material", async () => {
     const { env, mtlsCalls, certificate, certificateValue } = createEnvironment();
     const originalFetch = globalThis.fetch;
     globalThis.fetch = async () => {
@@ -80,18 +80,20 @@ test("STS rejection logs useful allow-listed diagnostics and redacts credential 
     assert.equal(stsBody.subject_token_type, "urn:ietf:params:oauth:token-type:mtls");
 
     const diagnostic = calls[0][1];
-    assert.equal(diagnostic.authStage, "sts_exchange");
-    assert.equal(diagnostic.httpStatus, 400);
-    assert.equal(diagnostic.responseContentType, "application/json; charset=utf-8");
+    assert.deepEqual(Object.keys(diagnostic).sort(), [
+        "bindingExists",
+        "bindingFetchIsFunction",
+        "destinationHostname",
+        "googleError",
+        "googleErrorDescription",
+        "returnedHttpStatus"
+    ].sort());
+    assert.equal(diagnostic.bindingExists, true);
+    assert.equal(diagnostic.bindingFetchIsFunction, true);
+    assert.equal(diagnostic.destinationHostname, "sts.mtls.googleapis.com");
+    assert.equal(diagnostic.returnedHttpStatus, 400);
     assert.equal(diagnostic.googleError, "invalid_grant");
     assert.match(diagnostic.googleErrorDescription, /certificate \[REDACTED\]/);
-    assert.equal(diagnostic.googleErrorUri, "https://sts.example/errors/invalid-grant");
-    assert.equal(diagnostic.requestAudience, EXPECTED_PROVIDER_RESOURCE);
-    assert.equal(diagnostic.providerResource, EXPECTED_PROVIDER_RESOURCE);
-    assert.equal(diagnostic.mtlsBindingPresent, true);
-    assert.equal(diagnostic.certificateChainPresent, true);
-    assert.equal(diagnostic.certificateChainEntryCount, 1);
-    assert.equal(diagnostic.serviceAccountEmail, env.OCR_GCP_SERVICE_ACCOUNT_EMAIL);
 
     const logged = JSON.stringify(calls);
     for (const secret of [certificate, certificateValue, JSON.stringify([certificate]), "ocr/api+key-secret", "ocr%2Fapi%2Bkey-secret", "leaked-token", "secret-key-material"]) {
@@ -145,10 +147,18 @@ test("service-account ID-token rejection preserves its external code and redacts
         assert.match(requests[0].url, /^https:\/\/iamcredentials\.googleapis\.com\/v1\/projects\/\-\/serviceAccounts\//);
         const body = JSON.parse(requests[0].options.body);
         assert.equal(body.audience, "https://other-ocr-service.run.app");
-        assert.equal(calls[0][1].authStage, "service_account_id_token");
-        assert.equal(calls[0][1].httpStatus, 403);
-        assert.equal(calls[0][1].googleError, "permission_denied");
-        assert.equal(calls[0][1].googleErrorUri, "https://iam.example/errors/denied");
+        const idTokenDiagnostic = calls.find(call =>
+            call[0] === "[OCR GOOGLE AUTH] Google token endpoint rejected authentication."
+        )[1];
+        assert.equal(idTokenDiagnostic.authStage, "service_account_id_token");
+        assert.equal(idTokenDiagnostic.httpStatus, 403);
+        assert.equal(idTokenDiagnostic.googleError, "permission_denied");
+        assert.equal(idTokenDiagnostic.googleErrorUri, "https://iam.example/errors/denied");
+        const stsDiagnostic = calls.find(call =>
+            call[0] === "[OCR GOOGLE AUTH] Temporary mTLS STS diagnostic."
+        )[1];
+        assert.equal(stsDiagnostic.returnedHttpStatus, 200);
+        assert.equal(stsDiagnostic.googleError, null);
         assert.equal(JSON.stringify(calls).includes("federated-access-secret"), false);
         assert.equal(authError.message, "Google authentication could not be completed.");
         assert.equal(String(authError.stack).includes("federated-access-secret"), false);
