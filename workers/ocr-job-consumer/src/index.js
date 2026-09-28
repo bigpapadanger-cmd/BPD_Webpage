@@ -1301,8 +1301,11 @@ async function processMessage(
                     permanent:
                         error.permanent,
 
-                    response:
-                        responseText
+                    responseBytes:
+                        new TextEncoder().encode(responseText).byteLength,
+
+                    responseType:
+                        response.headers.get("Content-Type") || null
                 }
             },
             ctx
@@ -1363,8 +1366,11 @@ async function processMessage(
                     permanent:
                         error.permanent,
 
-                    response:
-                        responseText
+                    responseBytes:
+                        new TextEncoder().encode(responseText).byteLength,
+
+                    responseType:
+                        response.headers.get("Content-Type") || null
                 }
             },
             ctx

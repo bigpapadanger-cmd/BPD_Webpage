@@ -11,7 +11,8 @@ When adding a new page:
 4. Set its page module.
 5. Set the appropriate header, sidebar, and footer.
 6. Add it to HEADER_MAP if its header behavior differs.
-7. Add the clean URL to _redirects when required.
+7. The Pages catch-all routes only registered human paths;
+   API and asset paths retain their exact matching behavior.
 
 CSS POLICY
 
@@ -262,7 +263,7 @@ export const ROUTES = {
             "/Framework/Shell/HTML/Header/header.html",
 
         sidebar:
-            "/Framework/Shell/HTML/Sidebar/rl_AuthSidebar.html",
+            "/Framework/Shell/HTML/Sidebar/rl_menu.html",
 
         footer:
             "/Framework/Shell/HTML/Footer/footer.html",
@@ -288,7 +289,7 @@ export const ROUTES = {
             "/Framework/Shell/HTML/Header/header.html",
 
         sidebar:
-            "/Framework/Shell/HTML/Sidebar/rl_AuthSidebar.html",
+            "/Framework/Shell/HTML/Sidebar/rl_menu.html",
 
         footer:
             "/Framework/Shell/HTML/Footer/footer.html",
@@ -312,7 +313,7 @@ export const ROUTES = {
             "/Framework/Shell/HTML/Header/header.html",
 
         sidebar:
-            "/Framework/Shell/HTML/Sidebar/rocketleague.html",
+            "/Framework/Shell/HTML/Sidebar/rl_menu.html",
 
         footer:
             "/Framework/Shell/HTML/Footer/footer.html",
@@ -599,6 +600,58 @@ export const ROUTES = {
             false
     },
 
+    "/Settings": {
+        title:
+            "Settings | BPD Gaming Network",
+
+        body:
+            "/Global/Settings/HTML/settings.html",
+
+        header:
+            "/Framework/Shell/HTML/Header/header.html",
+
+        sidebar:
+            "/Framework/Shell/HTML/Sidebar/mainmenu.html",
+
+        footer:
+            "/Framework/Shell/HTML/Footer/footer.html",
+
+        module:
+            "/Global/Settings/JS/settings.js",
+
+        requiresAuth:
+            false,
+
+        sitemap:
+            true
+    },
+
+    "/Suggestions": {
+        title:
+            "Community Suggestions | BPD Gaming Network",
+
+        body:
+            "/Global/Suggestions/HTML/index.html",
+
+        header:
+            "/Framework/Shell/HTML/Header/header.html",
+
+        sidebar:
+            "/Framework/Shell/HTML/Sidebar/mainmenu.html",
+
+        footer:
+            "/Framework/Shell/HTML/Footer/footer.html",
+
+        module:
+            "/Global/Suggestions/JS/index.js",
+
+        requiresAuth:
+            false,
+
+        sitemap:
+            true
+    },
+
     // =====================================================
     // ADMIN PAGES
     // =====================================================
@@ -653,8 +706,119 @@ export const ROUTES = {
 
         sitemap:
             false
+    },
+
+    "/Admin/PageSettings": {
+        title:
+            "Page Settings | BPD Gaming Network",
+
+        body:
+            "/Global/Admin/PageSettings/HTML/index.html",
+
+        header:
+            "/Framework/Shell/HTML/Header/header.html",
+
+        sidebar:
+            "/Framework/Shell/HTML/Sidebar/admin.html",
+
+        footer:
+            "/Framework/Shell/HTML/Footer/footer.html",
+
+        module:
+            "/Global/Admin/PageSettings/JS/index.js",
+
+        requiresAuth:
+            true,
+
+        sitemap:
+            false
+    },
+
+    "/Admin/SuggestionReview": {
+        title:
+            "Suggestion Review | BPD Gaming Network",
+
+        body:
+            "/Global/Admin/Suggestions/HTML/index.html",
+
+        header:
+            "/Framework/Shell/HTML/Header/header.html",
+
+        sidebar:
+            "/Framework/Shell/HTML/Sidebar/admin.html",
+
+        footer:
+            "/Framework/Shell/HTML/Footer/footer.html",
+
+        module:
+            "/Global/Admin/Suggestions/JS/index.js",
+
+        requiresAuth:
+            true,
+
+        sitemap:
+            false
     }
 };
+
+/* =========================================================
+HUMAN PAGE ROUTE INDEX
+
+The configured route path remains the preferred public form.
+The lower-case key is only for case-insensitive page lookup;
+it must never be applied to APIs, assets, callbacks, or URLs
+outside this page registry.
+========================================================= */
+
+export function buildHumanPageRouteIndex(
+    routeRegistry = ROUTES
+) {
+    const routeIndex = new Map();
+
+    for (const [routePath, config] of Object.entries(routeRegistry)) {
+        const canonicalPath = normalizeRoutePath(routePath);
+        const lookupKey = canonicalPath.toLowerCase();
+        const previous = routeIndex.get(lookupKey);
+
+        if (previous && previous.canonicalPath !== canonicalPath) {
+            throw new Error(
+                `Human page route collision: ${previous.canonicalPath} and ${canonicalPath}`
+            );
+        }
+
+        routeIndex.set(lookupKey, {
+            canonicalPath,
+            config
+        });
+    }
+
+    return routeIndex;
+}
+
+const HUMAN_PAGE_ROUTE_INDEX =
+    buildHumanPageRouteIndex();
+
+export function resolveHumanPageRoute(
+    routePath
+) {
+    const normalizedPath =
+        normalizeRoutePath(routePath);
+
+    const route =
+        HUMAN_PAGE_ROUTE_INDEX.get(
+            normalizedPath.toLowerCase()
+        );
+
+    if (!route) {
+        return null;
+    }
+
+    return {
+        requestedPath: normalizedPath,
+        canonicalPath: route.canonicalPath,
+        config: route.config
+    };
+}
 
 /* =========================================================
 ROUTE NORMALIZATION
@@ -750,23 +914,24 @@ export function getMasterCssForRoute(
         );
 
     if (
-        normalizedPath ===
+        resolveHumanPageRoute(normalizedPath)?.canonicalPath ===
             "/Error"
     ) {
         return MASTER_CSS_PATH;
     }
 
+    const canonicalPath =
+        resolveHumanPageRoute(normalizedPath)?.canonicalPath;
+
     if (
-        !routeExists(
-            normalizedPath
-        )
+        !canonicalPath
     ) {
         return MASTER_CSS_PATH;
     }
 
     const root =
         getRouteRoot(
-            normalizedPath
+            canonicalPath
         );
 
     if (
@@ -790,19 +955,8 @@ ROUTE RESOLUTION
 export function getRouteConfig(
     routePath
 ) {
-    const normalizedPath =
-        normalizeRoutePath(
-            routePath
-        );
-
-    return (
-        ROUTES[
-            normalizedPath
-        ]
-        || ROUTES[
-            "/Error"
-        ]
-    );
+    return resolveHumanPageRoute(routePath)?.config
+        || ROUTES["/Error"];
 }
 
 /* =========================================================
@@ -812,17 +966,7 @@ ROUTE EXISTS
 export function routeExists(
     routePath
 ) {
-    const normalizedPath =
-        normalizeRoutePath(
-            routePath
-        );
-
-    return Object.prototype
-        .hasOwnProperty
-        .call(
-            ROUTES,
-            normalizedPath
-        );
+    return Boolean(resolveHumanPageRoute(routePath));
 }
 
 /* =========================================================

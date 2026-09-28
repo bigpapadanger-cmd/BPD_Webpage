@@ -8,6 +8,12 @@
 const DEBUG_DETAIL_MAX_BYTES =
     12000;
 
+const DEBUG_SENSITIVE_KEY =
+    /(?:secret|token|authorization|cookie|password|credential|certificate|private.?key|subject.?token|raw.?response|response|request.?body|image|payload|message|preview|snippet|\btext\b)/i;
+
+const DEBUG_SAFE_RESPONSE_KEY =
+    /^(?:responseBytes|responseType)$/i;
+
 // ============================================================
 // ENABLED
 // ============================================================
@@ -71,9 +77,32 @@ function normalizeJobId(
         : "";
 }
 
-function sanitizeDebugDetail(
-    detail
-) {
+function sanitizeDiagnosticValue(value) {
+    if (Array.isArray(value)) {
+        return value.slice(0, 50).map(sanitizeDiagnosticValue);
+    }
+
+    if (value && typeof value === "object") {
+        const safe = {};
+        for (const [key, item] of Object.entries(value)) {
+            if (DEBUG_SENSITIVE_KEY.test(key) && !DEBUG_SAFE_RESPONSE_KEY.test(key)) continue;
+            safe[key] = sanitizeDiagnosticValue(item);
+        }
+        return safe;
+    }
+
+    if (typeof value === "string") {
+        return value
+            .replace(/\bBearer\s+\S+/gi, "Bearer [REDACTED]")
+            .replace(/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g, "[REDACTED_TOKEN]")
+            .replace(/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/gi, "[REDACTED_PRIVATE_KEY]")
+            .slice(0, 2000);
+    }
+
+    return value;
+}
+
+function sanitizeDebugDetail(detail) {
     if (
         detail === undefined
         || detail === null
@@ -82,10 +111,8 @@ function sanitizeDebugDetail(
     }
 
     try {
-        const serialized =
-            JSON.stringify(
-                detail
-            );
+        const safeDetail = sanitizeDiagnosticValue(detail);
+        const serialized = JSON.stringify(safeDetail);
 
         if (
             serialized.length <=
@@ -100,12 +127,7 @@ function sanitizeDebugDetail(
             truncated:
                 true,
             originalLength:
-                serialized.length,
-            preview:
-                serialized.slice(
-                    0,
-                    DEBUG_DETAIL_MAX_BYTES
-                )
+                serialized.length
         };
     }
     catch (
@@ -114,15 +136,8 @@ function sanitizeDebugDetail(
         return {
             serializationFailed:
                 true,
-            message:
-                String(
-                    error?.message
-                    || error
-                )
-                    .slice(
-                        0,
-                        500
-                    )
+            errorName:
+                String(error?.name || "Error").slice(0, 80)
         };
     }
 }
@@ -270,11 +285,8 @@ export async function writeOcrDebugTrace(
                     safeComponent,
                 event:
                     safeEvent,
-                message:
-                    String(
-                        error?.message
-                        || error
-                    )
+                errorName:
+                    String(error?.name || "Error").slice(0, 80)
             }
         );
 

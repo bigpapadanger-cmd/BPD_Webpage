@@ -1,0 +1,68 @@
+.user-settings {
+    width: min(100% - 2rem, 64rem);
+    margin: 2rem auto;
+    color: var(--text-primary, #f2f4f8);
+}
+
+.user-settings__hero,
+.user-settings__section {
+    margin-block: 1rem;
+    padding: clamp(1rem, 3vw, 2rem);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 1rem;
+    background: rgba(12, 18, 30, 0.84);
+}
+
+.user-settings__eyebrow {
+    color: #83bfff;
+    letter-spacing: 0.12em;
+    font-size: 0.75rem;
+}
+
+.user-settings h1,
+.user-settings h2 {
+    margin: 0 0 0.75rem;
+}
+
+.user-settings__row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.user-settings__row span {
+    display: grid;
+    gap: 0.25rem;
+}
+
+.user-settings small,
+.user-settings__section > p {
+    color: #b9c2d1;
+}
+
+.user-settings button,
+.user-settings select {
+    min-height: 2.6rem;
+    padding: 0.5rem 0.9rem;
+    border: 1px solid rgba(131, 191, 255, 0.6);
+    border-radius: 0.5rem;
+    background: #152338;
+    color: inherit;
+    font: inherit;
+}
+
+.user-settings a {
+    display: inline-block;
+    margin-top: 0.75rem;
+    color: #9acbff;
+}
+
+@media (max-width: 600px) {
+    .user-settings__row {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+}

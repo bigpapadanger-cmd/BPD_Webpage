@@ -1,346 +1,117 @@
-/*
-=========================================================
-BPD GAMING NETWORK
-SETTINGS
-=========================================================
-Controls the user's global BPD Gaming Network preferences.
+"use strict";
 
-Settings stored in localStorage:
+const DEFAULTS = Object.freeze({
+    theme: "blue",
+    animations: "on",
+    sidebar: "open"
+});
 
-bpdTheme
-bpdAnimations
-bpdSidebar
+const STORAGE_KEYS = Object.freeze({
+    theme: "bpdTheme",
+    animations: "bpdAnimations",
+    sidebar: "bpdSidebar"
+});
 
-The actual sidebar is controlled exclusively by sidebar.js.
-This file only saves the user's sidebar preference and
-updates the Settings page UI.
-=========================================================
-*/
-
-
-/*
-=========================================================
-SETTINGS ELEMENTS
-=========================================================
-*/
-
-const themeSetting = document.getElementById("themeSetting");
-const animationSetting = document.getElementById("animationSetting");
-const sidebarSetting = document.getElementById("sidebarSetting");
-const resetSettings = document.getElementById("resetSettings");
-
-
-/*
-=========================================================
-DEFAULT SETTINGS
-=========================================================
-*/
-
-const DEFAULT_THEME = "blue";
-const DEFAULT_ANIMATIONS = "on";
-const DEFAULT_SIDEBAR = "open";
-
-
-/*
-=========================================================
-GET SAVED SETTINGS
-=========================================================
-*/
-
-function getSavedSettings() {
-    return {
-        theme:
-            localStorage.getItem("bpdTheme") ||
-            DEFAULT_THEME,
-        animations:
-            localStorage.getItem("bpdAnimations") ||
-            DEFAULT_ANIMATIONS,
-        sidebar:
-            localStorage.getItem("bpdSidebar") ||
-            DEFAULT_SIDEBAR
-    };
-}
-
-
-/*
-=========================================================
-APPLY THEME
-=========================================================
-*/
-
-function applyTheme(theme) {
-    document.body.dataset.theme = theme;
-}
-
-
-/*
-=========================================================
-APPLY ANIMATIONS
-=========================================================
-*/
-
-function applyAnimations(animations) {
-    document.body.dataset.animations = animations;
-
-    if (animations === "off") {
-        document.body.classList.add("animations-off");
-    } else {
-        document.body.classList.remove("animations-off");
+function readPreferences() {
+    try {
+        return {
+            theme: ["blue", "orange", "purple", "green"].includes(localStorage.getItem(STORAGE_KEYS.theme))
+                ? localStorage.getItem(STORAGE_KEYS.theme)
+                : DEFAULTS.theme,
+            animations: localStorage.getItem(STORAGE_KEYS.animations) === "off" ? "off" : DEFAULTS.animations,
+            sidebar: localStorage.getItem(STORAGE_KEYS.sidebar) === "collapsed" ? "collapsed" : DEFAULTS.sidebar
+        };
+    } catch {
+        return { ...DEFAULTS };
     }
 }
 
-
-/*
-=========================================================
-UPDATE THEME UI
-=========================================================
-*/
-
-function updateThemeUI() {
-    if (!themeSetting) {
-        return;
+function writePreference(key, value) {
+    try {
+        localStorage.setItem(STORAGE_KEYS[key], value);
+        return true;
+    } catch {
+        return false;
     }
-
-    const settings = getSavedSettings();
-
-    themeSetting.value = settings.theme;
 }
 
-
-/*
-=========================================================
-UPDATE ANIMATION BUTTON
-=========================================================
-*/
-
-function updateAnimationButton() {
-    if (!animationSetting) {
-        return;
-    }
-
-    const settings = getSavedSettings();
-
-    const enabled =
-        settings.animations === "on";
-
-    animationSetting.classList.toggle(
-        "active",
-        enabled
-    );
-
-    const toggleText =
-        animationSetting.querySelector(
-            ".toggle-text"
-        );
-
-    if (toggleText) {
-        toggleText.textContent =
-            enabled ? "On" : "Off";
-    }
-
-    animationSetting.setAttribute(
-        "aria-pressed",
-        enabled ? "true" : "false"
-    );
+function applyPreferences(preferences) {
+    document.body.dataset.theme = preferences.theme;
+    document.body.dataset.animations = preferences.animations;
+    document.body.classList.toggle("animations-off", preferences.animations === "off");
 }
 
+export async function initializePage() {
+    const theme = document.getElementById("themeSetting");
+    const animations = document.getElementById("animationSetting");
+    const sidebar = document.getElementById("sidebarSetting");
+    const reset = document.getElementById("resetSettings");
+    const privacy = document.getElementById("privacySettings");
+    const privacyStatus = document.getElementById("privacySettingsStatus");
+    const preferences = readPreferences();
 
-/*
-=========================================================
-UPDATE SIDEBAR BUTTON
-=========================================================
-
-This ONLY updates the Settings page button.
-
-sidebar.js controls the actual sidebar.
-
-=========================================================
-*/
-
-function updateSidebarButton() {
-    if (!sidebarSetting) {
-        return;
+    applyPreferences(preferences);
+    if (theme) theme.value = preferences.theme;
+    if (animations) {
+        animations.textContent = preferences.animations === "on" ? "On" : "Off";
+        animations.setAttribute("aria-pressed", String(preferences.animations === "on"));
+    }
+    if (sidebar) {
+        sidebar.textContent = preferences.sidebar === "open" ? "Open" : "Collapsed";
+        sidebar.setAttribute("aria-pressed", String(preferences.sidebar === "open"));
     }
 
-    const settings = getSavedSettings();
-
-    const sidebarOpen =
-        settings.sidebar !== "collapsed";
-
-    sidebarSetting.classList.toggle(
-        "active",
-        sidebarOpen
-    );
-
-    const toggleText =
-        sidebarSetting.querySelector(
-            ".toggle-text"
-        );
-
-    if (toggleText) {
-        toggleText.textContent =
-            sidebarOpen
-                ? "Open"
-                : "Collapsed";
-    }
-
-    sidebarSetting.setAttribute(
-        "aria-pressed",
-        sidebarOpen ? "true" : "false"
-    );
-}
-
-
-/*
-=========================================================
-THEME SETTING
-=========================================================
-*/
-
-if (themeSetting) {
-    themeSetting.addEventListener(
-        "change",
-        () => {
-            const theme =
-                themeSetting.value;
-
-            localStorage.setItem(
-                "bpdTheme",
-                theme
-            );
-
-            applyTheme(theme);
+    theme?.addEventListener("change", () => {
+        if (writePreference("theme", theme.value)) {
+            preferences.theme = theme.value;
+            applyPreferences(preferences);
         }
-    );
-}
+    });
 
+    animations?.addEventListener("click", () => {
+        preferences.animations = preferences.animations === "on" ? "off" : "on";
+        writePreference("animations", preferences.animations);
+        applyPreferences(preferences);
+        animations.textContent = preferences.animations === "on" ? "On" : "Off";
+        animations.setAttribute("aria-pressed", String(preferences.animations === "on"));
+    });
 
-/*
-=========================================================
-ANIMATION SETTING
-=========================================================
-*/
+    sidebar?.addEventListener("click", () => {
+        preferences.sidebar = preferences.sidebar === "open" ? "collapsed" : "open";
+        writePreference("sidebar", preferences.sidebar);
+        sidebar.textContent = preferences.sidebar === "open" ? "Open" : "Collapsed";
+        sidebar.setAttribute("aria-pressed", String(preferences.sidebar === "open"));
+    });
 
-if (animationSetting) {
-    animationSetting.addEventListener(
-        "click",
-        () => {
-            const settings =
-                getSavedSettings();
-
-            const newState =
-                settings.animations === "on"
-                    ? "off"
-                    : "on";
-
-            localStorage.setItem(
-                "bpdAnimations",
-                newState
-            );
-
-            applyAnimations(
-                newState
-            );
-
-            updateAnimationButton();
+    reset?.addEventListener("click", () => {
+        for (const [key, value] of Object.entries(DEFAULTS)) writePreference(key, value);
+        Object.assign(preferences, DEFAULTS);
+        applyPreferences(preferences);
+        if (theme) theme.value = DEFAULTS.theme;
+        if (animations) {
+            animations.textContent = "On";
+            animations.setAttribute("aria-pressed", "true");
         }
-    );
-}
-
-
-/*
-=========================================================
-SIDEBAR SETTING
-=========================================================
-
-This ONLY changes the saved preference.
-
-sidebar.js owns the actual sidebar.
-
-=========================================================
-*/
-
-if (sidebarSetting) {
-    sidebarSetting.addEventListener(
-        "click",
-        () => {
-            const settings =
-                getSavedSettings();
-
-            const newState =
-                settings.sidebar === "collapsed"
-                    ? "open"
-                    : "collapsed";
-
-            localStorage.setItem(
-                "bpdSidebar",
-                newState
-            );
-
-            updateSidebarButton();
+        if (sidebar) {
+            sidebar.textContent = "Open";
+            sidebar.setAttribute("aria-pressed", "true");
         }
-    );
-}
+    });
 
-
-/*
-=========================================================
-RESET SETTINGS
-=========================================================
-*/
-
-if (resetSettings) {
-    resetSettings.addEventListener(
-        "click",
-        () => {
-            localStorage.setItem(
-                "bpdTheme",
-                DEFAULT_THEME
-            );
-
-            localStorage.setItem(
-                "bpdAnimations",
-                DEFAULT_ANIMATIONS
-            );
-
-            localStorage.setItem(
-                "bpdSidebar",
-                DEFAULT_SIDEBAR
-            );
-
-            applyTheme(
-                DEFAULT_THEME
-            );
-
-            applyAnimations(
-                DEFAULT_ANIMATIONS
-            );
-
-            updateThemeUI();
-            updateAnimationButton();
-            updateSidebarButton();
+    privacy?.addEventListener("click", () => {
+        const googlefc = window.googlefc;
+        if (
+            googlefc
+            && googlefc.callbackQueue
+            && typeof googlefc.showRevocationMessage === "function"
+        ) {
+            googlefc.callbackQueue.push(googlefc.showRevocationMessage);
+            if (privacyStatus) privacyStatus.textContent = "Google’s privacy choices were opened.";
+            return;
         }
-    );
+
+        if (privacyStatus) {
+            privacyStatus.textContent = "Google AdSense Privacy & Messaging is not available. The site owner must enable its consent message in AdSense.";
+        }
+    });
 }
-
-
-/*
-=========================================================
-INITIALIZE SETTINGS UI
-=========================================================
-*/
-
-const savedSettings =
-    getSavedSettings();
-
-applyTheme(
-    savedSettings.theme
-);
-
-applyAnimations(
-    savedSettings.animations
-);
-
-updateThemeUI();
-updateAnimationButton();
-updateSidebarButton();

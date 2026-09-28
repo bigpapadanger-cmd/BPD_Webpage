@@ -1,156 +1,34 @@
+<main class="community-suggestions" aria-labelledby="suggestionsTitle">
+    <header class="suggestions-hero">
+        <p class="suggestions-eyebrow">COMMUNITY IDEAS</p>
+        <h1 id="suggestionsTitle">Suggestions</h1>
+        <p>Browse approved ideas, support the ones you like, and share an improvement for BPD Gaming Network.</p>
+    </header>
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
+    <section class="suggestions-submit" aria-labelledby="submitSuggestionTitle">
+        <h2 id="submitSuggestionTitle">Share an idea</h2>
+        <p>Submissions stay pending until staff approval; they are not public beforehand.</p>
+        <p id="suggestionAuthNotice" role="status" aria-live="polite"></p>
+        <a id="suggestionLoginLink" href="/Login" data-router-link hidden>Log in to submit a suggestion or vote</a>
+        <form id="suggestionForm">
+            <label for="suggestionTitle">Title</label>
+            <input id="suggestionTitle" name="title" type="text" minlength="3" maxlength="100" required>
+            <label for="suggestionDescription">What would you like to see?</label>
+            <textarea id="suggestionDescription" name="description" minlength="10" maxlength="2000" rows="5" required></textarea>
+            <button type="submit">Submit for review</button>
+            <p id="suggestionFormStatus" role="status" aria-live="polite"></p>
+        </form>
+    </section>
 
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
-
-    <title>FAQ | BPD Gaming Network</title>
-
-    <link
-        rel="stylesheet"
-        href="./faq.css"
-    >
-</head>
-
-<body>
-
-    <main class="faq-page">
-
-        <section class="faq-header">
-
-            <div class="faq-header-content">
-
-                <span class="faq-eyebrow">
-                    SUPPORT
-                </span>
-
-                <h1>
-                    Frequently Asked Questions
-                </h1>
-
-                <p>
-                    Find answers to common questions about BPD Gaming Network.
-                </p>
-
+    <section class="suggestions-list-section" aria-labelledby="approvedSuggestionsTitle">
+        <div class="suggestions-list-heading">
+            <div>
+                <p class="suggestions-eyebrow">COMMUNITY VOTES</p>
+                <h2 id="approvedSuggestionsTitle">Approved suggestions</h2>
             </div>
-
-        </section>
-
-
-        <section
-            class="faq-content"
-            aria-label="Frequently asked questions"
-        >
-
-            <div
-                class="faq-list"
-                id="faqList"
-            ></div>
-
-        </section>
-
-
-        <section class="faq-suggestion">
-
-            <div class="faq-suggestion-content">
-
-                <div>
-
-                    <h2>
-                        Can't find your question?
-                    </h2>
-
-                    <p>
-                        Suggest a question you'd like added to the FAQ.
-                    </p>
-
-                </div>
-
-                <button
-                    class="faq-suggestion-button"
-                    id="faqSuggestionButton"
-                    type="button"
-                >
-                    Suggest an FAQ
-                </button>
-
-            </div>
-
-        </section>
-
-    </main>
-
-
-    <div
-        class="faq-login-modal"
-        id="faqLoginModal"
-        hidden
-    >
-
-        <div
-            class="faq-login-backdrop"
-            data-close-login
-        ></div>
-
-        <div
-            class="faq-login-dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="faqLoginTitle"
-        >
-
-            <button
-                class="faq-login-close"
-                type="button"
-                aria-label="Close login prompt"
-                data-close-login
-            >
-                ×
-            </button>
-
-            <span class="faq-login-eyebrow">
-                ACCOUNT REQUIRED
-            </span>
-
-            <h2 id="faqLoginTitle">
-                Sign in to continue
-            </h2>
-
-            <p id="faqLoginMessage">
-                You need to be logged in to perform this action.
-            </p>
-
-            <div class="faq-login-actions">
-
-                <button
-                    class="faq-login-primary"
-                    id="faqLoginButton"
-                    type="button"
-                >
-                    Log In
-                </button>
-
-                <button
-                    class="faq-login-secondary"
-                    type="button"
-                    data-close-login
-                >
-                    Cancel
-                </button>
-
-            </div>
-
+            <button id="refreshSuggestions" type="button">Refresh</button>
         </div>
-
-    </div>
-
-
-    <script src="./faq.js"></script>
-
-</body>
-</html>
+        <p id="suggestionsListStatus" role="status" aria-live="polite">Loading suggestions…</p>
+        <div id="suggestionsList" class="suggestions-list"></div>
+    </section>
+</main>

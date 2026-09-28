@@ -1,0 +1,20 @@
+<section class="page-settings" aria-labelledby="pageSettingsTitle">
+    <header>
+        <p class="admin-eyebrow">Read-only diagnostics</p>
+        <h1 id="pageSettingsTitle">Page Settings</h1>
+        <p>Route health and connection configuration presence. Secret values are never displayed.</p>
+    </header>
+    <p id="pageSettingsStatus" role="status" aria-live="polite">Checking your access…</p>
+    <section id="pageSettingsContent" hidden>
+        <h2>Human page routes</h2>
+        <div class="page-settings-table-wrap"><table>
+            <thead><tr><th>Path</th><th>Type</th><th>Lookup key</th><th>Case policy</th><th>Handler / source</th><th>Methods</th><th>Auth</th><th>Deep link</th><th>Health</th><th>Targets</th></tr></thead>
+            <tbody id="pageRouteRows"></tbody>
+        </table></div>
+        <h2>Connection points</h2>
+        <ul id="connectionRows"></ul>
+        <h2>Known findings</h2>
+        <ul id="findingRows"></ul>
+        <p id="pageSettingsGeneratedAt"></p>
+    </section>
+</section>

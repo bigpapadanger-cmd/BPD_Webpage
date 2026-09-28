@@ -1,0 +1,2139 @@
+{
+  "generatedAt": "2026-09-28T19:22:55.707Z",
+  "policy": {
+    "humanPagePaths": "case-insensitive lookup; canonical TitleCase path",
+    "apiAndAssetPaths": "exact-case; never normalized by the human-page router",
+    "unknownPaths": "real 404; no generic SPA fallback"
+  },
+  "pages": [
+    {
+      "path": "/",
+      "lookupKey": "/",
+      "canonicalPath": "/",
+      "routeType": "page",
+      "casePolicy": "human-insensitive",
+      "sourceFiles": [
+        "public/routes.js"
+      ],
+      "handler": "functions/[[path]].js",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "authRequired": false,
+      "healthStatus": "registered",
+      "deepLinkSupported": true,
+      "targets": [
+        {
+          "path": "/Framework/Shell/HTML/Body/body.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Header/header.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Sidebar/mainmenu.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Footer/footer.html",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "path": "/Dashboard",
+      "lookupKey": "/dashboard",
+      "canonicalPath": "/Dashboard",
+      "routeType": "page",
+      "casePolicy": "human-insensitive",
+      "sourceFiles": [
+        "public/routes.js"
+      ],
+      "handler": "functions/[[path]].js",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "authRequired": false,
+      "healthStatus": "registered",
+      "deepLinkSupported": true,
+      "targets": [
+        {
+          "path": "/Global/Index/HTML/home.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Header/header.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Sidebar/dashboard.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Footer/footer.html",
+          "exists": true
+        },
+        {
+          "path": "/Global/Index/JS/index.js",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "path": "/Account",
+      "lookupKey": "/account",
+      "canonicalPath": "/Account",
+      "routeType": "page",
+      "casePolicy": "human-insensitive",
+      "sourceFiles": [
+        "public/routes.js"
+      ],
+      "handler": "functions/[[path]].js",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "authRequired": true,
+      "healthStatus": "registered",
+      "deepLinkSupported": true,
+      "targets": [
+        {
+          "path": "/Global/Account/HTML/index.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Header/header.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Sidebar/dashboard.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Footer/footer.html",
+          "exists": true
+        },
+        {
+          "path": "/Global/Account/JS/index.js",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "path": "/Login",
+      "lookupKey": "/login",
+      "canonicalPath": "/Login",
+      "routeType": "page",
+      "casePolicy": "human-insensitive",
+      "sourceFiles": [
+        "public/routes.js"
+      ],
+      "handler": "functions/[[path]].js",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "authRequired": false,
+      "healthStatus": "registered",
+      "deepLinkSupported": true,
+      "targets": [
+        {
+          "path": "/Global/Login/HTML/index.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Header/header.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Footer/footer.html",
+          "exists": true
+        },
+        {
+          "path": "/Global/Login/JS/index.js",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "path": "/RocketLeague",
+      "lookupKey": "/rocketleague",
+      "canonicalPath": "/RocketLeague",
+      "routeType": "page",
+      "casePolicy": "human-insensitive",
+      "sourceFiles": [
+        "public/routes.js"
+      ],
+      "handler": "functions/[[path]].js",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "authRequired": false,
+      "healthStatus": "registered",
+      "deepLinkSupported": true,
+      "targets": [
+        {
+          "path": "/Tabs/RocketLeague/Index/HTML/index.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Header/header.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Sidebar/rl_menu.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Footer/footer.html",
+          "exists": true
+        },
+        {
+          "path": "/Tabs/RocketLeague/Index/JS/index.js",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "path": "/RocketLeague/Profile",
+      "lookupKey": "/rocketleague/profile",
+      "canonicalPath": "/RocketLeague/Profile",
+      "routeType": "page",
+      "casePolicy": "human-insensitive",
+      "sourceFiles": [
+        "public/routes.js"
+      ],
+      "handler": "functions/[[path]].js",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "authRequired": true,
+      "healthStatus": "registered",
+      "deepLinkSupported": true,
+      "targets": [
+        {
+          "path": "/Tabs/RocketLeague/Registration/HTML/index.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Header/header.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Footer/footer.html",
+          "exists": true
+        },
+        {
+          "path": "/Tabs/RocketLeague/Registration/JS/index.js",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "path": "/RocketLeague/SubmitMatchResults",
+      "lookupKey": "/rocketleague/submitmatchresults",
+      "canonicalPath": "/RocketLeague/SubmitMatchResults",
+      "routeType": "page",
+      "casePolicy": "human-insensitive",
+      "sourceFiles": [
+        "public/routes.js"
+      ],
+      "handler": "functions/[[path]].js",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "authRequired": true,
+      "healthStatus": "registered",
+      "deepLinkSupported": true,
+      "targets": [
+        {
+          "path": "/ocr/HTML/submitimg.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Header/header.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Sidebar/rl_menu.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Footer/footer.html",
+          "exists": true
+        },
+        {
+          "path": "/ocr/JS/index.js",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "path": "/RocketLeague/ImageScanning",
+      "lookupKey": "/rocketleague/imagescanning",
+      "canonicalPath": "/RocketLeague/ImageScanning",
+      "routeType": "page",
+      "casePolicy": "human-insensitive",
+      "sourceFiles": [
+        "public/routes.js"
+      ],
+      "handler": "functions/[[path]].js",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "authRequired": true,
+      "healthStatus": "registered",
+      "deepLinkSupported": true,
+      "targets": [
+        {
+          "path": "/Tabs/RocketLeague/Index/HTML/index.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Header/header.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Sidebar/rl_menu.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Footer/footer.html",
+          "exists": true
+        },
+        {
+          "path": "/Tabs/RocketLeague/Index/JS/index.js",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "path": "/RocketLeague/Leaderboards",
+      "lookupKey": "/rocketleague/leaderboards",
+      "canonicalPath": "/RocketLeague/Leaderboards",
+      "routeType": "page",
+      "casePolicy": "human-insensitive",
+      "sourceFiles": [
+        "public/routes.js"
+      ],
+      "handler": "functions/[[path]].js",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "authRequired": false,
+      "healthStatus": "registered",
+      "deepLinkSupported": true,
+      "targets": [
+        {
+          "path": "/Tabs/RocketLeague/Index/HTML/index.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Header/header.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Sidebar/rl_menu.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Footer/footer.html",
+          "exists": true
+        },
+        {
+          "path": "/Tabs/RocketLeague/Index/JS/index.js",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "path": "/RocketLeague/MatchResults",
+      "lookupKey": "/rocketleague/matchresults",
+      "canonicalPath": "/RocketLeague/MatchResults",
+      "routeType": "page",
+      "casePolicy": "human-insensitive",
+      "sourceFiles": [
+        "public/routes.js"
+      ],
+      "handler": "functions/[[path]].js",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "authRequired": true,
+      "healthStatus": "registered",
+      "deepLinkSupported": true,
+      "targets": [
+        {
+          "path": "/Tabs/RocketLeague/MatchResults/HTML/index.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Header/header.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Sidebar/rl_menu.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Footer/footer.html",
+          "exists": true
+        },
+        {
+          "path": "/Tabs/RocketLeague/MatchResults/JS/index.js",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "path": "/About",
+      "lookupKey": "/about",
+      "canonicalPath": "/About",
+      "routeType": "page",
+      "casePolicy": "human-insensitive",
+      "sourceFiles": [
+        "public/routes.js"
+      ],
+      "handler": "functions/[[path]].js",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "authRequired": false,
+      "healthStatus": "registered",
+      "deepLinkSupported": true,
+      "targets": [
+        {
+          "path": "/Required/About/HTML/index.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Header/header.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Sidebar/mainmenu.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Footer/footer.html",
+          "exists": true
+        },
+        {
+          "path": "/Required/About/JS/index.js",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "path": "/FAQ",
+      "lookupKey": "/faq",
+      "canonicalPath": "/FAQ",
+      "routeType": "page",
+      "casePolicy": "human-insensitive",
+      "sourceFiles": [
+        "public/routes.js"
+      ],
+      "handler": "functions/[[path]].js",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "authRequired": false,
+      "healthStatus": "registered",
+      "deepLinkSupported": true,
+      "targets": [
+        {
+          "path": "/Required/FAQ/HTML/index.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Header/header.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Sidebar/mainmenu.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Footer/footer.html",
+          "exists": true
+        },
+        {
+          "path": "/Required/FAQ/JS/index.js",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "path": "/Privacy",
+      "lookupKey": "/privacy",
+      "canonicalPath": "/Privacy",
+      "routeType": "page",
+      "casePolicy": "human-insensitive",
+      "sourceFiles": [
+        "public/routes.js"
+      ],
+      "handler": "functions/[[path]].js",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "authRequired": false,
+      "healthStatus": "registered",
+      "deepLinkSupported": true,
+      "targets": [
+        {
+          "path": "/Required/PrivacyPolicy/HTML/index.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Header/header.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Sidebar/mainmenu.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Footer/footer.html",
+          "exists": true
+        },
+        {
+          "path": "/Required/PrivacyPolicy/JS/index.js",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "path": "/TOS",
+      "lookupKey": "/tos",
+      "canonicalPath": "/TOS",
+      "routeType": "page",
+      "casePolicy": "human-insensitive",
+      "sourceFiles": [
+        "public/routes.js"
+      ],
+      "handler": "functions/[[path]].js",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "authRequired": false,
+      "healthStatus": "registered",
+      "deepLinkSupported": true,
+      "targets": [
+        {
+          "path": "/Required/TOS/HTML/index.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Header/header.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Sidebar/mainmenu.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Footer/footer.html",
+          "exists": true
+        },
+        {
+          "path": "/Required/TOS/JS/index.js",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "path": "/Minecraft",
+      "lookupKey": "/minecraft",
+      "canonicalPath": "/Minecraft",
+      "routeType": "page",
+      "casePolicy": "human-insensitive",
+      "sourceFiles": [
+        "public/routes.js"
+      ],
+      "handler": "functions/[[path]].js",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "authRequired": false,
+      "healthStatus": "registered",
+      "deepLinkSupported": true,
+      "targets": [
+        {
+          "path": "/Tabs/Minecraft/HTML/index.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Header/header.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Sidebar/mainmenu.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Footer/footer.html",
+          "exists": true
+        },
+        {
+          "path": "/Tabs/Minecraft/JS/index.js",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "path": "/Minecraft/Mods",
+      "lookupKey": "/minecraft/mods",
+      "canonicalPath": "/Minecraft/Mods",
+      "routeType": "page",
+      "casePolicy": "human-insensitive",
+      "sourceFiles": [
+        "public/routes.js"
+      ],
+      "handler": "functions/[[path]].js",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "authRequired": false,
+      "healthStatus": "registered",
+      "deepLinkSupported": true,
+      "targets": [
+        {
+          "path": "/Tabs/Minecraft/HTML/mods.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Header/header.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Sidebar/mainmenu.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Footer/footer.html",
+          "exists": true
+        },
+        {
+          "path": "/Tabs/Minecraft/JS/mods.js",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "path": "/Minecraft/Announcements",
+      "lookupKey": "/minecraft/announcements",
+      "canonicalPath": "/Minecraft/Announcements",
+      "routeType": "page",
+      "casePolicy": "human-insensitive",
+      "sourceFiles": [
+        "public/routes.js"
+      ],
+      "handler": "functions/[[path]].js",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "authRequired": false,
+      "healthStatus": "registered",
+      "deepLinkSupported": true,
+      "targets": [
+        {
+          "path": "/Tabs/Minecraft/HTML/announcements.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Header/header.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Sidebar/mainmenu.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Footer/footer.html",
+          "exists": true
+        },
+        {
+          "path": "/Tabs/Minecraft/JS/announcements.js",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "path": "/Ark",
+      "lookupKey": "/ark",
+      "canonicalPath": "/Ark",
+      "routeType": "page",
+      "casePolicy": "human-insensitive",
+      "sourceFiles": [
+        "public/routes.js"
+      ],
+      "handler": "functions/[[path]].js",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "authRequired": false,
+      "healthStatus": "registered",
+      "deepLinkSupported": true,
+      "targets": [
+        {
+          "path": "/Tabs/Ark/HTML/index.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Header/header.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Sidebar/mainmenu.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Footer/footer.html",
+          "exists": true
+        },
+        {
+          "path": "/Tabs/Ark/JS/index.js",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "path": "/Ark/Mods",
+      "lookupKey": "/ark/mods",
+      "canonicalPath": "/Ark/Mods",
+      "routeType": "page",
+      "casePolicy": "human-insensitive",
+      "sourceFiles": [
+        "public/routes.js"
+      ],
+      "handler": "functions/[[path]].js",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "authRequired": false,
+      "healthStatus": "registered",
+      "deepLinkSupported": true,
+      "targets": [
+        {
+          "path": "/Tabs/Ark/HTML/mods.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Header/header.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Sidebar/mainmenu.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Footer/footer.html",
+          "exists": true
+        },
+        {
+          "path": "/Tabs/Ark/JS/mods.js",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "path": "/Ark/Announcements",
+      "lookupKey": "/ark/announcements",
+      "canonicalPath": "/Ark/Announcements",
+      "routeType": "page",
+      "casePolicy": "human-insensitive",
+      "sourceFiles": [
+        "public/routes.js"
+      ],
+      "handler": "functions/[[path]].js",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "authRequired": false,
+      "healthStatus": "registered",
+      "deepLinkSupported": true,
+      "targets": [
+        {
+          "path": "/Tabs/Ark/HTML/announcements.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Header/header.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Sidebar/mainmenu.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Footer/footer.html",
+          "exists": true
+        },
+        {
+          "path": "/Tabs/Ark/JS/announcements.js",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "path": "/Error",
+      "lookupKey": "/error",
+      "canonicalPath": "/Error",
+      "routeType": "page",
+      "casePolicy": "human-insensitive",
+      "sourceFiles": [
+        "public/routes.js"
+      ],
+      "handler": "functions/[[path]].js",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "authRequired": false,
+      "healthStatus": "registered",
+      "deepLinkSupported": true,
+      "targets": [
+        {
+          "path": "/Global/404/HTML/404.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Header/header.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Sidebar/mainmenu.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Footer/footer.html",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "path": "/Settings",
+      "lookupKey": "/settings",
+      "canonicalPath": "/Settings",
+      "routeType": "page",
+      "casePolicy": "human-insensitive",
+      "sourceFiles": [
+        "public/routes.js"
+      ],
+      "handler": "functions/[[path]].js",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "authRequired": false,
+      "healthStatus": "registered",
+      "deepLinkSupported": true,
+      "targets": [
+        {
+          "path": "/Global/Settings/HTML/settings.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Header/header.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Sidebar/mainmenu.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Footer/footer.html",
+          "exists": true
+        },
+        {
+          "path": "/Global/Settings/JS/settings.js",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "path": "/Suggestions",
+      "lookupKey": "/suggestions",
+      "canonicalPath": "/Suggestions",
+      "routeType": "page",
+      "casePolicy": "human-insensitive",
+      "sourceFiles": [
+        "public/routes.js"
+      ],
+      "handler": "functions/[[path]].js",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "authRequired": false,
+      "healthStatus": "registered",
+      "deepLinkSupported": true,
+      "targets": [
+        {
+          "path": "/Global/Suggestions/HTML/index.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Header/header.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Sidebar/mainmenu.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Footer/footer.html",
+          "exists": true
+        },
+        {
+          "path": "/Global/Suggestions/JS/index.js",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "path": "/Admin",
+      "lookupKey": "/admin",
+      "canonicalPath": "/Admin",
+      "routeType": "page",
+      "casePolicy": "human-insensitive",
+      "sourceFiles": [
+        "public/routes.js"
+      ],
+      "handler": "functions/[[path]].js",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "authRequired": true,
+      "healthStatus": "registered",
+      "deepLinkSupported": true,
+      "targets": [
+        {
+          "path": "/Global/Admin/Home/HTML/index.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Header/header.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Sidebar/admin.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Footer/footer.html",
+          "exists": true
+        },
+        {
+          "path": "/Global/Admin/Home/JS/index.js",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "path": "/Admin/Taskboard",
+      "lookupKey": "/admin/taskboard",
+      "canonicalPath": "/Admin/Taskboard",
+      "routeType": "page",
+      "casePolicy": "human-insensitive",
+      "sourceFiles": [
+        "public/routes.js"
+      ],
+      "handler": "functions/[[path]].js",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "authRequired": true,
+      "healthStatus": "registered",
+      "deepLinkSupported": true,
+      "targets": [
+        {
+          "path": "/Global/Admin/TaskBoard/HTML/index.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Header/header.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Sidebar/admin.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Footer/footer.html",
+          "exists": true
+        },
+        {
+          "path": "/Global/Admin/TaskBoard/JS/index.js",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "path": "/Admin/PageSettings",
+      "lookupKey": "/admin/pagesettings",
+      "canonicalPath": "/Admin/PageSettings",
+      "routeType": "page",
+      "casePolicy": "human-insensitive",
+      "sourceFiles": [
+        "public/routes.js"
+      ],
+      "handler": "functions/[[path]].js",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "authRequired": true,
+      "healthStatus": "registered",
+      "deepLinkSupported": true,
+      "targets": [
+        {
+          "path": "/Global/Admin/PageSettings/HTML/index.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Header/header.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Sidebar/admin.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Footer/footer.html",
+          "exists": true
+        },
+        {
+          "path": "/Global/Admin/PageSettings/JS/index.js",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "path": "/Admin/SuggestionReview",
+      "lookupKey": "/admin/suggestionreview",
+      "canonicalPath": "/Admin/SuggestionReview",
+      "routeType": "page",
+      "casePolicy": "human-insensitive",
+      "sourceFiles": [
+        "public/routes.js"
+      ],
+      "handler": "functions/[[path]].js",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "authRequired": true,
+      "healthStatus": "registered",
+      "deepLinkSupported": true,
+      "targets": [
+        {
+          "path": "/Global/Admin/Suggestions/HTML/index.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Header/header.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Sidebar/admin.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Footer/footer.html",
+          "exists": true
+        },
+        {
+          "path": "/Global/Admin/Suggestions/JS/index.js",
+          "exists": true
+        }
+      ]
+    }
+  ],
+  "apis": [
+    {
+      "path": "/api/admin/page-settings/route-health",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/admin/page-settings/route-health.js"
+      ],
+      "handler": "functions/api/admin/page-settings/route-health.js",
+      "methods": [
+        "GET"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/admin/suggestions/:suggestionId/review",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/admin/suggestions/[suggestionId]/review.js"
+      ],
+      "handler": "functions/api/admin/suggestions/[suggestionId]/review.js",
+      "methods": [
+        "POST"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/admin/suggestions",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/admin/suggestions/index.js"
+      ],
+      "handler": "functions/api/admin/suggestions/index.js",
+      "methods": [
+        "GET"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/auth/_oauth/callback",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/auth/_oauth/callback.js"
+      ],
+      "handler": "functions/api/auth/_oauth/callback.js",
+      "methods": [
+        "GET"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/auth/account/deactivate",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/auth/account/deactivate.js"
+      ],
+      "handler": "functions/api/auth/account/deactivate.js",
+      "methods": [
+        "ALL",
+        "POST"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/auth/account",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/auth/account/index.js"
+      ],
+      "handler": "functions/api/auth/account/index.js",
+      "methods": [
+        "ALL",
+        "DELETE"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/auth/account/last_login",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/auth/account/last_login.js"
+      ],
+      "handler": "functions/api/auth/account/last_login.js",
+      "methods": [
+        "POST"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/auth/account/profile",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/auth/account/profile.js"
+      ],
+      "handler": "functions/api/auth/account/profile.js",
+      "methods": [
+        "ALL",
+        "POST"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/auth/admin/access",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/auth/admin/access.js"
+      ],
+      "handler": "functions/api/auth/admin/access.js",
+      "methods": [
+        "ALL",
+        "GET"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/auth/admin/tasks/:taskCode",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/auth/admin/tasks/[taskCode].js"
+      ],
+      "handler": "functions/api/auth/admin/tasks/[taskCode].js",
+      "methods": [
+        "ALL",
+        "GET",
+        "PATCH"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/auth/admin/tasks/:taskCode/events",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/auth/admin/tasks/[taskCode]/events.js"
+      ],
+      "handler": "functions/api/auth/admin/tasks/[taskCode]/events.js",
+      "methods": [
+        "ALL",
+        "GET",
+        "POST"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/auth/admin/tasks/:taskCode/lifecycle",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/auth/admin/tasks/[taskCode]/lifecycle.js"
+      ],
+      "handler": "functions/api/auth/admin/tasks/[taskCode]/lifecycle.js",
+      "methods": [
+        "ALL",
+        "POST"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/auth/admin/tasks",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/auth/admin/tasks/index.js"
+      ],
+      "handler": "functions/api/auth/admin/tasks/index.js",
+      "methods": [
+        "ALL",
+        "GET",
+        "POST"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/auth/admin/tasks/task-activity",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/auth/admin/tasks/task-activity.js"
+      ],
+      "handler": "functions/api/auth/admin/tasks/task-activity.js",
+      "methods": [
+        "ALL",
+        "GET"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/auth/admin/tasks/task-assignees",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/auth/admin/tasks/task-assignees.js"
+      ],
+      "handler": "functions/api/auth/admin/tasks/task-assignees.js",
+      "methods": [
+        "ALL",
+        "GET"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/auth/admin/tasks/task-summary",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/auth/admin/tasks/task-summary.js"
+      ],
+      "handler": "functions/api/auth/admin/tasks/task-summary.js",
+      "methods": [
+        "ALL",
+        "GET"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/auth/discord/callback",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/auth/discord/callback.js"
+      ],
+      "handler": "functions/api/auth/discord/callback.js",
+      "methods": [],
+      "authRequired": "handler-defined",
+      "healthStatus": "missing-handler",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/auth/discord/login",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/auth/discord/login.js"
+      ],
+      "handler": "functions/api/auth/discord/login.js",
+      "methods": [
+        "DELETE",
+        "GET",
+        "PATCH",
+        "POST",
+        "PUT"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/auth/discord/matchbot/channels",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/auth/discord/matchbot/channels.js"
+      ],
+      "handler": "functions/api/auth/discord/matchbot/channels.js",
+      "methods": [
+        "DELETE",
+        "GET",
+        "PATCH",
+        "POST",
+        "PUT"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/auth/discord/matchbot/events",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/auth/discord/matchbot/events.js"
+      ],
+      "handler": "functions/api/auth/discord/matchbot/events.js",
+      "methods": [
+        "DELETE",
+        "GET",
+        "PATCH",
+        "POST",
+        "PUT"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/auth/discord/matchbot/guilds",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/auth/discord/matchbot/guilds.js"
+      ],
+      "handler": "functions/api/auth/discord/matchbot/guilds.js",
+      "methods": [
+        "DELETE",
+        "GET",
+        "PATCH",
+        "POST",
+        "PUT"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/auth/discord/matchbot/install",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/auth/discord/matchbot/install.js"
+      ],
+      "handler": "functions/api/auth/discord/matchbot/install.js",
+      "methods": [
+        "DELETE",
+        "GET",
+        "PATCH",
+        "POST",
+        "PUT"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/auth/discord/matchbot/interactions",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/auth/discord/matchbot/interactions.js"
+      ],
+      "handler": "functions/api/auth/discord/matchbot/interactions.js",
+      "methods": [
+        "DELETE",
+        "GET",
+        "PATCH",
+        "POST",
+        "PUT"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/auth/discord/matchbot/permission",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/auth/discord/matchbot/permission.js"
+      ],
+      "handler": "functions/api/auth/discord/matchbot/permission.js",
+      "methods": [],
+      "authRequired": "handler-defined",
+      "healthStatus": "missing-handler",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/auth/discord/matchbot/test_message",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/auth/discord/matchbot/test_message.js"
+      ],
+      "handler": "functions/api/auth/discord/matchbot/test_message.js",
+      "methods": [
+        "DELETE",
+        "GET",
+        "PATCH",
+        "POST",
+        "PUT"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/auth/epic/callback",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/auth/epic/callback.js"
+      ],
+      "handler": "functions/api/auth/epic/callback.js",
+      "methods": [
+        "DELETE",
+        "GET",
+        "PATCH",
+        "POST",
+        "PUT"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/auth/epic/login",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/auth/epic/login.js"
+      ],
+      "handler": "functions/api/auth/epic/login.js",
+      "methods": [
+        "DELETE",
+        "GET",
+        "PATCH",
+        "POST",
+        "PUT"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/auth/google/login",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/auth/google/login.js"
+      ],
+      "handler": "functions/api/auth/google/login.js",
+      "methods": [
+        "DELETE",
+        "GET",
+        "PATCH",
+        "POST",
+        "PUT"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/auth/link",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/auth/link.js"
+      ],
+      "handler": "functions/api/auth/link.js",
+      "methods": [
+        "ALL",
+        "GET"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/auth/logout",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/auth/logout.js"
+      ],
+      "handler": "functions/api/auth/logout.js",
+      "methods": [
+        "GET"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/auth/rocketleague/discord-notifications",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/auth/rocketleague/discord-notifications.js"
+      ],
+      "handler": "functions/api/auth/rocketleague/discord-notifications.js",
+      "methods": [
+        "GET"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/auth/rocketleague/profile",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/auth/rocketleague/profile.js"
+      ],
+      "handler": "functions/api/auth/rocketleague/profile.js",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/auth/rocketleague/session",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/auth/rocketleague/session.js"
+      ],
+      "handler": "functions/api/auth/rocketleague/session.js",
+      "methods": [
+        "GET"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/auth/session",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/auth/session.js"
+      ],
+      "handler": "functions/api/auth/session.js",
+      "methods": [
+        "GET"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/auth/steam/callback",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/auth/steam/callback.js"
+      ],
+      "handler": "functions/api/auth/steam/callback.js",
+      "methods": [],
+      "authRequired": "handler-defined",
+      "healthStatus": "missing-handler",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/auth/steam/login",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/auth/steam/login.js"
+      ],
+      "handler": "functions/api/auth/steam/login.js",
+      "methods": [],
+      "authRequired": "handler-defined",
+      "healthStatus": "missing-handler",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/auth/unlink",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/auth/unlink.js"
+      ],
+      "handler": "functions/api/auth/unlink.js",
+      "methods": [
+        "ALL",
+        "POST"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/curseforge/mods",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/curseforge/mods.js"
+      ],
+      "handler": "functions/api/curseforge/mods.js",
+      "methods": [
+        "GET"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/health/apihealth",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/health/apihealth.js"
+      ],
+      "handler": "functions/api/health/apihealth.js",
+      "methods": [
+        "GET"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/ocr/compare",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/ocr/compare.js"
+      ],
+      "handler": "functions/api/ocr/compare.js",
+      "methods": [
+        "POST"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/ocr/confirm",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/ocr/confirm.js"
+      ],
+      "handler": "functions/api/ocr/confirm.js",
+      "methods": [
+        "ALL"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/ocr/debug/mtls-probe",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/ocr/debug/mtls-probe.js"
+      ],
+      "handler": "functions/api/ocr/debug/mtls-probe.js",
+      "methods": [
+        "POST"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/ocr",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/ocr/index.js"
+      ],
+      "handler": "functions/api/ocr/index.js",
+      "methods": [
+        "ALL"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/ocr/jobs/get_job",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/ocr/jobs/get_job.js"
+      ],
+      "handler": "functions/api/ocr/jobs/get_job.js",
+      "methods": [
+        "GET"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/ocr/jobs/get_result",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/ocr/jobs/get_result.js"
+      ],
+      "handler": "functions/api/ocr/jobs/get_result.js",
+      "methods": [
+        "GET"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/ocr/jobs/image",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/ocr/jobs/image.js"
+      ],
+      "handler": "functions/api/ocr/jobs/image.js",
+      "methods": [
+        "GET"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/ocr/jobs/process_job",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/ocr/jobs/process_job.js"
+      ],
+      "handler": "functions/api/ocr/jobs/process_job.js",
+      "methods": [
+        "POST"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/ocr/jobs/progress",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/ocr/jobs/progress.js"
+      ],
+      "handler": "functions/api/ocr/jobs/progress.js",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/ocr/jobs/submit_job",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/ocr/jobs/submit_job.js"
+      ],
+      "handler": "functions/api/ocr/jobs/submit_job.js",
+      "methods": [
+        "POST"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/ocr/localTracking",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/ocr/localTracking.js"
+      ],
+      "handler": "functions/api/ocr/localTracking.js",
+      "methods": [
+        "ALL"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/ocr/localize",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/ocr/localize.js"
+      ],
+      "handler": "functions/api/ocr/localize.js",
+      "methods": [
+        "ALL"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/ocr/storeMatch",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/ocr/storeMatch.js"
+      ],
+      "handler": "functions/api/ocr/storeMatch.js",
+      "methods": [
+        "ALL"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/ocr/training",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/ocr/training.js"
+      ],
+      "handler": "functions/api/ocr/training.js",
+      "methods": [
+        "ALL"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/suggestions/:suggestionId/vote",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/suggestions/[suggestionId]/vote.js"
+      ],
+      "handler": "functions/api/suggestions/[suggestionId]/vote.js",
+      "methods": [
+        "POST"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/suggestions",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/suggestions/index.js"
+      ],
+      "handler": "functions/api/suggestions/index.js",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    }
+  ],
+  "workerRoutes": [
+    {
+      "path": "https://ocr.bpd-gaming-network.com/*",
+      "lookupKey": null,
+      "routeType": "worker",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "workers/ocr-job-consumer/src/index.js"
+      ],
+      "handler": "workers/ocr-job-consumer/src/index.js",
+      "methods": [
+        "ALL"
+      ],
+      "authRequired": "not applicable",
+      "healthStatus": "returns 404 for all HTTP requests",
+      "deepLinkSupported": false,
+      "ownerSystem": "bpd-ocr-job-consumer"
+    },
+    {
+      "path": "https://status.bpd-gaming-network.com/health",
+      "lookupKey": null,
+      "routeType": "worker",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "workers/rl-presence-monitor/src/index.js"
+      ],
+      "handler": "workers/rl-presence-monitor/src/index.js",
+      "methods": [
+        "GET"
+      ],
+      "authRequired": false,
+      "healthStatus": "handler-defined",
+      "deepLinkSupported": false,
+      "ownerSystem": "bpd-rl-presence-monitor"
+    },
+    {
+      "path": "https://status.bpd-gaming-network.com/wake",
+      "lookupKey": null,
+      "routeType": "worker",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "workers/rl-presence-monitor/src/index.js"
+      ],
+      "handler": "workers/rl-presence-monitor/src/index.js",
+      "methods": [
+        "POST"
+      ],
+      "authRequired": true,
+      "healthStatus": "handler-defined",
+      "deepLinkSupported": false,
+      "ownerSystem": "bpd-rl-presence-monitor"
+    }
+  ],
+  "workerSchedules": [
+    {
+      "path": "cron: */30 * * * *",
+      "routeType": "schedule",
+      "casePolicy": "not-applicable",
+      "sourceFiles": [
+        "workers/ocr-job-consumer/wrangler.jsonc"
+      ],
+      "handler": "workers/ocr-job-consumer/src/index.js",
+      "methods": [
+        "SCHEDULE"
+      ],
+      "authRequired": "platform-triggered",
+      "healthStatus": "configured",
+      "ownerSystem": "bpd-ocr-job-consumer"
+    },
+    {
+      "path": "cron: */15 * * * *",
+      "routeType": "schedule",
+      "casePolicy": "not-applicable",
+      "sourceFiles": [
+        "workers/rl-presence-monitor/wrangler.jsonc"
+      ],
+      "handler": "workers/rl-presence-monitor/src/index.js",
+      "methods": [
+        "SCHEDULE"
+      ],
+      "authRequired": "platform-triggered",
+      "healthStatus": "configured",
+      "ownerSystem": "bpd-rl-presence-monitor"
+    },
+    {
+      "path": "cron: 5 11 * * SAT",
+      "routeType": "schedule",
+      "casePolicy": "not-applicable",
+      "sourceFiles": [
+        "workers/rl-presence-monitor/wrangler.jsonc"
+      ],
+      "handler": "workers/rl-presence-monitor/src/index.js",
+      "methods": [
+        "SCHEDULE"
+      ],
+      "authRequired": "platform-triggered",
+      "healthStatus": "configured",
+      "ownerSystem": "bpd-rl-presence-monitor"
+    },
+    {
+      "path": "cron: 0 0 * * *",
+      "routeType": "schedule",
+      "casePolicy": "not-applicable",
+      "sourceFiles": [
+        "workers/rl-presence-monitor/wrangler.jsonc"
+      ],
+      "handler": "workers/rl-presence-monitor/src/index.js",
+      "methods": [
+        "SCHEDULE"
+      ],
+      "authRequired": "platform-triggered",
+      "healthStatus": "configured",
+      "ownerSystem": "bpd-rl-presence-monitor"
+    }
+  ],
+  "workerQueues": [
+    {
+      "path": "queue: bpd-ocr-jobs",
+      "routeType": "queue-consumer",
+      "casePolicy": "not-applicable",
+      "sourceFiles": [
+        "workers/ocr-job-consumer/wrangler.jsonc"
+      ],
+      "handler": "workers/ocr-job-consumer/src/index.js",
+      "methods": [
+        "MESSAGE"
+      ],
+      "authRequired": "platform-binding",
+      "healthStatus": "configured",
+      "ownerSystem": "bpd-ocr-job-consumer"
+    }
+  ]
+}

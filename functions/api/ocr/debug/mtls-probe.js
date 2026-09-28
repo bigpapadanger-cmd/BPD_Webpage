@@ -156,11 +156,40 @@ async function readGoogleErrorFields(
 }
 
 function logProbeDiagnostic(
-    diagnostic
+    diagnostic,
+    env,
+    options = {}
 ) {
+    const headers = new Headers(options.headers || {});
+    const body = typeof options.body === "string"
+        ? options.body
+        : "";
+    let bodyFieldNames = [];
+    try {
+        const parsedBody = JSON.parse(body);
+        if (parsedBody && typeof parsedBody === "object" && !Array.isArray(parsedBody)) {
+            bodyFieldNames = Object.keys(parsedBody).sort();
+        }
+    }
+    catch {
+        // Never log the raw request body.
+    }
+
     console.info(
         "[OCR mTLS probe]",
-        diagnostic
+        {
+            sameBindingObject: Boolean(env?.OCR_GCP_MTLS),
+            bindingFetchType: typeof env?.OCR_GCP_MTLS?.fetch,
+            requestMethod: String(options.method || "GET").toUpperCase(),
+            hostname: GOOGLE_STS_HOSTNAME,
+            hasSignal: Boolean(options.signal),
+            contentType: headers.get("Content-Type"),
+            bodyLength: new TextEncoder().encode(body).byteLength,
+            bodyFieldNames,
+            responseStatus: diagnostic.httpStatus,
+            googleError: diagnostic.googleError,
+            googleErrorDescription: diagnostic.googleErrorDescription
+        }
     );
 }
 
@@ -169,7 +198,7 @@ export async function runMtlsProbe(
 ) {
     const diagnostic = emptyDiagnostic(env);
     if (!diagnostic.bindingFetchIsFunction) {
-        logProbeDiagnostic(diagnostic);
+        logProbeDiagnostic(diagnostic, env);
         return jsonResponse(
             {
                 probeCompleted: false,
@@ -184,19 +213,20 @@ export async function runMtlsProbe(
         () => controller.abort(),
         PROBE_TIMEOUT_MS
     );
+    const requestOptions = {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/x-www-form-urlencoded"
+        },
+        body: "",
+        redirect: "manual",
+        signal: controller.signal
+    };
 
     try {
         const response = await env.OCR_GCP_MTLS.fetch(
             GOOGLE_STS_URL,
-            {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/x-www-form-urlencoded"
-                },
-                body: "",
-                redirect: "manual",
-                signal: controller.signal
-            }
+            requestOptions
         );
 
         diagnostic.httpStatus = Number(response.status) || 0;
@@ -211,14 +241,14 @@ export async function runMtlsProbe(
             );
         }
 
-        logProbeDiagnostic(diagnostic);
+        logProbeDiagnostic(diagnostic, env, requestOptions);
         return jsonResponse({
             probeCompleted: true,
             ...diagnostic
         });
     }
     catch {
-        logProbeDiagnostic(diagnostic);
+        logProbeDiagnostic(diagnostic, env, requestOptions);
         return jsonResponse(
             {
                 probeCompleted: false,

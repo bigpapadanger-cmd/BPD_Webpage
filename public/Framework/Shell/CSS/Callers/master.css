@@ -56,3 +56,5 @@ Also used as the fallback for unknown routes.
    ========================================================= */
 @import url("/Global/Account/CSS/index.css");
 @import url("/Global/Login/CSS/index.css");
+@import url("/Global/Settings/CSS/settings-page.css");
+@import url("/Global/Suggestions/CSS/index.css");

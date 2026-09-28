@@ -1,17 +1,3 @@
-/RocketLeague                       /RocketLeague 200
-/Ark                                /Ark 200
-/Minecraft                          /Minecraft 200
-/FAQ                                /FAQ 200
-/Settings                           /index.html 200
-/About                              /About 200
-/Privacy                            /Privacy 200
-/TOS                                /TOS 200
-/Error                              /index.html 200
-/Account                            /Account 200
-/Login                              /Login 200
-/Admin                              /index.html 200
-
-/RocketLeague/*                     /RocketLeague 200
-/Minecraft/*                        /Minecraft 200
-/Ark/*                              /Ark 200
-/Admin/*                            /index.html 200
+# Human page routes and case canonicalization are handled by
+# functions/[[path]].js. This file intentionally contains no
+# catch-all rewrite so assets and unknown paths keep their status.

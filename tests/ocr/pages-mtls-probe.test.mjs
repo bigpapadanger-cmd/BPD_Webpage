@@ -113,7 +113,28 @@ test("isolated probe uses the mTLS binding directly without token helpers", asyn
     assert.equal(requests[0].options.body, "");
     assert.equal(requests[0].options.redirect, "manual");
     assert.equal(requests[0].options.headers.Authorization, undefined);
-    assert.equal(Object.keys(calls[0][1]).length, 6);
+    assert.deepEqual(Object.keys(calls[0][1]).sort(), [
+        "sameBindingObject",
+        "bindingFetchType",
+        "requestMethod",
+        "hostname",
+        "hasSignal",
+        "contentType",
+        "bodyLength",
+        "bodyFieldNames",
+        "responseStatus",
+        "googleError",
+        "googleErrorDescription"
+    ].sort());
+    assert.equal(calls[0][1].sameBindingObject, true);
+    assert.equal(calls[0][1].bindingFetchType, "function");
+    assert.equal(calls[0][1].requestMethod, "POST");
+    assert.equal(calls[0][1].hostname, GOOGLE_STS_HOSTNAME);
+    assert.equal(calls[0][1].hasSignal, true);
+    assert.equal(calls[0][1].contentType, "application/x-www-form-urlencoded");
+    assert.equal(calls[0][1].bodyLength, 0);
+    assert.deepEqual(calls[0][1].bodyFieldNames, []);
+    assert.equal(calls[0][1].responseStatus, 400);
 
     const source = await readFile(
         new URL("../../functions/api/ocr/debug/mtls-probe.js", import.meta.url),
@@ -166,15 +187,21 @@ test("mTLS probe never logs or returns credential-like values from Google errors
 
     assert.equal(calls.length, 1);
     assert.deepEqual(Object.keys(calls[0][1]).sort(), [
-        "bindingExists",
-        "bindingFetchIsFunction",
-        "destinationHostname",
+        "sameBindingObject",
+        "bindingFetchType",
+        "requestMethod",
+        "hostname",
+        "hasSignal",
+        "contentType",
+        "bodyLength",
+        "bodyFieldNames",
+        "responseStatus",
         "googleError",
         "googleErrorDescription",
-        "httpStatus"
     ].sort());
-    assert.equal(calls[0][1].bindingExists, true);
-    assert.equal(calls[0][1].bindingFetchIsFunction, true);
-    assert.equal(calls[0][1].destinationHostname, GOOGLE_STS_HOSTNAME);
-    assert.equal(calls[0][1].httpStatus, 400);
+    assert.equal(calls[0][1].sameBindingObject, true);
+    assert.equal(calls[0][1].bindingFetchType, "function");
+    assert.equal(calls[0][1].requestMethod, "POST");
+    assert.equal(calls[0][1].hostname, GOOGLE_STS_HOSTNAME);
+    assert.equal(calls[0][1].responseStatus, 400);
 });

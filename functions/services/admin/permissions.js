@@ -105,7 +105,10 @@ export const ADMIN_PERMISSIONS =
             "audit.read",
 
         ADMIN_SETTINGS_MANAGE:
-            "admin.settings.manage"
+            "admin.settings.manage",
+
+        SUGGESTIONS_MANAGE:
+            "admin.suggestions.manage"
     });
 
 /* =========================================================
@@ -133,6 +136,7 @@ Baseline:
     - May read/create/update/assign tasks.
     - May perform normal task lifecycle operations.
     - May read and send normal site notifications.
+    - May review community suggestions.
     - May not delete or restore deleted tasks.
     - May not read the global Admin audit feed.
     - May not send Discord alerts.
@@ -149,7 +153,8 @@ const MODERATOR_PERMISSIONS =
         ADMIN_PERMISSIONS.TASKS_ASSIGN,
 
         ADMIN_PERMISSIONS.NOTIFICATIONS_READ,
-        ADMIN_PERMISSIONS.NOTIFICATIONS_SEND
+        ADMIN_PERMISSIONS.NOTIFICATIONS_SEND,
+        ADMIN_PERMISSIONS.SUGGESTIONS_MANAGE
     ]);
 
 /* =========================================================

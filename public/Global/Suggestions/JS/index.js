@@ -1,818 +1,151 @@
-/* BPD GAMING NETWORK - FAQ */
-import { apiFetch } from "../../../scripts/apiConnection.js";
-const FAQ_API_URL = "/api/faq";
-const FAQ_UPVOTE_URL = "/api/faq/upvote";
-const FAQ_SUGGEST_URL = "/faq/suggest";
-const FUTURE_VALIDATION_PATH="/api/auth/XXX/session";
+"use strict";
 
-//STILL DEVELOPING THIS NEEDS RESPONSE PAGE BUILT
-const faqList =
-    document.getElementById("faqList");
+import { getAuthState, hasActiveAccount, isAuthenticated } from "/Framework/Auth/auth.js";
+import { SUGGESTIONS_API_URL, suggestionVoteApiUrl } from "/scripts/apiRoutes.js";
 
-const faqSuggestionButton =
-    document.getElementById(
-        "faqSuggestionButton"
-    );
-
-const faqLoginModal =
-    document.getElementById(
-        "faqLoginModal"
-    );
-
-const faqLoginMessage =
-    document.getElementById(
-        "faqLoginMessage"
-    );
-
-const faqLoginButton =
-    document.getElementById(
-        "faqLoginButton"
-    );
-
-
-let pendingAuthAction = null;
-
-
-/*
-=========================================================
-INITIALIZE
-=========================================================
-*/
-
-document.addEventListener(
-    "DOMContentLoaded",
-    initializeFaqPage
-);
-
-
-async function initializeFaqPage() {
-
-    await loadFaqs();
-
-    bindFaqSuggestion();
-
-    bindLoginModal();
-
+function element(tag, text, className) {
+    const node = document.createElement(tag);
+    if (text !== undefined) node.textContent = String(text ?? "");
+    if (className) node.className = className;
+    return node;
 }
 
+function loginUrl() {
+    const returnTo = `${window.location.pathname}${window.location.search}`;
+    return `/Login?returnTo=${encodeURIComponent(returnTo)}`;
+}
 
-/*
-=========================================================
-LOAD FAQ DATA
-=========================================================
-*/
+function formatDate(value) {
+    const date = new Date(value);
+    return Number.isNaN(date.valueOf()) ? "Date unavailable" : date.toLocaleDateString();
+}
 
-async function loadFaqs() {
+export async function initializePage() {
+    const form = document.getElementById("suggestionForm");
+    const formStatus = document.getElementById("suggestionFormStatus");
+    const list = document.getElementById("suggestionsList");
+    const listStatus = document.getElementById("suggestionsListStatus");
+    const loginLink = document.getElementById("suggestionLoginLink");
+    const authNotice = document.getElementById("suggestionAuthNotice");
+    const refreshButton = document.getElementById("refreshSuggestions");
+    if (!form || !list || !listStatus) return;
 
+    let auth = null;
     try {
+        auth = await getAuthState({ force: true });
+    } catch {
+        // Public browsing does not depend on an available login service.
+    }
+    const authenticated = isAuthenticated(auth) && hasActiveAccount(auth);
+    if (!authenticated) {
+        authNotice.textContent = "Sign in is required to submit an idea or vote.";
+        loginLink.href = loginUrl();
+        loginLink.hidden = false;
+    }
 
-        const response =
-            await apiFetch(
-                FAQ_API_URL,
-                {
-                    credentials:
-                        "include",
-                    cache:
-                        "no-store"
-                }
-            );
-
-
-        if (!response.ok) {
-
-            faqList.replaceChildren();
-
+    form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        if (!authenticated) {
+            window.location.assign(loginUrl());
             return;
-
         }
 
-
-        const result =
-            await response.json();
-
-
-        const faqs =
-            Array.isArray(result)
-                ? result
-                : Array.isArray(result.faqs)
-                    ? result.faqs
-                    : [];
-
-
-        renderFaqs(faqs);
-
-    }
-    catch (error) {
-
-        console.error(
-            "Unable to load FAQs:",
-            error
-        );
-
-        faqList.replaceChildren();
-
-    }
-
-}
-
-
-/*
-=========================================================
-RENDER FAQ DATA
-=========================================================
-*/
-
-function renderFaqs(faqs) {
-
-    faqList.replaceChildren();
-
-
-    if (
-        !Array.isArray(faqs) ||
-        faqs.length === 0
-    ) {
-
-        return;
-
-    }
-
-
-    const fragment =
-        document.createDocumentFragment();
-
-
-    faqs.forEach(
-        faq => {
-
-            const faqElement =
-                createFaqElement(faq);
-
-            fragment.appendChild(
-                faqElement
-            );
-
-        }
-    );
-
-
-    faqList.appendChild(
-        fragment
-    );
-
-}
-
-
-/*
-=========================================================
-CREATE FAQ ITEM
-=========================================================
-*/
-
-function createFaqElement(faq) {
-
-    const item =
-        document.createElement("article");
-
-    item.className =
-        "faq-item";
-
-    item.dataset.faqId =
-        String(
-            faq.id ?? ""
-        );
-
-
-    const main =
-        document.createElement("div");
-
-    main.className =
-        "faq-item-main";
-
-
-    const voteContainer =
-        document.createElement("div");
-
-    voteContainer.className =
-        "faq-vote";
-
-
-    const upvoteButton =
-        document.createElement("button");
-
-    upvoteButton.type =
-        "button";
-
-    upvoteButton.className =
-        "faq-upvote-button";
-
-    upvoteButton.setAttribute(
-        "aria-label",
-        `Upvote ${faq.question || "FAQ"}`
-    );
-
-    upvoteButton.textContent =
-        "▲";
-
-
-    if (faq.userUpvoted === true) {
-
-        upvoteButton.classList.add(
-            "voted"
-        );
-
-    }
-
-
-    const voteCount =
-        document.createElement("span");
-
-    voteCount.className =
-        "faq-upvote-count";
-
-    voteCount.textContent =
-        formatVoteCount(
-            faq.upvotes
-        );
-
-
-    voteContainer.append(
-        upvoteButton,
-        voteCount
-    );
-
-
-    const questionButton =
-        document.createElement("button");
-
-    questionButton.type =
-        "button";
-
-    questionButton.className =
-        "faq-question-button";
-
-    questionButton.setAttribute(
-        "aria-expanded",
-        "false"
-    );
-
-
-    const questionContent =
-        document.createElement("div");
-
-    questionContent.className =
-        "faq-question-content";
-
-
-    const question =
-        document.createElement("h2");
-
-    question.className =
-        "faq-question";
-
-    question.textContent =
-        faq.question || "";
-
-
-    const summary =
-        document.createElement("p");
-
-    summary.className =
-        "faq-summary";
-
-    summary.textContent =
-        faq.summary || "";
-
-
-    questionContent.append(
-        question,
-        summary
-    );
-
-
-    const chevron =
-        document.createElement("span");
-
-    chevron.className =
-        "faq-chevron";
-
-    chevron.setAttribute(
-        "aria-hidden",
-        "true"
-    );
-
-    chevron.textContent =
-        "⌄";
-
-
-    questionButton.append(
-        questionContent,
-        chevron
-    );
-
-
-    main.append(
-        voteContainer,
-        questionButton
-    );
-
-
-    const answer =
-        document.createElement("div");
-
-    answer.className =
-        "faq-answer";
-
-
-    const answerText =
-        document.createElement("p");
-
-    answerText.textContent =
-        faq.answer || "";
-
-
-    answer.appendChild(
-        answerText
-    );
-
-
-    item.append(
-        main,
-        answer
-    );
-
-
-    questionButton.addEventListener(
-        "click",
-        () => {
-
-            toggleFaqItem(
-                item,
-                questionButton
-            );
-
-        }
-    );
-
-
-    upvoteButton.addEventListener(
-        "click",
-        async event => {
-
-            event.stopPropagation();
-
-            await handleFaqUpvote(
-                faq,
-                upvoteButton,
-                voteCount
-            );
-
-        }
-    );
-
-
-    return item;
-
-}
-
-
-/*
-=========================================================
-EXPAND FAQ
-=========================================================
-*/
-
-function toggleFaqItem(
-    item,
-    button
-) {
-
-    const expanded =
-        item.classList.toggle(
-            "expanded"
-        );
-
-
-    button.setAttribute(
-        "aria-expanded",
-        String(expanded)
-    );
-
-}
-
-
-/*
-=========================================================
-UPVOTE
-=========================================================
-*/
-
-async function handleFaqUpvote(
-    faq,
-    button,
-    voteCount
-) {
-
-    const session =
-        await getCurrentSession();
-
-
-    if (!session) {
-
-        showLoginPrompt(
-            "Log in to upvote this FAQ.",
-            {
-                type:
-                    "upvote",
-
-                faqId:
-                    faq.id
-            }
-        );
-
-        return;
-
-    }
-
-
-    if (button.disabled) {
-
-        return;
-
-    }
-
-
-    button.disabled =
-        true;
-
-
-    try {
-
-        const response =
-            await apiFetch(
-                FAQ_UPVOTE_URL,
-                {
-                    method:
-                        "POST",
-
-                    credentials:
-                        "include",
-
-                    headers: {
-                        "Content-Type":
-                            "application/json"
-                    },
-
-                    body:
-                        JSON.stringify(
-                            {
-                                faqId:
-                                    faq.id
-                            }
-                        )
-                }
-            );
-
-
-        if (
-            response.status === 401 ||
-            response.status === 403
-        ) {
-
-            showLoginPrompt(
-                "Log in to upvote this FAQ.",
-                {
-                    type:
-                        "upvote",
-
-                    faqId:
-                        faq.id
-                }
-            );
-
-            return;
-
-        }
-
-
-        if (!response.ok) {
-
-            throw new Error(
-                `FAQ upvote failed: ${response.status}`
-            );
-
-        }
-
-
-        const result =
-            await response.json();
-
-
-        voteCount.textContent =
-            formatVoteCount(
-                result.upvotes
-            );
-
-
-        button.classList.toggle(
-            "voted",
-            result.userUpvoted === true
-        );
-
-    }
-    catch (error) {
-
-        console.error(
-            "Unable to update FAQ vote:",
-            error
-        );
-
-    }
-    finally {
-
-        button.disabled =
-            false;
-
-    }
-
-}
-
-
-/*
-=========================================================
-SUGGEST FAQ
-=========================================================
-*/
-
-function bindFaqSuggestion() {
-
-    faqSuggestionButton.addEventListener(
-        "click",
-        async () => {
-
-            const session =
-                await getCurrentSession();
-
-
-            if (!session) {
-
-                showLoginPrompt(
-                    "Log in before submitting an FAQ suggestion.",
-                    {
-                        type:
-                            "suggestion"
-                    }
-                );
-
+        const submitButton = form.querySelector("button[type='submit']");
+        const title = form.elements.title.value.trim();
+        const description = form.elements.description.value.trim();
+        submitButton.disabled = true;
+        formStatus.textContent = "Submitting for staff review…";
+        try {
+            const response = await fetch(SUGGESTIONS_API_URL, {
+                method: "POST",
+                credentials: "same-origin",
+                headers: { "Content-Type": "application/json", Accept: "application/json" },
+                body: JSON.stringify({ title, description })
+            });
+            const result = await response.json();
+            if (response.status === 401 || response.status === 403) {
+                window.location.assign(loginUrl());
                 return;
-
             }
-
-
-            openSuggestionPage();
-
+            if (!response.ok || result.success !== true) throw new Error("SUBMISSION_FAILED");
+            form.reset();
+            formStatus.textContent = "Thanks. Your suggestion is pending staff approval and is not public yet.";
+        } catch {
+            formStatus.textContent = "We could not submit this suggestion. Please try again.";
+        } finally {
+            submitButton.disabled = false;
         }
-    );
+    });
 
-}
-
-
-function openSuggestionPage() {
-
-    window.location.href =
-        FAQ_SUGGEST_URL;
-
-}
-
-
-/*
-=========================================================
-AUTHENTICATION
-=========================================================
-*/
-
-async function getCurrentSession() {
-
-    try {
-
-        if (
-            window.BPDAuth &&
-            typeof window.BPDAuth.getSession
-                === "function"
-        ) {
-
-            const session =
-                await window.BPDAuth.getSession();
-
-            return session || null;
-
-        }
-
-
-        const response =
-            await apiFetch(
-                `${FUTURE_VALIDATION_PATH}`,
-                {
-                    credentials:
-                        "include",
-
-                    cache:
-                        "no-store"
-                }
-            );
-
-
-        if (!response.ok) {
-
-            return null;
-
-        }
-
-
-        const session =
-            await response.json();
-
-
-        if (
-            !session ||
-            session.authenticated !== true
-        ) {
-
-            return null;
-
-        }
-
-
-        return session;
-
-    }
-    catch {
-
-        return null;
-
-    }
-
-}
-
-
-/*
-=========================================================
-LOGIN PROMPT
-=========================================================
-*/
-
-function showLoginPrompt(
-    message,
-    action
-) {
-
-    pendingAuthAction =
-        action || null;
-
-
-    faqLoginMessage.textContent =
-        message;
-
-
-    faqLoginModal.hidden =
-        false;
-
-
-    document.body.style.overflow =
-        "hidden";
-
-
-    faqLoginButton.focus();
-
-}
-
-
-function closeLoginPrompt() {
-
-    faqLoginModal.hidden =
-        true;
-
-
-    document.body.style.overflow =
-        "";
-
-
-    pendingAuthAction =
-        null;
-
-}
-
-
-/*
-=========================================================
-LOGIN MODAL EVENTS
-=========================================================
-*/
-
-function bindLoginModal() {
-
-    document
-        .querySelectorAll(
-            "[data-close-login]"
-        )
-        .forEach(
-            element => {
-
-                element.addEventListener(
-                    "click",
-                    closeLoginPrompt
-                );
-
+    async function loadSuggestions() {
+        refreshButton.disabled = true;
+        listStatus.textContent = "Loading approved suggestions…";
+        list.replaceChildren();
+        try {
+            const response = await fetch(SUGGESTIONS_API_URL, {
+                credentials: "same-origin",
+                headers: { Accept: "application/json" },
+                cache: "no-store"
+            });
+            const result = await response.json();
+            if (!response.ok || result.success !== true) throw new Error("LIST_FAILED");
+            const suggestions = Array.isArray(result.suggestions) ? result.suggestions : [];
+            if (!suggestions.length) {
+                listStatus.textContent = "No approved suggestions yet.";
+                return;
             }
-        );
-
-
-    faqLoginButton.addEventListener(
-        "click",
-        () => {
-
-            beginLogin();
-
+            listStatus.textContent = "";
+            for (const suggestion of suggestions) list.append(createSuggestionCard(suggestion, authenticated, loadSuggestions));
+        } catch {
+            listStatus.textContent = "Suggestions are unavailable right now. Please retry.";
+        } finally {
+            refreshButton.disabled = false;
         }
-    );
+    }
 
+    refreshButton.addEventListener("click", loadSuggestions);
+    await loadSuggestions();
+}
 
-    document.addEventListener(
-        "keydown",
-        event => {
-
-            if (
-                event.key === "Escape" &&
-                !faqLoginModal.hidden
-            ) {
-
-                closeLoginPrompt();
-
+function createSuggestionCard(suggestion, authenticated, refresh) {
+    const card = element("article", undefined, "suggestion-card");
+    const header = element("header", undefined, "suggestion-card-header");
+    const heading = element("h3", suggestion.title);
+    const vote = element("button", undefined, "suggestion-vote");
+    vote.type = "button";
+    vote.setAttribute("aria-pressed", suggestion.user_upvoted === true ? "true" : "false");
+    vote.textContent = `${suggestion.user_upvoted === true ? "Remove vote" : "▲ Vote"} · ${Number(suggestion.upvotes) || 0}`;
+    const metadata = element("p", `${suggestion.creator_display_name || "BPD member"} · ${formatDate(suggestion.created_at)}`, "suggestion-meta");
+    const description = element("p", suggestion.description);
+    vote.addEventListener("click", async () => {
+        if (!authenticated) {
+            window.location.assign(loginUrl());
+            return;
+        }
+        vote.disabled = true;
+        try {
+            const response = await fetch(suggestionVoteApiUrl(suggestion.id), {
+                method: "POST",
+                credentials: "same-origin",
+                headers: { Accept: "application/json" }
+            });
+            const result = await response.json();
+            if (response.status === 401 || response.status === 403) {
+                window.location.assign(loginUrl());
+                return;
             }
-
+            if (!response.ok || result.success !== true) throw new Error("VOTE_FAILED");
+            suggestion.upvotes = result.upvotes;
+            suggestion.user_upvoted = result.userUpvoted;
+            vote.setAttribute("aria-pressed", String(result.userUpvoted));
+            vote.textContent = `${result.userUpvoted ? "Remove vote" : "▲ Vote"} · ${result.upvotes}`;
+        } catch {
+            await refresh();
+        } finally {
+            vote.disabled = false;
         }
-    );
-
-}
-
-
-/*
-=========================================================
-START LOGIN
-=========================================================
-*/
-
-function beginLogin() {
-
-    const returnUrl =
-        window.location.pathname +
-        window.location.search;
-
-
-    const action =
-        pendingAuthAction;
-
-
-    if (action) {
-
-        sessionStorage.setItem(
-            "faqPendingAction",
-            JSON.stringify(action)
-        );
-
-    }
-
-
-    window.location.href =
-        "/login?return=" +
-        encodeURIComponent(
-            returnUrl
-        );
-
-}
-
-
-/*
-=========================================================
-UTILITIES
-=========================================================
-*/
-
-function formatVoteCount(value) {
-
-    const count =
-        Number(value);
-
-
-    if (!Number.isFinite(count)) {
-
-        return "0";
-
-    }
-
-
-    return Math.max(
-        0,
-        Math.trunc(count)
-    ).toLocaleString();
-
+    });
+    header.append(heading, vote);
+    card.append(header, metadata, description);
+    return card;
 }

@@ -32,6 +32,10 @@ V12/
 
 **/AGENTS
 
-# Local Taskboard SQL support and regression tests
+# Local Taskboard SQL support
 /functions/services/supabase/admin/tasks/sql/
-/workers/rl-presence-monitor/tests/
+
+# Local-only Supabase setup scripts; keep these out of the Pages function tree,
+# GitHub source, and deployment inputs.
+/Notes/supabase/suggestions/
+/functions/services/supabase/suggestions/sql/

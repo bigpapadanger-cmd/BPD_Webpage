@@ -93,6 +93,8 @@ let ctx = null;
 let sourceImage = null;
 let sourceFile = null;
 let sourceFileName = "scoreboard.png";
+let sourceImageId = null;
+let sourceImagePersisted = false;
 
 let displayScale = 1;
 let ocrControlsLocked = false;
@@ -985,6 +987,14 @@ function decodeImageFile(
     );
 }
 
+function createOcrImageId() {
+    if (typeof crypto?.randomUUID === "function") {
+        return crypto.randomUUID();
+    }
+
+    return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+}
+
 /* =========================================================
    IPHONE / HEIC NORMALIZATION
    ========================================================= */
@@ -1293,7 +1303,8 @@ function openOcrImageDatabase() {
 }
 
 async function saveLastUploadedImage(
-    file
+    file,
+    imageId
 ) {
     if (
         !(file instanceof Blob)
@@ -1326,6 +1337,9 @@ async function saveLastUploadedImage(
 
                 store.put(
                     {
+                        imageId:
+                            String(imageId || ""),
+
                         blob:
                             file,
 
@@ -1450,23 +1464,27 @@ async function readLastUploadedImage() {
             return null;
         }
 
-        return new File(
-            [
-                record.blob
-            ],
-            String(
-                record.name
-                || "scoreboard.png"
-            ),
-            {
-                type:
+        return {
+            imageId:
+                String(record.imageId || ""),
+
+            file:
+                new File(
+                    [record.blob],
                     String(
-                        record.type
-                        || record.blob.type
-                        || "image/png"
-                    )
-            }
-        );
+                        record.name
+                        || "scoreboard.png"
+                    ),
+                    {
+                        type:
+                            String(
+                                record.type
+                                || record.blob.type
+                                || "image/png"
+                            )
+                    }
+                )
+        };
     }
     catch (
         error
@@ -1484,23 +1502,38 @@ async function readLastUploadedImage() {
 }
 
 async function restoreLastUploadedImage() {
-    const file =
+    const storedImage =
         await readLastUploadedImage();
 
     if (
-        !file
+        !storedImage
     ) {
         return false;
     }
 
+    let imageId =
+        storedImage.imageId;
+
+    if (!imageId) {
+        const migratedImageId = createOcrImageId();
+        if (await saveLastUploadedImage(storedImage.file, migratedImageId)) {
+            imageId = migratedImageId;
+        }
+    }
+
     return loadImageFile(
-        file,
+        storedImage.file,
         {
             persist:
                 false,
 
             restored:
                 true,
+
+            imageId,
+
+            imagePersisted:
+                Boolean(imageId),
 
             allowFallbackRestore:
                 false
@@ -1541,13 +1574,15 @@ function savePageState() {
 
     if (
         !sourceImage
+        || !sourceImageId
+        || !sourceImagePersisted
     ) {
         return;
     }
 
     const state = {
-        imageData:
-            sourceImage.src,
+        imageId:
+            sourceImageId,
 
         sourceFileName,
 
@@ -1679,9 +1714,7 @@ function restorePageState() {
         return false;
     }
 
-    if (
-        !state?.imageData
-    ) {
+    if (!state || (!state.imageId && !state.imageData)) {
         return false;
     }
 
@@ -1716,118 +1749,83 @@ function restorePageState() {
         state.sourceFileName
         || "scoreboard.png";
 
-    const image =
-        new Image();
+    setOcrControlsLocked(true);
+    setStatus("Restoring saved scoreboard image...");
+    void restorePageImageFromStorage(state);
 
-    image.onload =
-        function() {
-            sourceImage =
-                image;
+    return true;
+}
 
-            sourceFile =
-                null;
+async function restorePageImageFromStorage(state) {
+    const storedImage = await readLastUploadedImage();
+    if (
+        !storedImage
+        || (state.imageId && storedImage.imageId !== state.imageId)
+    ) {
+        clearPageState();
+        sourceImage = null;
+        sourceFile = null;
+        sourceImageId = null;
+        sourceImagePersisted = false;
+        setOcrControlsLocked(false);
+        setStatus("The saved image is unavailable. Please select it again.");
+        return false;
+    }
 
-            fitCanvasToImage();
+    let imageId =
+        storedImage.imageId || state.imageId || createOcrImageId();
+    let imagePersisted =
+        Boolean(storedImage.imageId);
 
-            if (
-                emptyState
-            ) {
-                emptyState.hidden =
-                    true;
-            }
+    if (!imagePersisted) {
+        imagePersisted = await saveLastUploadedImage(
+            storedImage.file,
+            imageId
+        );
+        if (!imagePersisted) {
+            imageId = null;
+        }
+    }
 
-            if (
-                canvas
-            ) {
-                canvas.hidden =
-                    false;
-            }
+    const restored = await loadImageFile(
+        storedImage.file,
+        {
+            persist: false,
+            restored: true,
+            allowFallbackRestore: false,
+            imageId,
+            imagePersisted,
+            deferStateSave: true,
+            deferUnlock: true
+        }
+    );
 
-            cropFallbackVisible =
-                Boolean(
-                    state.cropFallbackVisible
-                );
+    if (!restored) {
+        clearPageState();
+        setOcrControlsLocked(false);
+        setStatus("The saved image could not be reopened. Please select it again.");
+        return false;
+    }
 
-            if (
-                cropFallbackVisible
-            ) {
-                if (
-                    !restoreNormalizedCrop(
-                        state.normalizedCrop
-                    )
-                ) {
-                    resetCrop();
-                }
-            }
-            else {
-                crop = {
-                    x: 0,
-                    y: 0,
-                    width: 0,
-                    height: 0
-                };
-            }
+    cropFallbackVisible = Boolean(state.cropFallbackVisible);
+    if (cropFallbackVisible) {
+        if (!restoreNormalizedCrop(state.normalizedCrop)) {
+            resetCrop();
+        }
+    }
+    else {
+        crop = { x: 0, y: 0, width: 0, height: 0 };
+    }
 
-            draw();
-
-            setStatus(
-                state.status
-                || (
-                    cropFallbackVisible
-                        ? "Adjust the crop and retry."
-                        : "Image restored. Ready to read scoreboard."
-                )
-            );
-
-            setOcrControlsLocked(
-                false
-            );
-        };
-
-    image.onerror =
-        function() {
-            clearPageState();
-
-            sourceImage =
-                null;
-
-            sourceFile =
-                null;
-
-            buildPlayerNameInputs(
-                state.playerNames
-                || readOcrFormState()
-                    ?.playerNames
-                || null
-            );
-
-            setOcrControlsLocked(
-                false
-            );
-
-            setStatus(
-                "Saved page image could not be restored. Checking the last uploaded image..."
-            );
-
-            void restoreLastUploadedImage()
-                .then(
-                    function(
-                        restored
-                    ) {
-                        if (
-                            !restored
-                        ) {
-                            setStatus(
-                                "FAIL: Saved image could not be restored."
-                            );
-                        }
-                    }
-                );
-        };
-
-    image.src =
-        state.imageData;
-
+    draw();
+    setStatus(
+        state.status
+        || (cropFallbackVisible
+            ? "Adjust the crop and retry."
+            : "Image restored. Ready to read scoreboard.")
+    );
+    savePageState();
+    setOcrControlsLocked(false);
     return true;
 }
 
@@ -2922,7 +2920,7 @@ async function loadImageFile(
     ) {
     if (
         !file
-        || ocrControlsLocked
+        || (ocrControlsLocked && options?.restored !== true)
     ) {
         return false;
     }
@@ -2945,6 +2943,13 @@ async function loadImageFile(
 
     sourceFile =
         null;
+
+    sourceImageId =
+        options?.imageId
+        || (shouldPersist ? createOcrImageId() : null);
+
+    sourceImagePersisted =
+        options?.imagePersisted === true;
 
     setOcrControlsLocked(
         true
@@ -3018,10 +3023,6 @@ async function loadImageFile(
 
         draw();
 
-        setOcrControlsLocked(
-            false
-        );
-
         if (
             restored
         ) {
@@ -3042,14 +3043,23 @@ async function loadImageFile(
             );
         }
 
-        savePageState();
-
-        if (
-            shouldPersist
-        ) {
-            void saveLastUploadedImage(
-                prepared.file
+        if (shouldPersist) {
+            sourceImagePersisted = await saveLastUploadedImage(
+                prepared.file,
+                sourceImageId
             );
+            if (!sourceImagePersisted) {
+                clearPageState();
+                setStatus("Image is ready, but could not be saved for reload. You can still submit it now.");
+            }
+        }
+
+        if (!options?.deferStateSave && sourceImagePersisted) {
+            savePageState();
+        }
+
+        if (!options?.deferUnlock) {
+            setOcrControlsLocked(false);
         }
 
         return true;
@@ -3067,6 +3077,12 @@ async function loadImageFile(
 
         sourceFile =
             null;
+
+        sourceImageId =
+            null;
+
+        sourceImagePersisted =
+            false;
 
         sourceFileName =
             "scoreboard.png";
@@ -3396,6 +3412,12 @@ function initializeOcrCore() {
 
         sourceFile =
             null;
+
+        sourceImageId =
+            null;
+
+        sourceImagePersisted =
+            false;
 
         sourceFileName =
             "scoreboard.png";

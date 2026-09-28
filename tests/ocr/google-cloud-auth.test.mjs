@@ -81,17 +81,34 @@ test("STS rejection logs only temporary mTLS diagnostics and redacts credential 
 
     const diagnostic = calls[0][1];
     assert.deepEqual(Object.keys(diagnostic).sort(), [
-        "bindingExists",
-        "bindingFetchIsFunction",
-        "destinationHostname",
+        "sameBindingObject",
+        "bindingFetchType",
+        "requestMethod",
+        "hostname",
+        "hasSignal",
+        "contentType",
+        "bodyLength",
+        "bodyFieldNames",
+        "responseStatus",
         "googleError",
         "googleErrorDescription",
-        "returnedHttpStatus"
     ].sort());
-    assert.equal(diagnostic.bindingExists, true);
-    assert.equal(diagnostic.bindingFetchIsFunction, true);
-    assert.equal(diagnostic.destinationHostname, "sts.mtls.googleapis.com");
-    assert.equal(diagnostic.returnedHttpStatus, 400);
+    assert.equal(diagnostic.sameBindingObject, true);
+    assert.equal(diagnostic.bindingFetchType, "function");
+    assert.equal(diagnostic.requestMethod, "POST");
+    assert.equal(diagnostic.hostname, "sts.mtls.googleapis.com");
+    assert.equal(diagnostic.hasSignal, true);
+    assert.equal(diagnostic.contentType, "application/json");
+    assert.ok(diagnostic.bodyLength > 0);
+    assert.deepEqual(diagnostic.bodyFieldNames, [
+        "audience",
+        "grant_type",
+        "requested_token_type",
+        "scope",
+        "subject_token",
+        "subject_token_type"
+    ]);
+    assert.equal(diagnostic.responseStatus, 400);
     assert.equal(diagnostic.googleError, "invalid_grant");
     assert.match(diagnostic.googleErrorDescription, /certificate \[REDACTED\]/);
 
@@ -157,11 +174,86 @@ test("service-account ID-token rejection preserves its external code and redacts
         const stsDiagnostic = calls.find(call =>
             call[0] === "[OCR GOOGLE AUTH] Temporary mTLS STS diagnostic."
         )[1];
-        assert.equal(stsDiagnostic.returnedHttpStatus, 200);
+        assert.equal(stsDiagnostic.responseStatus, 200);
         assert.equal(stsDiagnostic.googleError, null);
         assert.equal(JSON.stringify(calls).includes("federated-access-secret"), false);
         assert.equal(authError.message, "Google authentication could not be completed.");
         assert.equal(String(authError.stack).includes("federated-access-secret"), false);
+    }
+    finally {
+        globalThis.fetch = originalFetch;
+    }
+});
+
+test("normal STS fetch preserves the binding receiver and direct diagnostic path keeps the exact request body", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async () => {
+        throw new Error("ID token exchange must not run after STS rejection");
+    };
+
+    async function captureStsRequest(env) {
+        let request;
+        const binding = env.OCR_GCP_MTLS;
+        binding.fetch = async function(url, options) {
+            assert.equal(this, binding, "mTLS fetch receiver must remain the original binding");
+            request = { url: String(url), options };
+            return Response.json({
+                error: "invalid_grant",
+                error_description: `No client cert found. Chain ${env.OCR_GCP_X509_CERT_CHAIN}; API key ${env.OCR_API_KEY}.`
+            }, { status: 400 });
+        };
+
+        await assert.rejects(
+            getGoogleCloudRunIdToken(env, "https://diagnostic-ocr-service.run.app"),
+            error => error.code === "OCR_GOOGLE_STS_EXCHANGE_FAILED"
+        );
+        return request;
+    }
+
+    try {
+        const normal = createEnvironment("D".repeat(160));
+        const direct = createEnvironment("D".repeat(160));
+        direct.env.OCR_GCP_STS_DIAGNOSTIC_DIRECT_FETCH = "true";
+
+        const { result: normalRequest, calls: normalLogs } = await captureConsoleError(
+            () => captureStsRequest(normal.env)
+        );
+        const { result: directRequest, calls: directLogs } = await captureConsoleError(
+            () => captureStsRequest(direct.env)
+        );
+
+        assert.equal(normalRequest.url, EXPECTED_STS_URL);
+        assert.equal(directRequest.url, EXPECTED_STS_URL);
+        assert.equal(normalRequest.options.method, "POST");
+        assert.equal(directRequest.options.method, "POST");
+        assert.equal(normalRequest.options.signal instanceof AbortSignal, true);
+        assert.equal(directRequest.options.signal instanceof AbortSignal, true);
+        assert.equal(normalRequest.options.redirect, undefined);
+        assert.equal(directRequest.options.redirect, undefined);
+        assert.equal(normalRequest.options.headers["Content-Type"], "application/json");
+        assert.equal(directRequest.options.headers["Content-Type"], "application/json");
+        assert.equal(normalRequest.options.body, directRequest.options.body);
+
+        const normalDiagnostic = normalLogs.find(call =>
+            call[0] === "[OCR GOOGLE AUTH] Temporary mTLS STS diagnostic."
+        )[1];
+        const directDiagnostic = directLogs.find(call =>
+            call[0] === "[OCR GOOGLE AUTH] Temporary mTLS STS diagnostic."
+        )[1];
+        assert.deepEqual(normalDiagnostic, directDiagnostic);
+        assert.equal(normalDiagnostic.sameBindingObject, true);
+        assert.equal(normalDiagnostic.hasSignal, true);
+        assert.equal(JSON.stringify(directLogs).includes(direct.env.OCR_GCP_X509_CERT_CHAIN), false);
+        assert.equal(JSON.stringify(directLogs).includes(direct.env.OCR_API_KEY), false);
+        assert.equal(JSON.stringify(directLogs).includes("D".repeat(160)), false);
+
+        direct.env.OCR_GCP_STS_DIAGNOSTIC_NO_SIGNAL = "true";
+        const { result: noSignalRequest, calls: noSignalLogs } = await captureConsoleError(
+            () => captureStsRequest(direct.env)
+        );
+        assert.equal(noSignalRequest.options.signal, undefined);
+        assert.equal(noSignalLogs[0][1].hasSignal, false);
+        assert.equal(noSignalRequest.options.body, directRequest.options.body);
     }
     finally {
         globalThis.fetch = originalFetch;

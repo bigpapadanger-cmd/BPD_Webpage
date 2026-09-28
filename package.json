@@ -1,17 +1,23 @@
 {
-    "name": "domaindata",
-    "version": "1.1.2",
-    "private": true,
-    "type": "module",
-    "scripts": {
-        "cache:ids": "node public/scripts/generate-cache-ids.js",
-        "build": "npm run cache:ids && wrangler pages functions build functions --outdir=.wrangler/pages-build",
-        "build:check": "wrangler pages functions build functions --outdir=.wrangler/pages-build",
-        "dev": "npm run cache:ids && wrangler pages dev",
-        "test": "npm run test:ocr && npm run build:check",
-        "test:ocr": "node --test tests/ocr/*.test.mjs"
-    },
-    "devDependencies": {
-        "wrangler": "^4"
-    }
+  "name": "domaindata",
+  "version": "1.1.3",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "cache:ids": "node public/scripts/generate-cache-ids.js",
+    "build": "npm run cache:ids && wrangler pages functions build functions --outdir=.wrangler/pages-build",
+    "build:check": "npm run routes:generate && wrangler pages functions build functions --outdir=.wrangler/pages-build",
+    "dev": "npm run cache:ids && wrangler pages dev",
+    "test": "npm run test:ocr && npm run test:suggestions && npm run test:routes && npm run build:check",
+    "test:ocr": "node --test tests/ocr/*.test.mjs",
+    "test:suggestions": "node --test tests/suggestions/*.test.mjs",
+    "test:routes": "npm run routes:generate && node --test tests/route_health/*.test.mjs",
+    "routes:generate": "node scripts/generate-api-route-inventory.mjs",
+    "wrangler:check": "npm outdated wrangler || exit 0",
+    "wrangler:update": "npm install --save-dev wrangler@latest",
+    "wrangler:version": "wrangler --version"
+  },
+  "devDependencies": {
+    "wrangler": "^4.143.0"
+  }
 }

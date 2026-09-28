@@ -181,6 +181,20 @@ export const FAQ_API_URL =
 export const FAQ_UPVOTE_URL =
     "/api/faq/upvote";
 
+export const SUGGESTIONS_API_URL =
+    "/api/suggestions";
+
+export const ADMIN_SUGGESTIONS_API_URL =
+    "/api/admin/suggestions";
+
+export function suggestionVoteApiUrl(suggestionId) {
+    return `${SUGGESTIONS_API_URL}/${encodeURIComponent(String(suggestionId))}/vote`;
+}
+
+export function adminSuggestionReviewApiUrl(suggestionId) {
+    return `${ADMIN_SUGGESTIONS_API_URL}/${encodeURIComponent(String(suggestionId))}/review`;
+}
+
 /* =========================================================
 HEALTH
 ========================================================= */

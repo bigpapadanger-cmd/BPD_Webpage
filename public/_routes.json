@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "include": [
+    "/*"
+  ],
+  "exclude": [
+    "/Assets/*",
+    "/Framework/*",
+    "/Global/*",
+    "/Required/*",
+    "/Tabs/*",
+    "/ocr/*",
+    "/scripts/*",
+    "/.assetsignore",
+    "/_headers",
+    "/_redirects",
+    "/ads.txt",
+    "/index.html",
+    "/robots.txt",
+    "/routes.js",
+    "/sitemap.xml"
+  ]
+}

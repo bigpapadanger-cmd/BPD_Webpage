@@ -34,7 +34,10 @@ functions/
 |   |   +-- rocketleague/
 |   |   |   +-- discord-notifications.js, profile.js, session.js
 |   |   +-- steam/callback.js, login.js
+|   +-- admin/page-settings/route-health.js, suggestions/index.js
+|   |   +-- suggestions/[suggestionId]/review.js
 |   +-- curseforge/mods.js
+|   +-- suggestions/index.js, [suggestionId]/vote.js
 |   +-- health/apihealth.js
 |   +-- ocr/
 |       +-- compare.js, confirm.js, index.js, localize.js
@@ -70,6 +73,7 @@ functions/
     +-- common_helpers/responses.js
     +-- config/api_vars.js
     +-- http/responses.js
+    +-- http/json.js                Bounded request JSON reader.
     +-- ocr/
     |   +-- confirm.js, handler.js, localize.js, storage.js
     |   +-- storeMatch.js, training.js, trainingCandidates.js, trainingStorage.js
@@ -82,6 +86,7 @@ functions/
     |       +-- refresh_with_gate.js, save_mmr.js
     +-- security/turnstile.js
     +-- supabase/
+        +-- suggestions.js         Allow-listed website suggestion RPC transport.
         +-- rocketleague/
         |   +-- ensure_player.js, get_latest_mmr.js
         |   +-- rocketleague_profile.js, save_profile.js
@@ -97,6 +102,11 @@ api/auth
     HTTP entrypoints for sessions, account/provider linking, OAuth callbacks,
     provider-specific login/callback flows, Rocket League account data, admin
     authorization, Taskboard APIs, and Discord Matchbot operations.
+
+api/suggestions and api/admin/suggestions
+    Publicly list approved suggestions; require an active BPD session for
+    submissions and vote toggles; require the server-side
+    admin.suggestions.manage permission for pending-list and review actions.
 
 api/ocr
     Synchronous OCR-facing endpoints plus the queued-job lifecycle. jobs/
@@ -125,6 +135,13 @@ services/supabase
     Direct persistence boundary for Rocket League profiles/MMR and admin
     Taskboard activity, assignment, comments, lifecycle, list/get/create/update,
     summaries, payloads, and RPCs.
+
+services/supabase/suggestions.js
+    Calls only the five website-suggestion RPCs defined by the local-only,
+    operator-prepared Supabase contract under Notes/supabase/suggestions/.
+    Service credentials remain server-side; public browser clients never
+    receive direct Supabase access. The SQL is outside the Pages deployment tree
+    and excluded from GitHub by .gitignore.
 
 services/admin, services/security, services/config, response helpers
     Cross-cutting permissions/Discord roles, Turnstile validation, environment

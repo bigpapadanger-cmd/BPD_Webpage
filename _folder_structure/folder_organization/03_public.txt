@@ -70,18 +70,20 @@ public/Global/
 |       |        task_detail.html, task_edit.html, task_history.html
 |       +-- JS/index.js, create_task.js, task_comments.js, task_confirm.js,
 |                task_detail.js, task_edit.js, task_history.js, task_lifecycle.js
+|   +-- PageSettings/      CSS/index.css, HTML/index.html, JS/index.js
+|   +-- Suggestions/       CSS/index.css, HTML/index.html, JS/index.js
 +-- Ads/                 CSS/ads.css, HTML/ads.html, JS/ads.js
 +-- Index/               CSS/index.css, HTML/home.html, JS/index.js
 +-- Links/               links.css, links.html, links.js
 +-- Login/               CSS/index.css, HTML/index.html, JS/index.js
-+-- Settings/            CSS/settings.css, HTML/settings.html, JS/settings.js
-+-- Suggestions/         CSS/index.css, HTML/index.html, JS/index.js
++-- Settings/            CSS/settings-page.css, HTML/settings.html, JS/settings.js
++-- Suggestions/         CSS/index.css, HTML/index.html, JS/index.js (canonical public route)
 
 public/Required/
 +-- About/               CSS/index.css, HTML/index.html, JS/index.js
 +-- FAQ/                 CSS/index.css, HTML/index.html, JS/index.js
 +-- PrivacyPolicy/       CSS/index.css, HTML/index.html, JS/index.js
-+-- Suggestions/         CSS/index.css, HTML/index.html, JS/index.js
++-- Suggestions/         Legacy FAQ-form copy; no registered route
 +-- TOS/                 CSS/index.css, HTML/index.html, JS/index.js
 
 public/Tabs/
@@ -121,7 +123,7 @@ SHARED SCRIPTS
 
 public/scripts/
 +-- apiConnection.js          Global API connection monitoring.
-+-- apiRoutes.js              Browser API route definitions/helpers.
++-- apiRoutes.js              Browser API route definitions/helpers, including suggestions.
 +-- cacheHandler.js           Client cache/version handling.
 +-- generate-cache-ids.js     Build-time cache ID generation.
 +-- repopulate_sitemap.js     Sitemap maintenance utility.
@@ -150,6 +152,10 @@ ROUTE-TO-FOLDER MAP
     /Ark*                 -> Tabs/Ark
     /About, /FAQ,
     /Privacy, /TOS        -> Required/*
+    /Settings             -> Global/Settings
+    /Suggestions          -> Global/Suggestions
+    /Admin/PageSettings   -> Global/Admin/PageSettings
+    /Admin/SuggestionReview -> Global/Admin/Suggestions
     /Error                -> Global/404
 
 The router loads the selected HTML body and JavaScript module, applies a master

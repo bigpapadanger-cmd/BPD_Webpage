@@ -63,7 +63,8 @@ Security:
 import {
     ROUTES,
     HEADER_MAP,
-    getMasterCssForRoute
+    getMasterCssForRoute,
+    resolveHumanPageRoute
 } from "/routes.js";
 
 import {
@@ -368,21 +369,18 @@ function resolveRoute(
             path
         );
 
-    if (
-        routeExists(
-            requestedPath
-        )
-    ) {
+    const humanRoute =
+        resolveHumanPageRoute(requestedPath);
+
+    if (humanRoute) {
         return {
             requestedPath,
 
             routePath:
-                requestedPath,
+                humanRoute.canonicalPath,
 
             config:
-                ROUTES[
-                    requestedPath
-                ],
+                humanRoute.config,
 
             found:
                 true
@@ -2092,6 +2090,23 @@ async function loadShell() {
             window.location.pathname
         );
 
+    if (
+        route.found
+        && window.location.pathname !== route.routePath
+    ) {
+        const canonicalUrl =
+            new URL(window.location.href);
+
+        canonicalUrl.pathname =
+            route.routePath;
+
+        window.history.replaceState(
+            {},
+            "",
+            canonicalUrl.href
+        );
+    }
+
     try {
         /* -------------------------------------------------
         1. AUTHORIZATION
@@ -2388,16 +2403,22 @@ async function navigate(
     destination,
     options = {}
 ) {
-    const normalizedDestination =
-        normalizeDestination(
-            destination
-        );
+    const destinationUrl = new URL(
+        normalizeDestination(destination),
+        window.location.origin
+    );
 
-    const destinationUrl =
-        new URL(
-            normalizedDestination,
-            window.location.origin
-        );
+    const humanRoute =
+        resolveHumanPageRoute(destinationUrl.pathname);
+
+    if (humanRoute) {
+        destinationUrl.pathname = humanRoute.canonicalPath;
+    }
+
+    const normalizedDestination =
+        destinationUrl.pathname
+        + destinationUrl.search
+        + destinationUrl.hash;
 
     const currentDestination =
         (

@@ -27,7 +27,7 @@ const FAQ_UPVOTE_URL =
     "/api/faq/upvote";
 
 const FAQ_SUGGEST_URL =
-    "/faq/suggest";
+    "/Suggestions";
 
 
 let faqList = null;
@@ -663,7 +663,7 @@ async function handleFaqSuggestion() {
 
     if (!session) {
         showLoginPrompt(
-            "Sign in is required before submitting an FAQ suggestion.",
+            "Sign in is required before submitting a community suggestion.",
             {
                 type:
                     "suggestion"
