@@ -49,6 +49,9 @@ function createAuthError(
     error.code =
         code;
 
+    error.isGoogleAuthError =
+        true;
+
     error.httpStatus =
         503;
 
@@ -119,6 +122,13 @@ function readConfiguration(
         serviceAccountEmail,
         certificateChain,
         certificateBinding,
+        diagnosticRedactionValues: [
+            JSON.stringify(certificateChain),
+            ...certificateChain.flatMap(function(certificate) {
+                return [certificate, atob(certificate)];
+            }),
+            String(env?.OCR_API_KEY || "")
+        ].filter(Boolean),
         providerResource:
             "//iam.googleapis.com/projects/"
             + projectNumber
@@ -237,11 +247,176 @@ async function hashCertificateChain(
     ).join("");
 }
 
+function sanitizeDiagnosticText(
+    value,
+    secrets = []
+) {
+    if (typeof value !== "string") {
+        return null;
+    }
+
+    let safeValue = value
+        .replace(/[\u0000-\u001f\u007f]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+
+    const redactions = secrets
+        .filter(secret => typeof secret === "string" && secret.length > 0)
+        .flatMap(function(secret) {
+            const variants = [secret];
+            try {
+                variants.push(encodeURIComponent(secret));
+                variants.push(JSON.stringify(secret).slice(1, -1));
+            }
+            catch {
+                // Keep the exact-value redaction if an encoding helper rejects input.
+            }
+            try {
+                variants.push(btoa(secret));
+            }
+            catch {
+                // Some secrets may contain non-byte Unicode characters.
+            }
+            return variants;
+        })
+        .sort((left, right) => right.length - left.length);
+
+    for (const secret of redactions) {
+        safeValue = safeValue.split(secret).join("[REDACTED]");
+    }
+
+    safeValue = safeValue
+        .replace(/\bBearer\s+[^\s,;]+/gi, "Bearer [REDACTED]")
+        .replace(/\bya29\.[A-Za-z0-9._~-]+/g, "[REDACTED_TOKEN]")
+        .replace(/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g, "[REDACTED_TOKEN]")
+        .replace(/-----BEGIN [A-Z ]*PRIVATE KEY-----.*?-----END [A-Z ]*PRIVATE KEY-----/gi, "[REDACTED_PRIVATE_KEY]");
+
+    return safeValue.slice(0, 1024) || null;
+}
+
+function sanitizeErrorUri(
+    value,
+    secrets
+) {
+    const safeValue = sanitizeDiagnosticText(value, secrets);
+    if (!safeValue) {
+        return null;
+    }
+
+    try {
+        const url = new URL(safeValue);
+        if (url.protocol !== "https:" && url.protocol !== "http:") {
+            return null;
+        }
+        return `${url.origin}${url.pathname}`.slice(0, 512);
+    }
+    catch {
+        return null;
+    }
+}
+
+function logGoogleHttpFailure(
+    context,
+    response,
+    parsedResponse,
+    secrets
+) {
+    const contentType = sanitizeDiagnosticText(
+        response.headers.get("Content-Type") || "",
+        secrets
+    );
+    const errorUri = parsedResponse && typeof parsedResponse === "object"
+        ? sanitizeErrorUri(parsedResponse.error_uri, secrets)
+        : null;
+
+    console.error(
+        "[OCR GOOGLE AUTH] Google token endpoint rejected authentication.",
+        {
+            authStage: context?.authStage || "unknown",
+            httpStatus: Number(response.status) || 0,
+            responseContentType: contentType,
+            googleError: sanitizeDiagnosticText(parsedResponse?.error, secrets),
+            googleErrorDescription: sanitizeDiagnosticText(parsedResponse?.error_description, secrets),
+            googleErrorUri: errorUri,
+            requestAudience: context?.requestAudience || null,
+            providerResource: context?.providerResource || null,
+            mtlsBindingPresent: context?.mtlsBindingPresent === true,
+            certificateChainPresent: context?.certificateChainEntryCount > 0,
+            certificateChainEntryCount: Number(context?.certificateChainEntryCount) || 0,
+            serviceAccountEmail: context?.serviceAccountEmail || null
+        }
+    );
+}
+
+function buildGoogleAuthDiagnosticContext(
+    config,
+    authStage,
+    requestAudience,
+    additionalRedactions = []
+) {
+    return {
+        authStage,
+        requestAudience,
+        providerResource: config.providerResource,
+        mtlsBindingPresent: Boolean(config.certificateBinding),
+        certificateChainEntryCount: config.certificateChain.length,
+        serviceAccountEmail: config.serviceAccountEmail,
+        redactionValues: [
+            ...config.diagnosticRedactionValues,
+            ...additionalRedactions
+        ]
+    };
+}
+
+async function readGoogleErrorJson(
+    response
+) {
+    if (!response.body) {
+        return null;
+    }
+
+    const reader = response.body.getReader();
+    const chunks = [];
+    let byteLength = 0;
+
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done) {
+            break;
+        }
+
+        byteLength += value.byteLength;
+        if (byteLength > MAX_GOOGLE_RESPONSE_BYTES) {
+            await reader.cancel();
+            return null;
+        }
+        chunks.push(value);
+    }
+
+    const bytes = new Uint8Array(byteLength);
+    let offset = 0;
+    for (const chunk of chunks) {
+        bytes.set(chunk, offset);
+        offset += chunk.byteLength;
+    }
+
+    try {
+        const parsed = JSON.parse(new TextDecoder().decode(bytes));
+        return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+            ? parsed
+            : null;
+    }
+    catch {
+        return null;
+    }
+}
+
 async function fetchJson(
     fetcher,
     url,
     options,
-    failureCode
+    failureCode,
+    diagnosticContext
 ) {
     const controller =
         new AbortController();
@@ -265,6 +440,26 @@ async function fetchJson(
                 }
             );
 
+        if (!response.ok) {
+            let parsedError = null;
+            try {
+                parsedError = await readGoogleErrorJson(response);
+            }
+            catch {
+                // The HTTP status and safe request context remain useful without a body.
+            }
+            logGoogleHttpFailure(
+                diagnosticContext,
+                response,
+                parsedError,
+                diagnosticContext?.redactionValues
+            );
+            throw createAuthError(
+                failureCode,
+                "Google authentication could not be completed."
+            );
+        }
+
         const contentLength =
             Number(
                 response.headers.get(
@@ -285,28 +480,32 @@ async function fetchJson(
         const text =
             await response.text();
 
-        if (
-            text.length > MAX_GOOGLE_RESPONSE_BYTES
-            || !response.ok
-        ) {
-            throw createAuthError(
-                failureCode,
-                "Google authentication could not be completed."
-            );
-        }
-
+        let parsedResponse = null;
         try {
-            return JSON.parse(text);
+            parsedResponse = JSON.parse(text);
         }
         catch {
+            // Error bodies are diagnostic input only; never expose raw response text.
+        }
+
+        if (text.length > MAX_GOOGLE_RESPONSE_BYTES) {
             throw createAuthError(
                 failureCode,
                 "Google authentication returned an invalid response."
             );
         }
+
+        if (!parsedResponse || typeof parsedResponse !== "object" || Array.isArray(parsedResponse)) {
+            throw createAuthError(
+                failureCode,
+                "Google authentication returned an invalid response."
+            );
+        }
+
+        return parsedResponse;
     }
     catch (error) {
-        if (error?.code) {
+        if (error?.isGoogleAuthError === true) {
             throw error;
         }
 
@@ -467,7 +666,12 @@ async function getFederatedAccessToken(
                                 GOOGLE_TOKEN_SCOPE
                         })
                     },
-                    "OCR_GOOGLE_STS_EXCHANGE_FAILED"
+                    "OCR_GOOGLE_STS_EXCHANGE_FAILED",
+                    buildGoogleAuthDiagnosticContext(
+                        config,
+                        "sts_exchange",
+                        config.providerResource
+                    )
                 );
 
             if (
@@ -575,7 +779,13 @@ export async function getGoogleCloudRunIdToken(
                             includeEmail: true
                         })
                     },
-                    "OCR_GOOGLE_ID_TOKEN_FAILED"
+                    "OCR_GOOGLE_ID_TOKEN_FAILED",
+                    buildGoogleAuthDiagnosticContext(
+                        config,
+                        "service_account_id_token",
+                        audience,
+                        [federatedAccessToken]
+                    )
                 );
 
             if (
