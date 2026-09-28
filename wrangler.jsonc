@@ -42,7 +42,8 @@
         "OCR_GCP_WORKLOAD_IDENTITY_PROVIDER_ID":"bpd-ocr-cloudflare-x509",
         "OCR_GCP_SERVICE_ACCOUNT_EMAIL":"ocr-cloudflare-handler@project-95bc2520-286c-45bf-9cb.iam.gserviceaccount.com",
         "OCR_GCP_STS_DIAGNOSTIC_DIRECT_FETCH":"true",
-        "OCR_GCP_STS_DIAGNOSTIC_NO_SIGNAL":"true"
+        "OCR_GCP_STS_DIAGNOSTIC_NO_SIGNAL":"true",
+        "OCR_GCP_STS_DIAGNOSTIC_MANUAL_REDIRECT":"true"
       
     },
 

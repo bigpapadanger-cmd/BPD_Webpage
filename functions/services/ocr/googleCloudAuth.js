@@ -382,7 +382,13 @@ function logMtlsStsDiagnostic(
             contentType: headers.get("Content-Type"),
             bodyLength: new TextEncoder().encode(body).byteLength,
             bodyFieldNames,
+            redirectMode: options?.redirect || "follow",
             responseStatus: Number(response.status) || 0,
+            locationHeaderExists: response.headers.has("Location"),
+            redirectLocationHostPath: safeLocationHostPath(
+                response.headers.get("Location"),
+                secrets
+            ),
             googleError: sanitizeDiagnosticText(parsedResponse?.error, secrets),
             googleErrorDescription: sanitizeDiagnosticText(
                 parsedResponse?.error_description,
@@ -395,6 +401,26 @@ function logMtlsStsDiagnostic(
 function safeHostname(url) {
     try {
         return new URL(url).hostname;
+    }
+    catch {
+        return null;
+    }
+}
+
+function safeLocationHostPath(value, secrets) {
+    if (typeof value !== "string" || !value) {
+        return null;
+    }
+
+    try {
+        const url = new URL(value, GOOGLE_STS_URL);
+        if (url.protocol !== "https:" && url.protocol !== "http:") {
+            return null;
+        }
+        return {
+            hostname: url.hostname,
+            path: sanitizeDiagnosticText(url.pathname, secrets)
+        };
     }
     catch {
         return null;
@@ -744,7 +770,10 @@ async function getFederatedAccessToken(
                         ),
                     scope:
                         GOOGLE_TOKEN_SCOPE
-                })
+                }),
+                ...(env?.OCR_GCP_STS_DIAGNOSTIC_MANUAL_REDIRECT === "true"
+                    ? { redirect: "manual" }
+                    : {})
             };
             const diagnosticContext = {
                 ...buildGoogleAuthDiagnosticContext(

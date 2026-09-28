@@ -89,7 +89,10 @@ test("STS rejection logs only temporary mTLS diagnostics and redacts credential 
         "contentType",
         "bodyLength",
         "bodyFieldNames",
+        "redirectMode",
         "responseStatus",
+        "locationHeaderExists",
+        "redirectLocationHostPath",
         "googleError",
         "googleErrorDescription",
     ].sort());
@@ -109,6 +112,9 @@ test("STS rejection logs only temporary mTLS diagnostics and redacts credential 
         "subject_token_type"
     ]);
     assert.equal(diagnostic.responseStatus, 400);
+    assert.equal(diagnostic.redirectMode, "follow");
+    assert.equal(diagnostic.locationHeaderExists, false);
+    assert.equal(diagnostic.redirectLocationHostPath, null);
     assert.equal(diagnostic.googleError, "invalid_grant");
     assert.match(diagnostic.googleErrorDescription, /certificate \[REDACTED\]/);
 
@@ -243,6 +249,9 @@ test("normal STS fetch preserves the binding receiver and direct diagnostic path
         assert.deepEqual(normalDiagnostic, directDiagnostic);
         assert.equal(normalDiagnostic.sameBindingObject, true);
         assert.equal(normalDiagnostic.hasSignal, true);
+        assert.equal(normalDiagnostic.redirectMode, "follow");
+        assert.equal(normalDiagnostic.locationHeaderExists, false);
+        assert.equal(normalDiagnostic.redirectLocationHostPath, null);
         assert.equal(JSON.stringify(directLogs).includes(direct.env.OCR_GCP_X509_CERT_CHAIN), false);
         assert.equal(JSON.stringify(directLogs).includes(direct.env.OCR_API_KEY), false);
         assert.equal(JSON.stringify(directLogs).includes("D".repeat(160)), false);
@@ -252,8 +261,102 @@ test("normal STS fetch preserves the binding receiver and direct diagnostic path
             () => captureStsRequest(direct.env)
         );
         assert.equal(noSignalRequest.options.signal, undefined);
+        assert.equal(noSignalRequest.options.redirect, undefined);
         assert.equal(noSignalLogs[0][1].hasSignal, false);
         assert.equal(noSignalRequest.options.body, directRequest.options.body);
+    }
+    finally {
+        globalThis.fetch = originalFetch;
+    }
+});
+
+test("manual STS redirect diagnostic is opt-in and redacts Location query values", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async () => {
+        throw new Error("ID token exchange must not run after STS rejection.");
+    };
+
+    const normal = createEnvironment("E".repeat(160));
+    const manual = createEnvironment("E".repeat(160));
+    manual.env.OCR_GCP_STS_DIAGNOSTIC_MANUAL_REDIRECT = "true";
+
+    async function rejectStsRequest(environment, response) {
+        const binding = environment.OCR_GCP_MTLS;
+        let request;
+        binding.fetch = async function(url, options) {
+            assert.equal(this, binding);
+            request = { url: String(url), options };
+            return response;
+        };
+
+        const { calls } = await captureConsoleError(async () => {
+            await assert.rejects(
+                getGoogleCloudRunIdToken(environment, "https://redirect-ocr-service.run.app"),
+                error => {
+                    assert.equal(error.code, "OCR_GOOGLE_STS_EXCHANGE_FAILED");
+                    assert.equal(error.message, "Google authentication could not be completed.");
+                    return true;
+                }
+            );
+        });
+        return { request, calls };
+    }
+
+    try {
+        const normalResult = await rejectStsRequest(
+            normal.env,
+            Response.json({ error: "invalid_grant", error_description: "normal rejection" }, { status: 400 })
+        );
+        const manualResult = await rejectStsRequest(
+            manual.env,
+            new Response(null, {
+                status: 302,
+                headers: {
+                    Location: "https://redirect.example/google/sts/ocr%2Fapi%2Bkey-secret?subject_token=redirect-secret&code=private"
+                }
+            })
+        );
+
+        assert.equal(normalResult.request.url, EXPECTED_STS_URL);
+        assert.equal(manualResult.request.url, EXPECTED_STS_URL);
+        assert.equal(normalResult.request.options.method, "POST");
+        assert.equal(manualResult.request.options.method, "POST");
+        assert.equal(normalResult.request.options.redirect, undefined);
+        assert.equal(manualResult.request.options.redirect, "manual");
+        assert.equal(normalResult.request.options.headers["Content-Type"], "application/json");
+        assert.equal(manualResult.request.options.headers["Content-Type"], "application/json");
+        assert.equal(normalResult.request.options.body, manualResult.request.options.body);
+
+        const normalBody = JSON.parse(normalResult.request.options.body);
+        assert.equal(normalBody.audience, EXPECTED_PROVIDER_RESOURCE);
+        assert.equal(normalBody.subject_token_type, "urn:ietf:params:oauth:token-type:mtls");
+        assert.ok(normalBody.subject_token);
+
+        const normalDiagnostic = normalResult.calls[0][1];
+        const manualDiagnostic = manualResult.calls[0][1];
+        assert.equal(normalDiagnostic.redirectMode, "follow");
+        assert.equal(normalDiagnostic.locationHeaderExists, false);
+        assert.equal(normalDiagnostic.redirectLocationHostPath, null);
+        assert.equal(manualDiagnostic.redirectMode, "manual");
+        assert.equal(manualDiagnostic.responseStatus, 302);
+        assert.equal(manualDiagnostic.locationHeaderExists, true);
+        assert.deepEqual(manualDiagnostic.redirectLocationHostPath, {
+            hostname: "redirect.example",
+            path: "/google/sts/[REDACTED]"
+        });
+        assert.equal(manualDiagnostic.googleError, null);
+        assert.equal(manualDiagnostic.googleErrorDescription, null);
+
+        const logs = JSON.stringify(manualResult.calls);
+        for (const secret of [
+            "redirect-secret",
+            "private",
+            normalBody.subject_token,
+            manual.env.OCR_GCP_X509_CERT_CHAIN,
+            manual.env.OCR_API_KEY
+        ]) {
+            assert.equal(logs.includes(secret), false, `diagnostic log leaked ${secret}`);
+        }
     }
     finally {
         globalThis.fetch = originalFetch;
