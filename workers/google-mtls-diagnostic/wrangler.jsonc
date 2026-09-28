@@ -1,0 +1,28 @@
+{
+    "name": "bpd-google-mtls-diagnostic",
+    "main": "src/index.js",
+    "compatibility_date": "2026-09-16",
+    "workers_dev": true,
+    "preview_urls": false,
+    "vars": {
+        "OCR_GCP_PROJECT_NUMBER": "1094994524157",
+        "OCR_GCP_WORKLOAD_IDENTITY_POOL_ID": "ocr-cloudflare-transfer-handler",
+        "OCR_GCP_WORKLOAD_IDENTITY_PROVIDER_ID": "bpd-ocr-cloudflare-x509",
+        "OCR_GCP_SERVICE_ACCOUNT_EMAIL": "ocr-cloudflare-handler@project-95bc2520-286c-45bf-9cb.iam.gserviceaccount.com",
+        "OCR_GCP_CLOUD_RUN_AUDIENCE": "https://bpd-ocr-y5wgeempka-uc.a.run.app"
+    },
+    "mtls_certificates": [
+        {
+            "binding": "OCR_GCP_MTLS",
+            "certificate_id": "3e548c5b-b4e6-4a00-bc90-582b8c8e7fd3"
+        }
+    ],
+    "observability": {
+        "logs": {
+            "enabled": true,
+            "head_sampling_rate": 1,
+            "invocation_logs": true,
+            "persist": true
+        }
+    }
+}

@@ -1,15 +1,20 @@
 WORKERS/: INDEPENDENT CLOUDFLARE WORKERS
-Snapshot: 2026-09-26
+Snapshot: 2026-09-28
 
 ROLE
 
-workers/ contains two separately configured Worker deployments. They do not use
+workers/ contains three separately configured Worker deployments. They do not use
 the root Pages wrangler.jsonc at deployment time; each child owns its entrypoint,
 bindings, routes, triggers, and observability settings.
 
 HIERARCHY
 
 workers/
++-- google-mtls-diagnostic/
+|   +-- wrangler.jsonc
+|   +-- README.md          Temporary, protected, manually invoked WIF/mTLS probes.
+|   +-- src/index.js       Bearer-protected probes; no cron, queue, or retries.
+|   +-- tests/index.test.mjs
 +-- ocr-job-consumer/
 |   +-- wrangler.jsonc
 |   +-- src/
@@ -18,21 +23,21 @@ workers/
 |       +-- debug.js       Sanitized OCR trace creation/storage.
 |
 +-- rl-presence-monitor/
-    +-- wrangler.jsonc
-    +-- src/
-    |   +-- index.js             /health, authorized /wake, and cron dispatcher.
-    |   +-- presence_cycle.js    Candidate selection, presence fetch/save cycle.
-    |   +-- scheduled_mmr.js     Scheduled MMR candidate refresh and persistence.
-    |   +-- taskboard_summary.js Taskboard aggregate load and Discord delivery.
-    +-- tests/
-    |   +-- account_mutations.test.mjs
-    |   +-- epic_entry_paths.test.mjs
-    |   +-- oauth_navigation.test.mjs
-    |   +-- oauth_provider_flows.test.mjs
-    |   +-- provider_authorization.test.mjs
-    |   +-- task_rpc_contract.test.mjs
-    |   +-- task_service_contract.test.mjs
-    |   +-- taskboard_sql_validation.mjs
+|   +-- wrangler.jsonc
+|   +-- src/
+|   |   +-- index.js             /health, authorized /wake, and cron dispatcher.
+|   |   +-- presence_cycle.js    Candidate selection, presence fetch/save cycle.
+|   |   +-- scheduled_mmr.js     Scheduled MMR candidate refresh and persistence.
+|   |   +-- taskboard_summary.js Taskboard aggregate load and Discord delivery.
+|   +-- tests/
+|       +-- account_mutations.test.mjs
+|       +-- epic_entry_paths.test.mjs
+|       +-- oauth_navigation.test.mjs
+|       +-- oauth_provider_flows.test.mjs
+|       +-- provider_authorization.test.mjs
+|       +-- task_rpc_contract.test.mjs
+|       +-- task_service_contract.test.mjs
+|       +-- taskboard_sql_validation.mjs
     |   +-- fixtures/taskboard_schema.sql
     +-- .wrangler/
         +-- cache/ and state/v3/
@@ -72,7 +77,7 @@ Configuration
     Custom domain     status.bpd-gaming-network.com
     KV binding        AUTH_SESSIONS
     Schedules         every 15 minutes, weekly Saturday MMR refresh,
-                      and a daily trigger
+                  and a daily Taskboard summary at 12:00 UTC
     External systems  Supabase and the configured MMR API
 
 Runtime relationships
@@ -80,6 +85,9 @@ Runtime relationships
         -> Worker health response
     POST /wake
         -> authorized on-demand presence cycle
+    POST /admin/run-scheduled
+        -> PRESENCE_TRIGGER_KEY-protected explicit presence/MMR/Taskboard run;
+           returns aggregate-only summary; rejects overlapping same-isolate job
     15-minute cron
         -> presence_cycle.js
         -> Supabase RPC candidate/state operations
@@ -91,6 +99,19 @@ Runtime relationships
     daily cron
         -> taskboard_summary.js
         -> loads Supabase Taskboard aggregates and sends Discord summary output
+
+GOOGLE mTLS DIAGNOSTIC WORKER
+
+Configuration
+    Worker name       bpd-google-mtls-diagnostic
+    Entry             src/index.js
+    Runtime URL       workers.dev; every route requires a dedicated bearer secret
+    mTLS binding      OCR_GCP_MTLS from the configured Cloudflare mTLS certificate
+    Triggers          none; no cron, queue, or automatic retries
+    Rates             calls occur only for an explicit authorized request:
+                      1 STS call for empty/full-sts, 1 STS + 1 IAM call for
+                      id-token; health makes no outbound calls
+    Secrets           DIAGNOSTIC_BEARER_TOKEN and OCR_GCP_X509_CERT_CHAIN
 
 TEST OWNERSHIP
 

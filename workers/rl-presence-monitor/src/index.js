@@ -41,6 +41,8 @@ import {
     runTaskboardSummary
 } from "./taskboard_summary.js";
 
+const activeJobs = new Set();
+
 /* =========================================================
 CRON DEFINITIONS
 ========================================================= */
@@ -105,6 +107,87 @@ function isWakeAuthorized(
         `Bearer ${expected}`;
 }
 
+function getJobRunner(job, env) {
+    if (job === "presence") {
+        return () => runPresenceCycle(env, { force: true });
+    }
+    if (job === "mmr") {
+        return () => runScheduledMmrRefresh(env);
+    }
+    if (job === "taskboard") {
+        return () => runTaskboardSummary(env);
+    }
+    return null;
+}
+
+function summarizeJobResult(job, result) {
+    if (job === "presence") {
+        return Object.fromEntries(
+            ["success", "skipped", "reason", "candidateCount", "checked", "failed", "anyOnline", "dormant"]
+                .filter(key => result?.[key] !== undefined)
+                .map(key => [key, result[key]])
+        );
+    }
+    if (job === "mmr") {
+        return Object.fromEntries(
+            ["success", "candidateCount", "processedCount", "refreshedCount", "skippedCount", "failedCount"]
+                .filter(key => result?.[key] !== undefined)
+                .map(key => [key, result[key]])
+        );
+    }
+    if (job === "taskboard") {
+        return {
+            success: result?.success === true,
+            ...(result?.summary ? { summary: result.summary } : {})
+        };
+    }
+    return { success: false };
+}
+
+async function executeJob(job, env) {
+    const run = getJobRunner(job, env);
+    if (!run) {
+        throw new Error("UNKNOWN_BACKGROUND_JOB");
+    }
+    if (activeJobs.has(job)) {
+        const error = new Error("BACKGROUND_JOB_ALREADY_RUNNING");
+        error.code = "BACKGROUND_JOB_ALREADY_RUNNING";
+        throw error;
+    }
+
+    activeJobs.add(job);
+    const startedAt = Date.now();
+    console.info("BPD BACKGROUND WORKER: Job started.", { job });
+    try {
+        const result = await run();
+        const summary = summarizeJobResult(job, result);
+        console.info("BPD BACKGROUND WORKER: Job completed.", {
+            job,
+            durationMs: Date.now() - startedAt,
+            ...summary
+        });
+        return summary;
+    }
+    catch (error) {
+        console.error("BPD BACKGROUND WORKER: Job failed.", {
+            job,
+            durationMs: Date.now() - startedAt,
+            code: error?.code || "BACKGROUND_JOB_FAILED",
+            status: Number.isInteger(error?.status) ? error.status : null
+        });
+        throw error;
+    }
+    finally {
+        activeJobs.delete(job);
+    }
+}
+
+function runInBackground(job, env, ctx) {
+    ctx.waitUntil(
+        executeJob(job, env).catch(() => undefined)
+    );
+}
+
 /* =========================================================
 FETCH HANDLER
 ========================================================= */
@@ -157,15 +240,7 @@ async function handleFetch(
             );
         }
 
-        ctx.waitUntil(
-            runPresenceCycle(
-                env,
-                {
-                    force:
-                        true
-                }
-            )
-        );
+        runInBackground("presence", env, ctx);
 
         return Response.json({
             success:
@@ -174,6 +249,48 @@ async function handleFetch(
             accepted:
                 true
         });
+    }
+
+    if (
+        request.method === "POST"
+        && url.pathname === "/admin/run-scheduled"
+    ) {
+        if (!isWakeAuthorized(request, env)) {
+            return Response.json({ success: false, code: "UNAUTHORIZED" }, { status: 401 });
+        }
+
+        const contentLength = Number(request.headers.get("Content-Length"));
+        if (Number.isFinite(contentLength) && contentLength > 128) {
+            return Response.json({ success: false, code: "INVALID_JOB" }, { status: 400 });
+        }
+
+        let body;
+        try {
+            const text = await request.text();
+            if (text.length > 128) {
+                throw new Error("BODY_TOO_LARGE");
+            }
+            body = JSON.parse(text);
+        }
+        catch {
+            return Response.json({ success: false, code: "INVALID_JOB" }, { status: 400 });
+        }
+
+        const job = body?.job;
+        if (!["presence", "mmr", "taskboard"].includes(job)) {
+            return Response.json({ success: false, code: "INVALID_JOB" }, { status: 400 });
+        }
+        if (activeJobs.has(job)) {
+            return Response.json({ success: false, code: "JOB_ALREADY_RUNNING" }, { status: 409 });
+        }
+
+        try {
+            const summary = await executeJob(job, env);
+            return Response.json({ success: summary.success !== false, job, summary });
+        }
+        catch {
+            return Response.json({ success: false, job, code: "BACKGROUND_JOB_FAILED" }, { status: 502 });
+        }
     }
 
     return Response.json(
@@ -204,11 +321,7 @@ async function handleScheduled(
         controller.cron ===
         PRESENCE_CRON
     ) {
-        ctx.waitUntil(
-            runPresenceCycle(
-                env
-            )
-        );
+        runInBackground("presence", env, ctx);
 
         return;
     }
@@ -217,11 +330,7 @@ async function handleScheduled(
         controller.cron ===
         MMR_REFRESH_CRON
     ) {
-        ctx.waitUntil(
-            runScheduledMmrRefresh(
-                env
-            )
-        );
+        runInBackground("mmr", env, ctx);
 
         return;
     }
@@ -230,11 +339,7 @@ async function handleScheduled(
         controller.cron ===
         TASKBOARD_SUMMARY_CRON
     ) {
-        ctx.waitUntil(
-            runTaskboardSummary(
-                env
-            )
-        );
+        runInBackground("taskboard", env, ctx);
 
         return;
     }
@@ -259,3 +364,5 @@ export default {
     scheduled:
         handleScheduled
 };
+
+export { handleFetch, handleScheduled };

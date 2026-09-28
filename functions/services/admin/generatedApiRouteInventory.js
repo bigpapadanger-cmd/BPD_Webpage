@@ -2049,6 +2049,23 @@ export const WORKER_ROUTE_INVENTORY = Object.freeze([
     "healthStatus": "handler-defined",
     "deepLinkSupported": false,
     "ownerSystem": "bpd-rl-presence-monitor"
+  },
+  {
+    "path": "https://status.bpd-gaming-network.com/admin/run-scheduled",
+    "lookupKey": null,
+    "routeType": "worker",
+    "casePolicy": "exact",
+    "sourceFiles": [
+      "workers/rl-presence-monitor/src/index.js"
+    ],
+    "handler": "workers/rl-presence-monitor/src/index.js",
+    "methods": [
+      "POST"
+    ],
+    "authRequired": true,
+    "healthStatus": "handler-defined",
+    "deepLinkSupported": false,
+    "ownerSystem": "bpd-rl-presence-monitor"
   }
 ]);
 export const WORKER_SCHEDULE_INVENTORY = Object.freeze([
@@ -2098,7 +2115,7 @@ export const WORKER_SCHEDULE_INVENTORY = Object.freeze([
     "ownerSystem": "bpd-rl-presence-monitor"
   },
   {
-    "path": "cron: 0 0 * * *",
+    "path": "cron: 0 12 * * *",
     "routeType": "schedule",
     "casePolicy": "not-applicable",
     "sourceFiles": [

@@ -74,7 +74,7 @@ for (const directory of workerFiles.sort()) {
             sourceFiles: [relative(root, entrypointPath).replaceAll("\\", "/")],
             handler: relative(root, entrypointPath).replaceAll("\\", "/"),
             methods: [match[1]],
-            authRequired: match[2] === "/wake",
+            authRequired: ["/wake", "/admin/run-scheduled"].includes(match[2]),
             healthStatus: "handler-defined",
             deepLinkSupported: false,
             ownerSystem: config.name
