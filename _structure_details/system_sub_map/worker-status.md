@@ -22,7 +22,7 @@ Worker name, HTTP method, shell command, or credential from the caller.
 | OCR Queue Consumer | Queue-only heartbeat; no HTTP liveness route | Reads heartbeat only | `SERVICE_STATUS`; once after each queue invocation |
 | Cloud Run OCR | Cached result from last explicit recheck | Secret-gated fixed transport route → cached WIF credential → authenticated `/api/ocr/health`; 30-second outer/6-second health request bound | `SERVICE_STATUS`; no OCR inference |
 | Supabase | Last explicit result; no routine network call | `HEAD /rest/v1/` with server-side API key, 2-second timeout | `RL_STATS_CACHE` |
-| MMR API/PsyNet | Existing protected `/health/ready` | Existing readiness check | Existing implementation preserved |
+| MMR API/PsyNet | Protected `/health/ready` | 45-second aggregate cache plus explicit Recheck | Safe config, auth stage, recent-failure, backoff, reconnect, latency, and aggregate traffic state |
 
 Worker `SERVICE_STATUS` bindings reuse the existing `RL_STATS_CACHE` KV
 namespace; no new namespace or cloud resource is introduced. Presence run
@@ -40,7 +40,7 @@ stable generic error code; no job IDs or image data.
 | OCR Queue Consumer | Yes: read heartbeat | No | No |
 | Cloud Run OCR | Yes: explicit readiness-only probe | No | No |
 | Supabase | Yes: bounded API availability check | No | No |
-| MMR API/PsyNet | Existing | Existing explicit reconnect | No |
+| MMR API/PsyNet | Recheck | Explicit reconnect through the existing Pages allowlist | No |
 
 All controls remain behind the admin permission. No periodic browser refresh is
 installed. See `request-frequency-inventory.md` for call rates and cooldowns.

@@ -74,6 +74,33 @@ function makeDetails(service) {
         service.lastFailureAt ? `Last issue ${readableTime(service.lastFailureAt)}` : null
     ].filter(Boolean);
     if (facts.length) content.append(textElement("p", facts.join(" · ")));
+    if (service.id === "mmr-api") {
+        const mmrFacts = [
+            `PsyNet state: ${service.psynetState || "unknown"}`,
+            `Config ready: ${service.configReady === true ? "yes" : "no"}`,
+            service.missingConfig?.length ? `Missing config: ${service.missingConfig.join(", ")}` : null,
+            service.lastAuthAttemptAt ? `Last auth attempt: ${readableTime(service.lastAuthAttemptAt)}` : null,
+            service.lastAuthSuccessAt ? `Last auth success: ${readableTime(service.lastAuthSuccessAt)}` : null,
+            service.lastAuthFailureAt ? `Last auth failure: ${readableTime(service.lastAuthFailureAt)}` : null,
+            service.lastFailureStage ? `Failure stage: ${service.lastFailureStage}` : null,
+            service.lastFailureCode ? `Failure code: ${service.lastFailureCode}` : null,
+            service.lastProviderCode ? `Provider code: ${service.lastProviderCode}` : null,
+            service.lastMmrRequestAt ? `Last MMR request: ${readableTime(service.lastMmrRequestAt)}` : null,
+            service.lastMmrSuccessAt ? `Last MMR success: ${readableTime(service.lastMmrSuccessAt)}` : null,
+            service.lastMmrFailureAt ? `Last MMR failure: ${readableTime(service.lastMmrFailureAt)}` : null,
+            service.lastReconnectAttemptAt ? `Last reconnect: ${readableTime(service.lastReconnectAttemptAt)} (${service.lastReconnectResult || "pending"})` : null,
+            service.backoffUntil ? `Backoff until: ${readableTime(service.backoffUntil)}` : null,
+            service.retryAfterSeconds ? `Retry after: ${service.retryAfterSeconds} seconds` : null,
+            `MMR requests: ${service.mmrRequests || 0} total · ${service.mmrSuccesses || 0} succeeded · ${service.mmrFailures || 0} failed`,
+            `Rejected: ${service.emptyRequests || 0} empty · ${service.rateLimitedRequests || 0} rate limited`,
+            `Limits: ${service.normalLimitPerMinute || 30}/min normal · ${service.emptyLimitPerMinute || 5}/min empty`,
+            `Reconnects: ${service.reconnectAttempts || 0} attempted · ${service.reconnectSuccesses || 0} succeeded · ${service.reconnectFailures || 0} failed`
+        ].filter(Boolean);
+        const list = document.createElement("ul");
+        list.className = "worker-status-facts";
+        for (const fact of mmrFacts) list.append(textElement("li", fact));
+        content.append(list);
+    }
     if (Array.isArray(service.dependencies) && service.dependencies.length) {
         content.append(textElement("p", `Dependencies: ${service.dependencies.map(dependency => `${dependency.id}: ${dependency.status}`).join(" · ")}`));
     }

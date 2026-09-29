@@ -66,7 +66,7 @@ transport contract, boundaries, and operator sequence.
   Routine refreshes make bounded RL, OCR transport, and MMR checks; Cloud Run
   and Supabase use last-known state, while the OCR queue is read from a
   per-invocation heartbeat. Service-specific actions use an explicit allowlist;
-  only RL presence has `Run Now`, and only MMR/PsyNet has `Reconnect`.
+  only RL presence has `Run Now`, and only MMR/PsyNet has `Reconnect`. The MMR`r`n  details remain secret-free and include config presence, auth/failure stages,`r`n  recent request outcomes, backoff, reconnect results, latency, and counters.
 - OCR transport and RL presence record safe operational state in the existing
   `RL_STATS_CACHE` namespace through their `SERVICE_STATUS` bindings. Queue
   status writes once per queue invocation. Cloud Run readiness is an explicit

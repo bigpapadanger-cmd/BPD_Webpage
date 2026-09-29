@@ -112,23 +112,57 @@ async function checkMmrApi(env) {
     const endpoint = String(env?.MMR_API_URL || "").trim();
     const apiKey = String(env?.MMR_API_KEY || "").trim();
     const actions = ["recheck", ...(String(env?.MMR_ADMIN_API_KEY || "").trim() ? ["reconnect"] : [])];
-    if (!endpoint || !apiKey) return statusEntry("mmr-api", "MMR API", "Unknown", "MMR readiness authorization is not configured.", { actions });
+    if (!endpoint || !apiKey) return statusEntry("mmr-api", "MMR API", "unknown", "MMR readiness authorization is not configured.", { actions, configReady: false });
+    const startedAt = Date.now();
     try {
         const response = await timedFetch(signal => fetch(new URL("/health/ready", endpoint), { method: "GET", redirect: "manual", signal, headers: { Authorization: `Bearer ${apiKey}`, Accept: "application/json" } }));
-        if (!response.ok) return statusEntry("mmr-api", "MMR API", response.status >= 500 ? "Down" : "Degraded", `Readiness endpoint returned HTTP ${response.status}.`, { actions });
+        const responseTimeMs = Date.now() - startedAt;
+        if (!response.ok) return statusEntry("mmr-api", "MMR API", response.status >= 500 ? "down" : "degraded", `Readiness endpoint returned HTTP ${response.status}.`, { actions, responseTimeMs });
         const payload = await readSmallJson(response);
-        if (!payload?.psynet || !["healthy", "degraded"].includes(payload.status)) return statusEntry("mmr-api", "MMR API", "Unknown", "Readiness response was not recognized.", { actions });
-        const state = String(payload.psynet.state || "unknown");
-        const detail = state === "connected" ? "PsyNet is connected." : `MMR Worker is reachable; PsyNet state is ${state}.`;
-        return statusEntry("mmr-api", "MMR API", payload.status === "healthy" ? "Healthy" : "Degraded", detail, {
+        if (!payload?.psynet || !["healthy", "degraded", "unknown"].includes(payload.status)) return statusEntry("mmr-api", "MMR API", "unknown", "Readiness response was not recognized.", { actions, responseTimeMs });
+        const psynet = payload.psynet;
+        const recovery = payload.recovery || {};
+        const traffic = payload.traffic || {};
+        const config = payload.config || {};
+        const state = String(psynet.state || "unknown");
+        const detail = state === "connected" ? "PsyNet is connected." : state === "idle" && payload.status === "healthy" ? "PsyNet is ready and will connect on the next request." : `MMR Worker is reachable; PsyNet state is ${state}.`;
+        return statusEntry("mmr-api", "MMR API", payload.status, detail, {
             actions,
-            lastSuccessfulAt: payload.psynet.lastSuccessfulAt || null,
-            lastFailureAt: payload.psynet.lastFailureAt || null,
-            lastFailureCode: payload.psynet.lastFailureCode || null,
-            retryAfterSeconds: Number(payload.psynet.retryAfterSeconds) || null
+            responseTimeMs,
+            psynetState: state,
+            configReady: config.requiredConfigPresent === true,
+            missingConfig: Array.isArray(config.missingConfig) ? config.missingConfig : [],
+            lastAuthAttemptAt: psynet.lastAuthAttemptAt || null,
+            lastAuthSuccessAt: psynet.lastAuthSuccessAt || null,
+            lastAuthFailureAt: psynet.lastAuthFailureAt || null,
+            lastSuccessfulAt: psynet.lastSuccessfulAt || traffic.lastSuccessAt || null,
+            lastFailureAt: psynet.lastFailureAt || traffic.lastFailureAt || null,
+            lastFailureCode: psynet.lastFailureCode || traffic.lastFailureCode || null,
+            lastFailureStage: psynet.lastFailureStage || null,
+            lastProviderCode: psynet.lastProviderCode || null,
+            backoffUntil: psynet.backoffUntil || psynet.nextRetryAt || null,
+            retryAfterSeconds: Number(psynet.retryAfterSeconds) || null,
+            consecutiveFailures: Number(psynet.consecutiveFailures) || 0,
+            lastMmrRequestAt: traffic.lastRequestAt || null,
+            lastMmrSuccessAt: traffic.lastSuccessAt || null,
+            lastMmrFailureAt: traffic.lastFailureAt || null,
+            lastMmrFailureCode: traffic.lastFailureCode || null,
+            mmrRequests: Number(traffic.totalRequests) || 0,
+            mmrSuccesses: Number(traffic.successfulRequests) || 0,
+            mmrFailures: Number(traffic.failedRequests) || 0,
+            emptyRequests: Number(traffic.emptyRequests) || 0,
+            rateLimitedRequests: Number(traffic.rateLimitedRequests) || 0,
+            normalLimitPerMinute: Number(traffic.normalLimitPerMinute) || 30,
+            emptyLimitPerMinute: Number(traffic.emptyLimitPerMinute) || 5,
+            lastReconnectAttemptAt: recovery.lastAttemptAt || null,
+            lastReconnectCompletedAt: recovery.lastCompletedAt || null,
+            lastReconnectResult: recovery.lastResult || null,
+            reconnectAttempts: Number(recovery.attempts) || 0,
+            reconnectSuccesses: Number(recovery.successes) || 0,
+            reconnectFailures: Number(recovery.failures) || 0
         });
     } catch (error) {
-        return statusEntry("mmr-api", "MMR API", error?.name === "AbortError" ? "Down" : "Unknown", error?.name === "AbortError" ? "Readiness check timed out." : "Readiness check failed.", { actions });
+        return statusEntry("mmr-api", "MMR API", error?.name === "AbortError" ? "down" : "unknown", error?.name === "AbortError" ? "Readiness check timed out." : "Readiness check failed.", { actions, responseTimeMs: Date.now() - startedAt });
     }
 }
 

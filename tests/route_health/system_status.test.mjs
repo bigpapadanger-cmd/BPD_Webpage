@@ -47,7 +47,7 @@ function installHealthFetch(calls) {
             calls.mmr += 1;
             assert.equal(url.pathname, "/health/ready");
             assert.equal(init.headers.Authorization, "Bearer lookup-key");
-            return Response.json({ status: "degraded", psynet: { state: "backoff", lastSuccessfulAt: null, lastFailureAt: "2026-09-28T00:00:00.000Z", lastFailureCode: "PSYNET_LOGIN_FAILED", retryAfterSeconds: 12 } });
+            return Response.json({ status: "degraded", config: { requiredConfigPresent: true, missingConfig: [] }, psynet: { state: "backoff", lastAuthAttemptAt: "2026-09-28T00:00:00.000Z", lastAuthFailureAt: "2026-09-28T00:00:01.000Z", lastSuccessfulAt: null, lastFailureAt: "2026-09-28T00:00:01.000Z", lastFailureCode: "PSYNET_AUTH_FAILED", lastFailureStage: "psynet_auth", lastProviderCode: "BuildError", backoffUntil: "2026-09-28T00:00:13.000Z", retryAfterSeconds: 12 }, recovery: { lastAttemptAt: "2026-09-28T00:00:00.000Z", lastResult: "failed", attempts: 2, successes: 1, failures: 1 }, traffic: { totalRequests: 4, successfulRequests: 2, failedRequests: 2, emptyRequests: 1, rateLimitedRequests: 1, lastRequestAt: "2026-09-28T00:00:01.000Z", lastSuccessAt: "2026-09-27T23:00:00.000Z", lastFailureAt: "2026-09-28T00:00:01.000Z", lastFailureCode: "PSYNET_AUTH_FAILED", normalLimitPerMinute: 30, emptyLimitPerMinute: 5 } });
         }
         calls.presence += 1;
         assert.equal(url.pathname, "/admin/health");
@@ -67,7 +67,12 @@ test("system health cache includes protected MMR readiness without starting MMR 
         const mmr = first.services.find(item => item.id === "mmr-api");
         assert.equal(mmr.status, "degraded");
         assert.deepEqual(mmr.actions, ["recheck", "reconnect"]);
-        assert.equal(mmr.lastFailureCode, "PSYNET_LOGIN_FAILED");
+        assert.equal(mmr.lastFailureCode, "PSYNET_AUTH_FAILED");
+        assert.equal(mmr.lastFailureStage, "psynet_auth");
+        assert.equal(mmr.lastProviderCode, "BuildError");
+        assert.equal(mmr.configReady, true);
+        assert.equal(mmr.mmrRequests, 4);
+        assert.equal(mmr.reconnectFailures, 1);
         assert.ok(["miss", "hit"].includes(concurrent.cache));
         await getSystemStatus(env);
         assert.equal(calls.transport, 1);
@@ -89,6 +94,9 @@ test("Worker Status UI is event-driven and exposes only per-service supported ac
     assert.match(source, /action === "reconnect" \? "↻ Reconnect"/);
     assert.match(source, /worker-status-indicator/);
     assert.match(source, /makeDetails\(service\)/);
+    assert.match(source, /PsyNet state:/);
+    assert.match(source, /Last MMR failure:/);
+    assert.match(source, /Reconnects:/);
     assert.match(source, /\/api\/admin\/page-settings\/route-health/);
     assert.match(source, /systemRouteRows/);
     assert.match(source, /statusIcon\(status\)/);
