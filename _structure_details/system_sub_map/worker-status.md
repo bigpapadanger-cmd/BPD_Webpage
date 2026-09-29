@@ -2,7 +2,10 @@
 
 ## Request and trust path
 
-`/Admin/WorkerStatus` → same-origin `/api/admin/system-status` →
+`/Admin/WorkerStatus` (also served by legacy `/Admin/PageSettings`) →
+same-origin `/api/admin/system-status` for service health and
+`/api/admin/page-settings/route-health` for the read-only route/configuration
+inventory →
 `ADMIN_SETTINGS_MANAGE` authorization → 45-second shared `RL_STATS_CACHE`
 snapshot → fixed service adapters. The browser does not fan out to Workers.
 Action requests use the same route, same-origin enforcement, a 1 KiB body cap,
@@ -41,6 +44,11 @@ stable generic error code; no job IDs or image data.
 
 All controls remain behind the admin permission. No periodic browser refresh is
 installed. See `request-frequency-inventory.md` for call rates and cooldowns.
+
+The main view uses compact status-icon rows; per-service metadata is collapsed
+under Details. Route, connection, and known-finding diagnostics share the same
+page in collapsed groups. The sidebar and Admin home provide one System Status
+entry; `/Admin/PageSettings` remains only as a bookmark-compatible alias.
 
 ## Status semantics and limits
 

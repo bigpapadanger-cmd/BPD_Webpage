@@ -1,32 +1,292 @@
-.worker-status { width: min(100% - 32px, 920px); margin: 28px auto; }
-.worker-status-actions { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 16px 0 8px; }
-.worker-status-actions button { padding: 8px 13px; }
-#workerStatusMessage:empty { display: none; }
-#workerStatusGenerated { margin: 8px 0; color: #aeb9c8; font-size: .82rem; }
-.worker-status-services { display: block; padding: 0; margin: 12px 0; list-style: none; border: 1px solid rgba(255,255,255,.13); border-radius: 10px; overflow: hidden; }
-.worker-status-row { padding: 0 14px; background: rgba(0,0,0,.18); border-bottom: 1px solid rgba(255,255,255,.1); }
-.worker-status-row:last-child { border-bottom: 0; }
-.worker-status-primary { min-height: 64px; display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; align-items: center; gap: 12px; }
-.worker-status-indicator { width: 28px; height: 28px; display: inline-grid; place-items: center; border: 1px solid currentColor; border-radius: 50%; font-size: 1rem; font-weight: 800; }
-.worker-status-identity { min-width: 0; display: flex; align-items: center; gap: 10px; }
-.worker-status-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.worker-status-label { padding: 3px 8px; border-radius: 999px; background: rgba(255,255,255,.08); font-size: .72rem; text-transform: capitalize; }
-.worker-status-healthy { color: #91e2a0; }
+.worker-status,
+.worker-status * {
+    box-sizing: border-box;
+}
+
+.worker-status {
+    width: min(100% - 32px, 980px);
+    min-width: 0;
+    margin: 30px auto 48px;
+    padding: clamp(20px, 3vw, 34px);
+    color: #edf4ff;
+    border: 1px solid rgba(148, 163, 184, .18);
+    border-radius: 20px;
+    background:
+        radial-gradient(ellipse at 8% 0%, rgba(14, 165, 233, .11), transparent 42%),
+        linear-gradient(145deg, rgba(20, 29, 43, .98), rgba(10, 15, 24, .98));
+    box-shadow: 0 22px 60px rgba(0, 0, 0, .22);
+}
+
+.worker-status > header {
+    margin-bottom: 24px;
+}
+
+.worker-status .admin-eyebrow {
+    margin: 0 0 8px;
+    color: #62d0ff;
+    font-size: .72rem;
+    font-weight: 800;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+}
+
+#workerStatusTitle {
+    margin: 0;
+    color: #f7faff;
+    font-size: clamp(1.7rem, 4vw, 2.25rem);
+    line-height: 1.12;
+    letter-spacing: -.035em;
+}
+
+.worker-status-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 14px;
+    margin: 0 0 12px;
+}
+
+#workerStatusMessage {
+    margin: 0;
+    color: #b7c6d9;
+    font-size: .9rem;
+}
+
+#workerStatusMessage:empty {
+    display: none;
+}
+
+.worker-status button {
+    min-height: 38px;
+    padding: 8px 13px;
+    color: #eaf7ff;
+    border: 1px solid rgba(125, 211, 252, .28);
+    border-radius: 10px;
+    background: rgba(14, 165, 233, .12);
+    font: inherit;
+    font-size: .86rem;
+    font-weight: 650;
+    cursor: pointer;
+    transition: background-color .15s ease, border-color .15s ease, transform .15s ease;
+}
+
+.worker-status button:hover:not(:disabled),
+.worker-status button:focus-visible {
+    border-color: rgba(125, 211, 252, .62);
+    background: rgba(14, 165, 233, .23);
+}
+
+.worker-status button:active:not(:disabled) {
+    transform: translateY(1px);
+}
+
+.worker-status button:disabled {
+    opacity: .58;
+    cursor: wait;
+}
+
+#workerStatusGenerated,
+#routeDiagnosticsGenerated {
+    margin: 8px 2px 12px;
+    color: #91a2b8;
+    font-size: .78rem;
+}
+
+.worker-status-services {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 9px;
+    padding: 0;
+    margin: 0;
+    list-style: none;
+}
+
+.worker-status-row {
+    min-width: 0;
+    padding: 0 15px;
+    border: 1px solid rgba(148, 163, 184, .16);
+    border-radius: 13px;
+    background: rgba(255, 255, 255, .035);
+    transition: border-color .15s ease, background-color .15s ease;
+}
+
+.worker-status-row:hover {
+    border-color: rgba(148, 197, 233, .3);
+    background: rgba(255, 255, 255, .055);
+}
+
+.worker-status-primary {
+    min-height: 68px;
+    display: grid;
+    grid-template-columns: 36px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 13px;
+}
+
+.worker-status-indicator {
+    width: 30px;
+    height: 30px;
+    display: inline-grid;
+    place-items: center;
+    flex: 0 0 auto;
+    border: 1px solid currentColor;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, .045);
+    font-size: .94rem;
+    font-weight: 800;
+}
+
+.worker-status-identity {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.worker-status-name {
+    overflow: hidden;
+    color: #edf4ff;
+    font-size: .98rem;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.worker-status-label {
+    padding: 4px 9px;
+    border: 1px solid currentColor;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, .035);
+    font-size: .72rem;
+    font-weight: 750;
+    letter-spacing: .025em;
+    line-height: 1.15;
+    text-transform: capitalize;
+    white-space: nowrap;
+}
+
+.worker-status-healthy { color: #75e3a1; }
 .worker-status-degraded { color: #ffd27a; }
-.worker-status-down { color: #ff8b8b; }
-.worker-status-unknown { color: #b9c5d4; }
-.worker-status-card-actions { display: flex; gap: 6px; justify-content: flex-end; }
-.worker-status-card-actions button { padding: 6px 9px; white-space: nowrap; }
-.worker-status-details { padding: 0 0 9px 46px; color: #b8c3d1; font-size: .83rem; }
-.worker-status-details summary { width: fit-content; cursor: pointer; opacity: .76; }
-.worker-status-detail-content { max-width: 760px; line-height: 1.45; overflow-wrap: anywhere; }
-.worker-status-detail-content p { margin: 7px 0 0; }
-@media (max-width: 560px) {
-    .worker-status { width: min(100% - 20px, 920px); }
-    .worker-status-row { padding: 0 10px; }
-    .worker-status-primary { grid-template-columns: 30px minmax(0, 1fr); gap: 9px; padding: 8px 0; }
-    .worker-status-indicator { width: 26px; height: 26px; }
-    .worker-status-identity { align-items: flex-start; flex-direction: column; gap: 4px; }
-    .worker-status-card-actions { grid-column: 2; justify-content: flex-start; }
-    .worker-status-details { padding-left: 39px; }
+.worker-status-down { color: #ff8f9a; }
+.worker-status-unknown { color: #b5c2d3; }
+
+.worker-status-card-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 7px;
+}
+
+.worker-status-card-actions button {
+    min-height: 34px;
+    padding: 6px 10px;
+    font-size: .8rem;
+    white-space: nowrap;
+}
+
+.worker-status-details {
+    padding: 0 0 12px 49px;
+    color: #bac8d8;
+    font-size: .83rem;
+}
+
+.worker-status-details summary,
+.system-diagnostic-details summary {
+    width: fit-content;
+    color: #a9c8df;
+    cursor: pointer;
+}
+
+.worker-status-detail-content {
+    max-width: 760px;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+
+.worker-status-detail-content p { margin: 8px 0 0; }
+
+.system-diagnostics {
+    margin-top: 24px;
+    overflow: hidden;
+    border: 1px solid rgba(148, 163, 184, .17);
+    border-radius: 14px;
+    background: rgba(2, 6, 13, .23);
+}
+
+.system-diagnostics > summary {
+    padding: 16px 18px;
+    color: #e4eefb;
+    font-size: .95rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background-color .15s ease;
+}
+
+.system-diagnostics > summary:hover,
+.system-diagnostics-group > summary:hover {
+    background: rgba(255, 255, 255, .035);
+}
+
+.system-diagnostics > p,
+.system-diagnostics > div { padding: 0 16px 12px; }
+
+.system-diagnostics-group {
+    margin: 8px 0;
+    overflow: hidden;
+    border: 1px solid rgba(148, 163, 184, .13);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, .025);
+}
+
+.system-diagnostics-group > summary {
+    padding: 11px 13px;
+    color: #dae7f5;
+    font-size: .86rem;
+    font-weight: 650;
+    cursor: pointer;
+}
+
+.system-diagnostic-list { padding: 0; margin: 0; list-style: none; }
+
+.system-diagnostic-row {
+    padding: 9px 13px;
+    border-top: 1px solid rgba(148, 163, 184, .1);
+}
+
+.system-diagnostic-primary {
+    min-height: 34px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.system-diagnostic-primary .worker-status-indicator {
+    width: 23px;
+    height: 23px;
+    font-size: .76rem;
+}
+
+.system-diagnostic-title { color: #e6effa; overflow-wrap: anywhere; }
+.system-diagnostic-label { color: #9eafc3; font-size: .78rem; }
+
+.system-diagnostic-details {
+    padding: 5px 0 1px 33px;
+    color: #aebed0;
+    font-size: .8rem;
+}
+
+.system-diagnostic-details p { margin: 6px 0; overflow-wrap: anywhere; }
+
+@media (max-width: 620px) {
+    .worker-status { width: min(100% - 20px, 980px); margin: 14px auto 30px; padding: 19px 15px; border-radius: 15px; }
+    .worker-status-actions { align-items: flex-start; flex-direction: column-reverse; }
+    .worker-status-primary { grid-template-columns: 32px minmax(0, 1fr); gap: 9px; padding: 9px 0; }
+    .worker-status-identity { align-items: flex-start; flex-direction: column; gap: 6px; }
+    .worker-status-card-actions { grid-column: 2; justify-content: flex-start; flex-wrap: wrap; }
+    .worker-status-details { padding-left: 41px; }
+    .system-diagnostics > p, .system-diagnostics > div { padding-right: 10px; padding-left: 10px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .worker-status *, .worker-status *::before, .worker-status *::after { transition-duration: .01ms !important; }
 }

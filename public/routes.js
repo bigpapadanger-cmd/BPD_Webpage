@@ -710,10 +710,10 @@ export const ROUTES = {
 
     "/Admin/PageSettings": {
         title:
-            "Page Settings | BPD Gaming Network",
+            "System Status | BPD Gaming Network",
 
         body:
-            "/Global/Admin/PageSettings/HTML/index.html",
+            "/Global/Admin/WorkerStatus/HTML/index.html",
 
         header:
             "/Framework/Shell/HTML/Header/header.html",
@@ -725,7 +725,7 @@ export const ROUTES = {
             "/Framework/Shell/HTML/Footer/footer.html",
 
         module:
-            "/Global/Admin/PageSettings/JS/index.js",
+            "/Global/Admin/WorkerStatus/JS/index.js",
 
         requiresAuth:
             true,
@@ -735,7 +735,7 @@ export const ROUTES = {
     },
 
     "/Admin/WorkerStatus": {
-        title: "Worker Status | BPD Gaming Network",
+        title: "System Status | BPD Gaming Network",
         body: "/Global/Admin/WorkerStatus/HTML/index.html",
         header: "/Framework/Shell/HTML/Header/header.html",
         sidebar: "/Framework/Shell/HTML/Sidebar/admin.html",

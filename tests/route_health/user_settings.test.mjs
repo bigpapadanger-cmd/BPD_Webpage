@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import test from "node:test";
+import { readFile } from "node:fs/promises";
 
 import { ROUTES } from "../../public/routes.js";
 
@@ -16,11 +17,20 @@ function createElement(value = "") {
     };
 }
 
-test("user Settings route is public and separate from permission-gated Admin diagnostics", () => {
+test("user Settings stays public and Page Settings remains an alias for unified admin diagnostics", () => {
     assert.equal(ROUTES["/Settings"].requiresAuth, false);
     assert.equal(ROUTES["/Settings"].body, "/Global/Settings/HTML/settings.html");
     assert.equal(ROUTES["/Admin/PageSettings"].requiresAuth, true);
-    assert.equal(ROUTES["/Admin/PageSettings"].module, "/Global/Admin/PageSettings/JS/index.js");
+    assert.equal(ROUTES["/Admin/PageSettings"].module, ROUTES["/Admin/WorkerStatus"].module);
+    assert.equal(ROUTES["/Admin/PageSettings"].body, ROUTES["/Admin/WorkerStatus"].body);
+});
+
+test("admin navigation has one System Status entry and recognizes the legacy bookmark", async () => {
+    const sidebar = await readFile(new URL("../../public/Framework/Shell/HTML/Sidebar/admin.html", import.meta.url), "utf8");
+    const navigation = await readFile(new URL("../../public/Framework/Shell/JS/Admin/sidebar.js", import.meta.url), "utf8");
+    assert.equal((sidebar.match(/data-tooltip="System Status"/g) || []).length, 1);
+    assert.match(sidebar, /data-nav-aliases="\/Admin\/PageSettings"/);
+    assert.match(navigation, /item\.dataset\.navAliases/);
 });
 
 test("appearance preferences remain browser-local and preserve existing storage keys", async () => {

@@ -962,20 +962,16 @@ function setupAdminActiveNavigation() {
         function(
             item
         ) {
-            const route =
-                normalizeAdminPath(
-                    item.dataset.navRoute
-                );
+            const routes = [
+                item.dataset.navRoute,
+                ...String(item.dataset.navAliases || "").split(",")
+            ].filter(Boolean).map(normalizeAdminPath);
 
-            const exactMatch =
-                currentPath ===
-                route;
+            const exactMatch = routes.includes(currentPath);
 
-            const childMatch =
-                route !== "/"
-                && currentPath.startsWith(
-                    `${route}/`
-                );
+            const childMatch = routes.some(route =>
+                route !== "/" && currentPath.startsWith(`${route}/`)
+            );
 
             const active =
                 exactMatch

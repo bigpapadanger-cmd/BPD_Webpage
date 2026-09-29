@@ -55,8 +55,13 @@ transport contract, boundaries, and operator sequence.
   (0.90 high, 0.70 review floor) are centralized and should be calibrated from
   reviewed samples before adjustment. A roster candidate keeps the job in the
   existing review state; it is never silently auto-accepted as identity.
-- `/Admin/WorkerStatus` uses `ADMIN_SETTINGS_MANAGE` and calls only
-  `/api/admin/system-status`. The Pages aggregator caches the normalized
+- `/Admin/WorkerStatus` is the unified System Status page; the old
+  `/Admin/PageSettings` route is a compatibility alias to the same screen. It
+  uses `ADMIN_SETTINGS_MANAGE`, shows compact health rows plus collapsed route,
+  connection, and findings diagnostics. It calls
+  `/api/admin/system-status` for service health and
+  `/api/admin/page-settings/route-health` for the read-only page inventory.
+  The Pages aggregator caches the normalized
   seven-service response for 45 seconds and deduplicates concurrent checks.
   Routine refreshes make bounded RL, OCR transport, and MMR checks; Cloud Run
   and Supabase use last-known state, while the OCR queue is read from a

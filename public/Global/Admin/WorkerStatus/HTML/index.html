@@ -1,7 +1,7 @@
 <section class="worker-status" aria-labelledby="workerStatusTitle">
     <header>
         <p class="admin-eyebrow">Service health · Admin</p>
-        <h1 id="workerStatusTitle">Worker Status</h1>
+        <h1 id="workerStatusTitle">System Status</h1>
     </header>
     <div class="worker-status-actions">
         <p id="workerStatusMessage" role="status" aria-live="polite">Checking your access…</p>
@@ -9,4 +9,23 @@
     </div>
     <p id="workerStatusGenerated"></p>
     <ul id="workerStatusServices" class="worker-status-services" aria-label="Service health"></ul>
+    <details class="system-diagnostics" id="systemDiagnostics">
+        <summary>Pages, routes &amp; configuration</summary>
+        <p id="routeDiagnosticsStatus" role="status" aria-live="polite">Loading route diagnostics…</p>
+        <div id="routeDiagnosticsContent" hidden>
+            <details class="system-diagnostics-group">
+                <summary>Routes <span id="routeDiagnosticsCount"></span></summary>
+                <ul id="systemRouteRows" class="system-diagnostic-list" aria-label="Registered routes"></ul>
+            </details>
+            <details class="system-diagnostics-group">
+                <summary>Connections <span id="connectionDiagnosticsCount"></span></summary>
+                <ul id="systemConnectionRows" class="system-diagnostic-list" aria-label="Configured connections"></ul>
+            </details>
+            <details class="system-diagnostics-group">
+                <summary>Known findings <span id="findingDiagnosticsCount"></span></summary>
+                <ul id="systemFindingRows" class="system-diagnostic-list" aria-label="Known route findings"></ul>
+            </details>
+            <p id="routeDiagnosticsGenerated"></p>
+        </div>
+    </details>
 </section>

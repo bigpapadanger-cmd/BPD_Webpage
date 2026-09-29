@@ -81,6 +81,85 @@ function makeDetails(service) {
     return details;
 }
 
+function inventoryStatus(value) {
+    const status = String(value || "unknown").toLowerCase();
+    if (/missing|invalid|error/.test(status)) return "down";
+    if (/unregistered|warning|degraded|partial|design-decision/.test(status)) return "degraded";
+    if (/unknown|unresolved|handler-defined|not applicable|historical/.test(status)) return "unknown";
+    return "healthy";
+}
+
+function diagnosticRow({ title, status, label, details = [] }) {
+    const item = document.createElement("li");
+    item.className = "system-diagnostic-row";
+    const line = document.createElement("div");
+    line.className = "system-diagnostic-primary";
+    const state = inventoryStatus(status);
+    const icon = textElement("span", statusIcon(state), `worker-status-indicator worker-status-${state}`);
+    icon.setAttribute("role", "img");
+    icon.setAttribute("aria-label", status || state);
+    line.append(icon, textElement("strong", title, "system-diagnostic-title"));
+    if (label) line.append(textElement("span", label, "system-diagnostic-label"));
+    item.append(line);
+    if (details.length) {
+        const disclosure = document.createElement("details");
+        disclosure.className = "system-diagnostic-details";
+        disclosure.append(textElement("summary", "Details"));
+        const content = document.createElement("div");
+        for (const detail of details.filter(Boolean)) content.append(textElement("p", detail));
+        disclosure.append(content);
+        item.append(disclosure);
+    }
+    return item;
+}
+
+async function loadRouteDiagnostics() {
+    const status = document.getElementById("routeDiagnosticsStatus");
+    const content = document.getElementById("routeDiagnosticsContent");
+    try {
+        const response = await fetch("/api/admin/page-settings/route-health", { credentials: "same-origin", cache: "no-store", headers: { Accept: "application/json" } });
+        const payload = await response.json();
+        if (!response.ok || payload.success !== true) throw new Error("Diagnostics unavailable");
+        const routeList = document.getElementById("systemRouteRows");
+        routeList.replaceChildren();
+        for (const route of payload.routes || []) {
+            const targets = (route.targets || []).map(target => typeof target === "string" ? target : `${target.path} (${target.exists ? "found" : "missing"})`);
+            routeList.append(diagnosticRow({
+                title: route.path,
+                status: route.healthStatus || "unknown",
+                label: `${route.routeType || "route"} · ${route.healthStatus || "not checked"}`,
+                details: [
+                    route.handler || route.sourceFiles?.join(", "),
+                    `Methods: ${(route.methods || []).join(", ") || "—"}`,
+                    `Authentication: ${route.authRequired === true ? "required" : route.authRequired === false ? "not required" : route.authRequired || "not applicable"}`,
+                    `Deep link: ${route.routeType === "api" ? "not applicable" : route.deepLinkSupported ? "supported" : "unknown"}`,
+                    `Lookup: ${route.lookupKey || "—"} · Case policy: ${route.casePolicy || "—"}`,
+                    targets.length ? `Targets: ${targets.join(", ")}` : null
+                ]
+            }));
+        }
+        const connections = document.getElementById("systemConnectionRows");
+        connections.replaceChildren();
+        for (const connection of payload.connections || []) {
+            const bindings = Object.entries(connection.bindingsPresent || {}).map(([name, present]) => `${name}: ${present ? "present" : "missing"}`);
+            connections.append(diagnosticRow({ title: connection.name, status: connection.status, label: connection.status, details: [...bindings, connection.detail] }));
+        }
+        const findings = document.getElementById("systemFindingRows");
+        findings.replaceChildren();
+        for (const finding of payload.knownFindings || []) {
+            findings.append(diagnosticRow({ title: finding.path, status: finding.status || finding.category, label: finding.category, details: [finding.detail, finding.owner ? `Owner: ${finding.owner}` : null] }));
+        }
+        document.getElementById("routeDiagnosticsCount").textContent = `(${(payload.routes || []).length})`;
+        document.getElementById("connectionDiagnosticsCount").textContent = `(${(payload.connections || []).length})`;
+        document.getElementById("findingDiagnosticsCount").textContent = `(${(payload.knownFindings || []).length})`;
+        document.getElementById("routeDiagnosticsGenerated").textContent = `Inventory updated ${readableTime(payload.generatedAt)}`;
+        status.textContent = "";
+        content.hidden = false;
+    } catch {
+        status.textContent = "Route diagnostics are unavailable.";
+    }
+}
+
 async function loadStatus() {
     if (requestInFlight) return requestInFlight;
     requestInFlight = (async () => {
@@ -131,7 +210,10 @@ export async function initializePage() {
         const auth = await getAuthState({ force: true });
         if (!hasAdminPermission(REQUIRED_PERMISSION, auth)) { message.textContent = "You do not have permission to view worker status."; return; }
         refresh.disabled = false;
-        refresh.addEventListener("click", () => { message.textContent = "Refreshing status…"; loadStatus().catch(() => { message.textContent = "Status is unavailable. Please retry later."; }); });
-        await loadStatus();
+        refresh.addEventListener("click", () => {
+            message.textContent = "Refreshing status…";
+            Promise.all([loadStatus(), loadRouteDiagnostics()]).catch(() => { message.textContent = "Status is unavailable. Please retry later."; });
+        });
+        await Promise.all([loadStatus(), loadRouteDiagnostics()]);
     } catch { message.textContent = "Status is unavailable. Please retry later."; }
 }

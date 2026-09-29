@@ -1003,7 +1003,7 @@ export const PAGE_ROUTE_INVENTORY = Object.freeze([
     "deepLinkSupported": true,
     "targets": [
       {
-        "path": "/Global/Admin/PageSettings/HTML/index.html",
+        "path": "/Global/Admin/WorkerStatus/HTML/index.html",
         "exists": true
       },
       {
@@ -1019,7 +1019,7 @@ export const PAGE_ROUTE_INVENTORY = Object.freeze([
         "exists": true
       },
       {
-        "path": "/Global/Admin/PageSettings/JS/index.js",
+        "path": "/Global/Admin/WorkerStatus/JS/index.js",
         "exists": true
       }
     ]

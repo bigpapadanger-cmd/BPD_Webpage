@@ -89,6 +89,8 @@ test("Worker Status UI is event-driven and exposes only per-service supported ac
     assert.match(source, /action === "reconnect" \? "↻ Reconnect"/);
     assert.match(source, /worker-status-indicator/);
     assert.match(source, /makeDetails\(service\)/);
+    assert.match(source, /\/api\/admin\/page-settings\/route-health/);
+    assert.match(source, /systemRouteRows/);
     assert.match(source, /statusIcon\(status\)/);
 });
 

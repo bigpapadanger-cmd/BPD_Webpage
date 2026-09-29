@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-29T03:11:35.046Z",
+  "generatedAt": "2026-09-29T03:36:14.935Z",
   "policy": {
     "humanPagePaths": "case-insensitive lookup; canonical TitleCase path",
     "apiAndAssetPaths": "exact-case; never normalized by the human-page router",
@@ -1009,7 +1009,7 @@
       "deepLinkSupported": true,
       "targets": [
         {
-          "path": "/Global/Admin/PageSettings/HTML/index.html",
+          "path": "/Global/Admin/WorkerStatus/HTML/index.html",
           "exists": true
         },
         {
@@ -1025,7 +1025,7 @@
           "exists": true
         },
         {
-          "path": "/Global/Admin/PageSettings/JS/index.js",
+          "path": "/Global/Admin/WorkerStatus/JS/index.js",
           "exists": true
         }
       ]
