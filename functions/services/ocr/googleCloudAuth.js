@@ -348,85 +348,6 @@ function logGoogleHttpFailure(
     );
 }
 
-function logMtlsStsDiagnostic(
-    context,
-    response,
-    parsedResponse,
-    secrets,
-    url,
-    options
-) {
-    const headers = new Headers(options?.headers || {});
-    const body = typeof options?.body === "string"
-        ? options.body
-        : "";
-    let bodyFieldNames = [];
-    try {
-        const parsedBody = JSON.parse(body);
-        if (parsedBody && typeof parsedBody === "object" && !Array.isArray(parsedBody)) {
-            bodyFieldNames = Object.keys(parsedBody).sort();
-        }
-    }
-    catch {
-        // Do not log raw request bodies; unknown bodies have no field names to report.
-    }
-
-    console.error(
-        "[OCR GOOGLE AUTH] Temporary mTLS STS diagnostic.",
-        {
-            sameBindingObject: context?.sameBindingObject === true,
-            bindingFetchType: context?.bindingFetchType || "undefined",
-            requestMethod: String(options?.method || "GET").toUpperCase(),
-            hostname: safeHostname(url),
-            hasSignal: Boolean(options?.signal),
-            contentType: headers.get("Content-Type"),
-            bodyLength: new TextEncoder().encode(body).byteLength,
-            bodyFieldNames,
-            redirectMode: options?.redirect || "follow",
-            responseStatus: Number(response.status) || 0,
-            locationHeaderExists: response.headers.has("Location"),
-            redirectLocationHostPath: safeLocationHostPath(
-                response.headers.get("Location"),
-                secrets
-            ),
-            googleError: sanitizeDiagnosticText(parsedResponse?.error, secrets),
-            googleErrorDescription: sanitizeDiagnosticText(
-                parsedResponse?.error_description,
-                secrets
-            )
-        }
-    );
-}
-
-function safeHostname(url) {
-    try {
-        return new URL(url).hostname;
-    }
-    catch {
-        return null;
-    }
-}
-
-function safeLocationHostPath(value, secrets) {
-    if (typeof value !== "string" || !value) {
-        return null;
-    }
-
-    try {
-        const url = new URL(value, GOOGLE_STS_URL);
-        if (url.protocol !== "https:" && url.protocol !== "http:") {
-            return null;
-        }
-        return {
-            hostname: url.hostname,
-            path: sanitizeDiagnosticText(url.pathname, secrets)
-        };
-    }
-    catch {
-        return null;
-    }
-}
-
 function buildGoogleAuthDiagnosticContext(
     config,
     authStage,
@@ -440,12 +361,6 @@ function buildGoogleAuthDiagnosticContext(
         mtlsBindingPresent: Boolean(config.certificateBinding),
         certificateChainEntryCount: config.certificateChain.length,
         serviceAccountEmail: config.serviceAccountEmail,
-        bindingExists: Boolean(config.certificateBinding),
-        bindingFetchIsFunction:
-            typeof config.certificateBinding?.fetch === "function",
-        destinationHostname: authStage === "sts_exchange"
-            ? new URL(GOOGLE_STS_URL).hostname
-            : null,
         redactionValues: [
             ...config.diagnosticRedactionValues,
             ...additionalRedactions
@@ -533,44 +448,15 @@ async function fetchJson(
             catch {
                 // The HTTP status and safe request context remain useful without a body.
             }
-            if (diagnosticContext?.authStage === "sts_exchange") {
-                logMtlsStsDiagnostic(
-                    diagnosticContext,
-                    response,
-                    parsedError,
-                    diagnosticContext?.redactionValues,
-                    url,
-                    {
-                        ...options,
-                        signal: controller.signal
-                    }
-                );
-            }
-            else {
-                logGoogleHttpFailure(
-                    diagnosticContext,
-                    response,
-                    parsedError,
-                    diagnosticContext?.redactionValues
-                );
-            }
+            logGoogleHttpFailure(
+                diagnosticContext,
+                response,
+                parsedError,
+                diagnosticContext?.redactionValues
+            );
             throw createAuthError(
                 failureCode,
                 "Google authentication could not be completed."
-            );
-        }
-
-        if (diagnosticContext?.authStage === "sts_exchange") {
-            logMtlsStsDiagnostic(
-                diagnosticContext,
-                response,
-                null,
-                diagnosticContext?.redactionValues,
-                url,
-                {
-                    ...options,
-                    signal: controller.signal
-                }
             );
         }
 
@@ -770,45 +656,25 @@ async function getFederatedAccessToken(
                         ),
                     scope:
                         GOOGLE_TOKEN_SCOPE
-                }),
-                ...(env?.OCR_GCP_STS_DIAGNOSTIC_MANUAL_REDIRECT === "true"
-                    ? { redirect: "manual" }
-                    : {})
+                })
             };
             const diagnosticContext = {
                 ...buildGoogleAuthDiagnosticContext(
                     config,
                     "sts_exchange",
                     config.providerResource
-                ),
-                sameBindingObject:
-                    config.certificateBinding === env?.OCR_GCP_MTLS,
-                bindingFetchType:
-                    typeof config.certificateBinding?.fetch
+                )
             };
 
-            // Temporary diagnostic switch; unset preserves the existing fetchJson path.
-            const response = env?.OCR_GCP_STS_DIAGNOSTIC_DIRECT_FETCH === "true"
-                ? await fetchStsDirectForDiagnostics(
-                    config.certificateBinding,
-                    GOOGLE_STS_URL,
-                    stsOptions,
-                    diagnosticContext,
-                    env?.OCR_GCP_STS_DIAGNOSTIC_NO_SIGNAL === "true"
-                )
-                : await fetchJson(
-                    function(url, options) {
-                        return fetchStsWithMtlsBinding(
-                            env,
-                            url,
-                            options
-                        );
-                    },
-                    GOOGLE_STS_URL,
-                    stsOptions,
-                    "OCR_GOOGLE_STS_EXCHANGE_FAILED",
-                    diagnosticContext
-                );
+            const response = await fetchJson(
+                function(url, options) {
+                    return fetchStsWithMtlsBinding(env, url, options);
+                },
+                GOOGLE_STS_URL,
+                stsOptions,
+                "OCR_GOOGLE_STS_EXCHANGE_FAILED",
+                diagnosticContext
+            );
 
             if (
                 typeof response.access_token !== "string"
@@ -830,95 +696,6 @@ async function getFederatedAccessToken(
             };
         }
     );
-}
-
-async function fetchStsDirectForDiagnostics(
-    certificateBinding,
-    url,
-    options,
-    diagnosticContext,
-    omitSignal
-) {
-    const controller = new AbortController();
-    const timeout = setTimeout(
-        () => controller.abort(),
-        GOOGLE_REQUEST_TIMEOUT_MS
-    );
-    const requestOptions = omitSignal
-        ? { ...options }
-        : { ...options, signal: controller.signal };
-
-    try {
-        const response = await certificateBinding.fetch(url, requestOptions);
-        let parsedResponse = null;
-        if (!response.ok) {
-            try {
-                parsedResponse = await readGoogleErrorJson(response);
-            }
-            catch {
-                // Only bounded Google error fields are used for diagnostics.
-            }
-        }
-
-        logMtlsStsDiagnostic(
-            diagnosticContext,
-            response,
-            parsedResponse,
-            diagnosticContext?.redactionValues,
-            url,
-            requestOptions
-        );
-
-        if (!response.ok) {
-            throw createAuthError(
-                "OCR_GOOGLE_STS_EXCHANGE_FAILED",
-                "Google authentication could not be completed."
-            );
-        }
-
-        const contentLength = Number(response.headers.get("Content-Length"));
-        if (Number.isFinite(contentLength) && contentLength > MAX_GOOGLE_RESPONSE_BYTES) {
-            throw createAuthError(
-                "OCR_GOOGLE_STS_EXCHANGE_FAILED",
-                "Google authentication returned an invalid response."
-            );
-        }
-
-        const text = await response.text();
-        if (text.length > MAX_GOOGLE_RESPONSE_BYTES) {
-            throw createAuthError(
-                "OCR_GOOGLE_STS_EXCHANGE_FAILED",
-                "Google authentication returned an invalid response."
-            );
-        }
-
-        let parsedToken = null;
-        try {
-            parsedToken = JSON.parse(text);
-        }
-        catch {
-            // Raw response data is never included in errors or logs.
-        }
-        if (!parsedToken || typeof parsedToken !== "object" || Array.isArray(parsedToken)) {
-            throw createAuthError(
-                "OCR_GOOGLE_STS_EXCHANGE_FAILED",
-                "Google authentication returned an invalid response."
-            );
-        }
-        return parsedToken;
-    }
-    catch (error) {
-        if (error?.isGoogleAuthError === true) {
-            throw error;
-        }
-        throw createAuthError(
-            "OCR_GOOGLE_STS_EXCHANGE_FAILED",
-            "Google authentication could not be completed."
-        );
-    }
-    finally {
-        clearTimeout(timeout);
-    }
 }
 
 function fetchStsWithMtlsBinding(

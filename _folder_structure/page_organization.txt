@@ -19,6 +19,7 @@ Cloudflare Pages application
         -> binds AUTH_SESSIONS and RL_STATS_CACHE (KV)
         -> binds OCR_TRAINING, OCR_STORAGE, and OCR_PROGRESS (R2)
         -> binds OCR_JOB_QUEUE as a queue producer
+        -> binds OCR_GOOGLE_TRANSPORT to bpd-ocr-cloud-run-proxy
     functions/api/
         -> file-based /api/* request handlers
         -> delegates reusable work to functions/services/
@@ -28,7 +29,10 @@ OCR job path
         -> functions/api/ocr/jobs/submit_job.js
         -> OCR_STORAGE / OCR_PROGRESS and OCR_JOB_QUEUE
         -> workers/ocr-job-consumer/
-        -> configured OCR processor URL
+        -> Pages /api/ocr/jobs/process_job
+        -> internal OCR_GOOGLE_TRANSPORT Service Binding (shared-secret gated)
+        -> workers/ocr-cloud-run-proxy/
+        -> Google mTLS STS / IAM ID token -> fixed Cloud Run OCR service
         -> ocr_cloudData/ Flask service and OCR pipeline
         -> result/progress endpoints in functions/api/ocr/jobs/
         -> browser OCR monitor/results modules
@@ -70,7 +74,10 @@ PRIMARY NAVIGATION INDEX
                   and Python requirements.
 
 4. workers/ - independently deployed Cloudflare Workers
+    ocr-cloud-run-proxy/  Pages-bound Cloud Run transport; custom domain is
+                          secret-gated and not called by browser code.
     ocr-job-consumer/     Consumes queued OCR jobs and performs cleanup.
+    google-mtls-diagnostic/ Temporary manual WIF/mTLS probes; not production.
     rl-presence-monitor/  Runs Rocket League and Taskboard automation.
 
 5. Root configuration and support

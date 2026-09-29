@@ -12,7 +12,7 @@
     "test:ocr": "node --test tests/ocr/*.test.mjs",
     "test:suggestions": "node --test tests/suggestions/*.test.mjs",
     "test:routes": "npm run routes:generate && node --test tests/route_health/*.test.mjs",
-    "test:workers": "npm run test:google-mtls-diagnostic && node --test workers/rl-presence-monitor/tests/worker_dispatch.test.mjs",
+    "test:workers": "npm run test:google-mtls-diagnostic && node --test workers/ocr-cloud-run-proxy/tests/*.test.mjs workers/rl-presence-monitor/tests/worker_dispatch.test.mjs",
     "test:google-mtls-diagnostic": "node --test workers/google-mtls-diagnostic/tests/*.test.mjs",
     "routes:generate": "node scripts/generate-api-route-inventory.mjs",
     "wrangler:check": "npm outdated wrangler || exit 0",

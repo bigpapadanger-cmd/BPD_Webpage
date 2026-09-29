@@ -158,8 +158,16 @@ KEY CROSS-FOLDER CONNECTIONS
         -> OCR storage/progress bindings and OCR_JOB_QUEUE
         -> workers/ocr-job-consumer
 
-    functions/services/ocr handler/localize
-        -> configured ocr_cloudData service URL
+    functions/api/ocr/jobs/process_job.js and services/ocr/handler.js
+        -> OCR_GOOGLE_TRANSPORT Pages Service Binding
+        -> workers/ocr-cloud-run-proxy
+        -> Google mTLS STS / IAM Credentials
+        -> fixed private Cloud Run OCR URL
+
+    functions/api/ocr/compare.js
+        -> existing Pages-side Google auth for the separately configured
+           OCR_API_TEST_URL benchmark target (not migrated because its target
+           contract is absent from checked-in configuration)
 
     functions/services/rl/presence/wake_monitor.js
         -> workers/rl-presence-monitor /wake

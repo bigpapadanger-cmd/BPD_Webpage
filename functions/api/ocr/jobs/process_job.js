@@ -11,8 +11,8 @@ import {
 } from "../../../services/ocr/contracts.js";
 
 import {
-    getGoogleCloudRunIdToken
-} from "../../../services/ocr/googleCloudAuth.js";
+    fetchOcrThroughGoogleWorker
+} from "../../../services/ocr/googleCloudTransport.js";
 
 import {
     persistOcrCandidateArchive
@@ -1100,7 +1100,7 @@ async function readJobImage(
    ========================================================= */
 
 async function fetchWithTimeout(
-    url,
+    fetchRequest,
     options,
     timeoutMs
 ) {
@@ -1118,12 +1118,10 @@ async function fetchWithTimeout(
         );
 
     try {
-        return await fetch(
-            url,
+        return await fetchRequest(
             {
                 ...options,
-                signal:
-                    controller.signal
+                signal: controller.signal
             }
         );
     }
@@ -1134,35 +1132,13 @@ async function fetchWithTimeout(
     }
 }
 
-async function buildProviderHeaders(
-    env,
-    jobId
-) {
-    const idToken =
-        await getGoogleCloudRunIdToken(
-            env,
-            env.OCR_API_URL
-        );
-
+function buildProviderHeaders(jobId) {
     const headers =
         new Headers();
 
     headers.set(
         "Accept",
         "application/json"
-    );
-
-    headers.set(
-        "X-API-Key",
-        String(
-            env.OCR_API_KEY
-            || ""
-        )
-    );
-
-    headers.set(
-        "Authorization",
-        "Bearer " + idToken
     );
 
     headers.set(
@@ -1183,41 +1159,14 @@ async function callOcrProvider(
     requestData,
     imageBytes
 ) {
-    if (
-        !String(
-            env.OCR_API_URL
-            || ""
-        )
-            .trim()
-    ) {
+    if (!env?.OCR_GOOGLE_TRANSPORT || typeof env.OCR_GOOGLE_TRANSPORT.fetch !== "function") {
         const error =
             new Error(
-                "OCR_API_URL is not configured."
+                "OCR transport is not configured."
             );
 
         error.code =
-            "OCR_API_URL_MISSING";
-
-        error.httpStatus =
-            500;
-
-        throw error;
-    }
-
-    if (
-        !String(
-            env.OCR_API_KEY
-            || ""
-        )
-            .trim()
-    ) {
-        const error =
-            new Error(
-                "OCR_API_KEY is not configured."
-            );
-
-        error.code =
-            "OCR_API_KEY_MISSING";
+            "OCR_GOOGLE_TRANSPORT_UNAVAILABLE";
 
         error.httpStatus =
             500;
@@ -1346,15 +1295,17 @@ async function callOcrProvider(
 
     const response =
         await fetchWithTimeout(
-            env.OCR_API_URL,
+            options => fetchOcrThroughGoogleWorker(
+                env,
+                options.body,
+                options.headers,
+                options.signal
+            ),
             {
                 method:
                     "POST",
                 headers:
-                    await buildProviderHeaders(
-                        env,
-                        jobId
-                    ),
+                    buildProviderHeaders(jobId),
                 body:
                     formData
             },

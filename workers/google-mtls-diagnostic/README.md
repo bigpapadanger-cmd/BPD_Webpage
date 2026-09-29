@@ -2,6 +2,13 @@
 
 Temporary, manually invoked diagnostics for the existing Cloudflare mTLS binding and Google X.509 Workload Identity Federation flow. This Worker has no cron, queue, retry, or background trigger. Each probe does only the outbound requests needed for that explicitly requested probe:
 
+The operator-verified `/probe/empty`, `/probe/full-sts`, and `/probe/id-token`
+probes all succeeded. This evidence established that the Cloudflare Worker
+runtime can present the client certificate and mint a Cloud Run ID token. The
+production OCR request path uses the separate private
+`workers/ocr-cloud-run-proxy/` Worker. Keep this diagnostic Worker temporary;
+it is not a production proxy and is not called by OCR jobs.
+
 - `POST /probe/empty`: one direct mTLS request to Google STS, with an empty form body.
 - `POST /probe/full-sts`: one direct mTLS STS exchange.
 - `POST /probe/id-token`: one direct mTLS STS exchange followed by one service-account `generateIdToken` request. It reports whether a token was returned but never returns it.

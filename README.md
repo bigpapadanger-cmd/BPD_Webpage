@@ -26,6 +26,18 @@ PROJECT SETUP & DEVELOPMENT GUIDE
         - Preview Builds: Enabled for all non‑default branches
         - Access Protection: Configure as needed
 
+    OCR Google Cloud Authentication:
+        - The queued OCR and `/api/ocr` paths use the private Pages Service
+          Binding `OCR_GOOGLE_TRANSPORT` to `bpd-ocr-cloud-run-proxy`.
+        - The Worker uses X.509 Workload Identity Federation and keeps Google
+          access/ID tokens internal. Its custom domain is protected by a
+          server-to-server shared secret; browser code does not call it.
+        - Required secrets and operator-controlled deployment order are
+          documented in `workers/ocr-cloud-run-proxy/README.md`.
+        - The admin-only `/api/ocr/debug/mtls-probe` remains diagnostic-only.
+          `/api/ocr/compare` still uses Pages-side auth for its separate
+          `OCR_API_TEST_URL`; establish that target contract before migrating.
+
     Git Auto‑Fetch (IMPORTANT):
         - Open VS Code
         - Press Ctrl + ,

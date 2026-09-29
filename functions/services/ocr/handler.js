@@ -51,8 +51,8 @@ import {
 } from "../auth/sessions/session_context.js";
 
 import {
-    getGoogleCloudRunIdToken
-} from "./googleCloudAuth.js";
+    fetchOcrThroughGoogleWorker
+} from "./googleCloudTransport.js";
 
 /* =========================================================
 VERSION
@@ -212,42 +212,6 @@ export async function handleOCRRequest(
         /* =================================================
         CONFIGURATION
         ================================================= */
-
-        if (
-            !env.OCR_API_URL
-        ) {
-            return jsonResponse(
-                {
-                    success:
-                        false,
-
-                    error:
-                        "OCR API URL is not configured.",
-
-                    handlerVersion:
-                        OCR_HANDLER_VERSION
-                },
-                503
-            );
-        }
-
-        if (
-            !env.OCR_API_KEY
-        ) {
-            return jsonResponse(
-                {
-                    success:
-                        false,
-
-                    error:
-                        "OCR API authentication is not configured.",
-
-                    handlerVersion:
-                        OCR_HANDLER_VERSION
-                },
-                503
-            );
-        }
 
         const ownerSecret =
             normalizeString(
@@ -579,43 +543,17 @@ export async function handleOCRRequest(
         fetch() generates the multipart boundary.
         ================================================= */
 
-        const upstreamHeaders =
-            new Headers();
-
-        upstreamHeaders.set(
-            "X-API-Key",
-            env.OCR_API_KEY
-        );
-
-        const cloudRunIdToken =
-            await getGoogleCloudRunIdToken(
-                env,
-                env.OCR_API_URL
-            );
-
-        upstreamHeaders.set(
-            "Authorization",
-            "Bearer " + cloudRunIdToken
-        );
-
+        const upstreamHeaders = new Headers();
         upstreamHeaders.set(
             "X-BPD-OCR-Handler-Version",
             OCR_HANDLER_VERSION
         );
 
         const ocrResponse =
-            await fetch(
-                env.OCR_API_URL,
-                {
-                    method:
-                        "POST",
-
-                    headers:
-                        upstreamHeaders,
-
-                    body:
-                        formData
-                }
+            await fetchOcrThroughGoogleWorker(
+                env,
+                formData,
+                upstreamHeaders
             );
 
         /* =================================================

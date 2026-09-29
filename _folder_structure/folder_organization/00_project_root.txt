@@ -7,6 +7,7 @@ DomainData/  (saved in Codex as the RLFolderStructuring project)
 +-- ocr_cloudData/       Python/Flask OCR processor, OCR source, and OCR datasets.
 +-- public/              Static site output, client router, pages, and assets.
 +-- workers/             Independently deployed Cloudflare Workers.
++-- _structure_details/  Canonical system map and maintained subsystem maps.
 +-- Notes/               Operational notes, schema scripts, and design material.
 |
 +-- .git/                Git repository metadata.
@@ -42,6 +43,8 @@ wrangler.jsonc
     KV bindings            -> AUTH_SESSIONS, RL_STATS_CACHE
     R2 bindings            -> OCR_TRAINING, OCR_STORAGE, OCR_PROGRESS
     queue producer         -> OCR_JOB_QUEUE on bpd-ocr-jobs
+    service binding         -> OCR_GOOGLE_TRANSPORT / bpd-ocr-cloud-run-proxy
+    custom domain           -> ocr-transport.bpd-gaming-network.com (secret gated)
     service URLs           -> OCR processor, OCR job callbacks, Supabase,
                               MMR API, and Rocket League presence monitor
     public identity/config -> OAuth and authorization identifiers used by runtime
@@ -54,18 +57,20 @@ ROOT-LEVEL RUNTIME BOUNDARIES
 
     workers/*
         Separate Worker deployments. Each child has its own wrangler.jsonc.
+        OCR adds a Google auth/transport Worker bound to Pages; its custom
+        domain is gated by a server-to-server shared secret.
 
     ocr_cloudData/
-        Separate containerized Python service. Cloudflare code reaches it through
-        the configured OCR_API_URL / processor URL rather than importing Python.
+        Separate containerized Python service. The OCR transport Worker
+        calls the configured OCR_API_URL rather than importing Python.
 
     Notes/
         Support/reference material, not a runtime import boundary.
 
 VERSION-CONTROL SNAPSHOT
 
-Tracked application areas include functions (126 files), public (173 files),
-workers (9 files), the root Wrangler/package configuration, static domain/OCR
+Tracked application areas include functions, public, workers, the root
+Wrangler/package configuration, static domain/OCR
 files, and a tracked .wrangler subset. ocr_cloudData, Notes, local environments,
 and several backup/local-secret files are present in the working directory but
 are not listed as tracked files in the current Git index.

@@ -2000,6 +2000,23 @@ export const API_ROUTE_INVENTORY = Object.freeze([
 ]);
 export const WORKER_ROUTE_INVENTORY = Object.freeze([
   {
+    "path": "https://ocr-transport.bpd-gaming-network.com/*",
+    "lookupKey": null,
+    "routeType": "worker",
+    "casePolicy": "exact",
+    "sourceFiles": [
+      "workers/ocr-cloud-run-proxy/src/index.js"
+    ],
+    "handler": "workers/ocr-cloud-run-proxy/src/index.js",
+    "methods": [
+      "ALL"
+    ],
+    "authRequired": "not applicable",
+    "healthStatus": "returns 404 for all HTTP requests",
+    "deepLinkSupported": false,
+    "ownerSystem": "bpd-ocr-cloud-run-proxy"
+  },
+  {
     "path": "https://ocr.bpd-gaming-network.com/*",
     "lookupKey": null,
     "routeType": "worker",
