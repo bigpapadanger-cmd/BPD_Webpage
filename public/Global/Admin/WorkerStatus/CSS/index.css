@@ -1,15 +1,32 @@
-.worker-status { width: min(100% - 32px, 1120px); margin: 28px auto; }
-.worker-status-actions { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
-.worker-status-actions button { padding: 9px 14px; }
-.worker-status-services { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; padding: 0; list-style: none; }
-.worker-status-services li { padding: 16px; border: 1px solid rgba(255,255,255,.15); border-radius: 8px; background: rgba(0,0,0,.2); }
-.worker-status-services p { margin: 8px 0 0; opacity: .82; }
-.worker-status-state { display: block; }
+.worker-status { width: min(100% - 32px, 920px); margin: 28px auto; }
+.worker-status-actions { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 16px 0 8px; }
+.worker-status-actions button { padding: 8px 13px; }
+#workerStatusMessage:empty { display: none; }
+#workerStatusGenerated { margin: 8px 0; color: #aeb9c8; font-size: .82rem; }
+.worker-status-services { display: block; padding: 0; margin: 12px 0; list-style: none; border: 1px solid rgba(255,255,255,.13); border-radius: 10px; overflow: hidden; }
+.worker-status-row { padding: 0 14px; background: rgba(0,0,0,.18); border-bottom: 1px solid rgba(255,255,255,.1); }
+.worker-status-row:last-child { border-bottom: 0; }
+.worker-status-primary { min-height: 64px; display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; align-items: center; gap: 12px; }
+.worker-status-indicator { width: 28px; height: 28px; display: inline-grid; place-items: center; border: 1px solid currentColor; border-radius: 50%; font-size: 1rem; font-weight: 800; }
+.worker-status-identity { min-width: 0; display: flex; align-items: center; gap: 10px; }
+.worker-status-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.worker-status-label { padding: 3px 8px; border-radius: 999px; background: rgba(255,255,255,.08); font-size: .72rem; text-transform: capitalize; }
 .worker-status-healthy { color: #91e2a0; }
 .worker-status-degraded { color: #ffd27a; }
 .worker-status-down { color: #ff8b8b; }
 .worker-status-unknown { color: #b9c5d4; }
-.worker-status-facts, .worker-status-dependencies { font-size: .88rem; line-height: 1.5; overflow-wrap: anywhere; }
-
-.worker-status-card-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-.worker-status-card-actions button { padding: 7px 10px; }
+.worker-status-card-actions { display: flex; gap: 6px; justify-content: flex-end; }
+.worker-status-card-actions button { padding: 6px 9px; white-space: nowrap; }
+.worker-status-details { padding: 0 0 9px 46px; color: #b8c3d1; font-size: .83rem; }
+.worker-status-details summary { width: fit-content; cursor: pointer; opacity: .76; }
+.worker-status-detail-content { max-width: 760px; line-height: 1.45; overflow-wrap: anywhere; }
+.worker-status-detail-content p { margin: 7px 0 0; }
+@media (max-width: 560px) {
+    .worker-status { width: min(100% - 20px, 920px); }
+    .worker-status-row { padding: 0 10px; }
+    .worker-status-primary { grid-template-columns: 30px minmax(0, 1fr); gap: 9px; padding: 8px 0; }
+    .worker-status-indicator { width: 26px; height: 26px; }
+    .worker-status-identity { align-items: flex-start; flex-direction: column; gap: 4px; }
+    .worker-status-card-actions { grid-column: 2; justify-content: flex-start; }
+    .worker-status-details { padding-left: 39px; }
+}

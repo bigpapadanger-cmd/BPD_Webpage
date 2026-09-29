@@ -85,8 +85,10 @@ test("system health cache includes protected MMR readiness without starting MMR 
 test("Worker Status UI is event-driven and exposes only per-service supported actions", async () => {
     const source = await readFile(new URL("../../public/Global/Admin/WorkerStatus/JS/index.js", import.meta.url), "utf8");
     assert.doesNotMatch(source, /setInterval\s*\(/);
-    assert.match(source, /action === "run-now" \? "Run Now"/);
-    assert.match(source, /action === "reconnect" \? "Reconnect PsyNet"/);
+    assert.match(source, /action === "run-now" \? "▶ Run"/);
+    assert.match(source, /action === "reconnect" \? "↻ Reconnect"/);
+    assert.match(source, /worker-status-indicator/);
+    assert.match(source, /makeDetails\(service\)/);
     assert.match(source, /statusIcon\(status\)/);
 });
 

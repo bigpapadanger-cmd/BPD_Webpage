@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-29T02:07:14.996Z",
+  "generatedAt": "2026-09-29T03:11:35.046Z",
   "policy": {
     "humanPagePaths": "case-insensitive lookup; canonical TitleCase path",
     "apiAndAssetPaths": "exact-case; never normalized by the human-page router",
