@@ -106,8 +106,8 @@ public/Framework/Shell/JS/router.js. public/routes.js selects a body fragment,
 page module, sidebar, header/footer behavior, and route metadata.
 
 Main/global routes
-    /                         Shared shell body / main menu.
-    /Dashboard                Global/Index home dashboard.
+    /                         Shared shell body / main menu; authorized Admin shortcut is shown only after server access confirmation.
+    /Dashboard                Global/Index personalized dashboard, separate from the public main menu.
     /Account                  Global/Account account management.
     /Login                    Global/Login authentication page.
     /About                    Required/About.

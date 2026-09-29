@@ -1231,6 +1231,7 @@ export const API_ROUTE_INVENTORY = Object.freeze([
     ],
     "handler": "functions/api/auth/account/last_login.js",
     "methods": [
+      "ALL",
       "POST"
     ],
     "authRequired": "handler-defined",

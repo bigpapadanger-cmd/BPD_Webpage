@@ -121,3 +121,29 @@ export async function onRequestPost(
         return authorizationErrorResponse(error);
     }
 }
+
+/*
+ * Keep accidental browser navigations and unsupported methods
+ * explicit. Account activity is a POST-only mutation and must
+ * never run from a GET request.
+ */
+export async function onRequest(
+    context
+) {
+    const request = context?.request;
+    const method = String(request?.method || "").toUpperCase();
+
+    if (method === "POST") {
+        return onRequestPost(context);
+    }
+
+    return json(
+        {
+            success: false,
+            code: "METHOD_NOT_ALLOWED",
+            message: "Use POST for account activity updates."
+        },
+        405,
+        { Allow: "POST" }
+    );
+}

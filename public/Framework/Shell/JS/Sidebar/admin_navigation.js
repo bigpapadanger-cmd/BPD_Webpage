@@ -1,8 +1,8 @@
-import { subscribeToAuthState, hasAuthorizedProvider } from "/Framework/Auth/auth.js";
-let authSubscriptionStarted = false;
-let accessCheckVersion = 0;
-
 "use strict";
+
+import { subscribeToAuthState, hasAdminAccess, peekAuthState } from "/Framework/Auth/auth.js";
+
+let authSubscriptionStarted = false;
 
 /* =========================================================
 BPD GAMING NETWORK
@@ -12,17 +12,15 @@ File:
     /Framework/Shell/JS/Sidebar/admin_navigation.js
 
 Purpose:
-    Controls visibility of the Admin sidebar navigation item.
+    Controls visibility of Admin shortcuts in the sidebar and
+    main menu.
 
 Responsibilities:
     - Starts the Admin navigation item hidden.
-    - Verifies Admin/staff access server-side.
+    - Reuses Admin/staff access verified by the shared auth module.
     - Shows the Admin item only for authorized accounts.
     - Fails closed when authorization cannot be verified.
 ========================================================= */
-
-const ADMIN_ACCESS_URL =
-    "/api/auth/admin/access";
 
 /* =========================================================
 SET VISIBILITY
@@ -44,22 +42,23 @@ function setAdminNavigationVisible(
 
 /* =========================================================
 INITIALIZE ADMIN NAVIGATION
+
+Reuse the canonical authorization state already fetched by
+the shared auth module. This keeps navigation fail-closed
+without issuing a second Admin access request per page.
 ========================================================= */
 
-export async function setupAdminNavigation(state) {
-    const checkVersion = ++accessCheckVersion;
+export function setupAdminNavigation(state) {
     if (!authSubscriptionStarted) {
         authSubscriptionStarted = true;
         subscribeToAuthState(nextState => { void setupAdminNavigation(nextState); });
     }
-    const adminNavItem =
-        document.getElementById(
-            "adminNavItem"
-        );
+    const adminNavItems = [
+        document.getElementById("adminNavItem"),
+        document.getElementById("adminHomeCard")
+    ].filter(Boolean);
 
-    if (
-        !adminNavItem
-    ) {
+    if (!adminNavItems.length) {
         return;
     }
 
@@ -69,70 +68,14 @@ export async function setupAdminNavigation(state) {
      * The Admin item remains hidden until the server explicitly
      * confirms that the current account is authorized.
      */
-    setAdminNavigationVisible(
-        adminNavItem,
-        false
-    );
+    adminNavItems.forEach(item => setAdminNavigationVisible(item, false));
 
-    if (state && (state.available !== true || state.authenticated !== true
-        || state.active !== true || !hasAuthorizedProvider("discord", state))) return;
+    const authState = state || peekAuthState();
+    if (authState?.available !== true || authState?.authenticated !== true || authState?.active !== true) return;
 
-    try {
-        const response =
-            await fetch(
-                ADMIN_ACCESS_URL,
-                {
-                    method:
-                        "GET",
-
-                    credentials:
-                        "same-origin",
-
-                    headers: {
-                        "Accept":
-                            "application/json"
-                    },
-
-                    cache:
-                        "no-store"
-                }
-            );
-
-        if (
-            !response.ok
-        ) {
-            return;
+    if (hasAdminAccess(authState)) {
+        for (const item of adminNavItems) {
+            if (item.isConnected !== false) setAdminNavigationVisible(item, true);
         }
-
-        const result =
-            await response
-                .json()
-                .catch(
-                    () => null
-                );
-
-        if (
-            result?.success !==
-                true
-            || result?.authorized !==
-                true
-        ) {
-            return;
-        }
-
-        if (checkVersion !== accessCheckVersion || document.getElementById("adminNavItem") !== adminNavItem) return;
-
-        setAdminNavigationVisible(
-            adminNavItem,
-            true
-        );
-    }
-    catch (
-        error
-    ) {
-        console.error(
-            "ADMIN NAVIGATION ACCESS CHECK FAILED:",
-            error
-        );
     }
 }

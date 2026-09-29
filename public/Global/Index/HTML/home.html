@@ -1,39 +1,43 @@
-<section class="home-page">
-    <div class="home-background-waves" aria-hidden="true"></div>
-    <div class="home-page-content">
-        <header class="hero-header">
-            <div class="hero-content">
-                <p class="hero-eyebrow">WELCOME TO</p>
-                <h1>BPD Gaming Network</h1>
-                <p class="hero-subtitle">Match. Compete. Climb.</p>
+<main class="user-dashboard" aria-labelledby="dashboardTitle">
+    <header class="dashboard-hero">
+        <div>
+            <p class="dashboard-eyebrow">YOUR BPD SPACE</p>
+            <h1 id="dashboardTitle">Your dashboard</h1>
+            <p id="dashboardWelcome">A personal starting point for your account and favorite areas.</p>
+        </div>
+        <a class="dashboard-account-link" href="/Account" data-router-link>
+            <span aria-hidden="true">◉</span> Account
+        </a>
+    </header>
+
+    <section class="dashboard-account-panel" aria-labelledby="dashboardAccountTitle">
+        <div class="dashboard-panel-heading">
+            <span class="dashboard-panel-icon" aria-hidden="true">♙</span>
+            <div>
+                <h2 id="dashboardAccountTitle">Account overview</h2>
+                <p id="dashboardAccountStatus" role="status" aria-live="polite">Checking account…</p>
             </div>
-        </header>
-        <div class="ad-slot ad-slot-top" data-ad-location="home-top"></div>
-        <section class="content-area" aria-labelledby="homeWelcomeTitle">
-            <div class="content-card">
-                <span class="card-label">BPD GAMING NETWORK</span>
-                <h2 id="homeWelcomeTitle">Welcome</h2>
-                <p>Your central hub for gaming, matchmaking, communities, leaderboards, and everything BPD Gaming Network.</p>
+        </div>
+        <div class="dashboard-account-meta">
+            <span class="dashboard-meta-label">Linked providers</span>
+            <span id="dashboardProviders">Loading…</span>
+        </div>
+        <a id="dashboardSignIn" class="dashboard-sign-in" href="/Login" data-router-link hidden>Sign in to manage your account <span aria-hidden="true">→</span></a>
+    </section>
+
+    <section class="dashboard-shortcuts" aria-labelledby="dashboardShortcutsTitle">
+        <div class="dashboard-section-heading">
+            <div>
+                <p class="dashboard-eyebrow">QUICK ACCESS</p>
+                <h2 id="dashboardShortcutsTitle">Pick up where you want to go</h2>
             </div>
-            <div class="ad-slot ad-slot-middle" data-ad-location="home-middle"></div>
-            <div class="content-grid">
-                <a href="/RocketLeague" class="info-card" data-router-link>
-                    <div class="info-card-icon" aria-hidden="true">⚽</div>
-                    <h3>Rocket League</h3>
-                    <p>Matchmaking, teams, leaderboards, voting, and competitive play.</p>
-                </a>
-                <div class="info-card disabled" aria-disabled="true">
-                    <div class="info-card-icon" aria-hidden="true">◇</div>
-                    <h3>Future</h3>
-                    <p>More games and features are coming to the BPD Gaming Network.</p>
-                </div>
-                <div class="info-card disabled" aria-disabled="true">
-                    <div class="info-card-icon" aria-hidden="true">◇</div>
-                    <h3>Future</h3>
-                    <p>New communities, tools, and experiences will be added here.</p>
-                </div>
-            </div>
-            <div class="ad-slot ad-slot-bottom" data-ad-location="home-bottom"></div>
-        </section>
-    </div>
-</section>
+            <a href="/" data-router-link class="dashboard-home-link">Main menu <span aria-hidden="true">→</span></a>
+        </div>
+        <nav class="dashboard-link-grid" aria-label="Dashboard shortcuts">
+            <a class="dashboard-link-card" href="/RocketLeague" data-router-link><span class="dashboard-link-icon" aria-hidden="true">⚽</span><span><strong>Rocket League</strong><small>Matches, players, and stats</small></span><span class="dashboard-arrow" aria-hidden="true">↗</span></a>
+            <a class="dashboard-link-card" href="/Minecraft" data-router-link><span class="dashboard-link-icon" aria-hidden="true">⛏</span><span><strong>Minecraft</strong><small>Projects and community</small></span><span class="dashboard-arrow" aria-hidden="true">↗</span></a>
+            <a class="dashboard-link-card" href="/Ark" data-router-link><span class="dashboard-link-icon" aria-hidden="true">🦖</span><span><strong>ARK: Survival Ascended</strong><small>Mods and updates</small></span><span class="dashboard-arrow" aria-hidden="true">↗</span></a>
+            <a class="dashboard-link-card" href="/Suggestions" data-router-link><span class="dashboard-link-icon" aria-hidden="true">💡</span><span><strong>Suggestions</strong><small>Ideas from the community</small></span><span class="dashboard-arrow" aria-hidden="true">↗</span></a>
+        </nav>
+    </section>
+</main>

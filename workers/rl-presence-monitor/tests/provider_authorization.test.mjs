@@ -8,7 +8,7 @@ import { authorizeRocketLeagueRequest } from "../../../functions/services/rl/aut
 import { handleRocketLeagueSession } from "../../../functions/services/rl/session.js";
 import { handleRocketLeagueProfile } from "../../../functions/services/rl/profile.js";
 import { handleEpicCallback } from "../../../functions/services/auth/providers/epic/callback.js";
-import { onRequestPost as lastLogin } from "../../../functions/api/auth/account/last_login.js";
+import { onRequest as accountActivityFallback, onRequestPost as lastLogin } from "../../../functions/api/auth/account/last_login.js";
 import { onRequestGet as getJob } from "../../../functions/api/ocr/jobs/get_job.js";
 import worker from "../src/index.js";
 
@@ -158,6 +158,17 @@ test("account activity uses the existing MMR service and does not record success
     assert.equal((await response.json()).statsRefresh.refreshed, false);
     assert.ok(calls.some(url => url.endsWith("get_stats_refresh_state")));
     assert.deepEqual(records.get("account_login_status:account-1"), before);
+});
+
+test("account activity rejects GET explicitly without touching account state", async () => {
+    const response = await accountActivityFallback({
+        request: new Request("https://bpd.invalid/api/auth/account/last_login", { method: "GET" }),
+        env: {}
+    });
+
+    assert.equal(response.status, 405);
+    assert.equal(response.headers.get("allow"), "POST");
+    assert.equal((await response.json()).code, "METHOD_NOT_ALLOWED");
 });
 
 test("Epic reauthorization rejects another subject without relinking", async () => {

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-29T03:36:14.935Z",
+  "generatedAt": "2026-09-29T03:52:46.610Z",
   "policy": {
     "humanPagePaths": "case-insensitive lookup; canonical TitleCase path",
     "apiAndAssetPaths": "exact-case; never normalized by the human-page router",
@@ -1237,6 +1237,7 @@
       ],
       "handler": "functions/api/auth/account/last_login.js",
       "methods": [
+        "ALL",
         "POST"
       ],
       "authRequired": "handler-defined",

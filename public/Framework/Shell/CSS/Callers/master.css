@@ -39,6 +39,7 @@ Also used as the fallback for unknown routes.
 
 @import url("/Global/Links/links.css");
 @import url("/Global/Index/CSS/index.css");
+@import url("/Global/Index/CSS/dashboard.css");
 @import url("/Global/404/CSS/404.css");
 
 

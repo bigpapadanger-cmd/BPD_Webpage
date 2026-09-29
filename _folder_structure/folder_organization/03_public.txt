@@ -74,7 +74,8 @@ public/Global/
 |   +-- PageSettings/      CSS/index.css, HTML/index.html, JS/index.js
 |   +-- Suggestions/       CSS/index.css, HTML/index.html, JS/index.js
 +-- Ads/                 CSS/ads.css, HTML/ads.html, JS/ads.js
-+-- Index/               CSS/index.css, HTML/home.html, JS/index.js
++-- Index/               CSS/index.css (main menu), CSS/dashboard.css,
+|                        HTML/home.html and JS/index.js (personal dashboard)
 +-- Links/               links.css, links.html, links.js
 +-- Login/               CSS/index.css, HTML/index.html, JS/index.js
 +-- Settings/            CSS/settings-page.css, HTML/settings.html, JS/settings.js
