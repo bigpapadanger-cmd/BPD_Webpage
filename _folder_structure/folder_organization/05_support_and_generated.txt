@@ -64,6 +64,10 @@ _folder_structure/route-health/routes.json
     The read-only Admin Page Settings API consumes the generated JS inventory;
     this JSON snapshot is repository documentation, not a public endpoint.
 
+_structure_details/system_sub_map/worker-status.md
+    Current Admin Worker Status trust path, health data sources, action matrix,
+    status semantics, and operational limitations.
+
 Notes/supabase/suggestions/ (local-only; excluded by .gitignore)
     website_suggestions.sql   Prepared website DB/RPC setup; operator-applied only.
     README.md                 Supabase project prerequisites and behavior contract.
@@ -99,6 +103,9 @@ REPOSITORY METADATA
 .git/
     Git object database, refs, logs, hooks, worktree index, and repository state.
     At inspection time: 202 descendant directories and 385 files.
+
+_structure_details/request-frequency-inventory.md
+    Repository request-frequency/health-check audit and known measurement gaps.
 
 LOCAL/UNTRACKED ROOT FILES
 

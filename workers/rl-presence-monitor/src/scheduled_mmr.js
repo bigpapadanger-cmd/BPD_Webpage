@@ -18,7 +18,7 @@ Policy:
     - Rocket League player must be active.
     - Registration must be complete.
     - Epic identity must be active and match the RL player.
-    - Account must have been inactive for at least 7 days.
+    - Account must have been inactive for at least 6 days.
     - MMR must not have refreshed within the last 24 hours.
     - Candidate eligibility is checked again before each
       MMR API request.
@@ -40,7 +40,7 @@ const DAY_MS =
     24 * 60 * 60 * 1000;
 
 const INACTIVE_AFTER_MS =
-    7 * DAY_MS;
+    6 * DAY_MS;
 
 const PLAYLIST_IDS = {
     ones:

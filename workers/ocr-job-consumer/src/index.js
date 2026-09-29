@@ -1514,11 +1514,14 @@ function traceMessageFailure(
 // QUEUE
 // ============================================================
 
-async function handleQueueBatch(
+export async function handleQueueBatch(
     batch,
     env,
     ctx
 ) {
+    const invocationStartedAt = Date.now();
+    let failures = 0;
+    let completed = 0;
     for (
         const message
         of batch.messages
@@ -1546,10 +1549,12 @@ async function handleQueueBatch(
             }
 
             message.ack();
+            completed += 1;
         }
         catch (
             error
         ) {
+            failures += 1;
             console.error(
                 "[OCR QUEUE] Job failed.",
                 {
@@ -1609,6 +1614,15 @@ async function handleQueueBatch(
              */
             message.retry();
         }
+    }
+    if (env?.SERVICE_STATUS) {
+        const key = "admin:service-status:ocr-queue";
+        let prior = {};
+        try { prior = await env.SERVICE_STATUS.get(key, "json") || {}; } catch { /* Best effort. */ }
+        const now = new Date().toISOString();
+        const successful = failures === 0;
+        const state = { lastInvocationAt: now, lastSuccessAt: successful ? now : prior.lastSuccessAt || null, lastFailureAt: successful ? prior.lastFailureAt || null : now, lastBatchSize: Array.isArray(batch?.messages) ? batch.messages.length : 0, lastCompletedCount: completed, lastFailureCount: failures, lastDurationMs: Date.now() - invocationStartedAt, lastErrorCode: failures ? "OCR_QUEUE_BATCH_PARTIAL_FAILURE" : null };
+        try { await env.SERVICE_STATUS.put(key, JSON.stringify(state), { expirationTtl: 2592000 }); } catch { /* Telemetry must not alter queue acknowledgement behavior. */ }
     }
 }
 

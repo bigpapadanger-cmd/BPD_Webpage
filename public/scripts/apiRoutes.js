@@ -67,6 +67,9 @@ export const BPD_AUTH_ACCOUNT_PROFILE_URL =
 export const BPD_AUTH_ACCOUNT_URL =
     "/api/auth/account";
 
+export const BPD_AUTH_ACCOUNT_ACTIVITY_URL =
+    "/api/auth/account/last_login";
+
 /* =========================================================
 PROVIDER LINKING / REAUTHORIZATION
 ========================================================= */

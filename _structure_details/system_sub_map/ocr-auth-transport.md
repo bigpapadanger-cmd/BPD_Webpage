@@ -36,6 +36,12 @@ tokens. Auth failures use existing `OCR_GOOGLE_STS_EXCHANGE_FAILED` and
 errors use `OCR_PROVIDER_TRANSPORT_FAILED`, `OCR_PROVIDER_TIMEOUT`, and
 `OCR_PROVIDER_RESPONSE_TOO_LARGE`.
 
+The authenticated `GET /health` Service Binding endpoint is separate from
+`POST /api/ocr`. It performs no Google STS/IAM or Cloud Run operation and
+returns only booleans indicating required configuration presence. It uses the
+same shared-secret authorization. The Admin system-status aggregator uses this
+route with a short timeout and a 45-second cache.
+
 ## Security/configuration
 
 `workers/ocr-cloud-run-proxy/wrangler.jsonc` has no workers.dev URL, preview

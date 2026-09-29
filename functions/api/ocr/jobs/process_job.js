@@ -17,6 +17,7 @@ import {
 import {
     persistOcrCandidateArchive
 } from "../../../services/ocr/trainingCandidates.js";
+import { suggestRosterName } from "../../../services/ocr/playerNameMatching.js";
 
 const PROCESS_JOB_VERSION =
     "ocr-process-job-2.2";
@@ -1397,8 +1398,9 @@ function getProviderResult(
     return null;
 }
 
-function resultRequiresReview(
-    result
+export function resultRequiresReview(
+    result,
+    rosterCandidates = []
 ) {
     if (
         result?.requiresPlayerReview ===
@@ -1423,10 +1425,22 @@ function resultRequiresReview(
             ? result.teams
             : [];
 
-    for (
-        const team
-        of teams
-    ) {
+    for (let teamArrayIndex = 0; teamArrayIndex < teams.length; teamArrayIndex += 1) {
+        const team = teams[teamArrayIndex];
+        const teamIndex = Number(team?.team ?? team?.teamIndex ?? teamArrayIndex + 1);
+        const roster = rosterCandidates.find(value => Number(value?.team) === teamIndex)?.roster || [];
+        const totalGoals = Number(team?.totalGoals);
+        if (
+            team?.totalGoalsRequiresVerification === true
+            || team?.totalGoals === null
+            || typeof team?.totalGoals === "undefined"
+            || String(team?.totalGoals ?? "").trim() === ""
+            || !Number.isSafeInteger(totalGoals)
+            || totalGoals < 0
+        ) {
+            return true;
+        }
+
         const players =
             Array.isArray(
                 team?.players
@@ -1438,6 +1452,8 @@ function resultRequiresReview(
             const player
             of players
         ) {
+            const observedName = String(player?.nameEvidence?.raw || player?.player || player?.matchedName || "").trim();
+            if (suggestRosterName(observedName, roster).candidate) return true;
             if (
                 player?.matchStatus === "NAME_REVIEW_REQUIRED"
                 || player?.matchStatus === "NAME_UNVERIFIED"
@@ -1477,6 +1493,26 @@ function resultRequiresReview(
     }
 
     return false;
+}
+
+function getSubmittedRosterCandidates(matchMetadata) {
+    let metadata = matchMetadata;
+    if (typeof metadata === "string") {
+        try { metadata = JSON.parse(metadata); }
+        catch { return []; }
+    }
+    const teams = Array.isArray(metadata?.teams) ? metadata.teams : [];
+    return [1, 2].map(teamIndex => {
+        const team = teams.find(value => Number(value?.team) === teamIndex);
+        const roster = Array.isArray(team?.roster) ? team.roster : [];
+        return {
+            team: teamIndex,
+            roster: [...new Set(roster
+                .filter(value => typeof value === "string")
+                .map(value => value.trim().slice(0, 64))
+                .filter(Boolean))].slice(0, 16)
+        };
+    }).filter(team => team.roster.length > 0);
 }
 
 /* =========================================================
@@ -1564,10 +1600,8 @@ async function persistResult(
         throw error;
     }
 
-    const requiresPlayerReview =
-        resultRequiresReview(
-            result
-        );
+    const rosterCandidates = getSubmittedRosterCandidates(fields?.matchMetadata);
+    const requiresPlayerReview = resultRequiresReview(result, rosterCandidates);
 
     const confirmationStatus =
         requiresPlayerReview
@@ -1642,6 +1676,9 @@ async function persistResult(
                 || fields?.sourceMode === "manual"
                 ? fields.sourceMode
                 : null,
+
+        rosterCandidates:
+            rosterCandidates,
 
         requiresPlayerReview,
 

@@ -1626,10 +1626,12 @@ function createScoreboardValueCell(
 function createScoreboardPlayerRow(
     teamIndex,
     player,
+    playerArrayIndex,
     fields,
     {
         editable = false,
-        useEffectiveValue = true
+        useEffectiveValue = true,
+        team = null
     } = {}
 ) {
     const playerName =
@@ -1664,6 +1666,65 @@ function createScoreboardPlayerRow(
 
     playerCell.textContent =
         playerName;
+
+    const matchStatus = String(player?.nameMatchStatus || player?.matchStatus || "").toUpperCase();
+    const suggestion = player?.nameSuggestion?.candidate;
+    const needsNameReview = ["NAME_REVIEW_REQUIRED", "NAME_UNVERIFIED"].includes(matchStatus)
+        || player?.nameSuggestion?.status === "needs_verification"
+        || /^Unknown Player(?:\s+\d+)?$/i.test(playerName);
+    if (needsNameReview && editable) {
+        const controls = document.createElement("div");
+        controls.className = "ocr-player-name-review";
+        const label = document.createElement("label");
+        const playerIndex = Number(player?.teamPlayerIndex) || playerArrayIndex + 1;
+        const selectorId = `ocr-name-${teamIndex}-${playerIndex}`;
+        label.htmlFor = selectorId;
+        label.textContent = suggestion
+            ? `⚠ Suggested: ${suggestion} (${Math.round(Number(player?.nameSuggestion?.confidence || 0) * 100)}%); verify or enter a name`
+            : "⚠ Name needs verification; choose roster member or enter a name";
+        const select = document.createElement("select");
+        select.id = selectorId;
+        select.className = "ocr-name-roster-choice";
+        select.dataset.team = String(teamIndex);
+        select.dataset.playerIndex = String(playerIndex);
+        const placeholder = document.createElement("option");
+        placeholder.value = "";
+        placeholder.textContent = "Select roster member to verify…";
+        select.append(placeholder);
+        for (const candidate of Array.isArray(team?.rosterCandidates) ? team.rosterCandidates : []) {
+            const option = document.createElement("option");
+            option.value = String(candidate);
+            option.textContent = String(candidate);
+            select.append(option);
+        }
+        if (suggestion && !Array.from(select.options).some(option => option.value === suggestion)) {
+            const option = document.createElement("option");
+            option.value = suggestion;
+            option.textContent = `Suggested: ${suggestion}`;
+            select.append(option);
+        }
+        const manual = document.createElement("input");
+        manual.type = "text";
+        manual.maxLength = 64;
+        manual.autocomplete = "off";
+        manual.placeholder = "Or enter verified player name";
+        manual.setAttribute("aria-label", `Enter a verified name for Team ${teamIndex} player ${playerIndex}`);
+        manual.className = "ocr-name-manual-input";
+        manual.dataset.team = String(teamIndex);
+        manual.dataset.playerIndex = String(playerIndex);
+        controls.append(label, select, manual);
+        playerCell.append(controls);
+    } else if (player?.nameResolution?.userVerified === true) {
+        const verified = document.createElement("small");
+        verified.className = "ocr-player-name-verified";
+        verified.textContent = "✓ Verified";
+        playerCell.append(verified);
+    } else if (suggestion) {
+        const hint = document.createElement("small");
+        hint.className = "ocr-player-name-suggestion";
+        hint.textContent = `⚠ Suggested: ${suggestion} — verify required`;
+        playerCell.append(hint);
+    }
 
     row.appendChild(
         playerCell
@@ -1749,14 +1810,40 @@ function createScoreboardTeamTable(
     const totalGoals = team?.totalGoals !== null
         && typeof team?.totalGoals !== "undefined"
         && String(team.totalGoals).trim() !== ""
-        && Number.isInteger(Number(team.totalGoals))
+        && Number.isSafeInteger(Number(team.totalGoals))
+        && Number(team.totalGoals) >= 0
         ? Number(team.totalGoals)
         : null;
-    const teamSummary = document.createElement("p");
+    const teamSummary = document.createElement("div");
     teamSummary.className = "ocr-scoreboard-team-summary";
-    teamSummary.textContent = totalGoals === null
-        ? `Authoritative team goals: Unavailable${team?.totalGoalsRequiresVerification ? " (verification required)" : ""}`
-        : `Authoritative team goals: ${totalGoals}${team?.totalGoalsRequiresVerification ? " (verification required)" : ""}`;
+    const totalTitle = document.createElement("strong");
+    totalTitle.textContent = "TEAM TOTAL GOALS";
+    const totalValue = document.createElement("span");
+    totalValue.className = "ocr-scoreboard-team-total";
+    totalValue.textContent = totalGoals === null ? "Needs verification" : String(totalGoals);
+    teamSummary.append(totalTitle, totalValue);
+    if (mode === "review" && editable) {
+        const totalInput = document.createElement("input");
+        totalInput.type = "number";
+        totalInput.min = "0";
+        totalInput.max = "99";
+        totalInput.step = "1";
+        totalInput.value = totalGoals === null ? "" : String(totalGoals);
+        totalInput.className = "ocr-team-total-review-input";
+        totalInput.dataset.team = String(teamIndex);
+        totalInput.setAttribute("aria-label", `Verify Team ${teamIndex} total goals`);
+        teamSummary.append(totalInput);
+    } else if (team?.totalGoalsProvenance?.userVerified === true) {
+        const verified = document.createElement("small");
+        verified.className = "ocr-player-name-verified";
+        verified.textContent = "Verified by reviewer";
+        teamSummary.append(verified);
+    } else if (team?.totalGoalsRequiresVerification === true) {
+        const warning = document.createElement("small");
+        warning.className = "ocr-team-total-warning";
+        warning.textContent = "OCR estimate — verification required";
+        teamSummary.append(warning);
+    }
     section.appendChild(teamSummary);
 
     if (
@@ -1805,8 +1892,13 @@ function createScoreboardTeamTable(
         );
 
     const caption = document.createElement("caption");
+    caption.className = "ocr-visually-hidden";
     caption.textContent = `Team ${teamIndex} player scoreboard`;
     table.appendChild(caption);
+    const playerScoreboardHeading = document.createElement("h4");
+    playerScoreboardHeading.className = "ocr-scoreboard-player-heading";
+    playerScoreboardHeading.textContent = "Player scoreboard";
+    section.appendChild(playerScoreboardHeading);
 
     const head =
         document.createElement(
@@ -1867,12 +1959,14 @@ function createScoreboardTeamTable(
 
     players.forEach(
         function(
-            player
+            player,
+            playerArrayIndex
         ) {
             body.appendChild(
                 createScoreboardPlayerRow(
                     teamIndex,
                     player,
+                    playerArrayIndex,
                     fields,
                     {
                         editable,
@@ -2057,6 +2151,7 @@ function renderOcrResultTable(
                     teamArrayIndex,
                     {
                         editable,
+                        team,
                         mode
                     }
                 )
@@ -2235,7 +2330,8 @@ function collectEditableFields(
 
 async function submitOcrFields(
     mode,
-    fields
+    fields,
+    reviewMetadata = {}
 ) {
     assertOcrResultEditable();
 
@@ -2287,7 +2383,8 @@ async function submitOcrFields(
                     JSON.stringify({
                         mode,
                         matchId,
-                        fields
+                        fields,
+                        ...reviewMetadata
                     })
             }
         );
@@ -2410,10 +2507,31 @@ async function submitReview() {
                 false
         });
 
+    const dialog = ensureOcrResultDialog();
+    const teamTotals = Array.from(dialog.querySelectorAll(".ocr-team-total-review-input")).map(input => {
+        const value = normalizeInteger(input.value);
+        if (value === null || value > 99) throw new Error("Enter a valid total-goals value for each team.");
+        return { team: normalizeInteger(input.dataset.team), userValue: value };
+    });
+    const nameCorrections = [];
+    for (const select of Array.from(dialog.querySelectorAll(".ocr-name-roster-choice"))) {
+        const manual = Array.from(dialog.querySelectorAll(".ocr-name-manual-input")).find(input => input.dataset.team === select.dataset.team && input.dataset.playerIndex === select.dataset.playerIndex);
+        const manualName = String(manual?.value || "").trim();
+        const resolvedDisplayName = manualName || String(select.value || "").trim();
+        if (!resolvedDisplayName) throw new Error("Verify every flagged player name using the roster or a manual name.");
+        nameCorrections.push({
+            team: normalizeInteger(select.dataset.team),
+            playerIndex: normalizeInteger(select.dataset.playerIndex),
+            resolvedDisplayName,
+            matchSource: manualName ? "manual-text" : "manual-roster"
+        });
+    }
+
     const data =
         await submitOcrFields(
             "review",
-            fields
+            fields,
+            { teamTotals, nameCorrections }
         );
 
     document.dispatchEvent(

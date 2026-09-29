@@ -18,7 +18,7 @@ Policy:
     - A valid Rocket League player UUID must exist.
     - A linked Epic account must exist.
     - Normal refresh: at most once every 24 hours.
-    - Accounts not seen for more than 7 days are not
+    - Accounts not seen for more than 6 days are not
       refreshed through ordinary activity unless their
       activity timestamp has already been updated.
     - Scheduled inactive-player refreshes are handled
@@ -58,7 +58,7 @@ const DAY_MS =
     24 * 60 * 60 * 1000;
 
 const INACTIVE_AFTER_MS =
-    7 * DAY_MS;
+    6 * DAY_MS;
 
 /* =========================================================
 NORMALIZATION

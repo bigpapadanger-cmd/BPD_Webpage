@@ -893,6 +893,28 @@ function normalizeFieldEntry(
     };
 }
 
+function normalizeTeamTotalEntry(entry) {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) return null;
+    const team = normalizeInteger(entry.team);
+    const userValue = normalizeInteger(entry.userValue);
+    return (team === 1 || team === 2) && userValue !== null && userValue <= 99
+        ? { team, userValue }
+        : null;
+}
+
+function normalizeNameCorrection(entry) {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) return null;
+    const team = normalizeInteger(entry.team);
+    const playerIndex = normalizeInteger(entry.playerIndex);
+    const resolvedDisplayName = normalizeString(entry.resolvedDisplayName);
+    const matchSource = normalizeString(entry.matchSource);
+    if ((team !== 1 && team !== 2) || playerIndex === null || playerIndex < 1 || playerIndex > 16
+        || !resolvedDisplayName || resolvedDisplayName.length > 64
+        || /[\u0000-\u001f\u007f]/.test(resolvedDisplayName)
+        || !["manual-roster", "manual-text"].includes(matchSource)) return null;
+    return { team, playerIndex, resolvedDisplayName, matchSource };
+}
+
 /* =========================================================
 FIELD KEY
 ========================================================= */
@@ -1389,11 +1411,14 @@ function buildExpectedReviewFieldKeys(
 REVIEW MODE
 ========================================================= */
 
-function processReviewConfirmation(
+export function processReviewConfirmation(
     existingReport,
     teams,
     fields,
-    submittedFieldKeys
+    submittedFieldKeys,
+    teamTotals,
+    nameCorrections,
+    reviewerAccountId = null
 ) {
     const currentStatus =
         normalizeConfirmationStatus(
@@ -1612,6 +1637,113 @@ function processReviewConfirmation(
             entry.userValue;
     }
 
+    const correctionKeys = new Set();
+    const appliedNameCorrections = [];
+    for (const correction of nameCorrections) {
+        const key = `${correction.team}:${correction.playerIndex}`;
+        if (correctionKeys.has(key)) {
+            return { error: { status: 400, message: "Duplicate player-name corrections were submitted." } };
+        }
+        correctionKeys.add(key);
+        const team = findStoredTeam(teams, correction.team);
+        const players = Array.isArray(team?.players) ? team.players : [];
+        const player = players.find((value, index) =>
+            Number(value?.teamPlayerIndex) === correction.playerIndex
+            || (!Number.isInteger(Number(value?.teamPlayerIndex)) && index + 1 === correction.playerIndex));
+        if (!team || !player) {
+            return { error: { status: 409, message: "A player row could not be matched for name review." } };
+        }
+        const originalOcrName = normalizeString(player?.nameEvidence?.raw)
+            || normalizeString(player?.player || player?.matchedName)
+            || `Unknown Player ${correction.playerIndex}`;
+        if (correction.matchSource === "manual-roster") {
+            const rosters = Array.isArray(existingReport?.rosterCandidates) ? existingReport.rosterCandidates : [];
+            const roster = rosters.find(value => Number(value?.team) === correction.team)?.roster;
+            if (!Array.isArray(roster) || !roster.some(value => normalizePlayerName(value) === normalizePlayerName(correction.resolvedDisplayName))) {
+                return { error: { status: 400, message: "Selected player is not in the submitted roster." } };
+            }
+        }
+        player.player = correction.resolvedDisplayName;
+        player.matchStatus = "NAME_MANUALLY_VERIFIED";
+        player.nameResolution = {
+            originalOcrName,
+            resolvedDisplayName: correction.resolvedDisplayName,
+            matchedPlayerId: null,
+            matchSource: correction.matchSource,
+            reviewerAccountId,
+            userVerified: true,
+            verifiedAt: new Date().toISOString()
+        };
+        appliedNameCorrections.push({
+            team: correction.team,
+            playerIndex: correction.playerIndex,
+            originalOcrName,
+            resolvedDisplayName: correction.resolvedDisplayName,
+            matchSource: correction.matchSource,
+            reviewerAccountId,
+            userVerified: true,
+            verifiedAt: player.nameResolution.verifiedAt
+        });
+    }
+
+    const requiredNameCorrections = [];
+    for (let teamArrayIndex = 0; teamArrayIndex < teams.length; teamArrayIndex += 1) {
+        const team = teams[teamArrayIndex];
+        const teamIndex = Number(team?.team ?? team?.teamIndex ?? teamArrayIndex + 1);
+        const players = Array.isArray(team?.players) ? team.players : [];
+        for (let playerArrayIndex = 0; playerArrayIndex < players.length; playerArrayIndex += 1) {
+            const player = players[playerArrayIndex];
+            const matchStatus = String(player?.matchStatus || "").toUpperCase();
+            const playerName = normalizeString(player?.player || player?.matchedName);
+            if (["NAME_REVIEW_REQUIRED", "NAME_UNVERIFIED"].includes(matchStatus) || /^Unknown Player(?:\s+\d+)?$/i.test(playerName)) {
+                const playerIndex = Number(player?.teamPlayerIndex) || playerArrayIndex + 1;
+                requiredNameCorrections.push(`${teamIndex}:${playerIndex}`);
+            }
+        }
+    }
+    if (requiredNameCorrections.some(key => !correctionKeys.has(key))) {
+        return { error: { status: 400, message: "Every uncertain player name must be reviewed or manually entered." } };
+    }
+
+    const appliedTeamTotals = [];
+    const teamTotalKeys = new Set();
+    for (const entry of teamTotals) {
+        if (teamTotalKeys.has(entry.team)) {
+            return { error: { status: 400, message: "Duplicate team totals were submitted." } };
+        }
+        teamTotalKeys.add(entry.team);
+        const team = findStoredTeam(teams, entry.team);
+        if (!team) return { error: { status: 409, message: "Stored team could not be matched for team total review." } };
+        const previousValue = normalizeInteger(team.totalGoals);
+        const verifiedAt = new Date().toISOString();
+        team.totalGoals = entry.userValue;
+        team.totalGoalsRequiresVerification = false;
+        team.totalGoalsProvenance = {
+            source: "human-review",
+            reviewerAccountId,
+            userVerified: true,
+            verifiedAt
+        };
+        appliedTeamTotals.push({
+            team: entry.team,
+            ocrValue: previousValue,
+            userValue: entry.userValue,
+            reviewerAccountId,
+            userVerified: true,
+            verifiedAt
+        });
+    }
+
+    for (let teamArrayIndex = 0; teamArrayIndex < teams.length; teamArrayIndex += 1) {
+        const team = teams[teamArrayIndex];
+        const teamIndex = Number(team?.team ?? team?.teamIndex ?? teamArrayIndex + 1);
+        const total = normalizeInteger(team?.totalGoals);
+        if ((team?.totalGoalsRequiresVerification === true || total === null)
+            && !teamTotalKeys.has(teamIndex)) {
+            return { error: { status: 400, message: "Every uncertain team total must be reviewed or entered." } };
+        }
+    }
+
     const disputes =
         authoritativeFields.filter(
             function(
@@ -1660,6 +1792,12 @@ function processReviewConfirmation(
 
         fields:
             authoritativeFields,
+
+        teamTotals:
+            appliedTeamTotals,
+
+        playerNames:
+            appliedNameCorrections,
 
         disputes
     };
@@ -2212,6 +2350,24 @@ export async function handleOcrConfirmation(
             );
         }
 
+        const rawTeamTotals = Array.isArray(body?.teamTotals) ? body.teamTotals : [];
+        const rawNameCorrections = Array.isArray(body?.nameCorrections) ? body.nameCorrections : [];
+        if (rawTeamTotals.length > 2 || rawNameCorrections.length > 32
+            || (mode === CONFIRM_MODE_ADJUSTMENT && (rawTeamTotals.length > 0 || rawNameCorrections.length > 0))) {
+            return jsonResponse({
+                success: false,
+                message: "One or more review metadata fields are invalid."
+            }, 400);
+        }
+        const teamTotals = rawTeamTotals.map(normalizeTeamTotalEntry).filter(Boolean);
+        const nameCorrections = rawNameCorrections.map(normalizeNameCorrection).filter(Boolean);
+        if (teamTotals.length !== rawTeamTotals.length || nameCorrections.length !== rawNameCorrections.length) {
+            return jsonResponse({
+                success: false,
+                message: "One or more review metadata fields are invalid."
+            }, 400);
+        }
+
         /* =================================================
         DUPLICATES
         ================================================= */
@@ -2519,7 +2675,10 @@ export async function handleOcrConfirmation(
                     existingReport,
                     teams,
                     fields,
-                    submittedFieldKeys
+                    submittedFieldKeys,
+                    teamTotals,
+                    nameCorrections,
+                    accountId
                 );
 
         if (

@@ -98,6 +98,20 @@ test("manual route rejects unauthorized and unknown jobs before external calls",
     assert.equal(calls, 0);
 });
 
+test("detailed health is protected, reports unknown before first run, and never starts presence work", async () => {
+    let calls = 0;
+    globalThis.fetch = async () => { calls += 1; throw new Error("health must not call dependencies"); };
+    const unauthorized = await handleFetch(new Request("https://status.invalid/admin/health"), env());
+    assert.equal(unauthorized.status, 401);
+    const authorized = await handleFetch(new Request("https://status.invalid/admin/health", { headers: { Authorization: `Bearer ${TRIGGER_KEY}` } }), env());
+    const payload = await authorized.json();
+    assert.equal(authorized.status, 200);
+    assert.equal(payload.status, "unknown");
+    assert.equal(payload.configuration.supabaseCredentialPresent, true);
+    assert.equal(JSON.stringify(payload).includes("test-service-role-secret"), false);
+    assert.equal(calls, 0);
+});
+
 test("manual route rejects a duplicate same-isolate run instead of duplicating outbound calls", async () => {
     let releaseRpc;
     let rpcStarted;

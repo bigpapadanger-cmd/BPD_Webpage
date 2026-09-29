@@ -1025,6 +1025,46 @@ export const PAGE_ROUTE_INVENTORY = Object.freeze([
     ]
   },
   {
+    "path": "/Admin/WorkerStatus",
+    "lookupKey": "/admin/workerstatus",
+    "canonicalPath": "/Admin/WorkerStatus",
+    "routeType": "page",
+    "casePolicy": "human-insensitive",
+    "sourceFiles": [
+      "public/routes.js"
+    ],
+    "handler": "functions/[[path]].js",
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "authRequired": true,
+    "healthStatus": "registered",
+    "deepLinkSupported": true,
+    "targets": [
+      {
+        "path": "/Global/Admin/WorkerStatus/HTML/index.html",
+        "exists": true
+      },
+      {
+        "path": "/Framework/Shell/HTML/Header/header.html",
+        "exists": true
+      },
+      {
+        "path": "/Framework/Shell/HTML/Sidebar/admin.html",
+        "exists": true
+      },
+      {
+        "path": "/Framework/Shell/HTML/Footer/footer.html",
+        "exists": true
+      },
+      {
+        "path": "/Global/Admin/WorkerStatus/JS/index.js",
+        "exists": true
+      }
+    ]
+  },
+  {
     "path": "/Admin/SuggestionReview",
     "lookupKey": "/admin/suggestionreview",
     "canonicalPath": "/Admin/SuggestionReview",
@@ -1109,6 +1149,23 @@ export const API_ROUTE_INVENTORY = Object.freeze([
     "handler": "functions/api/admin/suggestions/index.js",
     "methods": [
       "GET"
+    ],
+    "authRequired": "handler-defined",
+    "healthStatus": "valid",
+    "deepLinkSupported": false
+  },
+  {
+    "path": "/api/admin/system-status",
+    "lookupKey": null,
+    "routeType": "api",
+    "casePolicy": "exact",
+    "sourceFiles": [
+      "functions/api/admin/system-status.js"
+    ],
+    "handler": "functions/api/admin/system-status.js",
+    "methods": [
+      "GET",
+      "POST"
     ],
     "authRequired": "handler-defined",
     "healthStatus": "valid",
@@ -2000,7 +2057,7 @@ export const API_ROUTE_INVENTORY = Object.freeze([
 ]);
 export const WORKER_ROUTE_INVENTORY = Object.freeze([
   {
-    "path": "https://ocr-transport.bpd-gaming-network.com/*",
+    "path": "https://ocr-transport.bpd-gaming-network.com/health",
     "lookupKey": null,
     "routeType": "worker",
     "casePolicy": "exact",
@@ -2009,10 +2066,27 @@ export const WORKER_ROUTE_INVENTORY = Object.freeze([
     ],
     "handler": "workers/ocr-cloud-run-proxy/src/index.js",
     "methods": [
-      "ALL"
+      "GET"
     ],
-    "authRequired": "not applicable",
-    "healthStatus": "returns 404 for all HTTP requests",
+    "authRequired": false,
+    "healthStatus": "handler-defined",
+    "deepLinkSupported": false,
+    "ownerSystem": "bpd-ocr-cloud-run-proxy"
+  },
+  {
+    "path": "https://ocr-transport.bpd-gaming-network.com/admin/recheck/cloud-run",
+    "lookupKey": null,
+    "routeType": "worker",
+    "casePolicy": "exact",
+    "sourceFiles": [
+      "workers/ocr-cloud-run-proxy/src/index.js"
+    ],
+    "handler": "workers/ocr-cloud-run-proxy/src/index.js",
+    "methods": [
+      "POST"
+    ],
+    "authRequired": false,
+    "healthStatus": "handler-defined",
     "deepLinkSupported": false,
     "ownerSystem": "bpd-ocr-cloud-run-proxy"
   },
@@ -2035,6 +2109,23 @@ export const WORKER_ROUTE_INVENTORY = Object.freeze([
   },
   {
     "path": "https://status.bpd-gaming-network.com/health",
+    "lookupKey": null,
+    "routeType": "worker",
+    "casePolicy": "exact",
+    "sourceFiles": [
+      "workers/rl-presence-monitor/src/index.js"
+    ],
+    "handler": "workers/rl-presence-monitor/src/index.js",
+    "methods": [
+      "GET"
+    ],
+    "authRequired": false,
+    "healthStatus": "handler-defined",
+    "deepLinkSupported": false,
+    "ownerSystem": "bpd-rl-presence-monitor"
+  },
+  {
+    "path": "https://status.bpd-gaming-network.com/admin/health",
     "lookupKey": null,
     "routeType": "worker",
     "casePolicy": "exact",

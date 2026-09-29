@@ -17,7 +17,7 @@ workers/
 |   +-- tests/index.test.mjs
 +-- ocr-cloud-run-proxy/
 |   +-- wrangler.jsonc       Pages Service Binding target plus secret-gated custom domain.
-|   +-- src/index.js         X.509 WIF, IAM ID token, fixed Cloud Run OCR transport.
+|   +-- src/index.js         X.509 WIF, fixed OCR transport, throttled operational state, and protected readiness-only Cloud Run recheck.
 |   +-- tests/index.test.mjs Production auth/transport contract coverage.
 |   +-- README.md            Secret/configuration and operator deployment plan.
 +-- ocr-job-consumer/
@@ -26,11 +26,12 @@ workers/
 |       +-- index.js       HTTP, queue, and scheduled-event entrypoint.
 |       +-- cleanup.js     Transient progress cleanup and edit-window sealing.
 |       +-- debug.js       Sanitized OCR trace creation/storage.
+|   +-- tests/status.test.mjs Queue invocation heartbeat and queue-only route regression coverage.
 |
 +-- rl-presence-monitor/
 |   +-- wrangler.jsonc
 |   +-- src/
-|   |   +-- index.js             /health, authorized /wake, and cron dispatcher.
+|   |   +-- index.js             /health, protected /admin/health, authorized /wake, cron dispatcher, presence heartbeat.
 |   |   +-- presence_cycle.js    Candidate selection, presence fetch/save cycle.
 |   |   +-- scheduled_mmr.js     Scheduled MMR candidate refresh and persistence.
 |   |   +-- taskboard_summary.js Taskboard aggregate load and Discord delivery.
@@ -58,6 +59,7 @@ Configuration
                       unauthenticated health response is exposed)
     Queue consumer    bpd-ocr-jobs; batch size 1; concurrency 2; two retries
     Schedule          every 30 minutes for cleanup
+    Status            Queue invocation heartbeat in shared status KV; no synthetic HTTP health route.
     R2 bindings       OCR_STORAGE and OCR_PROGRESS
     External callback configured to the Pages process_job API
 

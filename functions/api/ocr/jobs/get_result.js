@@ -1,5 +1,7 @@
-import { authorizeRocketLeagueRequest, authorizationErrorResponse } from "../../../services/rl/authorization.js";
 "use strict";
+
+import { authorizeRocketLeagueRequest, authorizationErrorResponse } from "../../../services/rl/authorization.js";
+import { suggestRosterName } from "../../../services/ocr/playerNameMatching.js";
 
 /* =========================================================
 BPD GAMING NETWORK
@@ -1021,6 +1023,12 @@ export function sanitizePublicScoreboard(
 
         const publicPlayers =
             [];
+        const submittedRoster = Array.isArray(matchReport?.rosterCandidates)
+            ? matchReport.rosterCandidates.find(value => Number(value?.team) === teamIndex)?.roster
+            : null;
+        const candidateRoster = Array.isArray(team?.rosterCandidates)
+            ? team.rosterCandidates
+            : submittedRoster;
 
         for (
             const player
@@ -1041,6 +1049,10 @@ export function sanitizePublicScoreboard(
                     playerName
                     || `Unknown Player ${Number.isSafeInteger(Number(player?.teamPlayerIndex)) && Number(player.teamPlayerIndex) > 0 ? Number(player.teamPlayerIndex) : publicPlayers.length + 1}`
             };
+            const playerIndex = Number(player?.teamPlayerIndex);
+            if (Number.isSafeInteger(playerIndex) && playerIndex >= 1 && playerIndex <= 16) {
+                publicPlayer.teamPlayerIndex = playerIndex;
+            }
 
             if (player?.nameEvidence && typeof player.nameEvidence === "object") {
                 const observedName = sanitizeText(player.nameEvidence.raw);
@@ -1052,13 +1064,38 @@ export function sanitizePublicScoreboard(
                     publicPlayer.observedName = observedName;
                 }
 
-                if (["NAME_MATCHED", "NAME_REVIEW_REQUIRED", "NAME_UNVERIFIED"].includes(matchStatus)) {
+                if (["NAME_MATCHED", "NAME_REVIEW_REQUIRED", "NAME_UNVERIFIED", "NAME_MANUALLY_VERIFIED"].includes(matchStatus)) {
                     publicPlayer.nameMatchStatus = matchStatus;
                 }
 
                 publicPlayer.nameConfidence = sanitizeConfidence(
                     player.nameEvidence.confidence
                 );
+            }
+
+            const rawName = String(player?.nameEvidence?.raw || playerName || "").trim();
+            const nameSuggestion = suggestRosterName(rawName, candidateRoster);
+            if (nameSuggestion.candidate) {
+                publicPlayer.nameSuggestion = nameSuggestion;
+            }
+
+            const nameResolution = player?.nameResolution;
+            if (nameResolution?.userVerified === true) {
+                const verifiedName = sanitizeText(nameResolution.resolvedDisplayName);
+                const matchSource = ["manual-roster", "manual-text"].includes(nameResolution.matchSource)
+                    ? nameResolution.matchSource
+                    : null;
+                const verifiedAt = sanitizeText(nameResolution.verifiedAt);
+                if (verifiedName && matchSource && verifiedAt) {
+                    publicPlayer.nameResolution = {
+                        originalOcrName: sanitizeText(nameResolution.originalOcrName),
+                        resolvedDisplayName: verifiedName,
+                        matchedPlayerId: null,
+                        matchSource,
+                        userVerified: true,
+                        verifiedAt
+                    };
+                }
             }
 
             if (typeof player?.overallConfidence !== "undefined") {
@@ -1163,6 +1200,14 @@ export function sanitizePublicScoreboard(
                     publicPlayers
             };
 
+            if (Array.isArray(candidateRoster)) {
+                publicTeam.rosterCandidates = candidateRoster
+                    .filter(value => typeof value === "string")
+                    .slice(0, 16)
+                    .map(value => sanitizeText(value))
+                    .filter(Boolean);
+            }
+
             if (Object.hasOwn(team, "totalGoals")) {
                 publicTeam.totalGoals = sanitizeScoreboardValue(
                     team.totalGoals
@@ -1172,6 +1217,16 @@ export function sanitizePublicScoreboard(
                 );
                 publicTeam.totalGoalsRequiresVerification =
                     team.totalGoalsRequiresVerification === true;
+                if (team.totalGoalsProvenance?.userVerified === true) {
+                    const verifiedAt = sanitizeText(team.totalGoalsProvenance.verifiedAt);
+                    if (verifiedAt) {
+                        publicTeam.totalGoalsProvenance = {
+                            source: "human-review",
+                            userVerified: true,
+                            verifiedAt
+                        };
+                    }
+                }
             }
 
             publicTeams.push(publicTeam);

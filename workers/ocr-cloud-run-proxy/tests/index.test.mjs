@@ -12,6 +12,7 @@ function makeEnvironment(options = {}) {
     const sequence = certificateSequence;
     const certificate = btoa(`${String(sequence).padStart(3, "0")}${"C".repeat(160)}`);
     const mtlsRequests = [];
+    const statusRecords = new Map();
     const env = {
         OCR_API_URL: CLOUD_RUN_URL,
         OCR_PUBLIC_HOSTNAME: "ocr-transport.bpd-gaming-network.com",
@@ -22,6 +23,10 @@ function makeEnvironment(options = {}) {
         OCR_GCP_WORKLOAD_IDENTITY_PROVIDER_ID: "bpd-ocr-cloudflare-x509",
         OCR_GCP_SERVICE_ACCOUNT_EMAIL: "ocr-cloudflare-handler@example.iam.gserviceaccount.com",
         OCR_GCP_X509_CERT_CHAIN: JSON.stringify([certificate]),
+        SERVICE_STATUS: {
+            async get(key) { return statusRecords.get(key) || null; },
+            async put(key, value) { statusRecords.set(key, JSON.parse(value)); }
+        },
         OCR_GCP_MTLS: {
             async fetch(url, request) {
                 mtlsRequests.push({ url: String(url), request });
@@ -32,7 +37,7 @@ function makeEnvironment(options = {}) {
             }
         }
     };
-    return { env, mtlsRequests };
+    return { env, mtlsRequests, statusRecords };
 }
 
 function multipartRequest(form = null, url = "https://ocr-google-transport.internal/api/ocr", authorization = "Bearer " + "T".repeat(48)) {
@@ -56,6 +61,56 @@ test("rejects a missing mTLS binding without contacting Google", async () => {
     const response = await handleRequest(multipartRequest(), env);
     assert.equal(response.status, 503);
     assert.equal((await response.json()).code, "OCR_GOOGLE_MTLS_BINDING_MISSING");
+});
+
+test("health endpoint requires transport authorization and returns only configuration booleans", async () => {
+    const { env, mtlsRequests } = makeEnvironment();
+    const unauthorized = await handleRequest(new Request("https://ocr-google-transport.internal/health"), env);
+    assert.equal(unauthorized.status, 401);
+    const response = await handleRequest(new Request("https://ocr-google-transport.internal/health", {
+        headers: { Authorization: `Bearer ${env.OCR_GOOGLE_TRANSPORT_SECRET}` }
+    }), env);
+    assert.equal(response.status, 200);
+    const payload = await response.json();
+    assert.equal(payload.status, "ok");
+    assert.deepEqual(payload.configuration, {
+        mtlsBindingPresent: true,
+        x509CertificateChainPresent: true,
+        apiUrlPresent: true,
+        apiKeyPresent: true
+    });
+    assert.equal(JSON.stringify(payload).includes(env.OCR_API_KEY), false);
+    assert.equal(JSON.stringify(payload).includes(env.OCR_GCP_X509_CERT_CHAIN), false);
+    assert.equal(payload.operational, null);
+    assert.equal(payload.cloudRun, null);
+    assert.equal(mtlsRequests.length, 0);
+});
+
+test("explicit Cloud Run recheck is authenticated, fixed-path, readiness-only, and sanitized", async () => {
+    const { env, mtlsRequests, statusRecords } = makeEnvironment();
+    const exp = Math.floor(Date.now() / 1000) + 3600;
+    const idPayload = btoa(JSON.stringify({ exp })).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
+    const idToken = `header.${idPayload}.test-id-token`;
+    const unauthenticated = await handleRequest(new Request("https://ocr-google-transport.internal/admin/recheck/cloud-run", { method: "POST" }), env);
+    assert.equal(unauthenticated.status, 401);
+    let target;
+    const response = await withFetch(async (url, request) => {
+        if (String(url).includes("iamcredentials.googleapis.com")) return Response.json({ token: idToken });
+        target = { url: String(url), method: request.method, headers: new Headers(request.headers) };
+        assert.equal(target.url, "https://bpd-ocr-y5wgeempka-uc.a.run.app/api/ocr/health");
+        assert.equal(target.method, "GET");
+        assert.equal(target.headers.get("Authorization"), `Bearer ${idToken}`);
+        assert.equal(target.headers.get("X-API-Key"), env.OCR_API_KEY);
+        return Response.json({ success: true, runtimeInitialization: { success: true, templates: { loaded: true } }, scheduler: { initialized: true }, privateDetail: "must-not-pass" });
+    }, () => handleRequest(new Request("https://ocr-google-transport.internal/admin/recheck/cloud-run", { method: "POST", headers: { Authorization: `Bearer ${env.OCR_GOOGLE_TRANSPORT_SECRET}` } }), env));
+    const result = await response.json();
+    assert.equal(response.status, 200);
+    assert.equal(result.status, "healthy");
+    assert.equal("privateDetail" in result, false);
+    assert.equal(JSON.stringify(result).includes(env.OCR_API_KEY), false);
+    assert.equal(JSON.stringify(result).includes(idToken), false);
+    assert.equal(mtlsRequests.length, 1);
+    assert.equal(statusRecords.get("admin:service-status:cloud-run-ocr").status, "healthy");
 });
 
 test("Worker custom domain is shared-secret gated and Pages uses its fixed service binding", async () => {

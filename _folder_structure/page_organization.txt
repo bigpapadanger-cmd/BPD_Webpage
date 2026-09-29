@@ -142,6 +142,7 @@ Administration routes
     /Admin                    Global/Admin/Home.
     /Admin/Taskboard          Global/Admin/TaskBoard and its multi-view modules.
     /Admin/PageSettings       Read-only route/connection diagnostics; permission-gated.
+    /Admin/WorkerStatus       Aggregated cached Worker/service liveness; permission-gated.
     /Admin/SuggestionReview   Pending suggestion moderation; admins and moderators only.
 
 DETAIL FILE INDEX

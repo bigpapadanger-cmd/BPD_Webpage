@@ -8,6 +8,60 @@ const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
 const MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
 const REQUEST_TIMEOUT_MS = 295000;
 const INTERNAL_HOSTNAME = "ocr-google-transport.internal";
+const TRANSPORT_STATUS_KEY = "admin:service-status:ocr-transport";
+const CLOUD_RUN_STATUS_KEY = "admin:service-status:cloud-run-ocr";
+const statusWriteAt = new Map();
+
+async function updateOperationalStatus(env, key, update, force = false) {
+    if (!env?.SERVICE_STATUS) return;
+    const lastWrite = statusWriteAt.get(key) || 0;
+    if (!force && Date.now() - lastWrite < 30000) return;
+    let previous = {};
+    try { previous = await env.SERVICE_STATUS.get(key, "json") || {}; } catch { /* Best effort. */ }
+    try { await env.SERVICE_STATUS.put(key, JSON.stringify({ ...previous, ...update }), { expirationTtl: 2592000 }); statusWriteAt.set(key, Date.now()); } catch { /* Telemetry does not change OCR behavior. */ }
+}
+
+async function recheckCloudRun(env) {
+    const apiUrl = String(env?.OCR_API_URL || "").trim();
+    const apiKey = String(env?.OCR_API_KEY || "").trim();
+    if (!apiUrl || !apiKey) return jsonResponse({ success: false, status: "unknown", message: "Cloud Run readiness is not configured." }, 503);
+    let healthUrl;
+    try {
+        const base = new URL(apiUrl);
+        if (base.protocol !== "https:" || base.pathname.replace(/\/$/, "") !== "/api/ocr" || base.search || base.hash) throw new Error("invalid configured path");
+        healthUrl = new URL("/api/ocr/health", base.origin);
+    } catch { return jsonResponse({ success: false, status: "unknown", message: "Cloud Run readiness configuration is invalid." }, 503); }
+
+    const started = Date.now();
+    let idToken;
+    try {
+        idToken = await getGoogleCloudRunIdToken(env, apiUrl);
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 6000);
+        let response;
+        try { response = await fetch(healthUrl, { method: "GET", redirect: "manual", signal: controller.signal, headers: { Accept: "application/json", Authorization: `Bearer ${idToken}`, "X-API-Key": apiKey } }); }
+        finally { clearTimeout(timeout); idToken = null; }
+        const declared = Number(response.headers.get("Content-Length"));
+        if (Number.isFinite(declared) && declared > 4096) return jsonResponse({ success: false, status: "degraded", message: "Cloud Run health response exceeded the safe limit." }, 502);
+        const text = await response.text();
+        if (text.length > 4096) return jsonResponse({ success: false, status: "degraded", message: "Cloud Run health response exceeded the safe limit." }, 502);
+        let body = {};
+        try { body = text ? JSON.parse(text) : {}; } catch { body = {}; }
+        const runtimeReady = body?.runtimeInitialization?.success === true;
+        const templatesReady = body?.runtimeInitialization?.templates?.loaded === true;
+        const schedulerReady = body?.scheduler?.initialized === true;
+        const status = response.ok && body.success === true ? (runtimeReady && templatesReady && schedulerReady ? "healthy" : "degraded") : response.status >= 500 ? "down" : "degraded";
+        const result = { success: response.ok && body.success === true, status, message: status === "healthy" ? "Cloud Run health, OCR runtime, templates, and scheduler are ready." : status === "degraded" ? "Cloud Run is reachable, but one or more readiness dependencies are incomplete." : "Cloud Run health endpoint is unavailable.", checkedAt: new Date().toISOString(), responseTimeMs: Date.now() - started, dependencies: [{ id: "runtime", status: runtimeReady ? "healthy" : "degraded" }, { id: "templates", status: templatesReady ? "healthy" : "degraded" }, { id: "scheduler", status: schedulerReady ? "healthy" : "degraded" }] };
+        await updateOperationalStatus(env, CLOUD_RUN_STATUS_KEY, result, true);
+        return jsonResponse(result, result.success ? 200 : 502);
+    } catch (error) {
+        idToken = null;
+        const status = error?.name === "AbortError" ? "down" : "unknown";
+        const result = { success: false, status, message: status === "down" ? "Cloud Run readiness check timed out." : "Cloud Run readiness check failed.", checkedAt: new Date().toISOString(), responseTimeMs: Date.now() - started };
+        await updateOperationalStatus(env, CLOUD_RUN_STATUS_KEY, result, true);
+        return jsonResponse(result, 502);
+    }
+}
 
 function configuredTimeout(env) {
     const value = Number(env?.OCR_PROVIDER_TIMEOUT_MS);
@@ -145,6 +199,32 @@ function redactResponseCredentials(bytes, credentials) {
 
 async function processOcr(request, env) {
     const url = new URL(request.url);
+    if (request.method === "GET" && url.pathname === "/health" && !url.search) {
+        const publicHostname = String(env?.OCR_PUBLIC_HOSTNAME || "").trim().toLowerCase();
+        if (url.hostname.toLowerCase() !== INTERNAL_HOSTNAME && (!publicHostname || url.hostname.toLowerCase() !== publicHostname)) {
+            return transportError("NOT_FOUND", 404);
+        }
+        const unauthorized = authorizeTransportRequest(request, env);
+        if (unauthorized) return unauthorized;
+        const configuration = {
+            mtlsBindingPresent: typeof env?.OCR_GCP_MTLS?.fetch === "function",
+            x509CertificateChainPresent: Boolean(env?.OCR_GCP_X509_CERT_CHAIN),
+            apiUrlPresent: Boolean(String(env?.OCR_API_URL || "").trim()),
+            apiKeyPresent: Boolean(String(env?.OCR_API_KEY || "").trim())
+        };
+        const configured = Object.values(configuration).every(Boolean);
+        let operational = null;
+        let cloudRun = null;
+        try { operational = await env?.SERVICE_STATUS?.get(TRANSPORT_STATUS_KEY, "json") || null; } catch { /* Last-known state is optional. */ }
+        try { cloudRun = await env?.SERVICE_STATUS?.get(CLOUD_RUN_STATUS_KEY, "json") || null; } catch { /* Last-known state is optional. */ }
+        return jsonResponse({ success: true, service: "bpd-ocr-cloud-run-proxy", status: configured ? "ok" : "degraded", configuration, operational: operational ? { lastRequestAt: operational.lastRequestAt || null, lastSuccessAt: operational.lastSuccessAt || null, lastFailureAt: operational.lastFailureAt || null, lastFailureStage: operational.lastFailureStage || null, lastErrorCode: operational.lastErrorCode || null } : null, cloudRun: cloudRun ? { status: cloudRun.status || "unknown", checkedAt: cloudRun.checkedAt || null, responseTimeMs: cloudRun.responseTimeMs ?? null, message: cloudRun.message || null } : null }, 200);
+    }
+    if (request.method === "POST" && url.pathname === "/admin/recheck/cloud-run" && !url.search) {
+        if (url.hostname.toLowerCase() !== INTERNAL_HOSTNAME && String(env?.OCR_PUBLIC_HOSTNAME || "").trim().toLowerCase() !== url.hostname.toLowerCase()) return transportError("NOT_FOUND", 404);
+        const unauthorized = authorizeTransportRequest(request, env);
+        if (unauthorized) return unauthorized;
+        return await recheckCloudRun(env);
+    }
     if (request.method !== "POST") return transportError("METHOD_NOT_ALLOWED", 405);
     if (url.pathname !== INTERNAL_PATH || url.search) return transportError("NOT_FOUND", 404);
     const publicHostname = String(env?.OCR_PUBLIC_HOSTNAME || "").trim().toLowerCase();
@@ -244,11 +324,24 @@ async function processOcr(request, env) {
 }
 
 export async function handleRequest(request, env) {
+    const requestStartedAt = Date.now();
+    const url = new URL(request.url);
+    const track = request.method === "POST" && url.pathname === INTERNAL_PATH && !url.search && !authorizeTransportRequest(request, env);
     try {
-        return await processOcr(request, env);
+        const response = await processOcr(request, env);
+        if (track) {
+            const success = response.status < 500 && response.status !== 401 && response.status !== 403;
+            let code = null;
+            if (!success) { try { code = (await response.clone().json())?.code || null; } catch { /* Do not retain raw bodies. */ } }
+            const stage = /^OCR_GOOGLE_STS_/.test(String(code)) ? "sts" : /^OCR_GOOGLE_ID_TOKEN/.test(String(code)) ? "iam" : response.status === 502 ? "cloud-run" : response.status === 504 ? "timeout" : "response-parse";
+            const update = { lastRequestAt: new Date().toISOString(), lastDurationMs: Date.now() - requestStartedAt, ...(success ? { lastSuccessAt: new Date().toISOString() } : { lastFailureAt: new Date().toISOString(), lastFailureStage: stage, lastErrorCode: /^[A-Z0-9_]{3,80}$/.test(String(code || "")) ? code : "OCR_TRANSPORT_FAILED" }) };
+            await updateOperationalStatus(env, TRANSPORT_STATUS_KEY, update);
+        }
+        return response;
     }
     catch {
         console.error("[OCR transport] request rejected by internal handler");
+        if (track) await updateOperationalStatus(env, TRANSPORT_STATUS_KEY, { lastRequestAt: new Date().toISOString(), lastFailureAt: new Date().toISOString(), lastFailureStage: "response-parse", lastErrorCode: "OCR_TRANSPORT_FAILED", lastDurationMs: Date.now() - requestStartedAt });
         return transportError("OCR_TRANSPORT_FAILED", 502);
     }
 }

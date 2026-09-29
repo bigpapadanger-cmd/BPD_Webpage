@@ -34,7 +34,7 @@ functions/
 |   |   +-- rocketleague/
 |   |   |   +-- discord-notifications.js, profile.js, session.js
 |   |   +-- steam/callback.js, login.js
-|   +-- admin/page-settings/route-health.js, suggestions/index.js
+|   +-- admin/page-settings/route-health.js, system-status.js, suggestions/index.js
 |   |   +-- suggestions/[suggestionId]/review.js
 |   +-- curseforge/mods.js
 |   +-- suggestions/index.js, [suggestionId]/vote.js
@@ -48,7 +48,7 @@ functions/
 |
 +-- services/
     +-- admin/
-    |   +-- permissions.js, taskboard_discord.js, taskboard_roles.js
+    |   +-- permissions.js, system_status.js, taskboard_discord.js, taskboard_roles.js
     +-- auth/
     |   +-- authentication.js, authorization.js
     |   +-- account/

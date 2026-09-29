@@ -734,6 +734,17 @@ export const ROUTES = {
             false
     },
 
+    "/Admin/WorkerStatus": {
+        title: "Worker Status | BPD Gaming Network",
+        body: "/Global/Admin/WorkerStatus/HTML/index.html",
+        header: "/Framework/Shell/HTML/Header/header.html",
+        sidebar: "/Framework/Shell/HTML/Sidebar/admin.html",
+        footer: "/Framework/Shell/HTML/Footer/footer.html",
+        module: "/Global/Admin/WorkerStatus/JS/index.js",
+        requiresAuth: true,
+        sitemap: false
+    },
+
     "/Admin/SuggestionReview": {
         title:
             "Suggestion Review | BPD Gaming Network",

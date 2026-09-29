@@ -632,21 +632,19 @@ Handles:
 .ocr-scoreboard-team {
     width:
         100%;
+
+    overflow: hidden;
+
+    border: 1px solid var(--ocr-popup-border);
+
+    border-radius: 8px;
 }
 
 .ocr-scoreboard-team-header {
     padding:
         9px 14px;
 
-    border:
-        1px solid
-        var(--ocr-popup-border);
-
-    border-bottom:
-        0;
-
-    border-radius:
-        8px 8px 0 0;
+    border-bottom: 1px solid var(--ocr-popup-border);
 
     background:
         rgba(255, 255, 255, 0.07);
@@ -668,8 +666,85 @@ Handles:
 }
 
 .ocr-scoreboard-table-wrap {
-    border-radius:
-        0 0 8px 8px;
+    border: 0;
+    border-radius: 0;
+}
+
+.ocr-scoreboard-team-summary {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px 16px;
+    padding: 12px 14px;
+    background: rgba(255, 255, 255, 0.035);
+}
+
+.ocr-scoreboard-team-summary > strong {
+    color: rgba(255, 255, 255, 0.68);
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+}
+
+.ocr-scoreboard-player-heading {
+    margin: 0;
+    padding: 10px 14px 4px;
+    color: rgba(255, 255, 255, 0.82);
+    font-size: 0.84rem;
+    font-weight: 700;
+}
+
+.ocr-visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+.ocr-scoreboard-team-total {
+    color: #fff;
+    font-size: 1.5rem;
+    font-weight: 800;
+    line-height: 1;
+}
+
+.ocr-team-total-review-input,
+.ocr-name-roster-choice,
+.ocr-name-manual-input {
+    max-width: 100%;
+    min-height: 36px;
+    padding: 6px 9px;
+    border: 1px solid var(--ocr-popup-border);
+    border-radius: 5px;
+    background: rgba(0, 0, 0, 0.3);
+    color: inherit;
+}
+
+.ocr-team-total-review-input { width: 90px; }
+
+.ocr-player-name-review {
+    display: grid;
+    gap: 5px;
+    margin-top: 6px;
+    white-space: normal;
+}
+
+.ocr-player-name-review label,
+.ocr-player-name-suggestion,
+.ocr-team-total-warning {
+    color: #ffd27a;
+    font-size: 0.78rem;
+}
+
+.ocr-player-name-verified {
+    display: inline-block;
+    margin-left: 6px;
+    color: #91e2a0;
+    font-size: 0.75rem;
 }
 
 .ocr-scoreboard-table {

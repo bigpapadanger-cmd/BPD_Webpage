@@ -66,6 +66,7 @@ Important:
 
 import {
     BPD_AUTH_SESSION_URL,
+    BPD_AUTH_ACCOUNT_ACTIVITY_URL,
     ROCKET_LEAGUE_SESSION_URL,
     ADMIN_ACCESS_URL
 } from "/scripts/apiRoutes.js";
@@ -105,6 +106,9 @@ let currentRequest =
 
 let lastLoadedAt =
     0;
+
+let accountActivityRequest =
+    null;
 
 /* =========================================================
 NORMALIZATION
@@ -1331,6 +1335,81 @@ async function loadSessionFromServer() {
 }
 
 /* =========================================================
+RECORD AUTHENTICATED PAGE ACTIVITY
+
+This request runs at most once per browser page load. The
+server updates the canonical account activity timestamp and
+applies the existing MMR refresh gate. It never accepts an
+account ID from the browser.
+========================================================= */
+
+function recordAuthenticatedPageActivity() {
+    if (
+        accountActivityRequest
+    ) {
+        return accountActivityRequest;
+    }
+
+    accountActivityRequest =
+        fetch(
+            BPD_AUTH_ACCOUNT_ACTIVITY_URL,
+            {
+                method:
+                    "POST",
+
+                credentials:
+                    "same-origin",
+
+                cache:
+                    "no-store",
+
+                headers: {
+                    "Accept":
+                        "application/json"
+                }
+            }
+        )
+            .then(
+                response => {
+                    if (
+                        !response.ok
+                    ) {
+                        const error =
+                            new Error(
+                                "Account activity update failed."
+                            );
+
+                        error.status =
+                            response.status;
+
+                        throw error;
+                    }
+
+                    return true;
+                }
+            )
+            .catch(
+                error => {
+                    console.warn(
+                        "BPD AUTH: Account activity update was unavailable.",
+                        {
+                            status:
+                                error?.status
+                                || null,
+
+                            message:
+                                error?.message
+                                || "Unknown error"
+                        }
+                    );
+
+                    return false;
+                }
+            );
+
+    return accountActivityRequest;
+}
+/* =========================================================
 LOAD ADMIN ACCESS
 
 Every fresh authenticated account load performs this check.
@@ -1531,6 +1610,8 @@ export async function refreshAuthState(
                             nextState.userId
                         )
                     ) {
+                        void recordAuthenticatedPageActivity();
+
                         const adminState =
                             await loadAdminAccessFromServer();
 

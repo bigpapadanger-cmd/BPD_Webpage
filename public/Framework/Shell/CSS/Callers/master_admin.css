@@ -32,5 +32,6 @@ Used for all valid /Admin routes.
 @import url("../../../../Global/Admin/TaskBoard/CSS/index.css");
 @import url("../../../../Global/Admin/TaskBoard/CSS/overlay.css");
 @import url("../../../../Global/Admin/PageSettings/CSS/index.css");
+@import url("../../../../Global/Admin/WorkerStatus/CSS/index.css");
 @import url("../../../../Global/Admin/Suggestions/CSS/index.css");
 

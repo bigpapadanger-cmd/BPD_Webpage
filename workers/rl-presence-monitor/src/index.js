@@ -42,6 +42,17 @@ import {
 } from "./taskboard_summary.js";
 
 const activeJobs = new Set();
+const PRESENCE_STATUS_KEY = "admin:service-status:rl-presence";
+
+async function recordPresenceRun(env, summary, startedAt, failed = false) {
+    if (!env?.SERVICE_STATUS) return;
+    let prior = {};
+    try { prior = await env.SERVICE_STATUS.get(PRESENCE_STATUS_KEY, "json") || {}; } catch { /* Best effort. */ }
+    const now = new Date().toISOString();
+    const succeeded = !failed && summary?.success !== false;
+    const lastSummary = Object.fromEntries(["success", "skipped", "reason", "candidateCount", "checked", "failed", "anyOnline", "dormant"].filter(key => summary?.[key] !== undefined).map(key => [key, summary[key]]));
+    try { await env.SERVICE_STATUS.put(PRESENCE_STATUS_KEY, JSON.stringify({ lastInvocationAt: now, lastSuccessAt: succeeded ? now : prior.lastSuccessAt || null, lastFailureAt: succeeded ? prior.lastFailureAt || null : now, lastDurationMs: Date.now() - startedAt, lastSummary }), { expirationTtl: 2592000 }); } catch { /* Telemetry must not change job behavior. */ }
+}
 
 /* =========================================================
 CRON DEFINITIONS
@@ -161,6 +172,7 @@ async function executeJob(job, env) {
     try {
         const result = await run();
         const summary = summarizeJobResult(job, result);
+        if (job === "presence") await recordPresenceRun(env, summary, startedAt);
         console.info("BPD BACKGROUND WORKER: Job completed.", {
             job,
             durationMs: Date.now() - startedAt,
@@ -169,6 +181,7 @@ async function executeJob(job, env) {
         return summary;
     }
     catch (error) {
+        if (job === "presence") await recordPresenceRun(env, { success: false, failed: 1 }, startedAt, true);
         console.error("BPD BACKGROUND WORKER: Job failed.", {
             job,
             durationMs: Date.now() - startedAt,
@@ -213,6 +226,15 @@ async function handleFetch(
             service:
                 "bpd-rl-presence-monitor"
         });
+    }
+
+    if (request.method === "GET" && url.pathname === "/admin/health") {
+        if (!isWakeAuthorized(request, env)) return Response.json({ success: false, code: "UNAUTHORIZED" }, { status: 401, headers: { "Cache-Control": "no-store" } });
+        let state = null;
+        try { state = await env?.SERVICE_STATUS?.get(PRESENCE_STATUS_KEY, "json") || null; } catch { /* Safe unknown fallback. */ }
+        const lastSuccessAt = state?.lastSuccessAt || null;
+        const lastFailureAt = state?.lastFailureAt || null;
+        return Response.json({ success: true, service: "bpd-rl-presence-monitor", status: !state ? "unknown" : lastFailureAt && (!lastSuccessAt || lastFailureAt >= lastSuccessAt) ? "degraded" : "healthy", checkedAt: new Date().toISOString(), lastInvocationAt: state?.lastInvocationAt || null, lastSuccessAt, lastFailureAt, lastDurationMs: Number.isFinite(state?.lastDurationMs) ? state.lastDurationMs : null, lastSummary: state?.lastSummary || null, configuration: { supabaseUrlPresent: Boolean(String(env?.SUPABASE_URL || "").trim()), supabaseCredentialPresent: Boolean(String(env?.SUPABASE_SERVICE_ROLE_KEY || env?.SUPABASE_AUTH || "").trim()), mmrApiUrlPresent: Boolean(String(env?.MMR_API_URL || "").trim()) } }, { headers: { "Cache-Control": "no-store" } });
     }
 
     if (

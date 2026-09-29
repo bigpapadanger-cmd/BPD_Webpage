@@ -44,3 +44,31 @@ probe and is not used for normal processing.
 
 See [OCR authentication sub-map](system_sub_map/ocr-auth-transport.md) for the
 transport contract, boundaries, and operator sequence.
+
+## Review and operational status
+
+- OCR result review keeps header team goals separate from player SCORE. Team
+  totals and uncertain OCR names can be explicitly reviewed and written to the
+  existing R2 match report with human-verification provenance. Roster matching
+  is a suggestion source only; all candidate matches require reviewer selection
+  because no player/account identity store is present. Initial confidence bands
+  (0.90 high, 0.70 review floor) are centralized and should be calibrated from
+  reviewed samples before adjustment. A roster candidate keeps the job in the
+  existing review state; it is never silently auto-accepted as identity.
+- `/Admin/WorkerStatus` uses `ADMIN_SETTINGS_MANAGE` and calls only
+  `/api/admin/system-status`. The Pages aggregator caches the normalized
+  seven-service response for 45 seconds and deduplicates concurrent checks.
+  Routine refreshes make bounded RL, OCR transport, and MMR checks; Cloud Run
+  and Supabase use last-known state, while the OCR queue is read from a
+  per-invocation heartbeat. Service-specific actions use an explicit allowlist;
+  only RL presence has `Run Now`, and only MMR/PsyNet has `Reconnect`.
+- OCR transport and RL presence record safe operational state in the existing
+  `RL_STATS_CACHE` namespace through their `SERVICE_STATUS` bindings. Queue
+  status writes once per queue invocation. Cloud Run readiness is an explicit
+  secret-gated transport action; routine page refresh never mints credentials
+  or calls Cloud Run. Supabase is checked only when an admin requests Recheck.
+- See [Worker Status sub-map](system_sub_map/worker-status.md) and
+  [request-frequency inventory](request-frequency-inventory.md) for contracts,
+  action limits, and dependency semantics.
+- See [request-frequency inventory](request-frequency-inventory.md) for audited
+  callers, controls, and known measurement gaps.

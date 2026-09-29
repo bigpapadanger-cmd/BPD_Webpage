@@ -46,6 +46,13 @@
         }
     ],
 
+    "kv_namespaces": [
+        {
+            "binding": "SERVICE_STATUS",
+            "id": "b01a6271a3fd47e7831bcb2502a0b901"
+        }
+    ],
+
     "observability": {
         "logs": {
             "enabled": true,
