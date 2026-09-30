@@ -76,17 +76,45 @@ test("build update uses only the fixed protected MMR route and sanitizes the res
         const url = new URL(input); paths.push(url.pathname);
         if (url.pathname === "/admin/build-configuration") {
             assert.equal(init.headers.Authorization, "Bearer admin-secret");
-            assert.deepEqual(JSON.parse(init.body), { buildId: "246758282", featureSet: "PrimeUpdate60" });
+            assert.deepEqual(JSON.parse(init.body), { buildId: "246758282", featureSet: "PrimeUpdate60", userAgentBuildVersion: "260918.75141.528314" });
             return Response.json({ resultCode: "RL_BUILD_UPDATE_PROMOTED", buildId: "246758282", featureSet: "PrimeUpdate60", validatedAt: "2026-09-29T12:00:00.000Z", reconnectSucceeded: true, PsyToken: "must-not-pass" });
         }
         return Response.json({ status: "healthy", config: { requiredConfigPresent: true }, build: { status: "valid", active: { buildId: "246758282", featureSet: "PrimeUpdate60", source: "admin-validated" }, fallback: { buildId: "-1887694083", featureSet: "PrimeUpdate60", source: "wrangler" } }, psynet: { state: "connected" }, recovery: {}, traffic: {} });
     };
     try {
-        const result = await updateMmrBuildConfiguration(env, { buildId: "246758282", featureSet: "PrimeUpdate60" });
+        const result = await updateMmrBuildConfiguration(env, { buildId: "246758282", featureSet: "PrimeUpdate60", userAgentBuildVersion: "260918.75141.528314" });
         assert.deepEqual(paths, ["/admin/build-configuration", "/health/ready"]);
         assert.equal(result.reconnectSucceeded, true);
         assert.equal(JSON.stringify(result).includes("must-not-pass"), false);
-        await assert.rejects(updateMmrBuildConfiguration(env, { buildId: "bad", featureSet: "x" }), { code: "RL_BUILD_UPDATE_INVALID", status: 400 });
+        await assert.rejects(updateMmrBuildConfiguration(env, { buildId: "bad", featureSet: "x", userAgentBuildVersion: "260918.75141.528314" }), { code: "RL_BUILD_UPDATE_INVALID", status: 400 });
+        await assert.rejects(updateMmrBuildConfiguration(env, { buildId: "246758282", featureSet: "PrimeUpdate60", userAgentBuildVersion: "not-a-version" }), { code: "RL_BUILD_UPDATE_INVALID", status: 400 });
+    } finally { globalThis.fetch = originalFetch; }
+});
+
+test("rejected build candidate refreshes status and is returned as a client-side validation failure", async () => {
+    const deleted = [];
+    const written = [];
+    const env = {
+        MMR_API_URL: "https://mmr.example.test",
+        MMR_ADMIN_API_KEY: "admin-secret",
+        MMR_API_KEY: "lookup-secret",
+        RL_STATS_CACHE: { async delete(key) { deleted.push(key); }, async get() { return null; }, async put(key) { written.push(key); } }
+    };
+    const originalFetch = globalThis.fetch;
+    const paths = [];
+    globalThis.fetch = async input => {
+        const url = new URL(input); paths.push(url.pathname);
+        if (url.pathname === "/admin/build-configuration") return Response.json({ code: "RL_BUILD_UPDATE_REJECTED", providerCode: "VersionMismatch" }, { status: 422 });
+        return Response.json({ status: "degraded", config: { requiredConfigPresent: true }, build: { status: "stale", candidateValidationResult: "VersionMismatch" }, psynet: { state: "idle" }, recovery: {}, traffic: {} });
+    };
+    try {
+        await assert.rejects(
+            updateMmrBuildConfiguration(env, { buildId: "246758282", featureSet: "PrimeUpdate60", userAgentBuildVersion: "260918.75141.528314" }),
+            { code: "RL_BUILD_UPDATE_REJECTED", status: 422, providerCode: "VersionMismatch" }
+        );
+        assert.deepEqual(paths, ["/admin/build-configuration", "/health/ready"]);
+        assert.ok(deleted.includes("admin:system-status:v2"));
+        assert.ok(written.includes("admin:service-status:mmr-api"));
     } finally { globalThis.fetch = originalFetch; }
 });
 
@@ -96,4 +124,11 @@ test("Worker Status deploy polling is bounded to active deployments", async () =
     assert.match(source, /setTimeout\(\(\) => \{ void loadDeploymentStatus\(\); \}, 7000\)/);
     assert.doesNotMatch(source, /setInterval\s*\(/);
     assert.match(source, /\["queued", "running"\]\.includes/);
+});
+
+test("Worker Status build form submits the logged client build version", async () => {
+    const source = await readFile(new URL("../../public/Global/Admin/WorkerStatus/JS/index.js", import.meta.url), "utf8");
+    assert.match(source, /name = "userAgentBuildVersion"/);
+    assert.match(source, /GPsyonixBuildID/);
+    assert.match(source, /userAgentBuildVersion\s*\}\)/);
 });

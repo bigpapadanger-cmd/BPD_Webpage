@@ -267,18 +267,25 @@ export async function updateMmrBuildConfiguration(env, input) {
     if (!endpoint || !adminKey) throw actionError("RL_BUILD_UPDATE_NOT_CONFIGURED", 503);
     const buildId = typeof input?.buildId === "string" ? input.buildId.trim() : "";
     const featureSet = typeof input?.featureSet === "string" ? input.featureSet.trim() : "";
-    if (!/^-?\d{1,12}$/.test(buildId) || !/^[A-Za-z0-9_.-]{1,64}$/.test(featureSet)) throw actionError("RL_BUILD_UPDATE_INVALID", 400);
+    const userAgentBuildVersion = typeof input?.userAgentBuildVersion === "string" ? input.userAgentBuildVersion.trim() : "";
+    if (!/^-?\d{1,12}$/.test(buildId) || !/^[A-Za-z0-9_.-]{1,64}$/.test(featureSet) || !/^\d{6}\.\d{1,8}\.\d{1,8}$/.test(userAgentBuildVersion)) throw actionError("RL_BUILD_UPDATE_INVALID", 400);
     let response;
     try {
         response = await timedFetch(signal => fetch(new URL("/admin/build-configuration", endpoint), {
             method: "POST", redirect: "manual", signal,
             headers: { Authorization: `Bearer ${adminKey}`, Accept: "application/json", "Content-Type": "application/json" },
-            body: JSON.stringify({ buildId, featureSet })
+            body: JSON.stringify({ buildId, featureSet, userAgentBuildVersion })
         }), ACTION_TIMEOUT_MS);
     } catch (cause) { throw actionError(cause?.name === "AbortError" ? "RL_BUILD_UPDATE_FAILED" : "RL_BUILD_UPDATE_UNAVAILABLE", cause?.name === "AbortError" ? 504 : 502); }
     const payload = await readSmallJson(response).catch(() => ({}));
     if (!response.ok) {
-        const error = actionError(String(payload?.code || "RL_BUILD_UPDATE_REJECTED"), [400, 409, 429, 502, 503, 504].includes(response.status) ? response.status : 502);
+        try {
+            await env?.RL_STATS_CACHE?.delete(CACHE_KEY);
+            await storeActionResult(env, await checkMmrApi(env));
+        } catch { /* Preserve the candidate rejection if refreshing readiness also fails. */ }
+        const code = String(payload?.code || "RL_BUILD_UPDATE_REJECTED");
+        const status = code === "RL_BUILD_UPDATE_REJECTED" ? 422 : [400, 409, 429, 502, 503, 504].includes(response.status) ? response.status : 502;
+        const error = actionError(code, status);
         error.providerCode = String(payload?.providerCode || "").replace(/[^A-Za-z0-9_.-]/g, "_").slice(0, 64) || null;
         throw error;
     }
@@ -290,6 +297,7 @@ export async function updateMmrBuildConfiguration(env, input) {
         resultCode: String(payload?.resultCode || "RL_BUILD_UPDATE_PROMOTED"),
         buildId: String(payload?.buildId || buildId),
         featureSet: String(payload?.featureSet || featureSet),
+        userAgentBuildVersion,
         validatedAt: payload?.validatedAt || null,
         reconnectSucceeded: payload?.reconnectSucceeded === true,
         reconnectCode: payload?.reconnectCode || null,

@@ -66,15 +66,18 @@ async function updateBuildConfiguration(form) {
     if (actionInFlight) return;
     const buildId = form.elements.buildId.value.trim();
     const featureSet = form.elements.featureSet.value.trim();
-    if (!buildId || !featureSet || !window.confirm(`Validate Build ID ${buildId} and Feature Set ${featureSet} with PsyNet? A successful candidate will be saved and reconnected.`)) return;
+    const userAgentBuildVersion = form.elements.userAgentBuildVersion.value.trim();
+    if (!buildId || !featureSet || !userAgentBuildVersion || !window.confirm(`Validate Build ID ${buildId}, Feature Set ${featureSet}, and client version ${userAgentBuildVersion} with PsyNet? A successful candidate will be saved and reconnected.`)) return;
     actionInFlight = true;
     const button = form.querySelector("button");
     button.disabled = true;
     try {
-        const response = await fetch("/api/admin/system-status", { method: "POST", credentials: "same-origin", cache: "no-store", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify({ service: "mmr-api", action: "update-build", buildId, featureSet }) });
+        const response = await fetch("/api/admin/system-status", { method: "POST", credentials: "same-origin", cache: "no-store", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify({ service: "mmr-api", action: "update-build", buildId, featureSet, userAgentBuildVersion }) });
         const payload = await response.json();
         const message = document.getElementById("workerStatusMessage");
-        if (!response.ok || payload.success !== true) message.textContent = `Build update was rejected (${payload.providerCode || payload.error || "RL_BUILD_UPDATE_FAILED"}).`;
+        if (!response.ok || payload.success !== true) message.textContent = payload.error === "RL_BUILD_UPDATE_REJECTED"
+            ? `PsyNet rejected that candidate (${payload.providerCode || "unknown reason"}); nothing was saved. Check the Build ID, Feature Set, and client version.`
+            : `Build update failed (${payload.providerCode || payload.error || "RL_BUILD_UPDATE_FAILED"}).`;
         else message.textContent = payload.reconnectSucceeded ? "Build updated and PsyNet reconnected." : `Build updated, but PsyNet reconnect failed (${payload.reconnectCode || "unknown"}).`;
         await loadStatus();
     } catch { document.getElementById("workerStatusMessage").textContent = "Build update failed. Please retry later."; }
@@ -208,8 +211,9 @@ function makeDetails(service) {
                 form.className = "mmr-build-form";
                 const build = document.createElement("input"); build.name = "buildId"; build.required = true; build.placeholder = "Build ID"; build.value = service.activeBuild?.buildId || service.currentBuildId || "";
                 const feature = document.createElement("input"); feature.name = "featureSet"; feature.required = true; feature.placeholder = "Feature Set"; feature.value = service.activeBuild?.featureSet || service.currentFeatureSet || "";
+                const clientVersion = document.createElement("input"); clientVersion.name = "userAgentBuildVersion"; clientVersion.required = true; clientVersion.placeholder = "Client Build Version (GPsyonixBuildID)"; clientVersion.pattern = "\\d{6}\\.\\d{1,8}\\.\\d{1,8}"; clientVersion.title = "Enter the dotted value shown after GPsyonixBuildID in Rocket League's log.";
                 const update = textElement("button", "Update Build Configuration"); update.type = "submit";
-                form.append(build, feature, update);
+                form.append(build, feature, clientVersion, update);
                 form.addEventListener("submit", event => { event.preventDefault(); void updateBuildConfiguration(form); });
                 operations.append(form);
             }

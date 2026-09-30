@@ -42,7 +42,7 @@ export async function onRequestPost({ request, env }) {
         return json(result);
     } catch (error) {
         console.warn("ADMIN SYSTEM ACTION", { service, action, accountId: authorization.accountId, requestedAt: new Date(startedAt).toISOString(), completedAt: new Date().toISOString(), result: error?.code || "failed", durationMs: Date.now() - startedAt });
-        const status = [400, 409, 429, 502, 503, 504].includes(Number(error?.status)) ? Number(error.status) : 503;
+        const status = [400, 409, 422, 429, 502, 503, 504].includes(Number(error?.status)) ? Number(error.status) : 503;
         return json({ success: false, error: error?.code || "SYSTEM_ACTION_FAILED", providerCode: error?.providerCode || null, retryAfterSeconds: error?.retryAfterSeconds || null }, status, error?.retryAfterSeconds ? { "Retry-After": String(error.retryAfterSeconds) } : {});
     }
 }
