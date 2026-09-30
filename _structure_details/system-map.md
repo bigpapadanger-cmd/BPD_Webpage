@@ -1,6 +1,6 @@
 # DomainData System Map
 
-Snapshot: 2026-09-28
+Snapshot: 2026-09-29
 
 ## Runtime overview
 
@@ -66,7 +66,12 @@ transport contract, boundaries, and operator sequence.
   Routine refreshes make bounded RL, OCR transport, and MMR checks; Cloud Run
   and Supabase use last-known state, while the OCR queue is read from a
   per-invocation heartbeat. Service-specific actions use an explicit allowlist;
-  only RL presence has `Run Now`, and only MMR/PsyNet has `Reconnect`. The MMR`r`n  details remain secret-free and include config presence, auth/failure stages,`r`n  recent request outcomes, backoff, reconnect results, latency, and counters.
+  only RL presence has `Run Now`, while MMR/PsyNet has `Reconnect` and
+  `Check Rocket League Version`. The MMR details remain secret-free and include
+  build state, safe build metadata, validation/check timestamps, auth/failure
+  stages, recent request outcomes, backoff, reconnect results, latency, and
+  counters. The check is an explicit admin action routed Pages -> MMR Worker;
+  no browser-held admin secret or direct Worker call is used.
 - OCR transport and RL presence record safe operational state in the existing
   `RL_STATS_CACHE` namespace through their `SERVICE_STATUS` bindings. Queue
   status writes once per queue invocation. Cloud Run readiness is an explicit

@@ -8,11 +8,11 @@ const CLOUD_RUN_ACTION_TIMEOUT_MS = 30000;
 const INTERNAL_HOSTNAME = "ocr-google-transport.internal";
 let inFlightCheck = null;
 const actionLocks = new Set();
-const ACTION_COOLDOWNS = { "mmr-api:reconnect": 30, "cloud-run-ocr:recheck": 60, "rl-presence:run-now": 60 };
+const ACTION_COOLDOWNS = { "mmr-api:reconnect": 30, "mmr-api:check-version": 60, "cloud-run-ocr:recheck": 60, "rl-presence:run-now": 60 };
 const ACTIONS = {
     pages: ["recheck"], "rl-presence": ["recheck", "run-now"], "ocr-transport": ["recheck"],
     "ocr-queue": ["recheck"], "cloud-run-ocr": ["recheck"], supabase: ["recheck"],
-    "mmr-api": ["recheck", "reconnect"]
+    "mmr-api": ["recheck", "reconnect", "check-version"]
 };
 const SERVICE_STATUS_PREFIX = "admin:service-status:";
 
@@ -111,7 +111,7 @@ async function checkSupabase(env) {
 async function checkMmrApi(env) {
     const endpoint = String(env?.MMR_API_URL || "").trim();
     const apiKey = String(env?.MMR_API_KEY || "").trim();
-    const actions = ["recheck", ...(String(env?.MMR_ADMIN_API_KEY || "").trim() ? ["reconnect"] : [])];
+    const actions = ["recheck", ...(String(env?.MMR_ADMIN_API_KEY || "").trim() ? ["reconnect", "check-version"] : [])];
     if (!endpoint || !apiKey) return statusEntry("mmr-api", "MMR API", "unknown", "MMR readiness authorization is not configured.", { actions, configReady: false });
     const startedAt = Date.now();
     try {
@@ -159,7 +159,22 @@ async function checkMmrApi(env) {
             lastReconnectResult: recovery.lastResult || null,
             reconnectAttempts: Number(recovery.attempts) || 0,
             reconnectSuccesses: Number(recovery.successes) || 0,
-            reconnectFailures: Number(recovery.failures) || 0
+            reconnectFailures: Number(recovery.failures) || 0,
+            buildStatus: payload.build?.status || "unknown",
+            currentBuildId: payload.build?.currentBuildId || null,
+            currentFeatureSet: payload.build?.currentFeatureSet || null,
+            userAgentConfigured: payload.build?.userAgentConfigured === true,
+            userAgentSummary: payload.build?.userAgentSummary || null,
+            buildSource: payload.build?.source || null,
+            lastVersionCheckAt: payload.build?.lastVersionCheckAt || null,
+            lastVersionCheckResult: payload.build?.lastVersionCheckResult || null,
+            lastBuildValidationAt: payload.build?.lastBuildValidationAt || null,
+            lastBuildValidationResult: payload.build?.lastBuildValidationResult || null,
+            versionMismatchDetectedAt: payload.build?.versionMismatchDetectedAt || null,
+            detectedBuildId: payload.build?.detectedBuildId || null,
+            detectedFeatureSet: payload.build?.detectedFeatureSet || null,
+            candidateValidationResult: payload.build?.candidateValidationResult || null,
+            nextScheduledVersionCheckAt: payload.build?.nextScheduledCheckAt || null
         });
     } catch (error) {
         return statusEntry("mmr-api", "MMR API", error?.name === "AbortError" ? "down" : "unknown", error?.name === "AbortError" ? "Readiness check timed out." : "Readiness check failed.", { actions, responseTimeMs: Date.now() - startedAt });
@@ -223,6 +238,7 @@ export async function performSystemStatusAction(env, service, action) {
             const result = await checkMmrApi(env); await storeActionResult(env, result); return { success: true, service, action, result };
         }
         if (service === "mmr-api" && action === "reconnect") return await reconnectMmr(env, service, action);
+        if (service === "mmr-api" && action === "check-version") return await checkMmrVersion(env, service, action);
         let result;
         if (service === "pages") result = statusEntry("pages", "Pages Functions", "healthy", "Authenticated Pages API is responding.", { responseTimeMs: 0 });
         else if (service === "rl-presence") {
@@ -318,4 +334,47 @@ async function reconnectMmr(env, service, action) {
     }
     try { await env?.RL_STATS_CACHE?.delete(CACHE_KEY); } catch { /* Best effort. */ }
     return { success: true, service, action, result: { state: String(payload?.state || "connected"), completedAt: payload?.completedAt || new Date().toISOString() } };
+}
+
+async function checkMmrVersion(env, service, action) {
+    const endpoint = String(env?.MMR_API_URL || "").trim();
+    const adminKey = String(env?.MMR_ADMIN_API_KEY || "").trim();
+    if (!endpoint || !adminKey) throw actionError("RL_VERSION_CHECK_NOT_CONFIGURED", 503);
+    let response;
+    try {
+        response = await timedFetch(signal => fetch(new URL("/admin/check-rocket-league-version", endpoint), {
+            method: "POST",
+            redirect: "manual",
+            signal,
+            headers: { Authorization: `Bearer ${adminKey}`, Accept: "application/json" }
+        }), ACTION_TIMEOUT_MS);
+    } catch (cause) {
+        throw actionError(cause?.name === "AbortError" ? "RL_VERSION_CHECK_TIMEOUT" : "RL_VERSION_CHECK_UNAVAILABLE", 503);
+    }
+    let payload;
+    try { payload = await readSmallJson(response); }
+    catch { throw actionError("RL_VERSION_CHECK_INVALID_RESPONSE", 502); }
+    if (!response.ok) {
+        const code = ["RL_VERSION_CHECK_IN_PROGRESS", "RL_VERSION_CHECK_COOLDOWN"].includes(payload?.code) ? payload.code : "RL_VERSION_CHECK_FAILED";
+        const error = actionError(code, [409, 429].includes(response.status) ? response.status : 502);
+        error.retryAfterSeconds = Number(payload?.retryAfterSeconds) || null;
+        throw error;
+    }
+    const allowedCodes = new Set(["RL_VERSION_SOURCE_UNAVAILABLE", "RL_VERSION_CHECK_SKIPPED", "RL_VERSION_VALIDATED", "RL_VERSION_UPDATED"]);
+    const resultCode = allowedCodes.has(payload?.resultCode) ? payload.resultCode : "RL_VERSION_CHECK_FAILED";
+    try { await env?.RL_STATS_CACHE?.delete(CACHE_KEY); } catch { /* Best effort. */ }
+    const readiness = await checkMmrApi(env);
+    await storeActionResult(env, readiness);
+    return {
+        success: true,
+        service,
+        action,
+        result: {
+            resultCode,
+            state: ["valid", "stale", "unknown", "checking"].includes(payload?.state) ? payload.state : "unknown",
+            currentBuildId: typeof payload?.currentBuildId === "string" ? payload.currentBuildId : null,
+            lastVersionCheckAt: typeof payload?.lastVersionCheckAt === "string" ? payload.lastVersionCheckAt : null,
+            message: resultCode === "RL_VERSION_SOURCE_UNAVAILABLE" ? "No authoritative first-party build source is available; the current configuration was retained." : resultCode === "RL_VERSION_CHECK_SKIPPED" ? "The current build was checked recently; no new check was needed." : "Rocket League version check completed."
+        }
+    };
 }

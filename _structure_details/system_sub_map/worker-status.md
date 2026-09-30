@@ -22,7 +22,7 @@ Worker name, HTTP method, shell command, or credential from the caller.
 | OCR Queue Consumer | Queue-only heartbeat; no HTTP liveness route | Reads heartbeat only | `SERVICE_STATUS`; once after each queue invocation |
 | Cloud Run OCR | Cached result from last explicit recheck | Secret-gated fixed transport route → cached WIF credential → authenticated `/api/ocr/health`; 30-second outer/6-second health request bound | `SERVICE_STATUS`; no OCR inference |
 | Supabase | Last explicit result; no routine network call | `HEAD /rest/v1/` with server-side API key, 2-second timeout | `RL_STATS_CACHE` |
-| MMR API/PsyNet | Protected `/health/ready` | 45-second aggregate cache plus explicit Recheck | Safe config, auth stage, recent-failure, backoff, reconnect, latency, and aggregate traffic state |
+| MMR API/PsyNet | Protected `/health/ready` | 45-second aggregate cache plus explicit Recheck or Check Rocket League Version | Safe config/build state, auth stage, recent-failure, backoff, reconnect, latency, and aggregate traffic state |
 
 Worker `SERVICE_STATUS` bindings reuse the existing `RL_STATS_CACHE` KV
 namespace; no new namespace or cloud resource is introduced. Presence run
@@ -40,10 +40,21 @@ stable generic error code; no job IDs or image data.
 | OCR Queue Consumer | Yes: read heartbeat | No | No |
 | Cloud Run OCR | Yes: explicit readiness-only probe | No | No |
 | Supabase | Yes: bounded API availability check | No | No |
-| MMR API/PsyNet | Recheck | Explicit reconnect through the existing Pages allowlist | No |
+| MMR API/PsyNet | Recheck | Explicit reconnect; Check Rocket League Version through the same protected Pages allowlist | No |
 
 All controls remain behind the admin permission. No periodic browser refresh is
 installed. See `request-frequency-inventory.md` for call rates and cooldowns.
+
+The version action uses the fixed Pages-to-MMR server-side route and a
+60-second action cooldown; the MMR Durable Object applies its own shared
+manual/scheduled lock and cooldown. The MMR Worker checks once Saturday at
+12:00 UTC, skipping recently validated builds. `VersionMismatch` marks build
+metadata stale but does not start discovery from user requests. Since no
+authoritative first-party build-discovery source is available, a check reports
+`RL_VERSION_SOURCE_UNAVAILABLE`, preserves current configuration, and leaves
+readiness degraded until a successful PsyNet authentication validates it.
+Build ID/FeatureSet/source/timestamps are shown in Details; raw User-Agent,
+credentials, and provider response content are not exposed.
 
 The main view uses compact status-icon rows; per-service metadata is collapsed
 under Details. Route, connection, and known-finding diagnostics share the same

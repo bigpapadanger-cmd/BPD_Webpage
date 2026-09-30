@@ -16,11 +16,12 @@ function textElement(tag, text, className) {
 async function runAction(service, action, button) {
     if (actionInFlight) return;
     if (action === "reconnect" && !window.confirm("Reconnect BPD MMR API to PsyNet now? Use this for maintenance when automatic recovery has not restored the connection.")) return;
+    if (action === "check-version" && !window.confirm("Check the Rocket League version source now? This is rate-limited and will keep the current build configuration if no authoritative source is available.")) return;
     if (action === "run-now" && !window.confirm("Run the RL presence check now? This performs the existing presence job and may call its configured game/account services.")) return;
     actionInFlight = true;
     button.disabled = true;
     const originalText = button.textContent;
-    button.textContent = action === "reconnect" ? "Reconnecting…" : action === "run-now" ? "Running…" : "Rechecking…";
+    button.textContent = action === "reconnect" ? "Reconnecting…" : action === "check-version" ? "Checking version…" : action === "run-now" ? "Running…" : "Rechecking…";
     const message = document.getElementById("workerStatusMessage");
     try {
         const response = await fetch("/api/admin/system-status", {
@@ -36,7 +37,16 @@ async function runAction(service, action, button) {
             message.textContent = retry ? `${originalText} is unavailable for ${retry} seconds.` : `${originalText} failed. Please retry later.`;
             return;
         }
-        message.textContent = action === "reconnect" ? "MMR API reconnected to PsyNet." : action === "run-now" ? "Presence run completed." : `${service} status rechecked.`;
+        if (service === "mmr-api" && action === "check-version") {
+            const resultCode = payload.result?.resultCode;
+            message.textContent = resultCode === "RL_VERSION_SOURCE_UNAVAILABLE"
+                ? "No authoritative build source is available. The current configuration was kept."
+                : resultCode === "RL_VERSION_CHECK_SKIPPED"
+                    ? "The current build was checked recently; no new check was needed."
+                    : "Rocket League version check completed.";
+        } else {
+            message.textContent = action === "reconnect" ? "MMR API reconnected to PsyNet." : action === "run-now" ? "Presence run completed." : `${service} status rechecked.`;
+        }
         await loadStatus(true);
     } catch {
         message.textContent = `${originalText} failed. Please retry later.`;
@@ -89,6 +99,17 @@ function makeDetails(service) {
             service.lastMmrSuccessAt ? `Last MMR success: ${readableTime(service.lastMmrSuccessAt)}` : null,
             service.lastMmrFailureAt ? `Last MMR failure: ${readableTime(service.lastMmrFailureAt)}` : null,
             service.lastReconnectAttemptAt ? `Last reconnect: ${readableTime(service.lastReconnectAttemptAt)} (${service.lastReconnectResult || "pending"})` : null,
+            `Build status: ${service.buildStatus || "unknown"}`,
+            service.currentBuildId ? `Current Build ID: ${service.currentBuildId}` : null,
+            service.currentFeatureSet ? `Feature set: ${service.currentFeatureSet}` : null,
+            service.userAgentSummary ? `User-Agent: ${service.userAgentSummary}` : `User-Agent configured: ${service.userAgentConfigured ? "yes" : "no"}`,
+            service.buildSource ? `Build source: ${service.buildSource}` : null,
+            service.lastVersionCheckAt ? `Last version check: ${readableTime(service.lastVersionCheckAt)} (${service.lastVersionCheckResult || "unknown"})` : null,
+            service.lastBuildValidationAt ? `Last successful validation: ${readableTime(service.lastBuildValidationAt)} (${service.lastBuildValidationResult || "unknown"})` : null,
+            service.versionMismatchDetectedAt ? `Version mismatch detected: ${readableTime(service.versionMismatchDetectedAt)}` : null,
+            service.detectedBuildId ? `Detected candidate: ${service.detectedBuildId}${service.detectedFeatureSet ? ` · ${service.detectedFeatureSet}` : ""}` : null,
+            service.candidateValidationResult ? `Candidate validation: ${service.candidateValidationResult}` : null,
+            service.nextScheduledVersionCheckAt ? `Next scheduled version check: ${readableTime(service.nextScheduledVersionCheckAt)}` : null,
             service.backoffUntil ? `Backoff until: ${readableTime(service.backoffUntil)}` : null,
             service.retryAfterSeconds ? `Retry after: ${service.retryAfterSeconds} seconds` : null,
             `MMR requests: ${service.mmrRequests || 0} total · ${service.mmrSuccesses || 0} succeeded · ${service.mmrFailures || 0} failed`,
@@ -212,9 +233,9 @@ async function loadStatus() {
                 const actions = document.createElement("div");
                 actions.className = "worker-status-card-actions";
                 for (const action of service.actions) {
-                    const button = textElement("button", action === "reconnect" ? "↻ Reconnect" : action === "run-now" ? "▶ Run" : "↻ Recheck");
+                    const button = textElement("button", action === "reconnect" ? "↻ Reconnect" : action === "check-version" ? "↻ Check Rocket League Version" : action === "run-now" ? "▶ Run" : "↻ Recheck");
                     button.type = "button";
-                    button.setAttribute("aria-label", `${action === "reconnect" ? "Reconnect PsyNet" : action === "run-now" ? "Run presence now" : `Recheck ${service.name}`}`);
+                    button.setAttribute("aria-label", `${action === "reconnect" ? "Reconnect PsyNet" : action === "check-version" ? "Check Rocket League Version" : action === "run-now" ? "Run presence now" : `Recheck ${service.name}`}`);
                     button.addEventListener("click", () => { void runAction(service.id, action, button); });
                     actions.append(button);
                 }
