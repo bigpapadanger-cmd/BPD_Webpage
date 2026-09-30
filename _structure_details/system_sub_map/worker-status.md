@@ -12,6 +12,12 @@ Action requests use the same route, same-origin enforcement, a 1 KiB body cap,
 and an explicit service/action allowlist. No action accepts a URL, hostname,
 Worker name, HTTP method, shell command, or credential from the caller.
 
+MMR production deployment uses a separate protected route and the dedicated
+`admin.mmr.deploy` permission. The route accepts only `{ "confirm": true }`.
+Repository, branch, workflow, and Worker are fixed server-side. It dispatches
+the existing MMR repository workflow and stores sanitized run state in
+`RL_STATS_CACHE`; `MMR_DEPLOY_GITHUB_TOKEN` never reaches the browser.
+
 ## Health sources
 
 | Service | Routine source | Explicit Recheck | Last-known state |
@@ -41,6 +47,14 @@ stable generic error code; no job IDs or image data.
 | Cloud Run OCR | Yes: explicit readiness-only probe | No | No |
 | Supabase | Yes: bounded API availability check | No | No |
 | MMR API/PsyNet | Recheck | Explicit reconnect; Check Rocket League Version through the same protected Pages allowlist | No |
+
+MMR Details also contains two manual operations: Update Build Configuration
+and Redeploy MMR Worker. Build update validates with PsyNet, persists the
+runtime override, and reconnects without deploying. Redeploy requires an
+explicit production confirmation, has a five-minute server cooldown, and polls
+GitHub every seven seconds only while queued or running. On success the server
+checks `/health` and protected `/health/ready`; deployment success and MMR
+operational readiness remain separate states.
 
 All controls remain behind the admin permission. No periodic browser refresh is
 installed. See `request-frequency-inventory.md` for call rates and cooldowns.

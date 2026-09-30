@@ -107,6 +107,9 @@ export const ADMIN_PERMISSIONS =
         ADMIN_SETTINGS_MANAGE:
             "admin.settings.manage",
 
+        MMR_DEPLOY:
+            "admin.mmr.deploy",
+
         SUGGESTIONS_MANAGE:
             "admin.suggestions.manage"
     });

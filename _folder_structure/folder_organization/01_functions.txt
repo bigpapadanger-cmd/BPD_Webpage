@@ -147,6 +147,14 @@ services/admin, services/security, services/config, response helpers
     Cross-cutting permissions/Discord roles, Turnstile validation, environment
     configuration access, and consistent HTTP response construction.
 
+services/admin/mmr_deployment.js
+    Fixed-target GitHub workflow dispatch, five-minute deployment guard,
+    sanitized RL_STATS_CACHE state, run polling, and post-deploy MMR health.
+
+api/admin/system-status/mmr-deploy.js
+    Dedicated admin.mmr.deploy route. Accepts only explicit confirmation and
+    never accepts a repository, branch, workflow, Worker name, or command.
+
 KEY CROSS-FOLDER CONNECTIONS
 
     public/* browser modules

@@ -3,8 +3,12 @@
 import { getAuthState, hasAdminPermission } from "/Framework/Auth/auth.js";
 
 const REQUIRED_PERMISSION = "admin.settings.manage";
+const DEPLOY_PERMISSION = "admin.mmr.deploy";
 let requestInFlight = null;
 let actionInFlight = false;
+let canDeployMmr = false;
+let deploymentPollTimer = null;
+let lastDeploymentState = null;
 
 function textElement(tag, text, className) {
     const element = document.createElement(tag);
@@ -57,6 +61,76 @@ async function runAction(service, action, button) {
     }
 }
 
+async function updateBuildConfiguration(form) {
+    if (actionInFlight) return;
+    const buildId = form.elements.buildId.value.trim();
+    const featureSet = form.elements.featureSet.value.trim();
+    if (!buildId || !featureSet || !window.confirm(`Validate Build ID ${buildId} and Feature Set ${featureSet} with PsyNet? A successful candidate will be saved and reconnected.`)) return;
+    actionInFlight = true;
+    const button = form.querySelector("button");
+    button.disabled = true;
+    try {
+        const response = await fetch("/api/admin/system-status", { method: "POST", credentials: "same-origin", cache: "no-store", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify({ service: "mmr-api", action: "update-build", buildId, featureSet }) });
+        const payload = await response.json();
+        const message = document.getElementById("workerStatusMessage");
+        if (!response.ok || payload.success !== true) message.textContent = `Build update was rejected (${payload.providerCode || payload.error || "RL_BUILD_UPDATE_FAILED"}).`;
+        else message.textContent = payload.reconnectSucceeded ? "Build updated and PsyNet reconnected." : `Build updated, but PsyNet reconnect failed (${payload.reconnectCode || "unknown"}).`;
+        await loadStatus();
+    } catch { document.getElementById("workerStatusMessage").textContent = "Build update failed. Please retry later."; }
+    finally { actionInFlight = false; button.disabled = false; }
+}
+
+function renderDeployment(deployment) {
+    const target = document.getElementById("mmrDeploymentState");
+    if (!target) return;
+    const lines = [
+        `State: ${deployment?.deploymentState || "idle"}`,
+        deployment?.triggeredAt ? `Triggered: ${readableTime(deployment.triggeredAt)}` : null,
+        deployment?.startedAt ? `Started: ${readableTime(deployment.startedAt)}` : null,
+        deployment?.completedAt ? `Completed: ${readableTime(deployment.completedAt)}` : null,
+        deployment?.commitSha ? `Commit: ${deployment.commitSha.slice(0, 7)}` : null,
+        deployment?.branch ? `Branch: ${deployment.branch}` : null,
+        Number.isFinite(deployment?.durationMs) ? `Duration: ${Math.round(deployment.durationMs / 1000)} sec` : null,
+        deployment?.verification ? `Post-deploy health: ${deployment.verification.status}${deployment.verification.psynetState ? ` · PsyNet ${deployment.verification.psynetState}` : ""}` : null,
+        deployment?.lastDeploymentFailureCode ? `Last failure: ${deployment.lastDeploymentFailureCode}` : null
+    ].filter(Boolean);
+    target.replaceChildren(...lines.map(line => textElement("li", line)));
+    const active = ["queued", "running"].includes(deployment?.deploymentState);
+    const button = document.getElementById("mmrDeployButton");
+    if (button) button.disabled = actionInFlight || active;
+    if (deploymentPollTimer) { clearTimeout(deploymentPollTimer); deploymentPollTimer = null; }
+    if (active) deploymentPollTimer = setTimeout(() => { void loadDeploymentStatus(); }, 7000);
+    lastDeploymentState = deployment?.deploymentState || "idle";
+}
+
+async function loadDeploymentStatus() {
+    if (!canDeployMmr) return;
+    try {
+        const response = await fetch("/api/admin/system-status/mmr-deploy", { credentials: "same-origin", cache: "no-store", headers: { Accept: "application/json" } });
+        const payload = await response.json();
+        if (response.ok && payload.success === true) {
+            const wasActive = ["queued", "running"].includes(lastDeploymentState);
+            const isTerminal = ["success", "failed", "cancelled", "unknown"].includes(payload.deployment?.deploymentState);
+            if (wasActive && isTerminal) await loadStatus();
+            renderDeployment(payload.deployment);
+        }
+    } catch { /* Existing service status remains usable. */ }
+}
+
+async function deployMmrWorker(button) {
+    if (actionInFlight || !window.confirm("Redeploy the production MMR Worker?\n\nThis will trigger the existing deployment pipeline for mmr-api-v2.")) return;
+    actionInFlight = true;
+    button.disabled = true;
+    try {
+        const response = await fetch("/api/admin/system-status/mmr-deploy", { method: "POST", credentials: "same-origin", cache: "no-store", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify({ confirm: true }) });
+        const payload = await response.json();
+        const message = document.getElementById("workerStatusMessage");
+        if (!response.ok || payload.success !== true) message.textContent = payload.retryAfterSeconds ? `Redeploy is cooling down for ${payload.retryAfterSeconds} seconds.` : `Redeploy could not start (${payload.error || "MMR_DEPLOY_TRIGGER_FAILED"}).`;
+        else { message.textContent = "Production MMR Worker deployment started."; renderDeployment(payload.deployment); }
+    } catch { document.getElementById("workerStatusMessage").textContent = "Redeploy could not start."; }
+    finally { actionInFlight = false; if (!deploymentPollTimer) button.disabled = false; }
+}
+
 function statusIcon(status) {
     return ({ healthy: "✓", degraded: "!", down: "×", unknown: "?" })[String(status).toLowerCase()] || "?";
 }
@@ -104,6 +178,8 @@ function makeDetails(service) {
             service.currentFeatureSet ? `Feature set: ${service.currentFeatureSet}` : null,
             service.userAgentSummary ? `User-Agent: ${service.userAgentSummary}` : `User-Agent configured: ${service.userAgentConfigured ? "yes" : "no"}`,
             service.buildSource ? `Build source: ${service.buildSource}` : null,
+            service.activeBuild ? `Active: ${service.activeBuild.buildId || "—"} · ${service.activeBuild.featureSet || "—"} · ${service.activeBuild.source || "unknown"}` : null,
+            service.fallbackBuild ? `Wrangler fallback: ${service.fallbackBuild.buildId || "—"} · ${service.fallbackBuild.featureSet || "—"}` : null,
             service.lastVersionCheckAt ? `Last version check: ${readableTime(service.lastVersionCheckAt)} (${service.lastVersionCheckResult || "unknown"})` : null,
             service.lastBuildValidationAt ? `Last successful validation: ${readableTime(service.lastBuildValidationAt)} (${service.lastBuildValidationResult || "unknown"})` : null,
             service.versionMismatchDetectedAt ? `Version mismatch detected: ${readableTime(service.versionMismatchDetectedAt)}` : null,
@@ -121,6 +197,26 @@ function makeDetails(service) {
         list.className = "worker-status-facts";
         for (const fact of mmrFacts) list.append(textElement("li", fact));
         content.append(list);
+        if (service.supportsBuildUpdate) {
+            const operations = document.createElement("section");
+            operations.className = "mmr-operations";
+            operations.append(textElement("h4", "Operations"));
+            const form = document.createElement("form");
+            form.className = "mmr-build-form";
+            const build = document.createElement("input"); build.name = "buildId"; build.required = true; build.placeholder = "Build ID"; build.value = service.activeBuild?.buildId || service.currentBuildId || "";
+            const feature = document.createElement("input"); feature.name = "featureSet"; feature.required = true; feature.placeholder = "Feature Set"; feature.value = service.activeBuild?.featureSet || service.currentFeatureSet || "";
+            const update = textElement("button", "Update Build Configuration"); update.type = "submit";
+            form.append(build, feature, update);
+            form.addEventListener("submit", event => { event.preventDefault(); void updateBuildConfiguration(form); });
+            operations.append(form);
+            if (canDeployMmr) {
+                const deploy = textElement("button", "Redeploy MMR Worker", "mmr-deploy-button"); deploy.type = "button"; deploy.id = "mmrDeployButton";
+                const deployment = textElement("ul", "", "worker-status-facts"); deployment.id = "mmrDeploymentState";
+                deploy.addEventListener("click", () => { void deployMmrWorker(deploy); });
+                operations.append(deploy, deployment);
+            }
+            content.append(operations);
+        }
     }
     if (Array.isArray(service.dependencies) && service.dependencies.length) {
         content.append(textElement("p", `Dependencies: ${service.dependencies.map(dependency => `${dependency.id}: ${dependency.status}`).join(" · ")}`));
@@ -257,11 +353,13 @@ export async function initializePage() {
     try {
         const auth = await getAuthState({ force: true });
         if (!hasAdminPermission(REQUIRED_PERMISSION, auth)) { message.textContent = "You do not have permission to view worker status."; return; }
+        canDeployMmr = hasAdminPermission(DEPLOY_PERMISSION, auth);
         refresh.disabled = false;
         refresh.addEventListener("click", () => {
             message.textContent = "Refreshing status…";
             Promise.all([loadStatus(), loadRouteDiagnostics()]).catch(() => { message.textContent = "Status is unavailable. Please retry later."; });
         });
         await Promise.all([loadStatus(), loadRouteDiagnostics()]);
+        await loadDeploymentStatus();
     } catch { message.textContent = "Status is unavailable. Please retry later."; }
 }

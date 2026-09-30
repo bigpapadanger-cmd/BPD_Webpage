@@ -72,6 +72,13 @@ transport contract, boundaries, and operator sequence.
   stages, recent request outcomes, backoff, reconnect results, latency, and
   counters. The check is an explicit admin action routed Pages -> MMR Worker;
   no browser-held admin secret or direct Worker call is used.
+  Runtime Build ID/Feature Set updates use the same protected MMR admin key,
+  validate in the singleton Durable Object, persist only on success, and
+  reconnect without deployment. Production code redeploys use the dedicated
+  `admin.mmr.deploy` permission and fixed
+  `/api/admin/system-status/mmr-deploy` route, which dispatches only
+  `bigpapadanger-cmd/mmr-api-v3` / `main` /
+  `deploy-production.yml` and tracks the run in `RL_STATS_CACHE`.
 - OCR transport and RL presence record safe operational state in the existing
   `RL_STATS_CACHE` namespace through their `SERVICE_STATUS` bindings. Queue
   status writes once per queue invocation. Cloud Run readiness is an explicit

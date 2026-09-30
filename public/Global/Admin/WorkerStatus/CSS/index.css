@@ -290,3 +290,8 @@
 @media (prefers-reduced-motion: reduce) {
     .worker-status *, .worker-status *::before, .worker-status *::after { transition-duration: .01ms !important; }
 }
+
+.mmr-operations { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid rgba(148, 163, 184, .18); }
+.mmr-build-form { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+.mmr-build-form input { min-width: 12rem; padding: .55rem .7rem; }
+.mmr-deploy-button { margin-top: 1rem; border-color: #c65b5b; color: #ffd8d8; }

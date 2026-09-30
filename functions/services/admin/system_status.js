@@ -166,6 +166,9 @@ async function checkMmrApi(env) {
             userAgentConfigured: payload.build?.userAgentConfigured === true,
             userAgentSummary: payload.build?.userAgentSummary || null,
             buildSource: payload.build?.source || null,
+            activeBuild: payload.build?.active || null,
+            fallbackBuild: payload.build?.fallback || null,
+            supportsBuildUpdate: Boolean(String(env?.MMR_ADMIN_API_KEY || "").trim()),
             lastVersionCheckAt: payload.build?.lastVersionCheckAt || null,
             lastVersionCheckResult: payload.build?.lastVersionCheckResult || null,
             lastBuildValidationAt: payload.build?.lastBuildValidationAt || null,
@@ -215,7 +218,7 @@ export async function getSystemStatus(env, { force = false } = {}) {
     return { ...(await inFlightCheck), cache: "miss" };
 }
 
-export async function performSystemStatusAction(env, service, action) {
+export async function performSystemStatusAction(env, service, action, input = {}) {
     if (!ACTIONS[service]?.includes(action)) {
         const error = new Error("Unsupported system action.");
         error.code = "SYSTEM_ACTION_UNSUPPORTED";
@@ -256,6 +259,42 @@ export async function performSystemStatusAction(env, service, action) {
         await storeActionResult(env, result);
         return { success: true, service, action, result };
     } finally { actionLocks.delete(lockKey); }
+}
+
+export async function updateMmrBuildConfiguration(env, input) {
+    const endpoint = String(env?.MMR_API_URL || "").trim();
+    const adminKey = String(env?.MMR_ADMIN_API_KEY || "").trim();
+    if (!endpoint || !adminKey) throw actionError("RL_BUILD_UPDATE_NOT_CONFIGURED", 503);
+    const buildId = typeof input?.buildId === "string" ? input.buildId.trim() : "";
+    const featureSet = typeof input?.featureSet === "string" ? input.featureSet.trim() : "";
+    if (!/^-?\d{1,12}$/.test(buildId) || !/^[A-Za-z0-9_.-]{1,64}$/.test(featureSet)) throw actionError("RL_BUILD_UPDATE_INVALID", 400);
+    let response;
+    try {
+        response = await timedFetch(signal => fetch(new URL("/admin/build-configuration", endpoint), {
+            method: "POST", redirect: "manual", signal,
+            headers: { Authorization: `Bearer ${adminKey}`, Accept: "application/json", "Content-Type": "application/json" },
+            body: JSON.stringify({ buildId, featureSet })
+        }), ACTION_TIMEOUT_MS);
+    } catch (cause) { throw actionError(cause?.name === "AbortError" ? "RL_BUILD_UPDATE_FAILED" : "RL_BUILD_UPDATE_UNAVAILABLE", cause?.name === "AbortError" ? 504 : 502); }
+    const payload = await readSmallJson(response).catch(() => ({}));
+    if (!response.ok) {
+        const error = actionError(String(payload?.code || "RL_BUILD_UPDATE_REJECTED"), [400, 409, 429, 502, 503, 504].includes(response.status) ? response.status : 502);
+        error.providerCode = String(payload?.providerCode || "").replace(/[^A-Za-z0-9_.-]/g, "_").slice(0, 64) || null;
+        throw error;
+    }
+    try { await env?.RL_STATS_CACHE?.delete(CACHE_KEY); } catch { /* Best effort. */ }
+    const readiness = await checkMmrApi(env);
+    await storeActionResult(env, readiness);
+    return {
+        success: true,
+        resultCode: String(payload?.resultCode || "RL_BUILD_UPDATE_PROMOTED"),
+        buildId: String(payload?.buildId || buildId),
+        featureSet: String(payload?.featureSet || featureSet),
+        validatedAt: payload?.validatedAt || null,
+        reconnectSucceeded: payload?.reconnectSucceeded === true,
+        reconnectCode: payload?.reconnectCode || null,
+        readiness
+    };
 }
 
 function actionError(code, status = 503) { return Object.assign(new Error("Service action failed."), { code, status }); }

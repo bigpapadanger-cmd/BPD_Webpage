@@ -2,7 +2,7 @@
 
 import { ADMIN_PERMISSIONS, authorizeAdminPermission } from "../../services/admin/permissions.js";
 import { readJsonBody } from "../../services/http/json.js";
-import { getSystemStatus, performSystemStatusAction } from "../../services/admin/system_status.js";
+import { getSystemStatus, performSystemStatusAction, updateMmrBuildConfiguration } from "../../services/admin/system_status.js";
 
 function json(body, status = 200, headers = {}) {
     return Response.json(body, { status, headers: { "Cache-Control": "no-store", ...headers } });
@@ -35,12 +35,14 @@ export async function onRequestPost({ request, env }) {
     const action = typeof parsed.data?.action === "string" ? parsed.data.action.trim() : "";
     const startedAt = Date.now();
     try {
-        const result = await performSystemStatusAction(env, service, action);
+        const result = service === "mmr-api" && action === "update-build"
+            ? await updateMmrBuildConfiguration(env, parsed.data)
+            : await performSystemStatusAction(env, service, action, parsed.data);
         console.info("ADMIN SYSTEM ACTION", { service, action, accountId: authorization.accountId, requestedAt: new Date(startedAt).toISOString(), completedAt: new Date().toISOString(), result: "success", durationMs: Date.now() - startedAt });
         return json(result);
     } catch (error) {
         console.warn("ADMIN SYSTEM ACTION", { service, action, accountId: authorization.accountId, requestedAt: new Date(startedAt).toISOString(), completedAt: new Date().toISOString(), result: error?.code || "failed", durationMs: Date.now() - startedAt });
         const status = [400, 409, 429, 502, 503, 504].includes(Number(error?.status)) ? Number(error.status) : 503;
-        return json({ success: false, error: error?.code || "SYSTEM_ACTION_FAILED", retryAfterSeconds: error?.retryAfterSeconds || null }, status, error?.retryAfterSeconds ? { "Retry-After": String(error.retryAfterSeconds) } : {});
+        return json({ success: false, error: error?.code || "SYSTEM_ACTION_FAILED", providerCode: error?.providerCode || null, retryAfterSeconds: error?.retryAfterSeconds || null }, status, error?.retryAfterSeconds ? { "Retry-After": String(error.retryAfterSeconds) } : {});
     }
 }

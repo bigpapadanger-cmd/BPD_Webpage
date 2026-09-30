@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-29T04:47:25.335Z",
+  "generatedAt": "2026-09-30T02:03:16.660Z",
   "policy": {
     "humanPagePaths": "case-insensitive lookup; canonical TitleCase path",
     "apiAndAssetPaths": "exact-case; never normalized by the human-page router",
@@ -1169,6 +1169,23 @@
         "functions/api/admin/system-status.js"
       ],
       "handler": "functions/api/admin/system-status.js",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/admin/system-status/mmr-deploy",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/admin/system-status/mmr-deploy.js"
+      ],
+      "handler": "functions/api/admin/system-status/mmr-deploy.js",
       "methods": [
         "GET",
         "POST"

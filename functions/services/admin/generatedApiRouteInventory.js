@@ -1172,6 +1172,23 @@ export const API_ROUTE_INVENTORY = Object.freeze([
     "deepLinkSupported": false
   },
   {
+    "path": "/api/admin/system-status/mmr-deploy",
+    "lookupKey": null,
+    "routeType": "api",
+    "casePolicy": "exact",
+    "sourceFiles": [
+      "functions/api/admin/system-status/mmr-deploy.js"
+    ],
+    "handler": "functions/api/admin/system-status/mmr-deploy.js",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "authRequired": "handler-defined",
+    "healthStatus": "valid",
+    "deepLinkSupported": false
+  },
+  {
     "path": "/api/auth/_oauth/callback",
     "lookupKey": null,
     "routeType": "api",
