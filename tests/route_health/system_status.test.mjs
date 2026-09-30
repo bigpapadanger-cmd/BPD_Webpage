@@ -3,7 +3,9 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import { getSystemStatus, performSystemStatusAction } from "../../functions/services/admin/system_status.js";
+import { getPermissionsForDiscordRoles, ADMIN_PERMISSIONS } from "../../functions/services/admin/permissions.js";
 import { onRequestGet, onRequestPost } from "../../functions/api/admin/system-status.js";
+import { getMmrControlModel } from "../../public/Global/Admin/WorkerStatus/JS/mmr_controls.js";
 
 const INTERNAL_HOSTNAME_FOR_TEST = "ocr-google-transport.internal";
 
@@ -67,6 +69,8 @@ test("system health cache includes protected MMR readiness without starting MMR 
         const mmr = first.services.find(item => item.id === "mmr-api");
         assert.equal(mmr.status, "degraded");
         assert.deepEqual(mmr.actions, ["recheck", "reconnect", "check-version"]);
+        assert.equal(mmr.supportsBuildUpdate, true);
+        assert.equal("canDeploy" in mmr, false);
         assert.equal(mmr.lastFailureCode, "PSYNET_AUTH_FAILED");
         assert.equal(mmr.lastFailureStage, "psynet_auth");
         assert.equal(mmr.lastProviderCode, "BuildError");
@@ -104,6 +108,53 @@ test("Worker Status UI is event-driven and exposes only per-service supported ac
     assert.match(source, /\/api\/admin\/page-settings\/route-health/);
     assert.match(source, /systemRouteRows/);
     assert.match(source, /statusIcon\(status\)/);
+    assert.match(source, /getMmrControlModel\(service, canDeployMmr\)/);
+});
+
+test("MMR control gates render separately for build configuration and Admin deployment permission", () => {
+    const service = { id: "mmr-api", actions: ["recheck", "reconnect", "check-version"], supportsBuildUpdate: false };
+    assert.deepEqual(getMmrControlModel(service, true), {
+        actions: ["recheck", "reconnect", "check-version"],
+        showBuildUpdate: false,
+        showDeploy: true,
+        showOperations: true
+    });
+    assert.deepEqual(getMmrControlModel({ ...service, supportsBuildUpdate: true }, false), {
+        actions: ["recheck", "reconnect", "check-version"],
+        showBuildUpdate: true,
+        showDeploy: false,
+        showOperations: true
+    });
+    assert.deepEqual(getMmrControlModel(service, false), {
+        actions: ["recheck", "reconnect", "check-version"],
+        showBuildUpdate: false,
+        showDeploy: false,
+        showOperations: false
+    });
+    assert.equal(getMmrControlModel({ ...service, id: "supabase" }, true).showDeploy, false);
+});
+
+test("Admin role receives system-status and MMR deploy permissions", () => {
+    const permissions = getPermissionsForDiscordRoles({ isAdmin: true });
+    assert.ok(permissions.includes(ADMIN_PERMISSIONS.ADMIN_SETTINGS_MANAGE));
+    assert.ok(permissions.includes(ADMIN_PERMISSIONS.MMR_DEPLOY));
+    const canDeployMmr = permissions.includes(ADMIN_PERMISSIONS.MMR_DEPLOY);
+    assert.equal(getMmrControlModel({ id: "mmr-api", supportsBuildUpdate: false }, canDeployMmr).showDeploy, true);
+});
+
+test("missing MMR server authorization omits reconnect/version/build capabilities", async () => {
+    const { env } = createEnv();
+    delete env.MMR_ADMIN_API_KEY;
+    const restore = installHealthFetch({ presence: 0, transport: 0, mmr: 0 });
+    try {
+        const status = await getSystemStatus(env, { force: true });
+        const mmr = status.services.find(item => item.id === "mmr-api");
+        assert.deepEqual(mmr.actions, ["recheck"]);
+        assert.equal(mmr.supportsBuildUpdate, false);
+        const adminControls = getMmrControlModel(mmr, true);
+        assert.equal(adminControls.showBuildUpdate, false);
+        assert.equal(adminControls.showDeploy, true);
+    } finally { restore(); }
 });
 
 test("health sweep cache expires and then refreshes all bounded checks", async () => {

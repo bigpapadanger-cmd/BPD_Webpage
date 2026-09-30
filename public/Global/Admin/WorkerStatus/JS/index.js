@@ -1,6 +1,7 @@
 "use strict";
 
 import { getAuthState, hasAdminPermission } from "/Framework/Auth/auth.js";
+import { getMmrControlModel } from "./mmr_controls.js";
 
 const REQUIRED_PERMISSION = "admin.settings.manage";
 const DEPLOY_PERMISSION = "admin.mmr.deploy";
@@ -197,19 +198,22 @@ function makeDetails(service) {
         list.className = "worker-status-facts";
         for (const fact of mmrFacts) list.append(textElement("li", fact));
         content.append(list);
-        if (service.supportsBuildUpdate) {
+        const controls = getMmrControlModel(service, canDeployMmr);
+        if (controls.showOperations) {
             const operations = document.createElement("section");
             operations.className = "mmr-operations";
             operations.append(textElement("h4", "Operations"));
-            const form = document.createElement("form");
-            form.className = "mmr-build-form";
-            const build = document.createElement("input"); build.name = "buildId"; build.required = true; build.placeholder = "Build ID"; build.value = service.activeBuild?.buildId || service.currentBuildId || "";
-            const feature = document.createElement("input"); feature.name = "featureSet"; feature.required = true; feature.placeholder = "Feature Set"; feature.value = service.activeBuild?.featureSet || service.currentFeatureSet || "";
-            const update = textElement("button", "Update Build Configuration"); update.type = "submit";
-            form.append(build, feature, update);
-            form.addEventListener("submit", event => { event.preventDefault(); void updateBuildConfiguration(form); });
-            operations.append(form);
-            if (canDeployMmr) {
+            if (controls.showBuildUpdate) {
+                const form = document.createElement("form");
+                form.className = "mmr-build-form";
+                const build = document.createElement("input"); build.name = "buildId"; build.required = true; build.placeholder = "Build ID"; build.value = service.activeBuild?.buildId || service.currentBuildId || "";
+                const feature = document.createElement("input"); feature.name = "featureSet"; feature.required = true; feature.placeholder = "Feature Set"; feature.value = service.activeBuild?.featureSet || service.currentFeatureSet || "";
+                const update = textElement("button", "Update Build Configuration"); update.type = "submit";
+                form.append(build, feature, update);
+                form.addEventListener("submit", event => { event.preventDefault(); void updateBuildConfiguration(form); });
+                operations.append(form);
+            }
+            if (controls.showDeploy) {
                 const deploy = textElement("button", "Redeploy MMR Worker", "mmr-deploy-button"); deploy.type = "button"; deploy.id = "mmrDeployButton";
                 const deployment = textElement("ul", "", "worker-status-facts"); deployment.id = "mmrDeploymentState";
                 deploy.addEventListener("click", () => { void deployMmrWorker(deploy); });
@@ -325,10 +329,11 @@ async function loadStatus() {
             identity.className = "worker-status-identity";
             identity.append(textElement("strong", service.name, "worker-status-name"), textElement("span", status, `worker-status-label worker-status-${status}`));
             primary.append(indicator, identity);
-            if (Array.isArray(service.actions) && service.actions.length) {
+            const controls = getMmrControlModel(service, canDeployMmr);
+            if (controls.actions.length) {
                 const actions = document.createElement("div");
                 actions.className = "worker-status-card-actions";
-                for (const action of service.actions) {
+                for (const action of controls.actions) {
                     const button = textElement("button", action === "reconnect" ? "↻ Reconnect" : action === "check-version" ? "↻ Check Rocket League Version" : action === "run-now" ? "▶ Run" : "↻ Recheck");
                     button.type = "button";
                     button.setAttribute("aria-label", `${action === "reconnect" ? "Reconnect PsyNet" : action === "check-version" ? "Check Rocket League Version" : action === "run-now" ? "Run presence now" : `Recheck ${service.name}`}`);

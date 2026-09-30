@@ -64,7 +64,7 @@ public/Global/
 +-- Account/             CSS/index.css, HTML/index.html, JS/index.js
 +-- Admin/
 |   +-- Home/            CSS/index.css, HTML/index.html, JS/index.js
-|   +-- WorkerStatus/    CSS/index.css, HTML/index.html, JS/index.js
+|   +-- WorkerStatus/    CSS/index.css, HTML/index.html, JS/index.js, JS/mmr_controls.js
 |   +-- TaskBoard/
 |       +-- CSS/index.css, overlay.css
 |       +-- HTML/index.html, create_task.html, task_confirm.html,
