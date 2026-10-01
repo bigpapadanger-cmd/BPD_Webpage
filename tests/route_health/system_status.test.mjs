@@ -140,7 +140,9 @@ test("Rocket League capability registry keeps only MMR / Skills active and place
     assert.doesNotMatch(renderer, /\bfetch\s*\(/);
     assert.doesNotMatch(renderer, /addEventListener\s*\(/);
     const css = await readFile(new URL("../../public/Global/Admin/WorkerStatus/CSS/index.css", import.meta.url), "utf8");
-    assert.match(css, /\.rocket-capability-category\s*\{[^}]*border:/s);
+    assert.match(renderer, /group\.className = "rocket-capability-category worker-status-row"/);
+    assert.match(renderer, /summary\.className = "rocket-capability-category-summary worker-status-primary"/);
+    assert.match(css, /\.rocket-capability-categories\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)/s);
     assert.match(css, /\.rocket-capability-category\s*>\s*summary\s*\{/);
     assert.match(css, /\.rocket-capability-list\s*\{[^}]*display:\s*grid/s);
 });
