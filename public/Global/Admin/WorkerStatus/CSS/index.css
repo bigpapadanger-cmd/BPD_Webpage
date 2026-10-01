@@ -113,26 +113,34 @@
 
 .rocket-capability-categories {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 290px), 1fr));
-    gap: 13px;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
+    align-items: start;
+    gap: 12px;
 }
 
 .rocket-capability-category {
     min-width: 0;
-    padding: 14px;
+    overflow: hidden;
     border: 1px solid rgba(148, 163, 184, .15);
-    border-radius: 13px;
-    background: rgba(255, 255, 255, .025);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, .03);
 }
 
-.rocket-capability-category h3 { margin: 0 0 10px; color: #dcecff; font-size: .94rem; }
-.rocket-capability-list { display: grid; gap: 7px; padding: 0; margin: 0; list-style: none; }
+.rocket-capability-category > summary { display: flex; min-height: 48px; align-items: center; gap: 10px; padding: 11px 14px; color: #e6effa; cursor: pointer; list-style: none; }
+.rocket-capability-category > summary::-webkit-details-marker { display: none; }
+.rocket-capability-category > summary::after { content: "+"; margin-left: auto; color: #8ea3bb; font-size: 1.2rem; line-height: 1; }
+.rocket-capability-category[open] > summary::after { content: "−"; }
+.rocket-capability-category > summary:hover, .rocket-capability-category > summary:focus-visible { background: rgba(255, 255, 255, .045); }
+.rocket-capability-category-name { font-size: .94rem; font-weight: 750; }
+.rocket-capability-category-count { padding: 3px 8px; border: 1px solid rgba(148, 163, 184, .17); border-radius: 999px; color: #9eafc3; font-size: .68rem; }
+.rocket-capability-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 9px; padding: 0 11px 11px; margin: 0; list-style: none; }
 
 .rocket-capability-card {
     min-width: 0;
-    padding: 10px 11px;
+    min-height: 120px;
+    padding: 12px;
     border: 1px solid rgba(148, 163, 184, .12);
-    border-radius: 10px;
+    border-radius: 11px;
     background: rgba(2, 6, 13, .22);
 }
 
@@ -140,16 +148,17 @@
 .rocket-capability-active { border-color: rgba(117, 227, 161, .3); background: rgba(34, 197, 94, .055); }
 .rocket-capability-future { border-style: dashed; }
 .rocket-capability-advanced { border-color: rgba(255, 210, 122, .2); background: rgba(255, 210, 122, .025); }
-.rocket-capability-title-row { display: flex; align-items: center; justify-content: flex-start; gap: 8px; }
-.rocket-capability-title-row .worker-status-indicator { width: 19px; height: 19px; font-size: .68rem; }
-.rocket-capability-name { color: #edf4ff; font-size: .86rem; }
-.rocket-capability-status { flex: 0 0 auto; margin-left: auto; color: #aebed0; font-size: .68rem; font-weight: 750; text-transform: uppercase; letter-spacing: .04em; }
+.rocket-capability-title-row { display: grid; grid-template-columns: 22px minmax(0, 1fr); align-items: center; column-gap: 8px; row-gap: 7px; }
+.rocket-capability-title-row .worker-status-indicator { width: 20px; height: 20px; font-size: .7rem; }
+.rocket-capability-name { min-width: 0; color: #edf4ff; font-size: .84rem; }
+.rocket-capability-status { grid-column: 2; width: fit-content; color: #aebed0; font-size: .67rem; font-weight: 750; text-transform: uppercase; letter-spacing: .04em; }
 .rocket-capability-status.worker-status-healthy { color: #75e3a1; }
 .rocket-capability-status.worker-status-degraded { color: #ffd27a; }
 .rocket-capability-status.worker-status-down { color: #ff8f9a; }
 .rocket-capability-purpose { margin: 6px 0; color: #aebed0; font-size: .76rem; line-height: 1.4; }
-.rocket-capability-meta { color: #7f91a8; font-size: .69rem; }
-.rocket-capability-link { display: inline-block; margin-top: 7px; color: #7dd3fc; font-size: .75rem; text-decoration: none; }
+.rocket-capability-meta { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
+.rocket-capability-tag { padding: 3px 7px; border: 1px solid rgba(148, 163, 184, .13); border-radius: 999px; color: #8fa2b8; font-size: .66rem; }
+.rocket-capability-link { display: inline-block; margin-top: 8px; color: #7dd3fc; font-size: .73rem; text-decoration: none; }
 .rocket-capability-link:hover, .rocket-capability-link:focus-visible { text-decoration: underline; }
 
 .worker-status-row {

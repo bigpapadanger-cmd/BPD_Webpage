@@ -259,9 +259,14 @@ function renderRocketLeagueCapabilities(services) {
     for (const category of ROCKET_LEAGUE_CAPABILITY_CATEGORIES) {
         const capabilities = ROCKET_LEAGUE_CAPABILITIES.filter(capability => capability.category === category.id);
         if (!capabilities.length) continue;
-        const group = document.createElement("section");
+        const group = document.createElement("details");
         group.className = `rocket-capability-category${category.id === "advanced" ? " rocket-capability-advanced" : ""}`;
-        const heading = textElement("h3", category.label);
+        const summary = document.createElement("summary");
+        summary.className = "rocket-capability-category-summary";
+        summary.append(textElement("span", category.label, "rocket-capability-category-name"));
+        const activeCount = capabilities.filter(capability => capability.status === "active").length;
+        const summaryLabel = activeCount ? `${activeCount} active · ${capabilities.length - activeCount} planned` : `${capabilities.length} planned`;
+        summary.append(textElement("span", summaryLabel, "rocket-capability-category-count"));
         const list = document.createElement("ul");
         list.className = "rocket-capability-list";
         for (const capability of capabilities) {
@@ -280,8 +285,11 @@ function renderRocketLeagueCapabilities(services) {
             titleRow.append(indicator, textElement("strong", capability.label, "rocket-capability-name"));
             titleRow.append(textElement("span", displayStatus, `rocket-capability-status${isActive ? ` worker-status-${state}` : ""}`));
             item.append(titleRow, textElement("p", capability.purpose, "rocket-capability-purpose"));
-            const metadata = [capability.access, Number.isInteger(capability.priority) ? `Priority ${capability.priority}` : null].filter(Boolean);
-            item.append(textElement("span", metadata.join(" · "), "rocket-capability-meta"));
+            const metadata = document.createElement("div");
+            metadata.className = "rocket-capability-meta";
+            metadata.append(textElement("span", capability.access, "rocket-capability-tag"));
+            if (Number.isInteger(capability.priority)) metadata.append(textElement("span", `Priority ${capability.priority}`, "rocket-capability-tag"));
+            item.append(metadata);
             if (isActive) {
                 const link = document.createElement("a");
                 link.href = "#worker-status-service-mmr-api";
@@ -291,7 +299,7 @@ function renderRocketLeagueCapabilities(services) {
             }
             list.append(item);
         }
-        group.append(heading, list);
+        group.append(summary, list);
         fragment.append(group);
     }
     target.replaceChildren(fragment);

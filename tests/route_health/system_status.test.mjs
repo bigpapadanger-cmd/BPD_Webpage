@@ -134,9 +134,15 @@ test("Rocket League capability registry keeps only MMR / Skills active and place
     const source = await readFile(new URL("../../public/Global/Admin/WorkerStatus/JS/index.js", import.meta.url), "utf8");
     const renderer = source.slice(source.indexOf("function renderRocketLeagueCapabilities"), source.indexOf("function makeDetails"));
     assert.match(source, /renderRocketLeagueCapabilities\(payload\.services\)/);
+    assert.match(renderer, /document\.createElement\("details"\)/);
+    assert.match(renderer, /document\.createElement\("summary"\)/);
     assert.match(renderer, /if \(!isActive\) item\.setAttribute\("aria-disabled", "true"\)/);
     assert.doesNotMatch(renderer, /\bfetch\s*\(/);
     assert.doesNotMatch(renderer, /addEventListener\s*\(/);
+    const css = await readFile(new URL("../../public/Global/Admin/WorkerStatus/CSS/index.css", import.meta.url), "utf8");
+    assert.match(css, /\.rocket-capability-category\s*\{[^}]*border:/s);
+    assert.match(css, /\.rocket-capability-category\s*>\s*summary\s*\{/);
+    assert.match(css, /\.rocket-capability-list\s*\{[^}]*display:\s*grid/s);
 });
 
 test("MMR controls keep operational, functional, build, and deployment gates separate", () => {
