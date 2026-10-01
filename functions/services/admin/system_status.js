@@ -8,11 +8,11 @@ const CLOUD_RUN_ACTION_TIMEOUT_MS = 30000;
 const INTERNAL_HOSTNAME = "ocr-google-transport.internal";
 let inFlightCheck = null;
 const actionLocks = new Set();
-const ACTION_COOLDOWNS = { "mmr-api:reconnect": 30, "mmr-api:check-version": 60, "cloud-run-ocr:recheck": 60, "rl-presence:run-now": 60 };
+const ACTION_COOLDOWNS = { "mmr-api:reconnect-psynet": 30, "mmr-api:refresh-eos": 15, "mmr-api:repair-session": 15, "cloud-run-ocr:recheck": 60, "rl-presence:run-now": 60 };
 const ACTIONS = {
     pages: ["recheck"], "rl-presence": ["recheck", "run-now"], "ocr-transport": ["recheck"],
     "ocr-queue": ["recheck"], "cloud-run-ocr": ["recheck"], supabase: ["recheck"],
-    "mmr-api": ["recheck", "reconnect", "check-version"]
+    "mmr-api": ["recheck", "refresh-eos", "reauthorize-account", "poll-authorization", "reconnect-psynet", "repair-session", "functional-test"]
 };
 const SERVICE_STATUS_PREFIX = "admin:service-status:";
 
@@ -40,11 +40,11 @@ async function timedFetch(fetcher, timeoutMs = CHECK_TIMEOUT_MS) {
     finally { clearTimeout(timer); }
 }
 
-async function readSmallJson(response) {
+async function readSmallJson(response, maximumBytes = 4096) {
     const declaredLength = Number(response.headers.get("Content-Length"));
-    if (Number.isFinite(declaredLength) && declaredLength > 4096) throw new Error("HEALTH_RESPONSE_TOO_LARGE");
+    if (Number.isFinite(declaredLength) && declaredLength > maximumBytes) throw new Error("HEALTH_RESPONSE_TOO_LARGE");
     const body = await response.text();
-    if (body.length > 4096) throw new Error("HEALTH_RESPONSE_TOO_LARGE");
+    if (body.length > maximumBytes) throw new Error("HEALTH_RESPONSE_TOO_LARGE");
     return body ? JSON.parse(body) : {};
 }
 
@@ -108,79 +108,85 @@ async function checkSupabase(env) {
     return statusEntry("supabase", "Supabase", state.status || "unknown", state.message || "Last explicit API availability check.", state);
 }
 
+const MMR_ADVERTISED_ACTIONS = new Set(["recheck", "refresh-eos", "reauthorize-account", "reconnect-psynet", "validate-build", "repair-session"]);
+
+function safeMmrActions(payload, adminConfigured) {
+    const advertised = Array.isArray(payload?.availableActions) ? payload.availableActions.filter(action => MMR_ADVERTISED_ACTIONS.has(action)) : ["recheck"];
+    return [...new Set(advertised.filter(action => action === "recheck" || adminConfigured))];
+}
+
+function normalizeMmrHealth(payload, responseTimeMs, adminConfigured) {
+    const components = payload?.components || {};
+    const psynet = payload?.psynet || {};
+    const recovery = payload?.recovery || {};
+    const traffic = payload?.traffic || {};
+    const build = payload?.build || {};
+    const config = payload?.config || {};
+    const component = name => ({
+        status: ["healthy", "degraded", "unhealthy", "unknown"].includes(components[name]?.status) ? components[name].status : "unknown",
+        state: typeof components[name]?.state === "string" ? components[name].state : null
+    });
+    const status = ["healthy", "degraded", "down", "unknown", "repairing"].includes(payload?.status) ? payload.status : "unknown";
+    const rootCause = typeof payload?.rootCause === "string" ? payload.rootCause : null;
+    const activeRepair = typeof payload?.activeRepair === "string" ? payload.activeRepair : null;
+    const state = String(psynet.state || components.psynetSocket?.state || "unknown");
+    const detail = status === "healthy" ? "MMR Worker, EOS, PsyNet, and MMR service are healthy."
+        : status === "repairing" ? `MMR repair is active${activeRepair ? `: ${activeRepair}` : "."}`
+            : rootCause ? `MMR Worker is ${status}; current cause: ${rootCause}.` : `MMR Worker is ${status}; no current root cause was reported.`;
+    return statusEntry("mmr-api", "MMR API", status, detail, {
+        actions: safeMmrActions(payload, adminConfigured), responseTimeMs, rootCause, activeRepair,
+        components: {
+            worker: component("worker"), configuration: component("configuration"), eosAuthorization: component("eosAuthorization"),
+            psynetAuthentication: component("psynetAuthentication"), psynetSocket: component("psynetSocket"),
+            buildConfiguration: component("buildConfiguration"), mmrService: component("mmrService")
+        },
+        psynetState: state, configReady: config.requiredConfigPresent === true,
+        missingConfig: Array.isArray(config.missingConfig) ? config.missingConfig.filter(value => typeof value === "string").slice(0, 20) : [],
+        gameVersion: components.buildConfiguration?.gameVersion || build.gameVersion || null,
+        currentBuildId: components.buildConfiguration?.derivedBuildId || build.currentBuildId || null,
+        currentFeatureSet: components.buildConfiguration?.featureSet || build.currentFeatureSet || null,
+        configurationGeneration: Number(components.buildConfiguration?.configurationGeneration ?? build.configurationGeneration) || 0,
+        buildSource: components.buildConfiguration?.source || build.source || null,
+        buildSecretConfigured: components.buildConfiguration?.buildSecretConfigured === true || build.buildSecretConfigured === true,
+        buildStatus: components.buildConfiguration?.status || build.status || "unknown",
+        supportsBuildUpdate: adminConfigured,
+        lastAuthAttemptAt: psynet.lastAuthAttemptAt || null,
+        lastAuthSuccessAt: components.psynetAuthentication?.lastSuccessAt || psynet.lastAuthSuccessAt || null,
+        lastMmrRequestAt: traffic.lastRequestAt || null,
+        lastMmrSuccessAt: components.mmrService?.lastSuccessAt || traffic.lastSuccessAt || null,
+        lastMmrFailureAt: components.mmrService?.lastFailureAt || traffic.lastFailureAt || null,
+        lastMmrFailureCode: components.mmrService?.lastFailureCode || traffic.lastFailureCode || null,
+        lastRepairAction: recovery.lastRepairAction || null,
+        lastRepairResult: recovery.lastRepairResult || null,
+        nextScheduledVersionCheckAt: build.nextScheduledCheckAt || null,
+        historical: {
+            lastVersionCheckAt: build.lastVersionCheckAt || null, lastVersionCheckResult: build.lastVersionCheckResult || null,
+            lastBuildValidationAt: build.lastBuildValidationAt || null, lastBuildValidationResult: build.lastBuildValidationResult || null,
+            versionMismatchDetectedAt: build.versionMismatchDetectedAt || null, lastFailureCode: psynet.lastFailureCode || null,
+            lastFailureStage: psynet.lastFailureStage || null, lastProviderCode: psynet.lastProviderCode || null
+        },
+        mmrRequests: Number(traffic.totalRequests) || 0, mmrSuccesses: Number(traffic.successfulRequests) || 0,
+        mmrFailures: Number(traffic.failedRequests) || 0, emptyRequests: Number(traffic.emptyRequests) || 0,
+        rateLimitedRequests: Number(traffic.rateLimitedRequests) || 0,
+        normalLimitPerMinute: Number(traffic.normalLimitPerMinute) || 30, emptyLimitPerMinute: Number(traffic.emptyLimitPerMinute) || 5
+    });
+}
+
 async function checkMmrApi(env) {
     const endpoint = String(env?.MMR_API_URL || "").trim();
     const apiKey = String(env?.MMR_API_KEY || "").trim();
-    const actions = ["recheck", ...(String(env?.MMR_ADMIN_API_KEY || "").trim() ? ["reconnect", "check-version"] : [])];
-    if (!endpoint || !apiKey) return statusEntry("mmr-api", "MMR API", "unknown", "MMR readiness authorization is not configured.", { actions, configReady: false });
+    const adminConfigured = Boolean(String(env?.MMR_ADMIN_API_KEY || "").trim());
+    if (!endpoint || !apiKey) return statusEntry("mmr-api", "MMR API", "unknown", "MMR readiness authorization is not configured.", { actions: ["recheck"], configReady: false, supportsBuildUpdate: false });
     const startedAt = Date.now();
     try {
         const response = await timedFetch(signal => fetch(new URL("/health/ready", endpoint), { method: "GET", redirect: "manual", signal, headers: { Authorization: `Bearer ${apiKey}`, Accept: "application/json" } }));
         const responseTimeMs = Date.now() - startedAt;
-        if (!response.ok) return statusEntry("mmr-api", "MMR API", response.status >= 500 ? "down" : "degraded", `Readiness endpoint returned HTTP ${response.status}.`, { actions, responseTimeMs });
-        const payload = await readSmallJson(response);
-        if (!payload?.psynet || !["healthy", "degraded", "unknown"].includes(payload.status)) return statusEntry("mmr-api", "MMR API", "unknown", "Readiness response was not recognized.", { actions, responseTimeMs });
-        const psynet = payload.psynet;
-        const recovery = payload.recovery || {};
-        const traffic = payload.traffic || {};
-        const config = payload.config || {};
-        const state = String(psynet.state || "unknown");
-        const detail = state === "connected" ? "PsyNet is connected." : state === "idle" && payload.status === "healthy" ? "PsyNet is ready and will connect on the next request." : `MMR Worker is reachable; PsyNet state is ${state}.`;
-        return statusEntry("mmr-api", "MMR API", payload.status, detail, {
-            actions,
-            responseTimeMs,
-            psynetState: state,
-            configReady: config.requiredConfigPresent === true,
-            missingConfig: Array.isArray(config.missingConfig) ? config.missingConfig : [],
-            lastAuthAttemptAt: psynet.lastAuthAttemptAt || null,
-            lastAuthSuccessAt: psynet.lastAuthSuccessAt || null,
-            lastAuthFailureAt: psynet.lastAuthFailureAt || null,
-            lastSuccessfulAt: psynet.lastSuccessfulAt || traffic.lastSuccessAt || null,
-            lastFailureAt: psynet.lastFailureAt || traffic.lastFailureAt || null,
-            lastFailureCode: psynet.lastFailureCode || traffic.lastFailureCode || null,
-            lastFailureStage: psynet.lastFailureStage || null,
-            lastProviderCode: psynet.lastProviderCode || null,
-            backoffUntil: psynet.backoffUntil || psynet.nextRetryAt || null,
-            retryAfterSeconds: Number(psynet.retryAfterSeconds) || null,
-            consecutiveFailures: Number(psynet.consecutiveFailures) || 0,
-            lastMmrRequestAt: traffic.lastRequestAt || null,
-            lastMmrSuccessAt: traffic.lastSuccessAt || null,
-            lastMmrFailureAt: traffic.lastFailureAt || null,
-            lastMmrFailureCode: traffic.lastFailureCode || null,
-            mmrRequests: Number(traffic.totalRequests) || 0,
-            mmrSuccesses: Number(traffic.successfulRequests) || 0,
-            mmrFailures: Number(traffic.failedRequests) || 0,
-            emptyRequests: Number(traffic.emptyRequests) || 0,
-            rateLimitedRequests: Number(traffic.rateLimitedRequests) || 0,
-            normalLimitPerMinute: Number(traffic.normalLimitPerMinute) || 30,
-            emptyLimitPerMinute: Number(traffic.emptyLimitPerMinute) || 5,
-            lastReconnectAttemptAt: recovery.lastAttemptAt || null,
-            lastReconnectCompletedAt: recovery.lastCompletedAt || null,
-            lastReconnectResult: recovery.lastResult || null,
-            reconnectAttempts: Number(recovery.attempts) || 0,
-            reconnectSuccesses: Number(recovery.successes) || 0,
-            reconnectFailures: Number(recovery.failures) || 0,
-            buildStatus: payload.build?.status || "unknown",
-            currentBuildId: payload.build?.currentBuildId || null,
-            currentFeatureSet: payload.build?.currentFeatureSet || null,
-            userAgentConfigured: payload.build?.userAgentConfigured === true,
-            userAgentSummary: payload.build?.userAgentSummary || null,
-            buildSource: payload.build?.source || null,
-            activeBuild: payload.build?.active || null,
-            fallbackBuild: payload.build?.fallback || null,
-            supportsBuildUpdate: Boolean(String(env?.MMR_ADMIN_API_KEY || "").trim()),
-            lastVersionCheckAt: payload.build?.lastVersionCheckAt || null,
-            lastVersionCheckResult: payload.build?.lastVersionCheckResult || null,
-            lastBuildValidationAt: payload.build?.lastBuildValidationAt || null,
-            lastBuildValidationResult: payload.build?.lastBuildValidationResult || null,
-            versionMismatchDetectedAt: payload.build?.versionMismatchDetectedAt || null,
-            detectedBuildId: payload.build?.detectedBuildId || null,
-            detectedFeatureSet: payload.build?.detectedFeatureSet || null,
-            candidateValidationResult: payload.build?.candidateValidationResult || null,
-            nextScheduledVersionCheckAt: payload.build?.nextScheduledCheckAt || null
-        });
+        if (!response.ok) return statusEntry("mmr-api", "MMR API", response.status >= 500 ? "down" : "degraded", `Readiness endpoint returned HTTP ${response.status}.`, { actions: ["recheck"], responseTimeMs, supportsBuildUpdate: adminConfigured });
+        const payload = await readSmallJson(response, 16384);
+        if (!payload?.components || !["healthy", "degraded", "down", "unknown", "repairing"].includes(payload.status)) return statusEntry("mmr-api", "MMR API", "unknown", "Readiness response was not recognized.", { actions: ["recheck"], responseTimeMs, supportsBuildUpdate: adminConfigured });
+        return normalizeMmrHealth(payload, responseTimeMs, adminConfigured);
     } catch (error) {
-        return statusEntry("mmr-api", "MMR API", error?.name === "AbortError" ? "down" : "unknown", error?.name === "AbortError" ? "Readiness check timed out." : "Readiness check failed.", { actions, responseTimeMs: Date.now() - startedAt });
+        return statusEntry("mmr-api", "MMR API", error?.name === "AbortError" ? "down" : "unknown", error?.name === "AbortError" ? "Readiness check timed out." : "Readiness check failed.", { actions: ["recheck"], responseTimeMs: Date.now() - startedAt, supportsBuildUpdate: adminConfigured });
     }
 }
 
@@ -219,29 +225,25 @@ export async function getSystemStatus(env, { force = false } = {}) {
 }
 
 export async function performSystemStatusAction(env, service, action, input = {}) {
-    if (!ACTIONS[service]?.includes(action)) {
-        const error = new Error("Unsupported system action.");
-        error.code = "SYSTEM_ACTION_UNSUPPORTED";
-        error.status = 400;
-        throw error;
-    }
+    if (!ACTIONS[service]?.includes(action)) throw actionError("SYSTEM_ACTION_UNSUPPORTED", 400);
     const lockKey = `${service}:${action}`;
-    if (actionLocks.has(lockKey)) { const error = new Error("Action already running."); error.code = "SERVICE_RECHECK_IN_PROGRESS"; error.status = 409; throw error; }
-    const cooldown = ACTION_COOLDOWNS[lockKey] || 15;
+    if (actionLocks.has(lockKey)) throw actionError("SERVICE_ACTION_IN_PROGRESS", 409);
+    const cooldown = ACTION_COOLDOWNS[lockKey] || 0;
     const cooldownKey = `admin:system-action:${lockKey}`;
     const now = Date.now();
-    try {
-        const last = Number(await env?.RL_STATS_CACHE?.get(cooldownKey));
-        if (last && now - last < cooldown * 1000) { const error = new Error("Action is cooling down."); error.code = "SERVICE_RECHECK_COOLDOWN"; error.status = 429; error.retryAfterSeconds = Math.ceil(cooldown - (now - last) / 1000); throw error; }
-    } catch (error) { if (error?.code === "SERVICE_RECHECK_COOLDOWN") throw error; }
+    if (cooldown) {
+        try {
+            const last = Number(await env?.RL_STATS_CACHE?.get(cooldownKey));
+            if (last && now - last < cooldown * 1000) { const error = actionError("SERVICE_ACTION_COOLDOWN", 429); error.retryAfterSeconds = Math.ceil(cooldown - (now - last) / 1000); throw error; }
+        } catch (error) { if (error?.code === "SERVICE_ACTION_COOLDOWN") throw error; }
+    }
     actionLocks.add(lockKey);
     try {
-        try { await env?.RL_STATS_CACHE?.put(cooldownKey, String(now), { expirationTtl: cooldown }); } catch { /* Isolate lock still deduplicates concurrent actions. */ }
-        if (service === "mmr-api" && action === "recheck") {
-            const result = await checkMmrApi(env); await storeActionResult(env, result); return { success: true, service, action, result };
+        if (cooldown) try { await env?.RL_STATS_CACHE?.put(cooldownKey, String(now), { expirationTtl: cooldown }); } catch { /* Local lock remains effective. */ }
+        if (service === "mmr-api") {
+            if (action === "functional-test") return await testMmrSkills(env, service, action, input);
+            return await runMmrAdminAction(env, service, action);
         }
-        if (service === "mmr-api" && action === "reconnect") return await reconnectMmr(env, service, action);
-        if (service === "mmr-api" && action === "check-version") return await checkMmrVersion(env, service, action);
         let result;
         if (service === "pages") result = statusEntry("pages", "Pages Functions", "healthy", "Authenticated Pages API is responding.", { responseTimeMs: 0 });
         else if (service === "rl-presence") {
@@ -249,7 +251,7 @@ export async function performSystemStatusAction(env, service, action, input = {}
                 const endpoint = String(env?.RL_PRESENCE_MONITOR_URL || "").trim(); const token = String(env?.PRESENCE_TRIGGER_KEY || "");
                 if (!endpoint || token.length < 32) throw actionError("PRESENCE_RUN_NOT_CONFIGURED", 503);
                 const response = await timedFetch(signal => fetch(new URL("/admin/run-scheduled", endpoint), { method: "POST", redirect: "manual", signal, headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify({ job: "presence" }) }), ACTION_TIMEOUT_MS);
-                if (!response.ok) throw actionError(response.status === 409 ? "SERVICE_RECHECK_IN_PROGRESS" : "PRESENCE_RUN_FAILED", response.status === 409 ? 409 : 502);
+                if (!response.ok) throw actionError(response.status === 409 ? "SERVICE_ACTION_IN_PROGRESS" : "PRESENCE_RUN_FAILED", response.status === 409 ? 409 : 502);
             }
             result = await checkPresenceMonitor(env);
         } else if (service === "ocr-transport") result = await checkOcrTransport(env);
@@ -265,43 +267,30 @@ export async function updateMmrBuildConfiguration(env, input) {
     const endpoint = String(env?.MMR_API_URL || "").trim();
     const adminKey = String(env?.MMR_ADMIN_API_KEY || "").trim();
     if (!endpoint || !adminKey) throw actionError("RL_BUILD_UPDATE_NOT_CONFIGURED", 503);
-    const buildId = typeof input?.buildId === "string" ? input.buildId.trim() : "";
+    const gameVersion = typeof input?.gameVersion === "string" ? input.gameVersion.trim() : "";
     const featureSet = typeof input?.featureSet === "string" ? input.featureSet.trim() : "";
-    const userAgentBuildVersion = typeof input?.userAgentBuildVersion === "string" ? input.userAgentBuildVersion.trim() : "";
-    if (!/^-?\d{1,12}$/.test(buildId) || !/^[A-Za-z0-9_.-]{1,64}$/.test(featureSet) || !/^\d{6}\.\d{1,8}\.\d{1,8}$/.test(userAgentBuildVersion)) throw actionError("RL_BUILD_UPDATE_INVALID", 400);
+    const buildSecret = typeof input?.buildSecret === "string" ? input.buildSecret.trim() : "";
+    if (!/^\d{6}\.\d{1,8}\.\d{1,8}$/.test(gameVersion) || !/^[A-Za-z0-9_.-]{1,64}$/.test(featureSet) || buildSecret.length < 8 || buildSecret.length > 512) throw actionError("RL_BUILD_UPDATE_INVALID", 400);
     let response;
     try {
         response = await timedFetch(signal => fetch(new URL("/admin/build-configuration", endpoint), {
             method: "POST", redirect: "manual", signal,
             headers: { Authorization: `Bearer ${adminKey}`, Accept: "application/json", "Content-Type": "application/json" },
-            body: JSON.stringify({ buildId, featureSet, userAgentBuildVersion })
+            body: JSON.stringify({ gameVersion, featureSet, buildSecret })
         }), ACTION_TIMEOUT_MS);
-    } catch (cause) { throw actionError(cause?.name === "AbortError" ? "RL_BUILD_UPDATE_FAILED" : "RL_BUILD_UPDATE_UNAVAILABLE", cause?.name === "AbortError" ? 504 : 502); }
+    } catch (cause) { throw actionError(cause?.name === "AbortError" ? "RL_BUILD_UPDATE_TIMEOUT" : "RL_BUILD_UPDATE_UNAVAILABLE", cause?.name === "AbortError" ? 504 : 502); }
     const payload = await readSmallJson(response).catch(() => ({}));
     if (!response.ok) {
-        try {
-            await env?.RL_STATS_CACHE?.delete(CACHE_KEY);
-            await storeActionResult(env, await checkMmrApi(env));
-        } catch { /* Preserve the candidate rejection if refreshing readiness also fails. */ }
-        const code = String(payload?.code || "RL_BUILD_UPDATE_REJECTED");
-        const status = code === "RL_BUILD_UPDATE_REJECTED" ? 422 : [400, 409, 429, 502, 503, 504].includes(response.status) ? response.status : 502;
-        const error = actionError(code, status);
-        error.providerCode = String(payload?.providerCode || "").replace(/[^A-Za-z0-9_.-]/g, "_").slice(0, 64) || null;
-        throw error;
+        await invalidateMmrStatus(env);
+        throw normalizedMmrError(response, payload, "RL_BUILD_UPDATE_REJECTED");
     }
-    try { await env?.RL_STATS_CACHE?.delete(CACHE_KEY); } catch { /* Best effort. */ }
-    const readiness = await checkMmrApi(env);
-    await storeActionResult(env, readiness);
+    await invalidateMmrStatus(env);
     return {
-        success: true,
-        resultCode: String(payload?.resultCode || "RL_BUILD_UPDATE_PROMOTED"),
-        buildId: String(payload?.buildId || buildId),
-        featureSet: String(payload?.featureSet || featureSet),
-        userAgentBuildVersion,
-        validatedAt: payload?.validatedAt || null,
-        reconnectSucceeded: payload?.reconnectSucceeded === true,
-        reconnectCode: payload?.reconnectCode || null,
-        readiness
+        success: true, resultCode: safeCode(payload?.resultCode, "RL_BUILD_UPDATE_PROMOTED"),
+        buildId: safeText(payload?.buildId), featureSet: safeText(payload?.featureSet || featureSet),
+        gameVersion: safeText(payload?.gameVersion || gameVersion), configurationGeneration: Number(payload?.configurationGeneration) || 0,
+        validatedAt: safeText(payload?.validatedAt), reconnectSucceeded: payload?.reconnectSucceeded === true,
+        reconnectCode: safeCode(payload?.reconnectCode, null)
     };
 }
 
@@ -346,82 +335,64 @@ async function recheckCloudRun(env) {
     } catch (error) { return statusEntry("cloud-run-ocr", "Google Cloud Run OCR", error?.name === "AbortError" ? "down" : "unknown", error?.name === "AbortError" ? "Cloud Run readiness check timed out." : "Cloud Run readiness check failed.", { responseTimeMs: Date.now() - started }); }
 }
 
-async function reconnectMmr(env, service, action) {
+function safeText(value, maximum = 256) { return typeof value === "string" ? value.replace(/[\r\n\t]/g, " ").slice(0, maximum) : null; }
+function safeCode(value, fallback = null) { const code = typeof value === "string" ? value.replace(/[^A-Za-z0-9_.-]/g, "_").slice(0, 64) : ""; return code || fallback; }
+function normalizedMmrError(response, payload, fallback) {
+    const status = [400, 401, 403, 409, 422, 429, 502, 503, 504].includes(response.status) ? response.status : 502;
+    const error = actionError(safeCode(payload?.code || payload?.error, fallback), status);
+    error.providerCode = safeCode(payload?.providerCode, null);
+    error.retryAfterSeconds = Number(payload?.retryAfterSeconds) || Number(response.headers.get("Retry-After")) || null;
+    error.rootCause = safeCode(payload?.rootCause, null);
+    error.action = safeCode(payload?.action, null);
+    error.safeMessage = safeText(payload?.message, 200);
+    return error;
+}
+async function invalidateMmrStatus(env) { try { await env?.RL_STATS_CACHE?.delete(CACHE_KEY); } catch { /* Best effort. */ } }
+
+async function callMmr(env, path, keyName, { method = "POST", body, timeout = ACTION_TIMEOUT_MS, maximumBytes = 4096 } = {}) {
     const endpoint = String(env?.MMR_API_URL || "").trim();
-    const adminKey = String(env?.MMR_ADMIN_API_KEY || "").trim();
-    if (!endpoint || !adminKey) {
-        const error = new Error("MMR reconnect is not configured.");
-        error.code = "MMR_RECONNECT_NOT_CONFIGURED";
-        error.status = 503;
-        throw error;
-    }
-    let response;
+    const key = String(env?.[keyName] || "").trim();
+    if (!endpoint || !key) throw actionError("MMR_ACTION_NOT_CONFIGURED", 503);
     try {
-        response = await timedFetch(signal => fetch(new URL("/admin/reconnect", endpoint), { method: "POST", redirect: "manual", signal, headers: { Authorization: `Bearer ${adminKey}`, Accept: "application/json" } }), ACTION_TIMEOUT_MS);
-    } catch (cause) {
-        const error = new Error("MMR reconnect request failed.");
-        error.code = cause?.name === "AbortError" ? "MMR_RECONNECT_TIMEOUT" : "MMR_RECONNECT_UNAVAILABLE";
-        error.status = 503;
-        throw error;
+        const response = await timedFetch(signal => fetch(new URL(path, endpoint), {
+            method, redirect: "manual", signal,
+            headers: { Authorization: `Bearer ${key}`, Accept: "application/json", ...(body ? { "Content-Type": "application/json" } : {}) },
+            ...(body ? { body: JSON.stringify(body) } : {})
+        }), timeout);
+        const payload = await readSmallJson(response, maximumBytes).catch(() => ({}));
+        if (!response.ok) throw normalizedMmrError(response, payload, "MMR_ACTION_FAILED");
+        return payload;
+    } catch (error) {
+        if (error?.code) throw error;
+        throw actionError(error?.name === "AbortError" ? "MMR_ACTION_TIMEOUT" : "MMR_ACTION_UNAVAILABLE", error?.name === "AbortError" ? 504 : 502);
     }
-    let payload;
-    try { payload = await readSmallJson(response); }
-    catch {
-        const error = new Error("MMR reconnect returned an invalid response.");
-        error.code = "MMR_RECONNECT_INVALID_RESPONSE";
-        error.status = 502;
-        throw error;
-    }
-    if (!response.ok) {
-        const error = new Error("MMR reconnect was not completed.");
-        error.code = String(payload?.code || "MMR_RECONNECT_FAILED");
-        error.status = [409, 429].includes(response.status) ? response.status : 502;
-        error.retryAfterSeconds = Number(payload?.retryAfterSeconds) || null;
-        throw error;
-    }
-    try { await env?.RL_STATS_CACHE?.delete(CACHE_KEY); } catch { /* Best effort. */ }
-    return { success: true, service, action, result: { state: String(payload?.state || "connected"), completedAt: payload?.completedAt || new Date().toISOString() } };
 }
 
-async function checkMmrVersion(env, service, action) {
-    const endpoint = String(env?.MMR_API_URL || "").trim();
-    const adminKey = String(env?.MMR_ADMIN_API_KEY || "").trim();
-    if (!endpoint || !adminKey) throw actionError("RL_VERSION_CHECK_NOT_CONFIGURED", 503);
-    let response;
-    try {
-        response = await timedFetch(signal => fetch(new URL("/admin/check-rocket-league-version", endpoint), {
-            method: "POST",
-            redirect: "manual",
-            signal,
-            headers: { Authorization: `Bearer ${adminKey}`, Accept: "application/json" }
-        }), ACTION_TIMEOUT_MS);
-    } catch (cause) {
-        throw actionError(cause?.name === "AbortError" ? "RL_VERSION_CHECK_TIMEOUT" : "RL_VERSION_CHECK_UNAVAILABLE", 503);
-    }
-    let payload;
-    try { payload = await readSmallJson(response); }
-    catch { throw actionError("RL_VERSION_CHECK_INVALID_RESPONSE", 502); }
-    if (!response.ok) {
-        const code = ["RL_VERSION_CHECK_IN_PROGRESS", "RL_VERSION_CHECK_COOLDOWN"].includes(payload?.code) ? payload.code : "RL_VERSION_CHECK_FAILED";
-        const error = actionError(code, [409, 429].includes(response.status) ? response.status : 502);
-        error.retryAfterSeconds = Number(payload?.retryAfterSeconds) || null;
-        throw error;
-    }
-    const allowedCodes = new Set(["RL_VERSION_SOURCE_UNAVAILABLE", "RL_VERSION_CHECK_SKIPPED", "RL_VERSION_VALIDATED", "RL_VERSION_UPDATED"]);
-    const resultCode = allowedCodes.has(payload?.resultCode) ? payload.resultCode : "RL_VERSION_CHECK_FAILED";
-    try { await env?.RL_STATS_CACHE?.delete(CACHE_KEY); } catch { /* Best effort. */ }
-    const readiness = await checkMmrApi(env);
-    await storeActionResult(env, readiness);
-    return {
-        success: true,
-        service,
-        action,
-        result: {
-            resultCode,
-            state: ["valid", "stale", "unknown", "checking"].includes(payload?.state) ? payload.state : "unknown",
-            currentBuildId: typeof payload?.currentBuildId === "string" ? payload.currentBuildId : null,
-            lastVersionCheckAt: typeof payload?.lastVersionCheckAt === "string" ? payload.lastVersionCheckAt : null,
-            message: resultCode === "RL_VERSION_SOURCE_UNAVAILABLE" ? "No authoritative first-party build source is available; the current configuration was retained." : resultCode === "RL_VERSION_CHECK_SKIPPED" ? "The current build was checked recently; no new check was needed." : "Rocket League version check completed."
-        }
+async function runMmrAdminAction(env, service, action) {
+    const paths = {
+        recheck: "/admin/recheck", "refresh-eos": "/admin/refresh", "reauthorize-account": "/admin/bootstrap",
+        "poll-authorization": "/admin/poll", "reconnect-psynet": "/admin/reconnect", "repair-session": "/admin/repair-session"
     };
+    const payload = await callMmr(env, paths[action], "MMR_ADMIN_API_KEY");
+    await invalidateMmrStatus(env);
+    if (action === "reauthorize-account") return { success: true, service, action, result: { status: "authorization_pending", url: safeText(payload?.url, 512), interval: Math.max(5, Number(payload?.interval) || 10) } };
+    if (action === "poll-authorization") return { success: true, service, action, result: { status: payload?.status === "authorized" ? "authorized" : "authorization_pending", retryAfter: Math.max(5, Number(payload?.retryAfter) || 10) } };
+    const readiness = action === "recheck" ? normalizeMmrHealth(payload, null, true) : await checkMmrApi(env);
+    await storeActionResult(env, readiness);
+    return { success: true, service, action, result: {
+        success: payload?.success !== false, resultCode: safeCode(payload?.resultCode || payload?.code, null),
+        state: safeCode(payload?.state || payload?.status, null), action: safeCode(payload?.action, null),
+        completedAt: safeText(payload?.completedAt), readiness
+    } };
+}
+
+async function testMmrSkills(env, service, action, input) {
+    const playerId = typeof input?.playerId === "string" ? input.playerId.trim() : "";
+    if (!/^Epic\|[A-Za-z0-9_-]{8,64}\|0$/.test(playerId)) throw actionError("MMR_PLAYER_ID_INVALID", 400);
+    const startedAt = Date.now();
+    const payload = await callMmr(env, `/get-skills?playerId=${encodeURIComponent(playerId)}`, "MMR_API_KEY", { method: "GET", timeout: ACTION_TIMEOUT_MS, maximumBytes: 16384 });
+    const playlists = Array.isArray(payload?.playlists) ? payload.playlists.slice(0, 32).map(item => ({
+        id: Number(item?.id), mmr: Number(item?.mmr), tier: Number(item?.tier), division: Number(item?.division)
+    })).filter(item => [item.id, item.mmr, item.tier, item.division].every(Number.isFinite)) : [];
+    return { success: true, service, action, result: { success: true, playlistCount: playlists.length, playlists, responseTimeMs: Date.now() - startedAt } };
 }

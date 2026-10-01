@@ -74,47 +74,33 @@ test("build update uses only the fixed protected MMR route and sanitizes the res
     const paths = [];
     globalThis.fetch = async (input, init = {}) => {
         const url = new URL(input); paths.push(url.pathname);
-        if (url.pathname === "/admin/build-configuration") {
-            assert.equal(init.headers.Authorization, "Bearer admin-secret");
-            assert.deepEqual(JSON.parse(init.body), { buildId: "246758282", featureSet: "PrimeUpdate60", userAgentBuildVersion: "260918.75141.528314" });
-            return Response.json({ resultCode: "RL_BUILD_UPDATE_PROMOTED", buildId: "246758282", featureSet: "PrimeUpdate60", validatedAt: "2026-09-29T12:00:00.000Z", reconnectSucceeded: true, PsyToken: "must-not-pass" });
-        }
-        return Response.json({ status: "healthy", config: { requiredConfigPresent: true }, build: { status: "valid", active: { buildId: "246758282", featureSet: "PrimeUpdate60", source: "admin-validated" }, fallback: { buildId: "-1887694083", featureSet: "PrimeUpdate60", source: "wrangler" } }, psynet: { state: "connected" }, recovery: {}, traffic: {} });
+        assert.equal(url.pathname, "/admin/build-configuration");
+        assert.equal(init.headers.Authorization, "Bearer admin-secret");
+        assert.deepEqual(JSON.parse(init.body), { gameVersion: "260918.75141.528314", featureSet: "PrimeUpdate60", buildSecret: "build-secret" });
+        return Response.json({ resultCode: "RL_BUILD_UPDATE_PROMOTED", buildId: "246758282", featureSet: "PrimeUpdate60", gameVersion: "260918.75141.528314", configurationGeneration: 2, validatedAt: "2026-09-29T12:00:00.000Z", reconnectSucceeded: true, PsyToken: "must-not-pass" });
     };
     try {
-        const result = await updateMmrBuildConfiguration(env, { buildId: "246758282", featureSet: "PrimeUpdate60", userAgentBuildVersion: "260918.75141.528314" });
-        assert.deepEqual(paths, ["/admin/build-configuration", "/health/ready"]);
+        const result = await updateMmrBuildConfiguration(env, { gameVersion: "260918.75141.528314", featureSet: "PrimeUpdate60", buildSecret: "build-secret" });
+        assert.deepEqual(paths, ["/admin/build-configuration"]);
         assert.equal(result.reconnectSucceeded, true);
+        assert.equal(result.configurationGeneration, 2);
         assert.equal(JSON.stringify(result).includes("must-not-pass"), false);
-        await assert.rejects(updateMmrBuildConfiguration(env, { buildId: "bad", featureSet: "x", userAgentBuildVersion: "260918.75141.528314" }), { code: "RL_BUILD_UPDATE_INVALID", status: 400 });
-        await assert.rejects(updateMmrBuildConfiguration(env, { buildId: "246758282", featureSet: "PrimeUpdate60", userAgentBuildVersion: "not-a-version" }), { code: "RL_BUILD_UPDATE_INVALID", status: 400 });
+        assert.equal(JSON.stringify(result).includes("build-secret"), false);
+        await assert.rejects(updateMmrBuildConfiguration(env, { gameVersion: "bad", featureSet: "x", buildSecret: "build-secret" }), { code: "RL_BUILD_UPDATE_INVALID", status: 400 });
+        await assert.rejects(updateMmrBuildConfiguration(env, { gameVersion: "260918.75141.528314", featureSet: "PrimeUpdate60", buildSecret: "short" }), { code: "RL_BUILD_UPDATE_INVALID", status: 400 });
     } finally { globalThis.fetch = originalFetch; }
 });
 
-test("rejected build candidate refreshes status and is returned as a client-side validation failure", async () => {
+test("rejected build candidate invalidates status and returns a sanitized validation failure", async () => {
     const deleted = [];
-    const written = [];
-    const env = {
-        MMR_API_URL: "https://mmr.example.test",
-        MMR_ADMIN_API_KEY: "admin-secret",
-        MMR_API_KEY: "lookup-secret",
-        RL_STATS_CACHE: { async delete(key) { deleted.push(key); }, async get() { return null; }, async put(key) { written.push(key); } }
-    };
+    const env = { MMR_API_URL: "https://mmr.example.test", MMR_ADMIN_API_KEY: "admin-secret", MMR_API_KEY: "lookup-secret", RL_STATS_CACHE: { async delete(key) { deleted.push(key); }, async get() { return null; }, async put() {} } };
     const originalFetch = globalThis.fetch;
     const paths = [];
-    globalThis.fetch = async input => {
-        const url = new URL(input); paths.push(url.pathname);
-        if (url.pathname === "/admin/build-configuration") return Response.json({ code: "RL_BUILD_UPDATE_REJECTED", providerCode: "VersionMismatch" }, { status: 422 });
-        return Response.json({ status: "degraded", config: { requiredConfigPresent: true }, build: { status: "stale", candidateValidationResult: "VersionMismatch" }, psynet: { state: "idle" }, recovery: {}, traffic: {} });
-    };
+    globalThis.fetch = async input => { const url = new URL(input); paths.push(url.pathname); return Response.json({ code: "RL_BUILD_UPDATE_REJECTED", providerCode: "VersionMismatch", buildSecret: "must-not-pass" }, { status: 422 }); };
     try {
-        await assert.rejects(
-            updateMmrBuildConfiguration(env, { buildId: "246758282", featureSet: "PrimeUpdate60", userAgentBuildVersion: "260918.75141.528314" }),
-            { code: "RL_BUILD_UPDATE_REJECTED", status: 422, providerCode: "VersionMismatch" }
-        );
-        assert.deepEqual(paths, ["/admin/build-configuration", "/health/ready"]);
+        await assert.rejects(updateMmrBuildConfiguration(env, { gameVersion: "260918.75141.528314", featureSet: "PrimeUpdate60", buildSecret: "build-secret" }), { code: "RL_BUILD_UPDATE_REJECTED", status: 422, providerCode: "VersionMismatch" });
+        assert.deepEqual(paths, ["/admin/build-configuration"]);
         assert.ok(deleted.includes("admin:system-status:v2"));
-        assert.ok(written.includes("admin:service-status:mmr-api"));
     } finally { globalThis.fetch = originalFetch; }
 });
 
@@ -126,9 +112,13 @@ test("Worker Status deploy polling is bounded to active deployments", async () =
     assert.match(source, /\["queued", "running"\]\.includes/);
 });
 
-test("Worker Status build form submits the logged client build version", async () => {
+test("Worker Status protocol form submits game version, feature set, and transient secret", async () => {
     const source = await readFile(new URL("../../public/Global/Admin/WorkerStatus/JS/index.js", import.meta.url), "utf8");
-    assert.match(source, /name = "userAgentBuildVersion"/);
-    assert.match(source, /GPsyonixBuildID/);
-    assert.match(source, /userAgentBuildVersion\s*\}\)/);
+    assert.match(source, /name = "gameVersion"/);
+    assert.match(source, /name = "featureSet"/);
+    assert.match(source, /name = "buildSecret"/);
+    assert.match(source, /secret\.type = "password"/);
+    assert.match(source, /postSystemAction\("validate-build", \{ gameVersion, featureSet, buildSecret \}\)/);
+    assert.match(source, /form\.elements\.buildSecret\.value = ""/);
+    assert.doesNotMatch(source, /localStorage|sessionStorage/);
 });

@@ -101,6 +101,57 @@
     list-style: none;
 }
 
+.rocket-capability-section {
+    margin-top: 28px;
+    padding-top: 24px;
+    border-top: 1px solid rgba(148, 163, 184, .17);
+}
+
+.rocket-capability-section > header { margin-bottom: 16px; }
+.rocket-capability-section h2 { margin: 0; color: #f2f7ff; font-size: 1.35rem; letter-spacing: -.02em; }
+.rocket-capability-section > header > p:last-child { margin: 7px 0 0; color: #9eafc3; font-size: .86rem; }
+
+.rocket-capability-categories {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 290px), 1fr));
+    gap: 13px;
+}
+
+.rocket-capability-category {
+    min-width: 0;
+    padding: 14px;
+    border: 1px solid rgba(148, 163, 184, .15);
+    border-radius: 13px;
+    background: rgba(255, 255, 255, .025);
+}
+
+.rocket-capability-category h3 { margin: 0 0 10px; color: #dcecff; font-size: .94rem; }
+.rocket-capability-list { display: grid; gap: 7px; padding: 0; margin: 0; list-style: none; }
+
+.rocket-capability-card {
+    min-width: 0;
+    padding: 10px 11px;
+    border: 1px solid rgba(148, 163, 184, .12);
+    border-radius: 10px;
+    background: rgba(2, 6, 13, .22);
+}
+
+.rocket-capability-card[aria-disabled="true"] { opacity: .74; }
+.rocket-capability-active { border-color: rgba(117, 227, 161, .3); background: rgba(34, 197, 94, .055); }
+.rocket-capability-future { border-style: dashed; }
+.rocket-capability-advanced { border-color: rgba(255, 210, 122, .2); background: rgba(255, 210, 122, .025); }
+.rocket-capability-title-row { display: flex; align-items: center; justify-content: flex-start; gap: 8px; }
+.rocket-capability-title-row .worker-status-indicator { width: 19px; height: 19px; font-size: .68rem; }
+.rocket-capability-name { color: #edf4ff; font-size: .86rem; }
+.rocket-capability-status { flex: 0 0 auto; margin-left: auto; color: #aebed0; font-size: .68rem; font-weight: 750; text-transform: uppercase; letter-spacing: .04em; }
+.rocket-capability-status.worker-status-healthy { color: #75e3a1; }
+.rocket-capability-status.worker-status-degraded { color: #ffd27a; }
+.rocket-capability-status.worker-status-down { color: #ff8f9a; }
+.rocket-capability-purpose { margin: 6px 0; color: #aebed0; font-size: .76rem; line-height: 1.4; }
+.rocket-capability-meta { color: #7f91a8; font-size: .69rem; }
+.rocket-capability-link { display: inline-block; margin-top: 7px; color: #7dd3fc; font-size: .75rem; text-decoration: none; }
+.rocket-capability-link:hover, .rocket-capability-link:focus-visible { text-decoration: underline; }
+
 .worker-status-row {
     min-width: 0;
     padding: 0 15px;
@@ -295,3 +346,11 @@
 .mmr-build-form { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
 .mmr-build-form input { min-width: 12rem; padding: .55rem .7rem; }
 .mmr-deploy-button { margin-top: 1rem; border-color: #c65b5b; color: #ffd8d8; }
+
+
+.mmr-functional-form { display: grid; gap: .55rem; margin-top: 1rem; }
+.mmr-functional-form h5 { margin: 0; color: #dcecff; font-size: .9rem; }
+.mmr-functional-form input { max-width: 30rem; padding: .55rem .7rem; }
+.mmr-functional-result { color: #aebed0; font-size: .82rem; }
+.worker-status-history { margin-top: .7rem; }
+.worker-status-history summary { color: #9eafc3; }

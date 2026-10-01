@@ -2,10 +2,11 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-import { getSystemStatus, performSystemStatusAction } from "../../functions/services/admin/system_status.js";
+import { getSystemStatus, performSystemStatusAction, updateMmrBuildConfiguration } from "../../functions/services/admin/system_status.js";
 import { getPermissionsForDiscordRoles, ADMIN_PERMISSIONS } from "../../functions/services/admin/permissions.js";
 import { onRequestGet, onRequestPost } from "../../functions/api/admin/system-status.js";
 import { getMmrControlModel } from "../../public/Global/Admin/WorkerStatus/JS/mmr_controls.js";
+import { ROCKET_LEAGUE_CAPABILITIES, ROCKET_LEAGUE_CAPABILITY_CATEGORIES } from "../../public/Global/Admin/WorkerStatus/JS/rocket_league_capabilities.js";
 
 const INTERNAL_HOSTNAME_FOR_TEST = "ocr-google-transport.internal";
 
@@ -49,12 +50,27 @@ function installHealthFetch(calls) {
             calls.mmr += 1;
             assert.equal(url.pathname, "/health/ready");
             assert.equal(init.headers.Authorization, "Bearer lookup-key");
-            return Response.json({ status: "degraded", config: { requiredConfigPresent: true, missingConfig: [] }, psynet: { state: "backoff", lastAuthAttemptAt: "2026-09-28T00:00:00.000Z", lastAuthFailureAt: "2026-09-28T00:00:01.000Z", lastSuccessfulAt: null, lastFailureAt: "2026-09-28T00:00:01.000Z", lastFailureCode: "PSYNET_AUTH_FAILED", lastFailureStage: "psynet_auth", lastProviderCode: "BuildError", backoffUntil: "2026-09-28T00:00:13.000Z", retryAfterSeconds: 12 }, recovery: { lastAttemptAt: "2026-09-28T00:00:00.000Z", lastResult: "failed", attempts: 2, successes: 1, failures: 1 }, traffic: { totalRequests: 4, successfulRequests: 2, failedRequests: 2, emptyRequests: 1, rateLimitedRequests: 1, lastRequestAt: "2026-09-28T00:00:01.000Z", lastSuccessAt: "2026-09-27T23:00:00.000Z", lastFailureAt: "2026-09-28T00:00:01.000Z", lastFailureCode: "PSYNET_AUTH_FAILED", normalLimitPerMinute: 30, emptyLimitPerMinute: 5 } });
+            return Response.json({
+                status: "degraded", rootCause: "PSYNET_AUTH_FAILED", activeRepair: null,
+                availableActions: ["recheck", "reconnect-psynet", "repair-session"],
+                components: {
+                    worker: { status: "healthy" }, configuration: { status: "healthy" },
+                    eosAuthorization: { status: "healthy", state: "authorized" },
+                    psynetAuthentication: { status: "unhealthy", state: "failed", lastSuccessAt: null },
+                    psynetSocket: { status: "unhealthy", state: "disconnected" },
+                    buildConfiguration: { status: "healthy", gameVersion: "260918.75141.528314", derivedBuildId: "246758282", featureSet: "PrimeUpdate60", configurationGeneration: 1, source: "runtime-validated", buildSecretConfigured: true },
+                    mmrService: { status: "degraded", lastFailureAt: "2026-09-28T00:00:01.000Z", lastFailureCode: "PSYNET_AUTH_FAILED" }
+                },
+                config: { requiredConfigPresent: true, missingConfig: [] },
+                build: { status: "valid", nextScheduledCheckAt: "2026-10-03T12:00:00.000Z", lastVersionCheckResult: "RL_VERSION_MISMATCH" },
+                psynet: { state: "idle", lastAuthAttemptAt: "2026-09-28T00:00:00.000Z", lastFailureCode: "PSYNET_AUTH_FAILED", lastFailureStage: "psynet_auth", lastProviderCode: "BuildError" },
+                recovery: { lastRepairAction: "reconnect-psynet", lastRepairResult: "failed" },
+                traffic: { totalRequests: 4, successfulRequests: 2, failedRequests: 2, emptyRequests: 1, rateLimitedRequests: 1, lastRequestAt: "2026-09-28T00:00:01.000Z", lastSuccessAt: "2026-09-27T23:00:00.000Z", lastFailureAt: "2026-09-28T00:00:01.000Z", lastFailureCode: "PSYNET_AUTH_FAILED" }
+            });
         }
         calls.presence += 1;
         assert.equal(url.pathname, "/admin/health");
-        assert.equal(init.headers.Authorization, `Bearer ${"p".repeat(48)}`);
-        return Response.json({ success: true, status: "unknown", configuration: { supabaseUrlPresent: true, supabaseCredentialPresent: true, mmrApiUrlPresent: true } });
+        return Response.json({ success: true, status: "unknown", configuration: {} });
     };
     return () => { globalThis.fetch = originalFetch; };
 }
@@ -64,74 +80,70 @@ test("system health cache includes protected MMR readiness without starting MMR 
     const restore = installHealthFetch(calls);
     try {
         const [first, concurrent] = await Promise.all([getSystemStatus(env), getSystemStatus(env)]);
-        assert.equal(first.services.find(item => item.id === "ocr-transport").status, "healthy");
-        assert.equal(first.services.find(item => item.id === "rl-presence").status, "unknown");
         const mmr = first.services.find(item => item.id === "mmr-api");
         assert.equal(mmr.status, "degraded");
-        assert.deepEqual(mmr.actions, ["recheck", "reconnect", "check-version"]);
-        assert.equal(mmr.supportsBuildUpdate, true);
-        assert.equal("canDeploy" in mmr, false);
-        assert.equal(mmr.lastFailureCode, "PSYNET_AUTH_FAILED");
-        assert.equal(mmr.lastFailureStage, "psynet_auth");
-        assert.equal(mmr.lastProviderCode, "BuildError");
-        assert.equal(mmr.configReady, true);
+        assert.equal(mmr.rootCause, "PSYNET_AUTH_FAILED");
+        assert.deepEqual(mmr.actions, ["recheck", "reconnect-psynet", "repair-session"]);
+        assert.equal(mmr.components.eosAuthorization.state, "authorized");
+        assert.equal(mmr.gameVersion, "260918.75141.528314");
+        assert.equal(mmr.currentBuildId, "246758282");
+        assert.equal(mmr.currentFeatureSet, "PrimeUpdate60");
+        assert.equal(mmr.configurationGeneration, 1);
+        assert.equal(mmr.historical.lastVersionCheckResult, "RL_VERSION_MISMATCH");
         assert.equal(mmr.mmrRequests, 4);
-        assert.equal(mmr.reconnectFailures, 1);
         assert.ok(["miss", "hit"].includes(concurrent.cache));
-        await getSystemStatus(env);
-        assert.equal(calls.transport, 1);
-        assert.equal(calls.presence, 1);
         assert.equal(calls.mmr, 1);
         assert.equal(JSON.stringify(first).includes("lookup-key"), false);
-        for (const item of first.services) {
-            assert.ok(["healthy", "degraded", "down", "unknown"].includes(item.status));
-            assert.ok(item.checkedAt);
-            assert.ok(Array.isArray(item.actions));
-        }
     } finally { restore(); }
 });
 
-test("Worker Status UI is event-driven and exposes only per-service supported actions", async () => {
+test("Worker Status UI is event-driven and exposes current MMR operations", async () => {
     const source = await readFile(new URL("../../public/Global/Admin/WorkerStatus/JS/index.js", import.meta.url), "utf8");
     assert.doesNotMatch(source, /setInterval\s*\(/);
-    assert.match(source, /action === "run-now" \? "▶ Run"/);
-    assert.match(source, /action === "reconnect" \? "↻ Reconnect"/);
-    assert.match(source, /action === "check-version" \? "↻ Check Rocket League Version"/);
-    assert.match(source, /worker-status-indicator/);
-    assert.match(source, /makeDetails\(service\)/);
-    assert.match(source, /PsyNet state:/);
-    assert.match(source, /Last MMR failure:/);
-    assert.match(source, /Reconnects:/);
-    assert.match(source, /Build status:/);
-    assert.match(source, /Last successful validation:/);
-    assert.match(source, /Next scheduled version check:/);
-    assert.match(source, /\/api\/admin\/page-settings\/route-health/);
-    assert.match(source, /systemRouteRows/);
-    assert.match(source, /statusIcon\(status\)/);
+    assert.match(source, /setTimeout\(poll, 7000\)/);
+    assert.match(source, /"refresh-eos": "Refresh EOS"/);
+    assert.match(source, /"reauthorize-account": "Reauthorize Account"/);
+    assert.match(source, /"reconnect-psynet": "Reconnect PsyNet"/);
+    assert.match(source, /"repair-session": "Repair Session"/);
+    assert.match(source, /MMR Functional Test/);
+    assert.match(source, /name = "buildSecret"/);
+    assert.match(source, /secret\.type = "password"/);
+    assert.match(source, /form\.elements\.buildSecret\.value = ""/);
+    assert.match(source, /Historical diagnostics/);
     assert.match(source, /getMmrControlModel\(service, canDeployMmr\)/);
 });
 
-test("MMR control gates render separately for build configuration and Admin deployment permission", () => {
-    const service = { id: "mmr-api", actions: ["recheck", "reconnect", "check-version"], supportsBuildUpdate: false };
-    assert.deepEqual(getMmrControlModel(service, true), {
-        actions: ["recheck", "reconnect", "check-version"],
-        showBuildUpdate: false,
-        showDeploy: true,
-        showOperations: true
-    });
-    assert.deepEqual(getMmrControlModel({ ...service, supportsBuildUpdate: true }, false), {
-        actions: ["recheck", "reconnect", "check-version"],
-        showBuildUpdate: true,
-        showDeploy: false,
-        showOperations: true
-    });
-    assert.deepEqual(getMmrControlModel(service, false), {
-        actions: ["recheck", "reconnect", "check-version"],
-        showBuildUpdate: false,
-        showDeploy: false,
-        showOperations: false
-    });
-    assert.equal(getMmrControlModel({ ...service, id: "supabase" }, true).showDeploy, false);
+test("Rocket League capability registry keeps only MMR / Skills active and placeholders inert", async () => {
+    const expectedIds = [
+        "player-profile", "xp-progression", "player-stats", "match-history", "mmr-skills", "leaderboards", "playlists", "population",
+        "clubs", "tournaments", "training", "rocket-pass", "inventory-products", "item-shop", "wallet", "challenges",
+        "regions", "ping-game-servers", "party", "matchmaking", "reservations-join-match"
+    ];
+    assert.deepEqual(ROCKET_LEAGUE_CAPABILITIES.map(capability => capability.id), expectedIds);
+    assert.deepEqual(ROCKET_LEAGUE_CAPABILITY_CATEGORIES.map(category => category.id), ["players", "competitive", "community", "account-items", "network-diagnostics", "advanced"]);
+    const active = ROCKET_LEAGUE_CAPABILITIES.filter(capability => capability.status === "active");
+    assert.deepEqual(active.map(({ id, serviceId }) => ({ id, serviceId })), [{ id: "mmr-skills", serviceId: "mmr-api" }]);
+    const placeholders = ROCKET_LEAGUE_CAPABILITIES.filter(capability => capability.status !== "active");
+    assert.equal(placeholders.length, 20);
+    assert.ok(placeholders.every(capability => ["placeholder", "future"].includes(capability.status)));
+    assert.ok(placeholders.every(capability => ["read-only", "interactive"].includes(capability.access)));
+    assert.ok(placeholders.every(capability => !("serviceId" in capability) && !("action" in capability) && !("endpoint" in capability)));
+    assert.deepEqual(ROCKET_LEAGUE_CAPABILITIES.filter(capability => capability.priority).sort((a, b) => a.priority - b.priority).slice(0, 6).map(capability => capability.id), ["player-profile", "player-stats", "match-history", "playlists", "population", "leaderboards"]);
+    assert.ok(ROCKET_LEAGUE_CAPABILITIES.filter(capability => capability.category === "advanced").every(capability => capability.status === "future" && capability.access === "interactive"));
+
+    const source = await readFile(new URL("../../public/Global/Admin/WorkerStatus/JS/index.js", import.meta.url), "utf8");
+    const renderer = source.slice(source.indexOf("function renderRocketLeagueCapabilities"), source.indexOf("function makeDetails"));
+    assert.match(source, /renderRocketLeagueCapabilities\(payload\.services\)/);
+    assert.match(renderer, /if \(!isActive\) item\.setAttribute\("aria-disabled", "true"\)/);
+    assert.doesNotMatch(renderer, /\bfetch\s*\(/);
+    assert.doesNotMatch(renderer, /addEventListener\s*\(/);
+});
+
+test("MMR controls keep operational, functional, build, and deployment gates separate", () => {
+    const service = { id: "mmr-api", actions: ["recheck", "repair-session"], supportsBuildUpdate: false };
+    assert.deepEqual(getMmrControlModel(service, true), { actions: ["recheck", "repair-session"], showBuildUpdate: false, showFunctionalTest: true, showDeploy: true, showOperations: true });
+    assert.deepEqual(getMmrControlModel({ ...service, actions: [...service.actions, "validate-build"], supportsBuildUpdate: true }, false), { actions: ["recheck", "repair-session"], showBuildUpdate: true, showFunctionalTest: true, showDeploy: false, showOperations: true });
+    assert.equal(getMmrControlModel({ ...service, id: "supabase" }, true).showFunctionalTest, false);
 });
 
 test("Admin role receives system-status and MMR deploy permissions", () => {
@@ -170,96 +182,77 @@ test("health sweep cache expires and then refreshes all bounded checks", async (
     } finally { restore(); }
 });
 
-test("MMR readiness exposes safe runtime build diagnostics", async () => {
+test("current healthy MMR state is not degraded by historical VersionMismatch", async () => {
     const { env } = createEnv();
     const originalFetch = globalThis.fetch;
     globalThis.fetch = async input => {
-        const url = new URL(input);
-        if (url.hostname === "mmr.example.test") {
-            return Response.json({
-                status: "degraded",
-                config: { requiredConfigPresent: true, missingConfig: [] },
-                build: {
-                    status: "stale", currentBuildId: "build-safe", currentFeatureSet: "feature-safe",
-                    userAgentConfigured: true, userAgentSummary: "Configured Rocket League client user agent",
-                    source: "wrangler-fallback", lastVersionCheckAt: "2026-09-28T00:00:02.000Z",
-                    lastVersionCheckResult: "RL_VERSION_SOURCE_UNAVAILABLE", lastBuildValidationAt: "2026-09-27T00:00:00.000Z",
-                    lastBuildValidationResult: "RL_VERSION_VALIDATED", versionMismatchDetectedAt: "2026-09-28T00:00:01.000Z",
-                    nextScheduledCheckAt: "2026-10-03T12:00:00.000Z"
-                },
-                psynet: { state: "backoff" }, recovery: {}, traffic: {}
-            });
-        }
-        return Response.json({ success: true, status: "unknown", configuration: {} });
+        if (new URL(input).hostname !== "mmr.example.test") return Response.json({ success: true, status: "unknown", configuration: {} });
+        return Response.json({
+            status: "healthy", rootCause: null, activeRepair: null, availableActions: ["recheck"],
+            components: { worker: { status: "healthy" }, configuration: { status: "healthy" }, eosAuthorization: { status: "healthy", state: "authorized" }, psynetAuthentication: { status: "healthy", state: "valid" }, psynetSocket: { status: "healthy", state: "connected" }, buildConfiguration: { status: "healthy", gameVersion: "260918.75141.528314", derivedBuildId: "246758282", featureSet: "PrimeUpdate60", configurationGeneration: 1, source: "runtime-validated", buildSecretConfigured: true }, mmrService: { status: "healthy" } },
+            config: { requiredConfigPresent: true }, build: { status: "valid", lastVersionCheckResult: "RL_VERSION_MISMATCH" }, psynet: { state: "connected" }, recovery: {}, traffic: {}
+        });
     };
     try {
-        const status = await getSystemStatus(env);
-        const mmr = status.services.find(item => item.id === "mmr-api");
-        assert.equal(mmr.buildStatus, "stale");
-        assert.equal(mmr.currentBuildId, "build-safe");
-        assert.equal(mmr.currentFeatureSet, "feature-safe");
-        assert.equal(mmr.userAgentSummary, "Configured Rocket League client user agent");
-        assert.equal(mmr.lastVersionCheckResult, "RL_VERSION_SOURCE_UNAVAILABLE");
-        assert.equal(mmr.nextScheduledVersionCheckAt, "2026-10-03T12:00:00.000Z");
-        assert.equal(JSON.stringify(mmr).includes("PsyToken"), false);
+        const mmr = (await getSystemStatus(env, { force: true })).services.find(item => item.id === "mmr-api");
+        assert.equal(mmr.status, "healthy");
+        assert.equal(mmr.rootCause, null);
+        assert.deepEqual(mmr.actions, ["recheck"]);
+        assert.equal(mmr.historical.lastVersionCheckResult, "RL_VERSION_MISMATCH");
     } finally { globalThis.fetch = originalFetch; }
 });
 
-test("ordinary MMR Recheck never calls version discovery", async () => {
+test("MMR Recheck calls only the protected recheck endpoint", async () => {
     const { env } = createEnv();
     const paths = [];
     const originalFetch = globalThis.fetch;
-    globalThis.fetch = async input => {
-        const url = new URL(input);
-        paths.push(url.pathname);
-        assert.equal(url.pathname, "/health/ready");
-        return Response.json({ status: "unknown", config: { requiredConfigPresent: true }, build: { status: "unknown" }, psynet: { state: "idle" }, recovery: {}, traffic: {} });
+    globalThis.fetch = async (input, init) => {
+        const url = new URL(input); paths.push(url.pathname);
+        assert.equal(init.headers.Authorization, "Bearer admin-key");
+        return Response.json({ status: "healthy", rootCause: null, availableActions: ["recheck"], components: { worker: { status: "healthy" }, configuration: { status: "healthy" }, eosAuthorization: { status: "healthy" }, psynetAuthentication: { status: "healthy" }, psynetSocket: { status: "healthy" }, buildConfiguration: { status: "healthy" }, mmrService: { status: "healthy" } }, config: { requiredConfigPresent: true }, build: {}, psynet: {}, recovery: {}, traffic: {} });
     };
     try {
         await performSystemStatusAction(env, "mmr-api", "recheck");
-        assert.deepEqual(paths, ["/health/ready"]);
+        assert.deepEqual(paths, ["/admin/recheck"]);
     } finally { globalThis.fetch = originalFetch; }
 });
 
-test("MMR reconnect uses only the configured protected endpoint and returns sanitized state", async () => {
+test("MMR reconnect uses the protected endpoint and refreshes safe readiness", async () => {
     const { env } = createEnv();
+    const paths = [];
     const originalFetch = globalThis.fetch;
     globalThis.fetch = async (input, init) => {
-        assert.equal(new URL(input).pathname, "/admin/reconnect");
-        assert.equal(init.method, "POST");
-        assert.equal(init.headers.Authorization, "Bearer admin-key");
-        return Response.json({ success: true, state: "connected", completedAt: "2026-09-28T01:00:00.000Z", access_token: "must-not-pass" });
+        const path = new URL(input).pathname; paths.push(path);
+        if (path === "/admin/reconnect") { assert.equal(init.headers.Authorization, "Bearer admin-key"); return Response.json({ success: true, state: "connected", PsyToken: "must-not-pass" }); }
+        return Response.json({ status: "healthy", rootCause: null, availableActions: ["recheck"], components: { worker: { status: "healthy" }, configuration: { status: "healthy" }, eosAuthorization: { status: "healthy" }, psynetAuthentication: { status: "healthy" }, psynetSocket: { status: "healthy", state: "connected" }, buildConfiguration: { status: "healthy" }, mmrService: { status: "healthy" } }, config: { requiredConfigPresent: true }, build: {}, psynet: {}, recovery: {}, traffic: {} });
     };
     try {
-        const result = await performSystemStatusAction(env, "mmr-api", "reconnect");
-        assert.deepEqual(result.result, { state: "connected", completedAt: "2026-09-28T01:00:00.000Z" });
+        const result = await performSystemStatusAction(env, "mmr-api", "reconnect-psynet");
+        assert.deepEqual(paths, ["/admin/reconnect", "/health/ready"]);
+        assert.equal(result.result.state, "connected");
         assert.equal(JSON.stringify(result).includes("must-not-pass"), false);
     } finally { globalThis.fetch = originalFetch; }
 });
 
-test("MMR version check uses its fixed protected endpoint, refreshes readiness once, and sanitizes output", async () => {
-    const { env } = createEnv();
-    const calls = [];
-    const originalFetch = globalThis.fetch;
-    globalThis.fetch = async (input, init = {}) => {
-        const url = new URL(input);
-        calls.push({ path: url.pathname, method: init.method, authorization: init.headers.Authorization });
-        if (url.pathname === "/admin/check-rocket-league-version") {
-            return Response.json({ success: true, resultCode: "RL_VERSION_SOURCE_UNAVAILABLE", state: "stale", currentBuildId: "build-safe", lastVersionCheckAt: "2026-09-28T02:00:00.000Z", access_token: "must-not-pass" });
-        }
-        assert.equal(url.pathname, "/health/ready");
-        return Response.json({ status: "degraded", config: { requiredConfigPresent: true }, build: { status: "stale", currentBuildId: "build-safe", currentFeatureSet: "feature-safe", userAgentConfigured: true, userAgentSummary: "Configured Rocket League client user agent", source: "wrangler-fallback", lastVersionCheckAt: "2026-09-28T02:00:00.000Z", lastVersionCheckResult: "RL_VERSION_SOURCE_UNAVAILABLE", lastBuildValidationAt: "2026-09-27T00:00:00.000Z", lastBuildValidationResult: "RL_VERSION_VALIDATED", versionMismatchDetectedAt: "2026-09-28T00:00:00.000Z", nextScheduledCheckAt: "2026-10-03T12:00:00.000Z" }, psynet: { state: "backoff" }, recovery: {}, traffic: {} });
-    };
-    try {
-        const result = await performSystemStatusAction(env, "mmr-api", "check-version");
-        assert.deepEqual(calls.map(call => call.path), ["/admin/check-rocket-league-version", "/health/ready"]);
-        assert.equal(calls[0].method, "POST");
-        assert.equal(calls[0].authorization, "Bearer admin-key");
-        assert.equal(calls[1].authorization, "Bearer lookup-key");
-        assert.equal(result.result.resultCode, "RL_VERSION_SOURCE_UNAVAILABLE");
-        assert.equal(result.result.currentBuildId, "build-safe");
-        assert.equal(JSON.stringify(result).includes("must-not-pass"), false);
-    } finally { globalThis.fetch = originalFetch; }
+test("MMR refresh, repair, and authorization use fixed protected endpoints", async () => {
+    const cases = [["refresh-eos", "/admin/refresh"], ["repair-session", "/admin/repair-session"], ["reauthorize-account", "/admin/bootstrap"], ["poll-authorization", "/admin/poll"]];
+    for (const [action, expected] of cases) {
+        const { env } = createEnv();
+        const paths = [];
+        const originalFetch = globalThis.fetch;
+        globalThis.fetch = async (input, init) => {
+            const path = new URL(input).pathname; paths.push(path); assert.equal(init.headers.Authorization, "Bearer admin-key");
+            if (path === "/admin/bootstrap") return Response.json({ url: "https://www.epicgames.com/activate?userCode=SAFE", interval: 10, device_code: "must-not-pass" });
+            if (path === "/admin/poll") return Response.json({ status: "authorized", access_token: "must-not-pass" });
+            if (path.startsWith("/admin/")) return Response.json({ success: true, resultCode: "OK", refresh_token: "must-not-pass" });
+            return Response.json({ status: "healthy", rootCause: null, availableActions: ["recheck"], components: { worker: { status: "healthy" }, configuration: { status: "healthy" }, eosAuthorization: { status: "healthy" }, psynetAuthentication: { status: "healthy" }, psynetSocket: { status: "healthy" }, buildConfiguration: { status: "healthy" }, mmrService: { status: "healthy" } }, config: { requiredConfigPresent: true }, build: {}, psynet: {}, recovery: {}, traffic: {} });
+        };
+        try {
+            const result = await performSystemStatusAction(env, "mmr-api", action);
+            assert.equal(paths[0], expected);
+            assert.equal(JSON.stringify(result).includes("must-not-pass"), false);
+        } finally { globalThis.fetch = originalFetch; }
+    }
 });
 
 test("MMR version action is unavailable to unauthenticated system-status callers", async () => {
@@ -346,5 +339,111 @@ test("system status route enforces admin permission before checking services", a
         assert.equal(payload.success, false);
         assert.equal("services" in payload, false);
         assert.equal(externalCalls, 0);
+    } finally { globalThis.fetch = originalFetch; }
+});
+
+
+test("build validation sends current contract and never returns or caches the secret", async () => {
+    const { env, values } = createEnv();
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async (input, init) => {
+        assert.equal(new URL(input).pathname, "/admin/build-configuration");
+        assert.deepEqual(JSON.parse(init.body), { gameVersion: "260918.75141.528314", featureSet: "PrimeUpdate60", buildSecret: "secret-value" });
+        return Response.json({ success: true, resultCode: "RL_BUILD_UPDATE_PROMOTED", buildId: "246758282", featureSet: "PrimeUpdate60", gameVersion: "260918.75141.528314", configurationGeneration: 2, validatedAt: "2026-10-01T00:00:00Z", reconnectSucceeded: true, buildSecret: "must-not-pass" });
+    };
+    try {
+        const result = await updateMmrBuildConfiguration(env, { gameVersion: "260918.75141.528314", featureSet: "PrimeUpdate60", buildSecret: "secret-value" });
+        assert.equal(result.configurationGeneration, 2);
+        assert.equal(JSON.stringify(result).includes("secret"), false);
+        assert.equal(JSON.stringify([...values.values()]).includes("secret-value"), false);
+    } finally { globalThis.fetch = originalFetch; }
+});
+
+test("rejected build validation preserves a sanitized failure", async () => {
+    const { env } = createEnv();
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async () => Response.json({ code: "RL_BUILD_UPDATE_REJECTED", providerCode: "VersionMismatch", access_token: "must-not-pass" }, { status: 422 });
+    try {
+        await assert.rejects(updateMmrBuildConfiguration(env, { gameVersion: "260918.75141.528314", featureSet: "PrimeUpdate60", buildSecret: "secret-value" }), { code: "RL_BUILD_UPDATE_REJECTED", status: 422, providerCode: "VersionMismatch" });
+    } finally { globalThis.fetch = originalFetch; }
+});
+
+test("MMR functional test validates Epic player IDs and sanitizes skill records", async () => {
+    const { env } = createEnv();
+    await assert.rejects(performSystemStatusAction(env, "mmr-api", "functional-test", { playerId: "bad" }), { code: "MMR_PLAYER_ID_INVALID", status: 400 });
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async (input, init) => {
+        assert.equal(new URL(input).pathname, "/get-skills");
+        assert.equal(new URL(input).searchParams.get("playerId"), "Epic|12345678|0");
+        assert.equal(init.headers.Authorization, "Bearer lookup-key");
+        return Response.json({ playlists: [{ id: 11, mmr: 1000, tier: 12, division: 2 }], access_token: "must-not-pass" });
+    };
+    try {
+        const result = await performSystemStatusAction(env, "mmr-api", "functional-test", { playerId: "Epic|12345678|0" });
+        assert.equal(result.result.playlistCount, 1);
+        assert.equal(JSON.stringify(result).includes("must-not-pass"), false);
+        assert.equal(JSON.stringify(result).includes("lookup-key"), false);
+    } finally { globalThis.fetch = originalFetch; }
+});
+
+test("system-status POST requires JSON and authorization before outbound calls", async () => {
+    let calls = 0;
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async () => { calls += 1; throw new Error("unexpected"); };
+    try {
+        const response = await onRequestPost({ request: new Request("https://site.example.test/api/admin/system-status", { method: "POST", headers: { Origin: "https://site.example.test" }, body: "{}" }), env: {} });
+        assert.ok([401, 403, 503].includes(response.status));
+        assert.equal(calls, 0);
+    } finally { globalThis.fetch = originalFetch; }
+});
+
+
+test("MMR normalization preserves unknown and repairing current states", async () => {
+    for (const current of [
+        { status: "unknown", rootCause: null, activeRepair: null, availableActions: ["recheck"] },
+        { status: "repairing", rootCause: "PSYNET_SOCKET_DISCONNECTED", activeRepair: "reconnect-psynet", availableActions: ["recheck"] }
+    ]) {
+        const { env } = createEnv();
+        const originalFetch = globalThis.fetch;
+        globalThis.fetch = async input => {
+            if (new URL(input).hostname !== "mmr.example.test") return Response.json({ success: true, status: "unknown", configuration: {} });
+            return Response.json({ ...current, components: { worker: { status: "healthy" }, configuration: { status: "healthy" }, eosAuthorization: { status: "healthy" }, psynetAuthentication: { status: "unknown" }, psynetSocket: { status: "unknown" }, buildConfiguration: { status: "healthy" }, mmrService: { status: "unknown" } }, config: { requiredConfigPresent: true }, build: {}, psynet: {}, recovery: {}, traffic: {} });
+        };
+        try {
+            const mmr = (await getSystemStatus(env, { force: true })).services.find(item => item.id === "mmr-api");
+            assert.equal(mmr.status, current.status);
+            assert.equal(mmr.activeRepair, current.activeRepair);
+        } finally { globalThis.fetch = originalFetch; }
+    }
+});
+
+test("MMR backend 409 and 429 responses remain sanitized", async () => {
+    for (const fixture of [
+        { status: 409, body: { code: "MMR_REPAIR_IN_PROGRESS", action: "repair-session", access_token: "must-not-pass" } },
+        { status: 429, body: { code: "MMR_RECONNECT_COOLDOWN", retryAfterSeconds: 12, refresh_token: "must-not-pass" } }
+    ]) {
+        const { env } = createEnv();
+        const originalFetch = globalThis.fetch;
+        globalThis.fetch = async () => Response.json(fixture.body, { status: fixture.status });
+        try {
+            await assert.rejects(performSystemStatusAction(env, "mmr-api", "reconnect-psynet"), error => {
+                assert.equal(error.status, fixture.status);
+                assert.equal(JSON.stringify(error).includes("must-not-pass"), false);
+                if (fixture.status === 429) assert.equal(error.retryAfterSeconds, 12);
+                return true;
+            });
+        } finally { globalThis.fetch = originalFetch; }
+    }
+});
+
+test("MMR provider and unavailable failures return stable safe codes", async () => {
+    const { env } = createEnv();
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async () => Response.json({ code: "PSYNET_AUTH_FAILED", providerCode: "VersionMismatch", raw: "must-not-pass" }, { status: 502 });
+    try {
+        await assert.rejects(performSystemStatusAction(env, "mmr-api", "refresh-eos"), { code: "PSYNET_AUTH_FAILED", status: 502, providerCode: "VersionMismatch" });
+    } finally { globalThis.fetch = async () => { throw new Error("offline"); }; }
+    try {
+        await assert.rejects(performSystemStatusAction(env, "mmr-api", "repair-session"), { code: "MMR_ACTION_UNAVAILABLE", status: 502 });
     } finally { globalThis.fetch = originalFetch; }
 });

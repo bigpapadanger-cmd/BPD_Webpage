@@ -141,7 +141,7 @@ Other game routes
 Administration routes
     /Admin                    Global/Admin/Home.
     /Admin/Taskboard          Global/Admin/TaskBoard and its multi-view modules.
-    /Admin/WorkerStatus       Unified health and route/connection diagnostics; permission-gated.
+    /Admin/WorkerStatus       Permission-gated service diagnostics and Rocket League capability registry; only MMR / Skills is active.
         /api/admin/system-status/mmr-deploy
             Dedicated fixed-target MMR production workflow dispatch/status.
     /Admin/PageSettings       Compatibility alias for the unified System Status page.

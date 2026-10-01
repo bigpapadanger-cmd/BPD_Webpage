@@ -29,20 +29,21 @@ export async function onRequestPost({ request, env }) {
     let authorization;
     try { authorization = await authorize(request, env); }
     catch (error) { return json({ success: false, error: error.code }, error.status); }
-    const parsed = await readJsonBody(request, 1024);
+    if (!String(request.headers.get("Content-Type") || "").toLowerCase().startsWith("application/json")) return json({ success: false, error: "CONTENT_TYPE_REQUIRED" }, 415);
+    const parsed = await readJsonBody(request, 4096);
     if (!parsed.success) return json({ success: false, error: "INVALID_INPUT" }, parsed.tooLarge ? 413 : 400);
     const service = typeof parsed.data?.service === "string" ? parsed.data.service.trim() : "";
     const action = typeof parsed.data?.action === "string" ? parsed.data.action.trim() : "";
     const startedAt = Date.now();
     try {
-        const result = service === "mmr-api" && action === "update-build"
+        const result = service === "mmr-api" && action === "validate-build"
             ? await updateMmrBuildConfiguration(env, parsed.data)
             : await performSystemStatusAction(env, service, action, parsed.data);
         console.info("ADMIN SYSTEM ACTION", { service, action, accountId: authorization.accountId, requestedAt: new Date(startedAt).toISOString(), completedAt: new Date().toISOString(), result: "success", durationMs: Date.now() - startedAt });
         return json(result);
     } catch (error) {
         console.warn("ADMIN SYSTEM ACTION", { service, action, accountId: authorization.accountId, requestedAt: new Date(startedAt).toISOString(), completedAt: new Date().toISOString(), result: error?.code || "failed", durationMs: Date.now() - startedAt });
-        const status = [400, 409, 422, 429, 502, 503, 504].includes(Number(error?.status)) ? Number(error.status) : 503;
-        return json({ success: false, error: error?.code || "SYSTEM_ACTION_FAILED", providerCode: error?.providerCode || null, retryAfterSeconds: error?.retryAfterSeconds || null }, status, error?.retryAfterSeconds ? { "Retry-After": String(error.retryAfterSeconds) } : {});
+        const status = [400, 401, 403, 409, 422, 429, 502, 503, 504].includes(Number(error?.status)) ? Number(error.status) : 503;
+        return json({ success: false, code: error?.code || "SYSTEM_ACTION_FAILED", message: error?.safeMessage || "The requested MMR operation could not be completed.", providerCode: error?.providerCode || null, retryAfterSeconds: error?.retryAfterSeconds || null, rootCause: error?.rootCause || null, action: error?.action || null }, status, error?.retryAfterSeconds ? { "Retry-After": String(error.retryAfterSeconds) } : {});
     }
 }
