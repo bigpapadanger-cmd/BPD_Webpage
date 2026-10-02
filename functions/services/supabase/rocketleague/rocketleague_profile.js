@@ -1,6 +1,6 @@
 "use strict";
 
-import { normalizeProfileSettings } from "../../rl/profile_settings.js";
+import { getProfileSettingsAvailability, normalizeProfileSettings } from "../../rl/profile_settings.js";
 
 /* =========================================================
 BPD GAMING NETWORK
@@ -430,6 +430,7 @@ export async function getRocketLeagueProfileByAccountId(
         updatedAt: normalizeTimestamp(providerData.updated_at)
     };
     const settings = normalizeProfileSettings(responseData);
+    const settingsAvailability = getProfileSettingsAvailability(responseData);
 
     /* =====================================================
     NORMALIZED PROFILE
@@ -592,6 +593,7 @@ export async function getRocketLeagueProfileByAccountId(
                 currentRanked
         },
 
-        settings
+        settings,
+        settingsAvailability
     };
 }

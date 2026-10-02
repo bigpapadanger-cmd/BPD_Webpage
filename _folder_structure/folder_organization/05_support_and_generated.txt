@@ -107,6 +107,16 @@ REPOSITORY METADATA
 _structure_details/request-frequency-inventory.md
     Repository request-frequency/health-check audit and known measurement gaps.
 
+_structure_details/rocketleague-capability-audit.md
+    Current verified provider capabilities, limitations, and request guidance.
+
+_structure_details/rocketleague-profile-settings.md
+    Private Rocket League settings read/save contract and fail-closed behavior.
+
+_structure_details/rocketleague-shop-audit.md
+    Read-only source audit and proposed separate authenticated shop-sync design;
+    no service, storage contract, API, or carousel implemented.
+
 LOCAL/UNTRACKED ROOT FILES
 
 .env

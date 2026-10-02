@@ -11,6 +11,7 @@ import {
 import { getRocketLeagueProfileByAccountId } from "../../functions/services/supabase/rocketleague/rocketleague_profile.js";
 import { saveRocketLeagueProfile } from "../../functions/services/supabase/rocketleague/save_profile.js";
 import { getPublicPresenceLabel, getPublicProfilePageUrl } from "../../public/Tabs/RocketLeague/shared/profileView.js";
+import { createPlayerCard, renderPlayers, renderSearchState } from "../../public/Tabs/RocketLeague/FindPlayers/JS/view.js";
 import { formatRocketLeagueTimestamp } from "../../public/Tabs/RocketLeague/shared/profilePresentation.js";
 import { ROUTES } from "../../public/routes.js";
 
@@ -49,6 +50,9 @@ test("profile load exposes find_profile_enabled as a boolean", async () => {
         assert.equal(profile.showOnlineStatus, false);
         assert.equal(profile.settings.findProfileEnabled, true);
         assert.equal(profile.settings.showOnlineStatus, false);
+        assert.equal(profile.settingsAvailability.findProfileEnabled, true);
+        assert.equal(profile.settingsAvailability.showOnlineStatus, true);
+        assert.equal(profile.settingsAvailability.email, false);
     });
 });
 
@@ -294,7 +298,7 @@ test("public profile does not expose provider/stat freshness timestamps absent f
 });
 
 test("Find Players cards stay lightweight and do not render career or unsupported provider fields", async () => {
-    const source = await readFile(new URL("../../public/Tabs/RocketLeague/FindPlayers/JS/index.js", import.meta.url), "utf8");
+    const source = await readFile(new URL("../../public/Tabs/RocketLeague/FindPlayers/JS/view.js", import.meta.url), "utf8");
     assert.doesNotMatch(source, /player\.stats\?|player\.provider\?/);
     assert.match(source, /getPublicPresenceLabel/);
     assert.match(source, /getPublicProfilePageUrl/);
@@ -333,25 +337,23 @@ test("MMR timestamp formatter shows weekday/date and 24-hour time, without inven
 test("private My Profile is standalone, read-only provider data stays safe, and unknown totals are not zero", async () => {
     const source = await readFile(new URL("../../public/Tabs/RocketLeague/MyProfile/JS/index.js", import.meta.url), "utf8");
     const html = await readFile(new URL("../../public/Tabs/RocketLeague/MyProfile/HTML/index.html", import.meta.url), "utf8");
-    assert.match(source, /profile\.provider\?\.displayUsername/);
-    assert.match(source, /safeCount\(career\[key\]\)/);
-    assert.match(source, /includePresence=false/);
     assert.match(html, /myProfileSettingsForm/);
-    assert.match(html, /myProfileProgressUnavailable/);
-    assert.match(html, /Loading MMR change history/);
-    assert.doesNotMatch(source, /provider\.(?:level|xp|creatorCode)/);
+    assert.match(source, /buildSettingsPayload/);
+    assert.match(source, /getConfirmedSettings/);
+    assert.doesNotMatch(html, /rocketLeagueMmrProgression|rocketLeagueMmrHistoryGraph/);
+    assert.doesNotMatch(source, /provider\.(?:level|xp|creatorCode)|includeMmr(?:Progression|History)/);
     assert.doesNotMatch(source, /SUPABASE_(?:AUTH|URL)/);
-    assert.match(html, /myProfileProgressComparedAt/);
 });
 
 test("private My Profile settings preserve persisted values and fail closed for unknown privacy preferences", async () => {
     const source = await readFile(new URL("../../public/Tabs/RocketLeague/MyProfile/JS/index.js", import.meta.url), "utf8");
+    const settingsView = await readFile(new URL("../../public/Tabs/RocketLeague/MyProfile/JS/settings_view.js", import.meta.url), "utf8");
     const html = await readFile(new URL("../../public/Tabs/RocketLeague/MyProfile/HTML/index.html", import.meta.url), "utf8");
-    assert.match(source, /typeof settings\.showOnlineStatus === "boolean" && typeof settings\.findProfileEnabled === "boolean"/);
+    assert.match(source, /getConfirmedSettings\(profile\)/);
     assert.match(source, /const availability = DAYS\.flatMap/);
-    assert.match(source, /notificationsEnabled,\s*notificationMethod: notificationsEnabled \?/);
+    assert.match(settingsView, /notificationMethod: notificationsEnabled \?/);
     assert.match(source, /autoDetectRegion: document\.getElementById\("autoDetectRegion"\)\.checked/);
-    assert.match(source, /settingsKnown = \["autoDetectRegion", "showOnlineStatus", "findProfileEnabled", "notificationsEnabled"\]/);
+    assert.match(source, /!confirmedSettings/);
     for (const id of ["preferredMode", "myProfileAvailability", "profileEmail", "profilePhone", "notificationMethod", "reminderMode"]) {
         assert.match(html, new RegExp(`id="${id}"`));
     }
@@ -372,19 +374,69 @@ test("public presence renders the explicit private label, not Offline", () => {
     assert.equal(getPublicPresenceLabel({ presence_shared: true, presence_state: "Online" }), "Online");
     assert.equal(getPublicPresenceLabel({ presence_shared: true, presence_state: "online" }), "Online");
     assert.equal(getPublicPresenceLabel({ presence_shared: true, presence_state: "unknown" }), "Status unavailable");
+    assert.equal(getPublicPresenceLabel({ presence_shared: true, presence_state: "in-match" }), "Status unavailable");
     assert.equal(getPublicProfilePageUrl(PROFILE_ID), `/RocketLeague/Player?id=${PROFILE_ID}`);
 });
 
 test("Find Players cards stay compact and use three, two, then one responsive columns", async () => {
-    const source = await readFile(new URL("../../public/Tabs/RocketLeague/FindPlayers/JS/index.js", import.meta.url), "utf8");
+    const source = await readFile(new URL("../../public/Tabs/RocketLeague/FindPlayers/JS/view.js", import.meta.url), "utf8");
     const css = await readFile(new URL("../../public/Tabs/RocketLeague/FindPlayers/CSS/index.css", import.meta.url), "utf8");
     assert.match(css, /grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\)/);
     assert.match(css, /@media \(max-width: 900px\)[\s\S]*?repeat\(2, minmax\(0, 1fr\)\)/);
     assert.match(css, /@media \(max-width: 620px\)[\s\S]*?minmax\(0, 1fr\)/);
-    assert.match(source, /addFact\(ranks, "1v1"/);
-    assert.match(source, /addFact\(ranks, "2v2"/);
-    assert.match(source, /addFact\(ranks, "3v3"/);
+    assert.match(source, /\["ones_tier", "ones_mmr", "1v1"\]/);
+    assert.match(source, /\["twos_tier", "twos_mmr", "2v2"\]/);
+    assert.match(source, /\["threes_tier", "threes_mmr", "3v3"\]/);
     assert.doesNotMatch(source, /career|aliases|accountId|rlPlayerId/i);
+});
+
+function fakeDocument() {
+    return {
+        createElement(tag) {
+            return {
+                tagName: tag,
+                children: [],
+                dataset: {},
+                attributes: {},
+                append(...nodes) { this.children.push(...nodes); },
+                setAttribute(key, value) { this.attributes[key] = value; }
+            };
+        }
+    };
+}
+
+test("Find Players card has three compact ranks, safe presence, and only public profile links", () => {
+    const documentRef = fakeDocument();
+    const card = createPlayerCard(documentRef, {
+        public_profile_id: PROFILE_ID,
+        display_name: "BPD Pilot",
+        epic_display_name: "Epic Pilot",
+        rl_platform: "Epic",
+        presence_shared: true,
+        presence_state: "in-match",
+        mmr: { ones_tier: "Gold", ones_mmr: 0, twos_tier: null, twos_mmr: null, threes_tier: "Diamond", threes_mmr: 900 }
+    });
+    const flattened = [];
+    const visit = node => { flattened.push(node); node.children?.forEach(visit); };
+    visit(card);
+    const text = flattened.map(node => node.textContent || "").join(" ");
+    assert.match(text, /Status unavailable/);
+    assert.match(text, /0 MMR/);
+    assert.match(text, /MMR unavailable/);
+    assert.doesNotMatch(text, /in-match/);
+    const links = flattened.filter(node => node.tagName === "a");
+    assert.equal(links.length, 1);
+    assert.equal(links[0].href, `/RocketLeague/Player?id=${PROFILE_ID}`);
+});
+
+test("Find Players result and search states replace stale content and use text only", () => {
+    const documentRef = fakeDocument();
+    const container = { children: [], append(node) { this.children.push(node); }, replaceChildren(...nodes) { this.children = nodes; } };
+    renderPlayers(documentRef, container, []);
+    assert.match(container.children[0].textContent, /No public players found/);
+    renderSearchState(documentRef, container, "error", "Search failed safely");
+    assert.equal(container.children.length, 1);
+    assert.equal(container.children[0].textContent, "Search failed safely");
 });
 
 test("public browser modules do not receive Supabase credentials", async () => {

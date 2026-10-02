@@ -102,13 +102,13 @@ public/Tabs/
 |   |   +-- CSS/index.css
 |   |   +-- HTML/index.html
 |   |   +-- JS/index.js, auth.js, connect_epic.js, profile.js, ranks.js,
-|   |           submenu.js
+|   |           submenu.js, mmr_dashboard.js; saved MMR progression/history UI
 |   +-- Registration/    CSS/index.css, HTML/index.html, JS/index.js, timezone.js; setup/onboarding only
-|   +-- MyProfile/       CSS/index.css, HTML/index.html, JS/index.js; private profile/settings, current ranks, career stats, snapshot MMR progression
+|   +-- MyProfile/       CSS/index.css, HTML/index.html, JS/index.js, settings_view.js; private settings editor, fail-closed unknown values
 |   +-- PublicProfile/   Public-safe profile by public_profile_id.
-|   +-- shared/          Profile visibility/presence and timestamp presentation helpers.
+|   +-- shared/          Profile visibility/presence (normalized online/offline only) and timestamp presentation helpers.
 |   +-- MatchResults/    CSS/index.css, HTML/index.html, JS/index.js
-|   +-- FindPlayers/     Public opt-in search; CSS/index.css, HTML/index.html, JS/index.js
+|   +-- FindPlayers/     Public opt-in search; CSS/index.css, HTML/index.html, JS/index.js, view.js
 |   +-- PrivateMatches/  CSS/index.css, HTML/index.html, JS/index.js
 |   +-- WeeklyMatches/   CSS/index.css, HTML/index.html, JS/index.js
 +-- Future/              Present empty placeholder directory.

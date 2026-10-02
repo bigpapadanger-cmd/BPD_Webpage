@@ -25,6 +25,17 @@ function getPath(source, path) {
     return String(path).split(".").reduce((value, key) => value && typeof value === "object" ? value[key] : undefined, source);
 }
 
+export function getProfileSettingsAvailability(source) {
+    const input = source && typeof source === "object" && !Array.isArray(source) ? source : {};
+    const availability = Object.fromEntries(Object.entries(PROFILE_SETTING_FIELDS).map(([key, definition]) => {
+        const paths = [`settings.${key}`, key, definition.db, ...(definition.aliases || [])];
+        return [key, paths.some(path => getPath(input, path) !== undefined)];
+    }));
+    availability.ageConsent = ["ageConsent", "age_consent"].some(path => getPath(input, path) !== undefined);
+    availability.policyConsent = ["policyConsent", "policy_consent"].some(path => getPath(input, path) !== undefined);
+    return availability;
+}
+
 function normalizeField(value, type) {
     if (type === "boolean") return typeof value === "boolean" ? value : null;
     if (type === "array") return Array.isArray(value) ? value : null;

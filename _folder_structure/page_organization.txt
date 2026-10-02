@@ -119,10 +119,10 @@ Main/global routes
     /Error                    Global/404.
 
 Rocket League routes
-    /RocketLeague             Tabs/RocketLeague/Index.
+    /RocketLeague             Tabs/RocketLeague/Index; signed-in home shows current ranks, saved MMR progression, and a last-15 capture history chart.
     /RocketLeague/Profile     Tabs/RocketLeague/Registration; onboarding/setup route, redirects established players to MyProfile.
-    /RocketLeague/MyProfile   Tabs/RocketLeague/MyProfile; authenticated overview, privacy settings, current ranks, career stats, and optional server-read snapshot-to-snapshot MMR progression.
-    /RocketLeague/FindPlayers Public opt-in player search through Pages API.
+    /RocketLeague/MyProfile   Tabs/RocketLeague/MyProfile; authenticated, fail-closed private settings editor. MMR progression/history remain on the Rocket League home page.
+    /RocketLeague/FindPlayers Public opt-in player search through Pages API; card results keep three compact ranks and normalized shared presence.
     /RocketLeague/Player      Public-safe profile by public_profile_id; hidden profiles unavailable.
     /RocketLeague/SubmitMatchResults
                               public/ocr submission workflow.

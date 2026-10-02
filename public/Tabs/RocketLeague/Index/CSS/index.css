@@ -471,6 +471,123 @@ PLAYER PROFILE
     color: #ff9ba8;
 }
 
+.rocket-league-page .rl-home-data-panel {
+    margin-top: 22px;
+    padding: 16px;
+    border: 1px solid var(--rl-border);
+    border-radius: 12px;
+    background: rgba(8, 10, 20, 0.42);
+    text-align: left;
+}
+
+.rocket-league-page .rl-home-data-heading {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 6px 14px;
+}
+
+.rocket-league-page .rl-home-data-heading h2 {
+    margin: 0;
+    color: #fff;
+    font-size: 0.92rem;
+}
+
+.rocket-league-page .rl-home-data-heading > span,
+.rocket-league-page .rl-home-data-note,
+.rocket-league-page .rl-home-data-status {
+    color: var(--rl-text-muted);
+    font-size: 0.75rem;
+}
+
+.rocket-league-page .rl-home-data-note {
+    margin: 6px 0 0;
+}
+
+.rocket-league-page .rl-home-data-status {
+    margin: 10px 0 0;
+}
+
+.rocket-league-page .rl-mmr-change-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.rocket-league-page .rl-mmr-change-item {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px 12px;
+    border: 1px solid var(--rl-border);
+    border-radius: 10px;
+    background: rgba(8, 10, 20, 0.48);
+}
+
+.rocket-league-page .rl-mmr-change-playlist,
+.rocket-league-page .rl-mmr-change-current {
+    color: #fff;
+    font-size: 0.8rem;
+}
+
+.rocket-league-page .rl-mmr-change-delta {
+    color: var(--rl-text-muted);
+    font-size: 0.76rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.rocket-league-page .rl-mmr-change-item[data-change="positive"] .rl-mmr-change-delta { color: #64e0b1; }
+.rocket-league-page .rl-mmr-change-item[data-change="negative"] .rl-mmr-change-delta { color: #ff9ba8; }
+.rocket-league-page .rl-mmr-change-item[data-change="unchanged"] .rl-mmr-change-delta { color: #c6d0e0; }
+
+.rocket-league-page .rl-mmr-history-graph {
+    min-width: 0;
+    margin-top: 8px;
+}
+
+.rocket-league-page .rl-mmr-history-graph svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    overflow: visible;
+}
+
+.rocket-league-page .rl-mmr-chart-gridline { stroke: rgba(181, 206, 242, 0.14); stroke-width: 1; }
+.rocket-league-page .rl-mmr-chart-axis-label { fill: var(--rl-text-muted); font-size: 11px; }
+.rocket-league-page .rl-mmr-chart-line { fill: none; stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+.rocket-league-page .rl-mmr-chart-point { stroke: rgba(8, 10, 20, 0.9); stroke-width: 2; }
+
+.rocket-league-page .rl-mmr-chart-legend {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px 18px;
+    margin-top: 4px;
+}
+
+.rocket-league-page .rl-mmr-chart-legend-item {
+    color: #b9c5d8;
+    font-size: 0.74rem;
+}
+
+.rocket-league-page .rl-mmr-chart-legend-item::before {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    margin-right: 6px;
+    border-radius: 50%;
+    background: var(--series-color);
+    content: "";
+    vertical-align: 1px;
+}
+
+.rocket-league-page .rl-mmr-chart-legend-item[data-series="ones"] { --series-color: #b49aff; }
+.rocket-league-page .rl-mmr-chart-legend-item[data-series="twos"] { --series-color: #68c5ff; }
+.rocket-league-page .rl-mmr-chart-legend-item[data-series="threes"] { --series-color: #64e0b1; }
+
 .rocket-league-page .rl-privacy-summary {
     display: flex;
     flex-wrap: wrap;
@@ -945,6 +1062,20 @@ RESPONSIVE
 @media (max-width: 900px) {
     .rocket-league-page .rank-row {
         grid-template-columns: 1fr;
+    }
+
+    .rocket-league-page .rl-mmr-change-grid {
+        gap: 6px;
+    }
+
+    .rocket-league-page .rl-mmr-change-item {
+        padding: 8px 7px;
+    }
+
+    .rocket-league-page .rl-mmr-change-playlist,
+    .rocket-league-page .rl-mmr-change-current,
+    .rocket-league-page .rl-mmr-change-delta {
+        font-size: 0.68rem;
     }
 
     .rocket-league-stat-strip {

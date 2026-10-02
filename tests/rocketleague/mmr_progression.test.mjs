@@ -7,6 +7,7 @@ import {
     getRocketLeagueMmrProgression,
     getRocketLeagueMmrProgressionSafely
 } from "../../functions/services/supabase/rocketleague/get_mmr_progression.js";
+import { renderMmrProgression } from "../../public/Tabs/RocketLeague/Index/JS/mmr_dashboard.js";
 
 function rpcResponse(body, status = 200) {
     return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -62,6 +63,35 @@ test("missing playlist values do not suppress progression for other playlists", 
     assert.equal(result.playlists[2].delta, 30);
 });
 
+test("homepage MMR change cards use snapshot wording and distinct signed/no-previous states", () => {
+    const target = { children: [], replaceChildren(...nodes) { this.children = nodes; }, append(node) { this.children.push(node); } };
+    const status = { textContent: "", hidden: false };
+    const documentRef = {
+        getElementById(id) { return id === "rocketLeagueMmrProgression" ? target : status; },
+        createElement() {
+            return { children: [], dataset: {}, append(...nodes) { this.children.push(...nodes); } };
+        }
+    };
+    renderMmrProgression({
+        previous: { capturedAt: "2026-09-29T00:00:00Z" },
+        current: { ones: 134, twos: 188, threes: 250 },
+        playlists: [
+            { key: "ones", label: "1v1", status: "available", delta: 34 },
+            { key: "twos", label: "2v2", status: "available", delta: -12 },
+            { key: "threes", label: "3v3", status: "available", delta: 0 }
+        ]
+    }, documentRef);
+    const rendered = target.children.flatMap(card => card.children.map(node => node.textContent)).join(" ");
+    assert.match(rendered, /\+34 MMR/);
+    assert.match(rendered, /-12 MMR/);
+    assert.match(rendered, /No change/);
+    assert.match(status.textContent, /^Compared with .+\.$/);
+
+    renderMmrProgression({ previous: null, current: { ones: 100 }, playlists: [{ key: "ones", label: "1v1", status: "no_previous", delta: null }] }, documentRef);
+    assert.match(status.textContent, /No previous capture yet/);
+    assert.match(target.children[0].children[2].textContent, /No previous capture/);
+});
+
 test("malformed progression RPC response is rejected", async () => {
     await withFetch(async () => rpcResponse({ current: [], previous: null }), async () => {
         await assert.rejects(
@@ -91,8 +121,11 @@ test("progression RPC failures degrade to unavailable without failing profile da
     assert.doesNotMatch(getHandler, /refreshProviderDataWithGate/);
 });
 
-test("My Profile requests progression server-side and never calls provider Worker from page code", async () => {
-    const page = await readFile(new URL("../../public/Tabs/RocketLeague/MyProfile/JS/index.js", import.meta.url), "utf8");
-    assert.match(page, /includePresence=false&includeMmrProgression=true/);
+test("Rocket League home requests progression and history as persisted data only", async () => {
+    const page = await readFile(new URL("../../public/Tabs/RocketLeague/Index/JS/profile.js", import.meta.url), "utf8");
+    assert.match(page, /includePresence=false&includeMmrProgression=true&includeMmrHistory=true/);
     assert.doesNotMatch(page, /MMR_API_URL|get-player-data|fetchProviderCapabilities|SUPABASE_AUTH/);
+    const privateSettings = await readFile(new URL("../../public/Tabs/RocketLeague/MyProfile/JS/index.js", import.meta.url), "utf8");
+    assert.doesNotMatch(privateSettings, /includeMmrProgression|includeMmrHistory/);
+    assert.doesNotMatch(privateSettings, /MMR_API_URL|get-player-data|fetchProviderCapabilities|SUPABASE_AUTH/);
 });

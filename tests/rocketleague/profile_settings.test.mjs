@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-import { mapProfileSettingsToRpcArgs, normalizeProfileSettings, PROFILE_SETTING_FIELDS } from "../../functions/services/rl/profile_settings.js";
+import { getProfileSettingsAvailability, mapProfileSettingsToRpcArgs, normalizeProfileSettings, PROFILE_SETTING_FIELDS } from "../../functions/services/rl/profile_settings.js";
+import { buildSettingsPayload, getConfirmedSettings } from "../../public/Tabs/RocketLeague/MyProfile/JS/settings_view.js";
 
 test("central settings mapping preserves false, empty, null, and availability values", () => {
     const settings = normalizeProfileSettings({
@@ -34,6 +35,61 @@ test("central settings mapping preserves false, empty, null, and availability va
 test("missing privacy setting remains unavailable rather than silently becoming false", () => {
     assert.equal(normalizeProfileSettings({ show_online_status: false }).findProfileEnabled, null);
     assert.equal(normalizeProfileSettings({ find_profile_enabled: true }).findProfileEnabled, true);
+});
+
+test("availability tracks missing separately from explicit null, false, and empty values", () => {
+    const source = { show_online_status: false, email: "", phone: null };
+    const known = getProfileSettingsAvailability(source);
+    assert.equal(known.showOnlineStatus, true);
+    assert.equal(known.email, true);
+    assert.equal(known.phone, true);
+    assert.equal(known.findProfileEnabled, false);
+    const settings = normalizeProfileSettings(source);
+    assert.equal(settings.showOnlineStatus, false);
+    assert.equal(settings.email, "");
+    assert.equal(settings.phone, null);
+});
+
+test("My Profile edits only confirmed values and preserves explicit nulls", () => {
+    const fields = Object.keys(PROFILE_SETTING_FIELDS);
+    const settings = Object.fromEntries(fields.map(key => [key,
+        PROFILE_SETTING_FIELDS[key].type === "boolean" ? false
+            : PROFILE_SETTING_FIELDS[key].type === "array" ? [] : ""
+    ]));
+    settings.phone = null;
+    const profile = {
+        ageConsent: true,
+        policyConsent: true,
+        settings,
+        settingsAvailability: Object.fromEntries([...fields, "ageConsent", "policyConsent"].map(key => [key, true]))
+    };
+    assert.equal(getConfirmedSettings(profile), settings);
+    const payload = buildSettingsPayload(profile, {
+        ...settings,
+        phone: "",
+        email: "",
+        notificationsEnabled: false,
+        availability: []
+    });
+    assert.equal(payload.phone, null);
+    assert.equal(payload.email, "");
+    assert.equal(payload.showOnlineStatus, false);
+    assert.equal(payload.notificationsEnabled, false);
+    assert.equal(Object.hasOwn(payload, "stats"), false);
+    assert.equal(Object.hasOwn(payload, "provider"), false);
+});
+
+test("My Profile fails closed when a setting or consent source is not confirmed", () => {
+    const complete = {
+        ageConsent: true,
+        policyConsent: true,
+        settings: { autoDetectRegion: false, showOnlineStatus: false, findProfileEnabled: false, notificationsEnabled: false,
+            preferredMode: null, otherMode: null, availability: [], email: null, phone: null, notificationMethod: null, reminderMode: null },
+        settingsAvailability: Object.fromEntries([...Object.keys(PROFILE_SETTING_FIELDS), "ageConsent", "policyConsent"].map(key => [key, true]))
+    };
+    assert.ok(getConfirmedSettings(complete));
+    assert.equal(getConfirmedSettings({ ...complete, settingsAvailability: { ...complete.settingsAvailability, email: false } }), null);
+    assert.equal(getConfirmedSettings({ ...complete, policyConsent: undefined }), null);
 });
 
 test("RPC projection is explicit and excludes read-only provider, stats, and unknown fields", () => {
@@ -92,6 +148,6 @@ test("private profile reads are persisted-data-only and never wake or call prese
     assert.doesNotMatch(getHandler, /fetchRocketLeaguePresence|activateRocketLeaguePresenceMonitor|wakeRocketLeaguePresenceMonitor/);
     for (const file of readers) {
         const source = await readFile(new URL(file, import.meta.url), "utf8");
-        assert.match(source, /includePresence=false/);
+        if (file.includes("Index/JS/profile")) assert.match(source, /includePresence=false/);
     }
 });

@@ -114,7 +114,8 @@ import {
 import {
     getDiscordMatchBotEligibility
 } from "../auth/providers/discord_matchbot/eligibility.js";
-import { normalizeProfileSettings } from "./profile_settings.js";
+import { getProfileSettingsAvailability, normalizeProfileSettings, PROFILE_SETTING_FIELDS } from "./profile_settings.js";
+import { getRocketLeagueMmrHistorySafely } from "../supabase/rocketleague/get_mmr_history.js";
 
 /* =========================================================
 CONSTANTS
@@ -406,6 +407,7 @@ function normalizeDatabaseProfile(
     const provider = normalizeObject(databaseProfile.provider);
     const careerStats = normalizeObject(databaseProfile.careerStats);
     const settings = normalizeProfileSettings(databaseProfile);
+    const settingsAvailability = normalizeObject(databaseProfile.settingsAvailability);
 
     return {
         accountId,
@@ -589,7 +591,8 @@ function normalizeDatabaseProfile(
             }
         },
 
-        settings
+        settings,
+        settingsAvailability
     };
 }
 
@@ -734,7 +737,10 @@ function buildFallbackProfile(
             notificationsEnabled: true,
             notificationMethod: null,
             reminderMode: "24-hours"
-        })
+        }),
+        settingsAvailability: Object.fromEntries([
+            ...Object.keys(PROFILE_SETTING_FIELDS), "ageConsent", "policyConsent"
+        ].map(key => [key, false]))
     };
 }
 
@@ -787,6 +793,17 @@ function normalizeAvailability(
             0,
             7
         );
+}
+
+function normalizeOptionalString(
+    body,
+    key,
+    maxLength
+) {
+    if (Object.prototype.hasOwnProperty.call(body || {}, key) && body[key] === null) {
+        return null;
+    }
+    return normalizeString(body?.[key], maxLength);
 }
 
 /* =========================================================
@@ -875,27 +892,32 @@ function normalizeRegistrationPayload(
             ),
 
         email:
-            normalizeString(
-                body?.email,
+            normalizeOptionalString(
+                body,
+                "email",
                 254
             ),
 
         phone:
-            normalizeString(
-                body?.phone,
+            normalizeOptionalString(
+                body,
+                "phone",
                 24
             ),
 
         preferredMode:
-            normalizeString(
-                body?.preferredMode,
+            normalizeOptionalString(
+                body,
+                "preferredMode",
                 20
             )
-                .toLowerCase(),
+                ?.toLowerCase?.()
+                ?? null,
 
         otherMode:
-            normalizeString(
-                body?.otherMode,
+            normalizeOptionalString(
+                body,
+                "otherMode",
                 50
             ),
 
@@ -1646,6 +1668,9 @@ async function handleProfileGet(
     const includeMmrProgression =
         requestUrl.searchParams.get("includeMmrProgression") === "true";
 
+    const includeMmrHistory =
+        requestUrl.searchParams.get("includeMmrHistory") === "true";
+
     const detectedLocation =
         detectLocationRequested
             ? getRequestLocation(
@@ -1795,6 +1820,9 @@ async function handleProfileGet(
     let mmrProgression =
         null;
 
+    let mmrHistory =
+        null;
+
     if (
         profileExists
         && profile.active ===
@@ -1804,6 +1832,10 @@ async function handleProfileGet(
     ) {
         if (includeMmrProgression && rocketLeagueAccess) {
             mmrProgression = await getRocketLeagueMmrProgressionSafely(env, accountId);
+        }
+
+        if (includeMmrHistory && rocketLeagueAccess) {
+            mmrHistory = await getRocketLeagueMmrHistorySafely(env, accountId);
         }
 
         try {
@@ -2039,6 +2071,8 @@ async function handleProfileGet(
             latestMmr,
 
             mmrProgression,
+
+            mmrHistory,
 
             profile
         },

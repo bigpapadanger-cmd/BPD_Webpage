@@ -46,6 +46,7 @@ import {
 } from "./ranks.js";
 
 import { formatRocketLeagueTimestamp } from "../../shared/profilePresentation.js";
+import { renderMmrHistory, renderMmrProgression } from "./mmr_dashboard.js";
 
 /* =========================================================
 NORMALIZATION
@@ -444,6 +445,8 @@ function renderRocketLeagueProfile(
     setPlayerName(displayName);
     renderProviderDisplayName(profile, displayName);
     renderCareerStats(profile);
+    renderMmrProgression(result.mmrProgression);
+    renderMmrHistory(result.mmrHistory);
 
     const inputRanked =
         getInputRanked(
@@ -695,7 +698,7 @@ export async function loadRocketLeagueProfile(
     try {
         response =
             await apiFetch(
-                `${ROCKET_LEAGUE_PROFILE_URL}?includePresence=false`,
+                `${ROCKET_LEAGUE_PROFILE_URL}?includePresence=false&includeMmrProgression=true&includeMmrHistory=true`,
                 {
                     method:
                         "GET",

@@ -91,7 +91,8 @@ functions/
     +-- supabase/
         +-- suggestions.js         Allow-listed website suggestion RPC transport.
         +-- rocketleague/
-        |   +-- ensure_player.js, get_latest_mmr.js
+        |   +-- ensure_player.js, get_latest_mmr.js, get_mmr_progression.js,
+        |       get_mmr_history.js
         |   +-- rocketleague_profile.js, save_profile.js
         +-- admin/tasks/
             +-- activity.js, assignees.js, comments.js, create.js, get.js

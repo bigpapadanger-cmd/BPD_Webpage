@@ -12,7 +12,7 @@ export function getPublicPresenceLabel(profile) {
     if (normalizedState === "unknown") return "Status unavailable";
     if (normalizedState === "online") return "Online";
     if (normalizedState === "offline") return "Offline";
-    return state || "Status unavailable";
+    return "Status unavailable";
 }
 
 export function getPublicProfilePageUrl(publicProfileId) {

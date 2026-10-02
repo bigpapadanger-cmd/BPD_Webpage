@@ -7,17 +7,17 @@
     <link rel="stylesheet" href="../CSS/index.css">
 </head>
 <body class="rocket-league-page find-players-page">
-    <main class="rl-discovery-shell">
+    <main class="rl-discovery-shell" aria-labelledby="playerSearchPageTitle">
         <header class="rl-discovery-heading">
-            <p class="rl-eyebrow">ROCKET LEAGUE COMMUNITY</p>
-            <h1>Find Players</h1>
-            <p>Search players who have chosen to make their profiles discoverable.</p>
+            <p class="rl-eyebrow">ROCKET LEAGUE · COMMUNITY</p>
+            <h1 id="playerSearchPageTitle">Find Players</h1>
+            <p>Search by BPD or Epic display name and explore public player profiles.</p>
         </header>
 
         <section class="rl-discovery-panel" aria-labelledby="playerSearchTitle">
             <h2 id="playerSearchTitle">Search the player directory</h2>
             <form id="playerSearchForm" class="player-search-form" role="search">
-                <label for="playerSearchQuery">Player name</label>
+                <label for="playerSearchQuery">Search by BPD or Epic display name</label>
                 <div class="player-search-controls">
                     <input
                         id="playerSearchQuery"
@@ -26,17 +26,17 @@
                         minlength="2"
                         maxlength="80"
                         autocomplete="off"
-                        placeholder="Enter at least 2 characters"
+                        placeholder="Enter a player name"
                         required
                     >
-                    <button id="playerSearchSubmit" type="submit">Search players</button>
+                    <button id="playerSearchSubmit" type="submit">Search</button>
                 </div>
-                <p class="rl-search-note">Only opted-in profiles appear. Historical names may help matching but are never shown.</p>
+                <p class="rl-search-note">Only players who have enabled profile discovery appear here.</p>
             </form>
         </section>
 
         <p id="playerSearchStatus" class="rl-discovery-status" role="status" aria-live="polite">
-            Enter a player name to begin.
+            Search for a Rocket League player.
         </p>
         <section id="playerSearchResults" class="rl-player-results" aria-label="Player search results"></section>
     </main>
