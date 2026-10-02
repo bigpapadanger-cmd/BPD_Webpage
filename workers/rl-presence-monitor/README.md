@@ -1,0 +1,60 @@
+# Rocket League Presence Monitor
+
+This Worker owns the scheduled refresh of Rocket League public-presence state.
+It is not a persistent PsyNet connection and does not query PsyNet directly.
+
+## Flow and boundaries
+
+`wrangler.jsonc` runs the presence cycle every 15 minutes. The cycle reads
+`api.get_rl_presence_candidates()`, which delegates to the live identity RPC.
+That RPC selects only active accounts and Rocket League players with
+`status='complete'` and a non-null registration-completion timestamp, plus an
+active Epic identity matching the Rocket League player and
+`show_online_status=true`. The cycle independently rechecks the
+canonical account, Epic identity, and fresh Epic authorization before a lookup.
+
+For each eligible player the Worker calls the protected MMR API
+`GET /get-player-data?playerId=Epic%7C...%7C0&capabilities=presence`. The MMR
+Worker owns the provider session and normalizes the response. This Worker saves
+only a successful, well-formed `online` or `offline` state and the provider's
+`checked_at` timestamp through `api.save_rl_player_presence(...)`. The live save
+RPC rechecks active account/player, completed registration, and presence-sharing
+eligibility.
+
+Timeout, auth/session failure, rate limit, malformed payload, and `unknown` are
+not Offline. They do not call the save RPC, so the existing row remains
+unchanged and becomes stale naturally. The RPC does not identify provider
+failure; this Worker must enforce the success-only rule before calling it.
+
+The candidate list is refreshed on every scheduled cycle even if all eligible
+players were previously offline. This keeps opt-in presence current and lets
+the monitor discover when a player returns. Normal profile/page GETs do not
+wake the Worker or call the provider. Admin Run Now is a separate protected
+action and does not change the normal schedule.
+
+## Public freshness and privacy
+
+Public discovery independently checks `show_online_status`. When disabled it
+returns `presence_shared=false`, `presence_state=null`, and
+`presence_checked_at=null`; the UI label is exactly “Presence not shared.”
+When enabled, a state is considered fresh for 30 minutes (two normal schedule
+intervals). Stale, malformed, future-dated, or unknown states render neutrally
+as unavailable/unknown, never confidently Online or Offline.
+
+## Frequency and scaling
+
+The unchanged 15-minute schedule allows 96 lookup opportunities per opted-in
+player per day: 25 players = 2,400 requests/day, 100 = 9,600, and 500 = 48,000.
+The Worker processes up to five at once with a 15-second pause between batches.
+At 500 players, pause time alone is approximately 24m45s, so the current cycle
+would exceed its schedule interval. Measure real eligible counts, duration,
+and shared MMR API rate-limit headroom before scaling; at that size consider at
+least a 30-minute cadence or bounded sharding. Do not shorten the schedule to
+10 or 5 minutes without measured capacity.
+
+## Verification ownership
+
+Worker cycle contract tests live under `tests/`. DomainData's public response
+sanitization and page behavior tests live under `../../tests/rocketleague/`.
+No migration, deployment, or Supabase change is performed by this Worker
+documentation.

@@ -34,13 +34,27 @@ probe and is not used for normal processing.
 
 `/RocketLeague/Profile` is the setup/onboarding route. Once the authenticated
 private profile confirms both completion and Rocket League access, the browser
-replaces the route with `/RocketLeague/MyProfile`. The latter reuses the same
-Registration page controller and private profile RPC, but presents established
-player settings plus read-only provider display name, persisted MMR ranks, and
-available career totals. Unknown numeric totals remain unavailable rather than
-rendering as zero. Normal profile reads remain provider-call-free; no direct
-Supabase table access was added. The established route is auth-gated and
-redirects incomplete/ineligible profiles back to setup.
+replaces the route with `/RocketLeague/MyProfile`. My Profile now has its own
+HTML, JavaScript module, and CSS under `public/Tabs/RocketLeague/MyProfile/`;
+it renders the authenticated private profile, three playlist ranks, known
+career totals, and independent profile-discovery/presence settings. Unknown
+numeric totals remain unavailable rather than rendering as zero. Private
+profile GETs read persisted data only: they do not wake the presence monitor or
+call the MMR/provider Worker. No direct Supabase table access was added. The
+established route is auth-gated and redirects incomplete/ineligible profiles
+back to setup.
+
+My Profile additionally requests `includeMmrProgression=true`. The authenticated
+Pages profile service uses the server-only Supabase credential to call the
+service-role-only `api.get_rl_player_mmr_progression(uuid)` RPC; the browser
+never calls Supabase directly. The RPC read is independent of the MMR Worker,
+provider refresh, and latest-rank display. Each playlist delta is computed only
+when both captures contain a valid value; missing values affect only that
+playlist. The UI labels these as snapshot-to-snapshot changes and identifies
+the previous capture time when available. A missing previous capture is shown
+as “No previous capture yet”; RPC/shape failures leave My Profile usable and
+show a temporary-unavailable message. Other private profile GETs do not request
+this RPC.
 
 Discord MatchBot eligibility currently returns a scoped `unavailable` result
 from `functions/services/auth/providers/discord_matchbot/eligibility.js` for
@@ -131,8 +145,7 @@ Authenticated account activity and a successful, complete Rocket League
 registration use the existing MMR refresh flow. Only when that flow completes
 an actual MMR refresh (the existing per-account 24-hour MMR gate allowed it)
 does Pages make one server-side request to the protected MMR Worker
-`/get-player-data` endpoint for `profile,stats`. Ordinary Rocket League profile
-GET requests never call the provider. A separate `RL_STATS_CACHE` cooldown
+`/get-player-data` endpoint for `profile,stats`. A separate `RL_STATS_CACHE` cooldown
 deduplicates provider-data work per isolate and retries failures after 15
 minutes; successful work is held for 24 hours. As with the existing KV gates,
 cross-isolate cooldown checks are best-effort. The Worker may make six PsyNet
@@ -149,6 +162,33 @@ call its persistence RPC; historical rows are retained. `SUPABASE_AUTH` and
 MMR / Skills, display-name Player Profile, and Player Stats active; XP /
 Progression and Match History are not represented as supported.
 
+### Presence pipeline
+
+`workers/rl-presence-monitor/wrangler.jsonc` owns the 15-minute presence cron.
+Its `presence_cycle.js` asks the API-schema candidate RPC for eligible players,
+then rechecks account activity, canonical Epic identity, and fresh Epic
+authorization before each lookup. The live candidate RPC additionally requires
+an active RL player, registration status `complete` with a non-null completion
+timestamp, and
+`show_online_status=true`; opted-out players are therefore not polled. The
+save RPC rechecks those same eligibility boundaries. The scheduled Worker
+continues examining the eligible-candidate set even when all selected players
+were previously offline, so it can discover when an opted-in player returns.
+
+Each candidate is read through the protected MMR Worker
+`/get-player-data?capabilities=presence` capability. Only normalized `online`
+or `offline` results with a valid provider `checked_at` are saved to the existing
+`core.rl_player_presence` path. Timeout, auth/session failure, rate limit,
+malformed response, or `unknown` do not overwrite prior state or translate to
+Offline. Public discovery masks disabled sharing as exactly “Presence not
+shared.”; enabled but missing, invalid, future-dated, or older-than-30-minute
+presence is returned as neutral `unknown` with no stale timestamp. The threshold
+covers two 15-minute check intervals. Admin Run Now remains an explicit,
+protected monitor action; the normal MMR force-refresh still excludes presence.
+No browser polling is used. The Admin capability registry marks presence
+active. No menu, party, matchmaking, private-match, or current-session state is
+authoritatively exposed by the inspected Worker request path.
+
 Admin-only force refresh is available from `/Admin/WorkerStatus`. It accepts a
 BPD account UUID, then the existing server-side refresh state and authorization
 services resolve/check the active account, Rocket League player, linked Epic
@@ -162,7 +202,9 @@ Private profile reads now carry a normalized `settings` object alongside legacy
 flat fields for compatibility. A single server-side allow-list maps those
 editable settings into the private profile response and the explicit save-RPC
 arguments. Provider identity, MMR, and career stats remain outside that
-allow-list and the profile form payload. Profile GET remains provider-call-free.
+allow-list and the profile form payload. Presence is separate: GET requests are
+persisted-data-only; explicit opt-in on a successful profile save activates only
+the scheduled monitor.
 
 ## Configuration ownership
 

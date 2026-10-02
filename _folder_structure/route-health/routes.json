@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-02T13:30:09.856Z",
+  "generatedAt": "2026-10-02T16:29:12.442Z",
   "policy": {
     "humanPagePaths": "case-insensitive lookup; canonical TitleCase path",
     "apiAndAssetPaths": "exact-case; never normalized by the human-page router",
@@ -253,7 +253,7 @@
       "deepLinkSupported": true,
       "targets": [
         {
-          "path": "/Tabs/RocketLeague/Registration/HTML/index.html",
+          "path": "/Tabs/RocketLeague/MyProfile/HTML/index.html",
           "exists": true
         },
         {
@@ -269,7 +269,7 @@
           "exists": true
         },
         {
-          "path": "/Tabs/RocketLeague/Registration/JS/index.js",
+          "path": "/Tabs/RocketLeague/MyProfile/JS/index.js",
           "exists": true
         }
       ]

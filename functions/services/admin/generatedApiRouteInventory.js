@@ -247,7 +247,7 @@ export const PAGE_ROUTE_INVENTORY = Object.freeze([
     "deepLinkSupported": true,
     "targets": [
       {
-        "path": "/Tabs/RocketLeague/Registration/HTML/index.html",
+        "path": "/Tabs/RocketLeague/MyProfile/HTML/index.html",
         "exists": true
       },
       {
@@ -263,7 +263,7 @@ export const PAGE_ROUTE_INVENTORY = Object.freeze([
         "exists": true
       },
       {
-        "path": "/Tabs/RocketLeague/Registration/JS/index.js",
+        "path": "/Tabs/RocketLeague/MyProfile/JS/index.js",
         "exists": true
       }
     ]

@@ -1,10 +1,12 @@
 # Request-Frequency and Health-Check Inventory
 
-Snapshot: 2026-09-29. This is a code/config audit, not a production traffic measurement.
+Snapshot: 2026-10-02. This is a code/config audit, not a production traffic measurement.
 
 | Caller / path | Trigger and expected frequency | Existing control / cost | Result |
 | --- | --- | --- | --- |
-| Browser -> `/api/auth/account/last_login` | Once per authenticated active full page load | One browser request per document; server derives the account from the session. Existing `RL_STATS_CACHE` gate prevents repeat MMR/database refresh work for 24 hours. Provider data is requested only after an actual successful MMR refresh, with a separate per-account 24-hour success gate and 15-minute failure cooldown. | Updates `last_seen_at`, keeps MMR refresh unchanged, then makes at most one protected `/get-player-data?capabilities=profile,stats` request per due MMR refresh. Worker stats fan out to six PsyNet requests. Ordinary profile GETs make none. |
+| Browser -> `/api/auth/account/last_login` | Once per authenticated active full page load | One browser request per document; server derives the account from the session. Existing `RL_STATS_CACHE` gate prevents repeat MMR/database refresh work for 24 hours. Provider data is requested only after an actual successful MMR refresh, with a separate per-account 24-hour success gate and 15-minute failure cooldown. | Updates `last_seen_at`, keeps MMR refresh unchanged, then makes at most one protected `/get-player-data?capabilities=profile,stats` request per due MMR refresh. Worker stats fan out to six PsyNet requests. Profile saves retain the existing gated refresh behavior. |
+| Rocket League private profile GET | Page view from signed-in Rocket League pages | Read-only persisted Supabase profile/MMR data; My Profile additionally makes one service-role progression RPC read. | No presence Worker wake, MMR Worker call, or provider polling from any profile GET. |
+| Rocket League presence monitor | Existing `bpd-rl-presence-monitor` 15-minute cron; explicit authenticated admin Run Now remains separate | Candidate RPC selects active accounts and RL players with `status='complete'`, a completion timestamp, an active matching Epic identity, and `show_online_status=true`. One `/get-player-data?capabilities=presence` MMR Worker request per selected player; concurrency 5, batches separated by 15 seconds. Candidate selection runs every cycle even if all players were offline on the prior cycle. | Only normalized online/offline successes are persisted. Failures/unknown leave existing rows untouched. Public exposure is masked when sharing is disabled and neutralized after 30 minutes. |
 | OCR submission -> Pages -> R2/Queue -> existing consumer -> transport Worker -> Cloud Run | One user submission; queued processing may retry under the existing queue policy | Existing R2/Queue architecture, validation, queue retry handling, request/body/time bounds, and transport token cache. | Preserved; no duplicate consumer and no new polling path. |
 | Browser -> OCR `get_job` | Foreground job lifecycle / restored active job | `ocr_job_monitor.js` has one module-level timer/check guard, staged backoff (5–35 seconds), 60-second tail, terminal/offline/stale/max-age stop conditions. | Already bounded and overlap-protected; left unchanged. |
 | Suggestions list / vote / submission | Page view or explicit user mutation | Event-driven; one list request per page initialization; vote/create are click actions. | No periodic polling found in the page module; server authorization/RLS contract is separate. |
@@ -25,6 +27,26 @@ Snapshot: 2026-09-29. This is a code/config audit, not a production traffic meas
 | Worker scheduled handlers | Cloudflare cron triggers in each Worker configuration | MMR API: Saturday noon UTC version-maintenance check, one run at most; `bpd-rl-presence-monitor`: every 15 minutes, Saturday 11:05 UTC MMR refresh, daily noon UTC Taskboard summary. `bpd-ocr-job-consumer`: every 30 minutes for cleanup plus a queue consumer (batch size 1, concurrency 2, up to 2 retries). Diagnostic and OCR transport Workers have no schedule. | Schedules are bounded; the MMR version operation shares its lock/cooldown with the manual action. Status page never starts scheduled work. |
 
 ## Audit findings, ranked by expected operational impact
+
+### Presence request budget scenarios
+
+The monitor is one provider request per eligible opted-in player per successful
+check. It runs every 15 minutes (96 opportunities per day per player). These are
+calculated request volumes, not production counts:
+
+| Eligible players | 15-minute cadence | 10-minute cadence | 5-minute cadence |
+| ---: | ---: | ---: | ---: |
+| 25 | 2,400/day | 3,600/day | 7,200/day |
+| 100 | 9,600/day | 14,400/day | 28,800/day |
+| 500 | 48,000/day | 72,000/day | 144,000/day |
+
+Keep 15 minutes for the current/medium scenarios until telemetry establishes
+real candidate counts, cycle duration, and shared MMR Worker headroom. At 500
+candidates, batches of five plus 15-second inter-batch delays require about
+24m45s of delay alone, so the current single cycle cannot reliably fit the
+15-minute interval. For that large scenario, first measure and then either
+extend the cadence to at least 30 minutes or deliberately shard/bound the work;
+do not switch to 10 or 5 minutes. The configured schedule was not changed.
 
 1. Highest-volume intentional foreground/background path is OCR job polling. It already has a single monitor loop, staged interval growth, bounded lifetime, stale-job stop conditions, and terminal-state stop behavior. No duplicate simultaneous loop was found in the monitor implementation.
 2. Admin Taskboard, Suggestions, and Settings are event-driven. Their reads/mutations are not scheduled by the audited page modules. Mutation submission controls and backend idempotency vary by endpoint; this pass did not change those independent contracts.

@@ -41,14 +41,18 @@ test("Rocket League setup and established My Profile routes stay distinct and ga
     assert.deepEqual(mine.auth, { required: true, provider: "epic", rocketLeague: true });
     assert.equal(mine.sidebar, "/Framework/Shell/HTML/Sidebar/rl_menu.html");
     assert.equal(mine.sitemap, false);
-    assert.equal(mine.body, setup.body);
-    assert.equal(mine.module, setup.module);
+    assert.notEqual(mine.body, setup.body);
+    assert.notEqual(mine.module, setup.module);
+    assert.match(mine.body, /MyProfile/u);
+    assert.match(mine.module, /MyProfile/u);
 
     const registration = readFileSync(resolve(repoRoot, "public/Tabs/RocketLeague/Registration/JS/index.js"), "utf8");
+    const myProfile = readFileSync(resolve(repoRoot, "public", `.${mine.module}`), "utf8");
     const sidebar = readFileSync(resolve(repoRoot, "public/Framework/Shell/JS/Sidebar/RocketLeague/sidebar_auth.js"), "utf8");
     const menu = readFileSync(resolve(repoRoot, "public/Framework/Shell/HTML/Sidebar/rl_menu.html"), "utf8");
     assert.match(registration, /isSetupRoute && profileComplete && rocketLeagueAccess/);
-    assert.match(registration, /isMyProfileRoute && !\(profileComplete && rocketLeagueAccess\)/);
+    assert.match(myProfile, /ROCKET_LEAGUE_PROFILE_URL/);
+    assert.match(myProfile, /profileComplete !== true \|\| result\.rocketLeagueAccess !== true/);
     assert.match(sidebar, /profileComplete && rocketLeagueAccess/);
     assert.match(menu, /href="\/RocketLeague\/MyProfile"[\s\S]*?data-rl-access="required"/);
 });

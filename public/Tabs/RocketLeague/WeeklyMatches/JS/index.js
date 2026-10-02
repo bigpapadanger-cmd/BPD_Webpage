@@ -249,7 +249,7 @@ async function loadRocketLeagueProfile(authUser) {
             "Epic Player";
     }
     const response = await apiFetch(
-        ROCKET_LEAGUE_PROFILE_URL,
+        `${ROCKET_LEAGUE_PROFILE_URL}?includePresence=false`,
         {
             method: "GET",
             credentials: "same-origin",

@@ -695,7 +695,7 @@ export async function loadRocketLeagueProfile(
     try {
         response =
             await apiFetch(
-                ROCKET_LEAGUE_PROFILE_URL,
+                `${ROCKET_LEAGUE_PROFILE_URL}?includePresence=false`,
                 {
                     method:
                         "GET",

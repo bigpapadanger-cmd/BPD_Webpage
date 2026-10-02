@@ -8,6 +8,7 @@ const RPC_NAMES = Object.freeze({
 const ALLOWED_RPCS = new Set(Object.values(RPC_NAMES));
 const PUBLIC_PROFILE_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const REQUEST_TIMEOUT_MS = 8000;
+const PRESENCE_STALE_AFTER_MS = 30 * 60 * 1000;
 
 export class RocketLeagueDiscoveryError extends Error {
     constructor(code, status = 503) {
@@ -50,6 +51,16 @@ function sanitizePublicProfile(value) {
     const mmr = normalizeObject(row.mmr);
     const provider = normalizeObject(row.provider);
     const stats = normalizeObject(row.stats);
+    const presenceCheckedAt = normalizeTimestamp(row.presence_checked_at);
+    const presenceCheckedAtMs = presenceCheckedAt ? Date.parse(presenceCheckedAt) : NaN;
+    const now = Date.now();
+    const presenceFresh = Number.isFinite(presenceCheckedAtMs)
+        && presenceCheckedAtMs <= now
+        && now - presenceCheckedAtMs <= PRESENCE_STALE_AFTER_MS;
+    const normalizedPresenceState = normalizeString(row.presence_state, 20).toLowerCase();
+    const presenceState = presenceFresh && ["online", "offline", "unknown"].includes(normalizedPresenceState)
+        ? normalizedPresenceState
+        : "unknown";
 
     return {
         public_profile_id: publicProfileId,
@@ -57,8 +68,8 @@ function sanitizePublicProfile(value) {
         epic_display_name: normalizeString(row.epic_display_name, 80) || null,
         rl_platform: normalizeString(row.rl_platform, 40) || null,
         presence_shared: presenceShared,
-        presence_state: presenceShared ? normalizeString(row.presence_state, 40) || null : null,
-        presence_checked_at: presenceShared ? normalizeTimestamp(row.presence_checked_at) : null,
+        presence_state: presenceShared ? presenceState : null,
+        presence_checked_at: presenceShared && presenceFresh ? presenceCheckedAt : null,
         mmr: {
             captured_at: normalizeTimestamp(mmr.captured_at),
             ones_mmr: normalizeNumber(mmr.ones_mmr),

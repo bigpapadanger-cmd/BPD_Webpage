@@ -103,7 +103,8 @@ public/Tabs/
 |   |   +-- HTML/index.html
 |   |   +-- JS/index.js, auth.js, connect_epic.js, profile.js, ranks.js,
 |   |           submenu.js
-|   +-- Registration/    CSS/index.css, HTML/index.html, JS/index.js, timezone.js; shared UI serves setup and established My Profile routes
+|   +-- Registration/    CSS/index.css, HTML/index.html, JS/index.js, timezone.js; setup/onboarding only
+|   +-- MyProfile/       CSS/index.css, HTML/index.html, JS/index.js; private profile/settings, current ranks, career stats, snapshot MMR progression
 |   +-- PublicProfile/   Public-safe profile by public_profile_id.
 |   +-- shared/          Profile visibility/presence and timestamp presentation helpers.
 |   +-- MatchResults/    CSS/index.css, HTML/index.html, JS/index.js
@@ -151,8 +152,8 @@ ROUTE-TO-FOLDER MAP
     /, /Dashboard         -> Framework shell and Global/Index
     /Account, /Login      -> Global/Account and Global/Login
     /Admin*               -> Global/Admin/Home and Global/Admin/TaskBoard
-    /RocketLeague/Profile -> Registration onboarding; established accounts redirect to /RocketLeague/MyProfile
-    /RocketLeague/MyProfile -> Registration-based private settings and read-only persisted provider/MMR/career data
+/RocketLeague/Profile -> Registration onboarding; established accounts redirect to /RocketLeague/MyProfile
+/RocketLeague/MyProfile -> MyProfile standalone private settings and read-only persisted provider/MMR/career data and snapshot-to-snapshot progression
     /RocketLeague*        -> Other Rocket League pages plus public/ocr for submission
     /Minecraft*           -> Tabs/Minecraft
     /Ark*                 -> Tabs/Ark

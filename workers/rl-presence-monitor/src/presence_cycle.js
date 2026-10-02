@@ -13,13 +13,15 @@ Purpose:
     players.
 
 Behavior:
-    - Dormant cycles exit before calling the MMR API.
-    - /wake may force an immediate cycle.
+    - The schedule checks the live eligible-candidate set every 15 minutes,
+      including when all opted-in players were previously offline.
+    - /wake may still request an explicit immediate cycle.
     - Eligible players are processed in batches of 5.
     - Batches are separated by 15 seconds.
-    - Any known-online player keeps monitoring active.
-    - A cycle becomes dormant only when every candidate was
-      checked successfully and all were offline.
+    - The persisted monitor state records whether a known-online player was
+      seen in the last cycle; it does not gate later scheduled candidate scans.
+    - An all-offline cycle may record dormant metadata while scheduled scans
+      continue so an opted-in player can be found after returning online.
     - Partial or complete lookup failures do NOT incorrectly
       mark the monitor dormant.
 ========================================================= */
@@ -32,6 +34,11 @@ const BATCH_DELAY_MS =
 
 const REQUEST_TIMEOUT_MS =
     15000;
+
+const PRESENCE_MAX_AGE_MS =
+    30 * 60 * 1000;
+
+const ALLOWED_PRESENCE_STATES = new Set(["online", "offline"]);
 
 /* =========================================================
 NORMALIZATION
@@ -149,9 +156,6 @@ async function callRpc(
             }
         );
 
-    const responseText =
-        await response.text();
-
     if (
         !response.ok
     ) {
@@ -169,89 +173,21 @@ async function callRpc(
         error.status =
             response.status;
 
-        error.response =
-            responseText
-                .replace(
-                    /\s+/g,
-                    " "
-                )
-                .slice(
-                    0,
-                    300
-                );
-
         throw error;
-    }
-
-    if (
-        !responseText
-    ) {
-        return null;
     }
 
     try {
-        return JSON.parse(
-            responseText
-        );
+        const responseText = await response.text();
+        return responseText ? JSON.parse(responseText) : null;
     }
     catch {
-        const error =
-            new Error(
-                `Supabase RPC returned invalid JSON: ${rpcName}`
-            );
-
-        error.code =
-            "SUPABASE_RPC_INVALID_JSON";
-
-        throw error;
+        throw Object.assign(new Error("Supabase RPC returned invalid JSON."), { code: "SUPABASE_RPC_INVALID_JSON" });
     }
 }
 
 /* =========================================================
 MONITOR STATE
 ========================================================= */
-
-async function getMonitorState(
-    env
-) {
-    const rows =
-        await callRpc(
-            env,
-            "get_rl_presence_monitor_state"
-        );
-
-    const row =
-        Array.isArray(
-            rows
-        )
-            ? rows[0]
-                || null
-            : rows;
-
-    return {
-        active:
-            row?.active ===
-            true,
-
-        activatedAt:
-            normalizeString(
-                row?.activated_at
-            )
-            || null,
-
-        lastCycleAt:
-            normalizeString(
-                row?.last_cycle_at
-            )
-            || null,
-
-        dormantAt:
-            normalizeString(
-                row?.dormant_at
-            )
-            || null
-    };
-}
 
 /* =========================================================
 CANDIDATES
@@ -305,7 +241,7 @@ async function getCandidates(
 MMR API PRESENCE
 ========================================================= */
 
-async function fetchPresence(
+export async function fetchPresence(
     env,
     epicAccountId
 ) {
@@ -334,16 +270,13 @@ async function fetchPresence(
         throw error;
     }
 
-    const url =
-        new URL(
-            "/get-profile",
-            baseUrl
-        );
+    const url = new URL("/get-player-data", baseUrl);
 
     url.searchParams.set(
         "playerId",
         `Epic|${epicAccountId}|0`
     );
+    url.searchParams.set("capabilities", "presence");
 
     const controller =
         new AbortController();
@@ -356,92 +289,51 @@ async function fetchPresence(
         );
 
     try {
-        const response =
-            await fetch(
-                url.href,
-                {
-                    method:
-                        "GET",
-
-                    headers: {
-                        Authorization:
-                            `Bearer ${apiKey}`,
-
-                        Accept:
-                            "application/json"
-                    },
-
-                    signal:
-                        controller.signal
-                }
-            );
-
-        const responseText =
-            await response.text();
+        const response = await fetch(url.href, {
+            method: "GET",
+            headers: {
+                Authorization: `Bearer ${apiKey}`,
+                Accept: "application/json"
+            },
+            signal: controller.signal
+        });
 
         if (
             !response.ok
         ) {
-            const error =
-                new Error(
-                    `MMR profile request failed: ${response.status}`
-                );
-
-            error.code =
-                "MMR_PROFILE_FAILED";
-
-            error.status =
-                response.status;
-
-            error.response =
-                responseText
-                    .replace(
-                        /\s+/g,
-                        " "
-                    )
-                    .slice(
-                        0,
-                        300
-                    );
-
-            throw error;
+            throw Object.assign(new Error("MMR presence capability request failed."), {
+                code: "MMR_PRESENCE_REQUEST_FAILED",
+                status: response.status
+            });
         }
 
         let payload;
 
         try {
-            payload =
-                responseText
-                    ? JSON.parse(
-                        responseText
-                    )
-                    : {};
+            payload = await response.json();
         }
         catch {
-            const error =
-                new Error(
-                    "MMR profile response was invalid."
-                );
-
-            error.code =
-                "MMR_PROFILE_INVALID";
-
-            throw error;
+            throw Object.assign(new Error("MMR presence capability response was invalid."), { code: "MMR_PRESENCE_RESPONSE_INVALID" });
         }
 
-        return {
-            displayName:
-                normalizeString(
-                    payload?.name
-                )
-                || null,
-
-            state:
-                normalizeString(
-                    payload?.state
-                )
-                || "Unknown"
-        };
+        const result = payload?.capabilities?.presence;
+        const state = normalizeString(result?.data?.state);
+        const checkedAt = normalizeString(result?.data?.checked_at);
+        const checkedAtMs = Date.parse(checkedAt);
+        if (payload?.success !== true || result?.status !== "success" || !result?.data
+            || !Number.isFinite(checkedAtMs) || checkedAtMs > Date.now() + 60000) {
+            throw Object.assign(new Error("MMR presence capability was unavailable or malformed."), { code: "MMR_PRESENCE_RESPONSE_INVALID" });
+        }
+        if (Date.now() - checkedAtMs > PRESENCE_MAX_AGE_MS) {
+            throw Object.assign(new Error("MMR presence capability was stale."), { code: "MMR_PRESENCE_RESPONSE_STALE" });
+        }
+        if (state === "unknown") {
+            throw Object.assign(new Error("MMR presence state is unknown."), { code: "MMR_PRESENCE_UNKNOWN" });
+        }
+        if (!ALLOWED_PRESENCE_STATES.has(state)) {
+            throw Object.assign(new Error("MMR presence state is invalid."), { code: "MMR_PRESENCE_RESPONSE_INVALID" });
+        }
+        return { state, checkedAt, displayName: null };
     }
     finally {
         clearTimeout(
@@ -454,11 +346,16 @@ async function fetchPresence(
 PRESENCE STORAGE
 ========================================================= */
 
-async function savePresence(
+export async function savePresence(
     env,
     player,
     presence
 ) {
+    if (!ALLOWED_PRESENCE_STATES.has(presence?.state)
+        || !Number.isFinite(Date.parse(presence?.checkedAt || ""))) {
+        throw Object.assign(new Error("Only confirmed normalized presence can be persisted."), { code: "MMR_PRESENCE_NOT_PERSISTABLE" });
+    }
+
     await callRpc(
         env,
         "save_rl_player_presence",
@@ -473,8 +370,7 @@ async function savePresence(
                 presence.state,
 
             p_checked_at:
-                new Date()
-                    .toISOString()
+                presence.checkedAt
         }
     );
 }
@@ -507,8 +403,7 @@ function isOnlineState(
         )
             .toLowerCase();
 
-    return normalized ===
-        "online";
+    return normalized === "online";
 }
 
 /* =========================================================
@@ -516,37 +411,8 @@ PRESENCE CYCLE
 ========================================================= */
 
 export async function runPresenceCycle(
-    env,
-    {
-        force = false
-    } = {}
+    env
 ) {
-    if (
-        force !==
-        true
-    ) {
-        const monitorState =
-            await getMonitorState(
-                env
-            );
-
-        if (
-            monitorState.active !==
-            true
-        ) {
-            return {
-                success:
-                    true,
-
-                skipped:
-                    true,
-
-                reason:
-                    "MONITOR_DORMANT"
-            };
-        }
-    }
-
     const candidates =
         await getCandidates(
             env
@@ -589,6 +455,9 @@ export async function runPresenceCycle(
         0;
 
     let failed =
+        0;
+
+    let skippedCount =
         0;
 
     let anyOnline =
@@ -646,6 +515,11 @@ export async function runPresenceCycle(
                 result.status ===
                 "fulfilled"
             ) {
+                if (result.value.skipped === true) {
+                    skippedCount += 1;
+                    continue;
+                }
+
                 checked +=
                     1;
 
@@ -667,12 +541,6 @@ export async function runPresenceCycle(
             console.error(
                 "RL PRESENCE: Player check failed.",
                 {
-                    accountId:
-                        player.accountId,
-
-                    rlPlayerId:
-                        player.rlPlayerId,
-
                     code:
                         result.reason?.code
                         || null,
@@ -680,10 +548,6 @@ export async function runPresenceCycle(
                     status:
                         result.reason?.status
                         || null,
-
-                    message:
-                        result.reason?.message
-                        || "Unknown error"
                 }
             );
         }
@@ -701,9 +565,7 @@ export async function runPresenceCycle(
         }
     }
 
-    /*
-     * Any confirmed online player keeps the monitor active.
-     */
+    /* Record whether the last completed cycle observed anyone online. */
     if (
         anyOnline ===
         true
@@ -725,6 +587,8 @@ export async function runPresenceCycle(
 
             checked,
 
+            skippedCount,
+
             failed,
 
             anyOnline:
@@ -735,19 +599,9 @@ export async function runPresenceCycle(
         };
     }
 
-    /*
-     * Only mark the monitor dormant if EVERY candidate
-     * completed successfully and all were offline.
-     *
-     * If one or more checks failed, leave the current
-     * monitor state unchanged so the next cron can retry.
-     */
-    if (
-        failed ===
-        0
-        && checked ===
-            candidates.length
-    ) {
+    // Mark the last cycle dormant only after complete successful offline
+    // results. The next cron still selects candidates and polls opt-ins.
+    if (failed === 0 && skippedCount === 0 && checked === candidates.length) {
         await finishCycle(
             env,
             false
@@ -764,6 +618,8 @@ export async function runPresenceCycle(
                 candidates.length,
 
             checked,
+
+            skippedCount,
 
             failed:
 
@@ -788,6 +644,8 @@ export async function runPresenceCycle(
             candidates.length,
 
         checked,
+
+        skippedCount,
 
         failed,
 

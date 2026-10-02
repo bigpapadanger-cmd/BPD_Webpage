@@ -36,8 +36,8 @@ Description:
     - Never accepts browser-submitted identity ownership.
     - Requires age eligibility AND policy/privacy consent for
       registration completion and Rocket League access.
-    - Wakes the Rocket League presence monitor for eligible
-      active opted-in Rocket League profiles.
+    - Activates scheduled presence monitoring only after an
+      explicit profile save with sharing enabled.
 
 Initial Registration Model:
     ageConsent
@@ -88,14 +88,6 @@ import {
     getLatestMmr
 } from "./stats/latest_mmr.js";
 import {
-    fetchRocketLeaguePresence
-} from "./presence/fetch_presence.js";
-
-import {
-    wakeRocketLeaguePresenceMonitor
-} from "./presence/wake_monitor.js";
-
-import {
     json
 } from "../common_helpers/responses.js";
 
@@ -111,6 +103,9 @@ import {
 import {
     getRocketLeagueProfileByAccountId
 } from "../supabase/rocketleague/rocketleague_profile.js";
+import {
+    getRocketLeagueMmrProgressionSafely
+} from "../supabase/rocketleague/get_mmr_progression.js";
 
 import {
     saveRocketLeagueProfile
@@ -1648,6 +1643,9 @@ async function handleProfileGet(
         ) ===
         "true";
 
+    const includeMmrProgression =
+        requestUrl.searchParams.get("includeMmrProgression") === "true";
+
     const detectedLocation =
         detectLocationRequested
             ? getRequestLocation(
@@ -1794,6 +1792,9 @@ async function handleProfileGet(
     let latestMmr =
         null;
 
+    let mmrProgression =
+        null;
+
     if (
         profileExists
         && profile.active ===
@@ -1801,6 +1802,10 @@ async function handleProfileGet(
         && epicUser.linked ===
             true
     ) {
+        if (includeMmrProgression && rocketLeagueAccess) {
+            mmrProgression = await getRocketLeagueMmrProgressionSafely(env, accountId);
+        }
+
         try {
             latestMmr =
                 await getLatestMmr(
@@ -1949,94 +1954,6 @@ async function handleProfileGet(
         };
     }
 
-    /* =====================================================
-    ROCKET LEAGUE PRESENCE MONITOR
-    ===================================================== */
-
-    const presenceEligible =
-        profileExists
-        && epicUser.linked ===
-            true
-        && profile.active ===
-            true
-        && profile.showOnlineStatus ===
-            true
-        && Boolean(
-            profile.rlPlayerId
-        )
-        && Boolean(
-            epicUser.EpicUniqueId
-        );
-
-    if (
-        presenceEligible
-    ) {
-        try {
-            await wakeRocketLeaguePresenceMonitor(
-                env,
-                accountId
-            );
-        }
-        catch (
-            error
-        ) {
-            console.error(
-                "ROCKET LEAGUE PROFILE: Presence monitor wake failed.",
-                {
-                    name:
-                        error?.name
-                        || "Error",
-
-                    code:
-                        error?.code
-                        || null,
-
-                    message:
-                        error?.message
-                        || "Unknown error"
-                }
-            );
-        }
-    }
-
-    /* =====================================================
-    CURRENT PLAYER PRESENCE
-    ===================================================== */
-
-    let presence =
-        null;
-
-    if (
-        presenceEligible
-    ) {
-        try {
-            presence =
-                await fetchRocketLeaguePresence(
-                    env,
-                    epicUser.EpicUniqueId
-                );
-        }
-        catch (
-            error
-        ) {
-            console.error(
-                "ROCKET LEAGUE PROFILE: Presence load failed.",
-                {
-                    name:
-                        error?.name
-                        || "Error",
-
-                    message:
-                        error?.message
-                        || "Unknown error"
-                }
-            );
-
-            presence =
-                null;
-        }
-    }
-
     return json(
         {
             success:
@@ -2114,11 +2031,14 @@ async function handleProfileGet(
             locationDetectionRequested:
                 detectLocationRequested,
 
-            presence,
+            presence:
+                null,
 
             statsRefresh,
 
             latestMmr,
+
+            mmrProgression,
 
             profile
         },
@@ -2684,7 +2604,6 @@ async function handleProfilePost(
         null;
     let providerDataRefresh =
         null;
-
     if (
         profileSaved ===
             true

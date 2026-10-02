@@ -230,7 +230,7 @@ export const ROUTES = {
             "My Rocket League Profile | BPD Gaming Network",
 
         body:
-            "/Tabs/RocketLeague/Registration/HTML/index.html",
+            "/Tabs/RocketLeague/MyProfile/HTML/index.html",
 
         header:
             "/Framework/Shell/HTML/Header/header.html",
@@ -242,7 +242,7 @@ export const ROUTES = {
             "/Framework/Shell/HTML/Footer/footer.html",
 
         module:
-            "/Tabs/RocketLeague/Registration/JS/index.js",
+            "/Tabs/RocketLeague/MyProfile/JS/index.js",
 
         sitemap:
             false,

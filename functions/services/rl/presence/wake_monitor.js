@@ -2,34 +2,26 @@
 
 /* =========================================================
 BPD GAMING NETWORK
-ROCKET LEAGUE PRESENCE MONITOR WAKE SERVICE
+ROCKET LEAGUE PRESENCE MONITOR ACTIVATION SERVICE
 
 File:
     functions/services/rl/presence/wake_monitor.js
 
 Purpose:
-    Wakes the Rocket League presence monitoring system when
-    an eligible authenticated Rocket League user becomes
-    active on the BPD website.
+    Activates scheduled monitoring after an eligible account
+    explicitly enables presence sharing.
 
 Flow:
     1. Ask Supabase to activate the presence monitor for the
        authenticated BPD account.
-    2. If Supabase confirms the account is eligible, call the
-       protected Cloudflare presence Worker /wake endpoint.
-    3. The Worker immediately scans all eligible opted-in
-       Rocket League players.
-    4. The Worker continues every 15 minutes while at least
-       one eligible player remains online.
+    2. The existing 15-minute Worker schedule performs the
+       next provider check; this request never calls a Worker.
 
 Important:
     - Server-side only.
     - Account ID comes from the authenticated BPD session.
-    - PRESENCE_TRIGGER_KEY is never exposed to the browser.
+    - The service calls Supabase only; it never calls the provider Worker.
 ========================================================= */
-
-const REQUEST_TIMEOUT_MS =
-    15000;
 
 function normalizeString(
     value
@@ -136,9 +128,6 @@ async function wakeSupabaseMonitor(
             }
         );
 
-    const responseText =
-        await response.text();
-
     if (
         !response.ok
     ) {
@@ -146,18 +135,7 @@ async function wakeSupabaseMonitor(
             "RL PRESENCE WAKE: Supabase wake RPC failed.",
             {
                 status:
-                    response.status,
-
-                response:
-                    responseText
-                        .replace(
-                            /\s+/g,
-                            " "
-                        )
-                        .slice(
-                            0,
-                            300
-                        )
+                    response.status
             }
         );
 
@@ -175,19 +153,14 @@ async function wakeSupabaseMonitor(
         throw error;
     }
 
-    if (
-        !responseText
-    ) {
+    if (response.status === 204) {
         return false;
     }
 
     let payload;
 
     try {
-        payload =
-            JSON.parse(
-                responseText
-            );
+        payload = await response.json();
     }
     catch {
         return false;
@@ -211,123 +184,7 @@ async function wakeSupabaseMonitor(
     return false;
 }
 
-async function wakePresenceWorker(
-    env
-) {
-    const workerUrl =
-        normalizeString(
-            env?.RL_PRESENCE_MONITOR_URL
-        );
-
-    const triggerKey =
-        normalizeString(
-            env?.PRESENCE_TRIGGER_KEY
-        );
-
-    if (
-        !workerUrl
-        || !triggerKey
-    ) {
-        const error =
-            new Error(
-                "Rocket League presence Worker configuration is unavailable."
-            );
-
-        error.code =
-            "RL_PRESENCE_WORKER_CONFIGURATION_MISSING";
-
-        error.status =
-            500;
-
-        throw error;
-    }
-
-    const url =
-        new URL(
-            "/wake",
-            workerUrl
-        );
-
-    const controller =
-        new AbortController();
-
-    const timeout =
-        setTimeout(
-            () =>
-                controller.abort(),
-            REQUEST_TIMEOUT_MS
-        );
-
-    try {
-        const response =
-            await fetch(
-                url.href,
-                {
-                    method:
-                        "POST",
-
-                    headers: {
-                        Authorization:
-                            `Bearer ${triggerKey}`,
-
-                        Accept:
-                            "application/json"
-                    },
-
-                    signal:
-                        controller.signal
-                }
-            );
-
-        const responseText =
-            await response.text();
-
-        if (
-            !response.ok
-        ) {
-            console.error(
-                "RL PRESENCE WAKE: Worker wake failed.",
-                {
-                    status:
-                        response.status,
-
-                    response:
-                        responseText
-                            .replace(
-                                /\s+/g,
-                                " "
-                            )
-                            .slice(
-                                0,
-                                300
-                            )
-                }
-            );
-
-            const error =
-                new Error(
-                    "Rocket League presence Worker wake failed."
-                );
-
-            error.code =
-                "RL_PRESENCE_WORKER_WAKE_FAILED";
-
-            error.status =
-                response.status;
-
-            throw error;
-        }
-
-        return true;
-    }
-    finally {
-        clearTimeout(
-            timeout
-        );
-    }
-}
-
-export async function wakeRocketLeaguePresenceMonitor(
+export async function activateRocketLeaguePresenceMonitor(
     env,
     accountId
 ) {
@@ -375,26 +232,16 @@ export async function wakeRocketLeaguePresenceMonitor(
             activated:
                 false,
 
-            workerWoken:
-                false,
-
             reason:
                 "PRESENCE_MONITOR_NOT_ELIGIBLE"
         };
     }
-
-    await wakePresenceWorker(
-        env
-    );
 
     return {
         success:
             true,
 
         activated:
-            true,
-
-        workerWoken:
             true
     };
 }

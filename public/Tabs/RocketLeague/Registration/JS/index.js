@@ -71,7 +71,6 @@ import {
     getProvider
 } from "../../../../Framework/Auth/auth.js";
 
-import { formatRocketLeagueTimestamp } from "../../shared/profilePresentation.js";
 
 /* =========================================================
 CONFIGURATION
@@ -81,8 +80,6 @@ const REGISTRATION_DRAFT_KEY =
     "bpdRocketLeagueRegistrationDraft";
 
 let registrationDraftAccountId = "";
-let profileUpdateMode = false;
-let missingBooleanSettings = new Set();
 
 function getRegistrationDraftKey() {
     return registrationDraftAccountId
@@ -1214,6 +1211,7 @@ async function detectRegion() {
             "detectLocation",
             "true"
         );
+        url.searchParams.set("includePresence", "false");
 
         const response =
             await apiFetch(
@@ -2094,67 +2092,6 @@ function normalizeProfile(
     };
 }
 
-function renderMyProfileReadOnlyData(profile) {
-    const section = document.getElementById("rlMyProfileReadOnlyData");
-    const providerName = document.getElementById("rlMyProfileProviderName");
-    const providerFreshness = document.getElementById("rlMyProfileProviderUpdated");
-    const ranksGrid = document.getElementById("rlMyProfileRanks");
-    const mmrFreshness = document.getElementById("rlMyProfileMmrUpdated");
-    const careerGrid = document.getElementById("rlMyProfileCareerStats");
-    const careerFreshness = document.getElementById("rlMyProfileCareerUpdated");
-    if (!section || !providerName || !ranksGrid || !careerGrid) return;
-
-    const provider = normalizeObject(profile?.provider);
-    providerName.textContent = normalizeString(provider.displayUsername) || "Not available";
-    const providerTime = formatRocketLeagueTimestamp(provider.providerUpdatedAt || provider.capturedAt);
-    providerFreshness.textContent = providerTime ? `Provider data updated ${providerTime}` : "";
-    providerFreshness.hidden = !providerTime;
-
-    const latestMmr = normalizeObject(profile?.latestMmr);
-    const currentRanks = normalizeObject(profile?.ranks?.current);
-    const rankData = latestMmr.available === true ? latestMmr : currentRanks;
-    ranksGrid.replaceChildren();
-    for (const [key, label] of [["ones", "1v1"], ["twos", "2v2"], ["threes", "3v3"]]) {
-        const rank = normalizeObject(rankData[key]);
-        const tierValue = rank.tier?.label || rank.tier?.name || rank.tier;
-        const tier = normalizeString(tierValue);
-        const mmr = Number.isSafeInteger(rank.mmr) && rank.mmr >= 0 ? rank.mmr : null;
-        const value = tier
-            ? `${tier}${mmr === null ? "" : ` · ${mmr.toLocaleString()} MMR`}`
-            : mmr === null ? "—" : `${mmr.toLocaleString()} MMR`;
-        const item = document.createElement("div");
-        item.className = "rl-profile-rank-item";
-        const name = document.createElement("span");
-        name.textContent = label;
-        const total = document.createElement("strong");
-        total.textContent = value;
-        item.append(name, total);
-        ranksGrid.append(item);
-    }
-
-    const mmrTime = formatRocketLeagueTimestamp(latestMmr.capturedAt || currentRanks.capturedAt);
-    mmrFreshness.textContent = mmrTime ? `MMR last updated ${mmrTime}` : "";
-    mmrFreshness.hidden = !mmrTime;
-
-    const career = normalizeObject(profile?.stats?.career);
-    careerGrid.replaceChildren();
-    for (const [key, label] of [["wins", "Wins"], ["goals", "Goals"], ["assists", "Assists"], ["saves", "Saves"], ["shots", "Shots"], ["mvps", "MVPs"]]) {
-        const value = career[key];
-        const item = document.createElement("div");
-        item.className = "rl-profile-career-item";
-        const name = document.createElement("span");
-        name.textContent = label;
-        const total = document.createElement("strong");
-        total.textContent = Number.isSafeInteger(value) && value >= 0 ? value.toLocaleString() : "—";
-        item.append(name, total);
-        careerGrid.append(item);
-    }
-    const careerTime = formatRocketLeagueTimestamp(career.capturedAt);
-    careerFreshness.textContent = careerTime ? `Career totals captured ${careerTime}` : "";
-    careerFreshness.hidden = !careerTime;
-    section.hidden = false;
-}
-
 /* =========================================================
 POPULATE PROFILE
 ========================================================= */
@@ -2163,10 +2100,6 @@ function populateProfileForm(
     profile
 ) {
     const settings = profile.settings || profile;
-    missingBooleanSettings = new Set(
-        ["autoDetectRegion", "showOnlineStatus", "findProfileEnabled", "notificationsEnabled"]
-            .filter(key => typeof settings[key] !== "boolean")
-    );
     setInputValue(
         "epicDisplayName",
         profile.EpicDisplayName
@@ -2356,7 +2289,7 @@ async function loadRocketLeagueProfile() {
     try {
         response =
             await apiFetch(
-                ROCKET_LEAGUE_PROFILE_URL,
+                `${ROCKET_LEAGUE_PROFILE_URL}?includePresence=false`,
                 {
                     method:
                         "GET",
@@ -2950,11 +2883,6 @@ async function submitRegistration(
         return;
     }
 
-    if (profileUpdateMode && missingBooleanSettings.size) {
-        showMessage(`One or more saved settings could not be loaded (${[...missingBooleanSettings].join(", ")}). Choose each setting before saving so an unknown value is not overwritten.`, "error");
-        return;
-    }
-
     const payload =
         buildRegistrationPayload(
             form
@@ -3094,13 +3022,11 @@ async function submitRegistration(
         );
 
         showMessage(
-            profileUpdateMode ? "Rocket League profile settings updated." : "Rocket League registration completed. Redirecting…",
+            "Rocket League registration completed. Redirecting…",
             "success"
         );
 
-        if (!profileUpdateMode) {
-            window.location.replace(result.redirectTo || "/RocketLeague");
-        }
+        window.location.replace(result.redirectTo || "/RocketLeague");
     }
     catch (
         error
@@ -3130,8 +3056,7 @@ async function submitRegistration(
             submitButton.disabled =
                 false;
 
-            submitButton.textContent =
-                profileUpdateMode ? "Update Profile" : "Complete Registration";
+            submitButton.textContent = "Complete Registration";
         }
     }
 }
@@ -3409,7 +3334,6 @@ export async function initializePage() {
     const rocketLeagueAccess = profileResult.rocketLeagueAccess === true;
     const path = window.location.pathname.replace(/\/+$/u, "").toLowerCase();
     const isSetupRoute = path === "/rocketleague/profile";
-    const isMyProfileRoute = path === "/rocketleague/myprofile";
 
     if (isSetupRoute && profileComplete && rocketLeagueAccess) {
         if (window.BPDRouter?.navigate) {
@@ -3420,38 +3344,9 @@ export async function initializePage() {
         return;
     }
 
-    if (isMyProfileRoute && !(profileComplete && rocketLeagueAccess)) {
-        if (window.BPDRouter?.navigate) {
-            await window.BPDRouter.navigate("/RocketLeague/Profile", { replace: true });
-        } else {
-            window.location.replace("/RocketLeague/Profile");
-        }
-        return;
-    }
-
-    if (isMyProfileRoute) {
-        const intro = document.querySelector(".registration-intro");
-        const eyebrow = intro?.querySelector("[data-copy='eyebrow']");
-        const title = intro?.querySelector("[data-copy='title']");
-        const description = intro?.querySelector("p[data-copy='intro']");
-        if (eyebrow) eyebrow.textContent = "ROCKET LEAGUE SETTINGS";
-        if (title) title.textContent = "My Rocket League Profile";
-        if (description) description.textContent = "Manage your player preferences and notification settings. Provider name, career totals, and competitive ranks are read-only and refresh separately.";
-        const onboardingConsent = document.querySelector(".eligibility-section");
-        if (onboardingConsent) onboardingConsent.hidden = true;
-        renderMyProfileReadOnlyData(profileResult.profile);
-    }
-
     populateProfileForm(
         profileResult.profile
     );
-
-    profileUpdateMode = isMyProfileRoute && profileComplete && rocketLeagueAccess;
-    const submitButton = document.getElementById("registrationSubmit");
-    if (submitButton) submitButton.textContent = profileUpdateMode ? "Update Profile" : "Complete Registration";
-    for (const settingName of ["autoDetectRegion", "showOnlineStatus", "findProfileEnabled", "notificationsEnabled"]) {
-        form.querySelectorAll(`[name="${settingName}"]`).forEach(control => control.addEventListener("change", () => missingBooleanSettings.delete(settingName)));
-    }
 
     if (
         profileResult.profileLoaded ===

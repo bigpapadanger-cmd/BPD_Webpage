@@ -1,0 +1,67 @@
+<link rel="stylesheet" href="/Tabs/RocketLeague/MyProfile/CSS/index.css">
+<main class="rl-my-profile" aria-labelledby="myProfileTitle">
+    <header class="my-profile-heading">
+        <p class="my-profile-eyebrow">ROCKET LEAGUE · PLAYER HUB</p>
+        <h1 id="myProfileTitle">My Profile</h1>
+        <p>Your private player overview, current competitive ranks, and career totals.</p>
+    </header>
+
+    <p id="myProfileStatus" class="my-profile-status" role="status" aria-live="polite">Loading your profile…</p>
+
+    <section class="my-profile-identity" aria-label="Player identity">
+        <div><span>BPD display name</span><strong id="myProfileBpdName">—</strong></div>
+        <div><span>Epic display name</span><strong id="myProfileEpicName">—</strong><small id="myProfileProviderFreshness"></small></div>
+        <div><span>Profile discovery</span><strong id="myProfileVisibility">—</strong></div>
+        <div><span>Online presence</span><strong id="myProfilePresencePreference">—</strong></div>
+    </section>
+
+    <section class="my-profile-section" aria-labelledby="myRanksTitle">
+        <div class="my-profile-section-heading"><div><p class="my-profile-eyebrow">COMPETITIVE</p><h2 id="myRanksTitle">Ranked playlists</h2></div><span id="myProfileMmrFreshness" class="my-profile-freshness"></span></div>
+        <div id="myProfileRanks" class="my-profile-ranks"></div>
+    </section>
+
+    <section class="my-profile-section" aria-labelledby="myProgressTitle">
+        <div class="my-profile-section-heading"><div><p class="my-profile-eyebrow">SNAPSHOT PROGRESSION</p><h2 id="myProgressTitle">Since previous capture</h2></div></div>
+        <p id="myProfileProgressUnavailable" class="my-profile-note">Loading MMR change history…</p>
+        <p id="myProfileProgressComparedAt" class="my-profile-freshness"></p>
+        <div id="myProfileProgress" class="my-profile-progress" hidden></div>
+    </section>
+
+    <section class="my-profile-section" aria-labelledby="myCareerTitle">
+        <div class="my-profile-section-heading"><div><p class="my-profile-eyebrow">CAREER</p><h2 id="myCareerTitle">Career totals</h2></div><span id="myProfileCareerFreshness" class="my-profile-freshness"></span></div>
+        <div id="myProfileCareer" class="my-profile-career"></div>
+    </section>
+
+    <section class="my-profile-section" aria-labelledby="mySettingsTitle">
+        <div class="my-profile-section-heading"><div><p class="my-profile-eyebrow">YOUR PREFERENCES</p><h2 id="mySettingsTitle">Profile settings</h2></div></div>
+        <p class="my-profile-note">These settings are saved to your private Rocket League profile. Discovery and presence sharing are independent.</p>
+        <form id="myProfileSettingsForm" class="my-profile-settings" hidden>
+            <fieldset class="my-profile-settings-group">
+                <legend>Visibility and location</legend>
+                <label class="my-profile-toggle"><input id="showOnlineStatus" type="checkbox"><span><strong>Share online status</strong><small>When disabled, public profiles show “Presence not shared.”</small></span></label>
+                <label class="my-profile-toggle"><input id="findProfileEnabled" type="checkbox"><span><strong>Appear in Find Players</strong><small>Allow other players to discover your opted-in public profile.</small></span></label>
+                <label class="my-profile-toggle"><input id="autoDetectRegion" type="checkbox"><span><strong>Detect approximate region and time zone</strong><small>Turning this off removes saved location data. When on, the server uses approximate request metadata.</small></span></label>
+            </fieldset>
+            <fieldset class="my-profile-settings-group">
+                <legend>Play preferences</legend>
+                <label class="my-profile-field" for="preferredMode"><span>Preferred mode</span><select id="preferredMode" required><option value="">Choose a mode</option><option value="1s">1s</option><option value="2s">2s</option><option value="3s">3s</option><option value="customs">Customs</option><option value="other">Other</option></select></label>
+                <label class="my-profile-field" for="otherMode" id="otherModeField" hidden><span>Describe your preferred mode</span><input id="otherMode" maxlength="50"></label>
+                <div><span class="my-profile-field-label">Weekly availability</span><div id="myProfileAvailability" class="my-profile-availability"></div><small>Times use your local time and must fall between 5:00 PM and 11:00 PM in 30-minute increments.</small></div>
+            </fieldset>
+            <fieldset class="my-profile-settings-group">
+                <legend>Contact and match reminders</legend>
+                <div class="my-profile-settings-fields">
+                    <label class="my-profile-field" for="profileEmail"><span>Email</span><input id="profileEmail" type="email" maxlength="254" autocomplete="email"></label>
+                    <label class="my-profile-field" for="profilePhone"><span>Phone</span><input id="profilePhone" type="tel" maxlength="24" autocomplete="tel"></label>
+                </div>
+                <label class="my-profile-toggle"><input id="notificationsEnabled" type="checkbox"><span><strong>Match notifications</strong><small>Choose where and when to receive match reminders.</small></span></label>
+                <div id="notificationFields" class="my-profile-settings-fields">
+                    <label class="my-profile-field" for="notificationMethod"><span>Delivery method</span><select id="notificationMethod"><option value="">Choose a method</option><option value="email">Email</option><option value="phone">Phone</option><option value="discord">Discord (existing preference)</option></select></label>
+                    <label class="my-profile-field" for="reminderMode"><span>Reminder timing</span><select id="reminderMode"><option value="">Choose timing</option><option value="24-hours">24 hours before</option><option value="1-hour">1 hour before</option><option value="both">Both</option></select></label>
+                </div>
+                <p id="discordSettingsNote" class="my-profile-note" hidden>Discord delivery remains subject to the server-side MatchBot availability check.</p>
+            </fieldset>
+            <button id="myProfileSave" type="submit">Save settings</button>
+        </form>
+    </section>
+</main>

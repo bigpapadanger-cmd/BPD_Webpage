@@ -37,8 +37,7 @@ test("eligibility source and registration UI contain no static guild dependency 
     assert.doesNotMatch(service, /DISCORD_GUILD_IDS?/);
     assert.doesNotMatch(service, /getDiscordMatchBotGuilds|discordMatchBotGet/);
     assert.match(service, /MATCHBOT_GUILD_REGISTRY_UNAVAILABLE/);
-    assert.match(registration, /new Set\(\s*\["autoDetectRegion"[\s\S]*?\.filter\(/);
-    assert.doesNotMatch(registration, /new Set\([^;]*\)\s*\.filter\(/s);
+    assert.doesNotMatch(registration, /\.filter\([^)]*\)\.filter\(/s);
     assert.match(registration, /Promise\.allSettled\(\[\s*loadRocketLeagueProfile\(\)/);
     assert.match(registration, /status === "unavailable"/);
 });

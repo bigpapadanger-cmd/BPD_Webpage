@@ -50,7 +50,7 @@ async function recordPresenceRun(env, summary, startedAt, failed = false) {
     try { prior = await env.SERVICE_STATUS.get(PRESENCE_STATUS_KEY, "json") || {}; } catch { /* Best effort. */ }
     const now = new Date().toISOString();
     const succeeded = !failed && summary?.success !== false;
-    const lastSummary = Object.fromEntries(["success", "skipped", "reason", "candidateCount", "checked", "failed", "anyOnline", "dormant"].filter(key => summary?.[key] !== undefined).map(key => [key, summary[key]]));
+    const lastSummary = Object.fromEntries(["success", "skipped", "skippedCount", "reason", "candidateCount", "checked", "failed", "anyOnline", "dormant"].filter(key => summary?.[key] !== undefined).map(key => [key, summary[key]]));
     try { await env.SERVICE_STATUS.put(PRESENCE_STATUS_KEY, JSON.stringify({ lastInvocationAt: now, lastSuccessAt: succeeded ? now : prior.lastSuccessAt || null, lastFailureAt: succeeded ? prior.lastFailureAt || null : now, lastDurationMs: Date.now() - startedAt, lastSummary }), { expirationTtl: 2592000 }); } catch { /* Telemetry must not change job behavior. */ }
 }
 
@@ -134,7 +134,7 @@ function getJobRunner(job, env) {
 function summarizeJobResult(job, result) {
     if (job === "presence") {
         return Object.fromEntries(
-            ["success", "skipped", "reason", "candidateCount", "checked", "failed", "anyOnline", "dormant"]
+            ["success", "skipped", "skippedCount", "reason", "candidateCount", "checked", "failed", "anyOnline", "dormant"]
                 .filter(key => result?.[key] !== undefined)
                 .map(key => [key, result[key]])
         );

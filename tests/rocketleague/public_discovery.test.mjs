@@ -252,6 +252,24 @@ test("public-profile RPC sanitization omits aliases and never returns hidden pre
     });
 });
 
+test("fresh public presence is visible while stale or unknown presence is neutral", async () => {
+    const fresh = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    const stale = new Date(Date.now() - 31 * 60 * 1000).toISOString();
+    const records = [
+        { public_profile_id: PROFILE_ID, find_profile_enabled: true, presence_shared: true, presence_state: "online", presence_checked_at: fresh },
+        { public_profile_id: PROFILE_ID, find_profile_enabled: true, presence_shared: true, presence_state: "online", presence_checked_at: stale },
+        { public_profile_id: PROFILE_ID, find_profile_enabled: true, presence_shared: true, presence_state: "unknown", presence_checked_at: fresh }
+    ];
+
+    for (const [index, expectedState] of [[0, "online"], [1, "unknown"], [2, "unknown"]]) {
+        await withFetch(async () => response(records[index]), async () => {
+            const profile = await getPublicRocketLeagueProfile(ENV, PROFILE_ID);
+            assert.equal(profile.presence_state, expectedState);
+            assert.equal(profile.presence_checked_at, index === 1 ? null : fresh);
+        });
+    }
+});
+
 test("public profile does not expose provider/stat freshness timestamps absent from its contract", async () => {
     await withFetch(async () => response({
         public_profile_id: PROFILE_ID,
@@ -312,12 +330,32 @@ test("MMR timestamp formatter shows weekday/date and 24-hour time, without inven
     assert.equal(formatRocketLeagueTimestamp("not-a-date"), "");
 });
 
-test("private My Profile read-only fields preserve unknown totals and never expose unsupported provider values", async () => {
-    const source = await readFile(new URL("../../public/Tabs/RocketLeague/Registration/JS/index.js", import.meta.url), "utf8");
-    assert.match(source, /renderMyProfileReadOnlyData\(profileResult\.profile\)/);
-    assert.match(source, /Number\.isSafeInteger\(value\) && value >= 0 \? value\.toLocaleString\(\) : "—"/);
-    assert.match(source, /provider\.displayUsername/);
+test("private My Profile is standalone, read-only provider data stays safe, and unknown totals are not zero", async () => {
+    const source = await readFile(new URL("../../public/Tabs/RocketLeague/MyProfile/JS/index.js", import.meta.url), "utf8");
+    const html = await readFile(new URL("../../public/Tabs/RocketLeague/MyProfile/HTML/index.html", import.meta.url), "utf8");
+    assert.match(source, /profile\.provider\?\.displayUsername/);
+    assert.match(source, /safeCount\(career\[key\]\)/);
+    assert.match(source, /includePresence=false/);
+    assert.match(html, /myProfileSettingsForm/);
+    assert.match(html, /myProfileProgressUnavailable/);
+    assert.match(html, /Loading MMR change history/);
     assert.doesNotMatch(source, /provider\.(?:level|xp|creatorCode)/);
+    assert.doesNotMatch(source, /SUPABASE_(?:AUTH|URL)/);
+    assert.match(html, /myProfileProgressComparedAt/);
+});
+
+test("private My Profile settings preserve persisted values and fail closed for unknown privacy preferences", async () => {
+    const source = await readFile(new URL("../../public/Tabs/RocketLeague/MyProfile/JS/index.js", import.meta.url), "utf8");
+    const html = await readFile(new URL("../../public/Tabs/RocketLeague/MyProfile/HTML/index.html", import.meta.url), "utf8");
+    assert.match(source, /typeof settings\.showOnlineStatus === "boolean" && typeof settings\.findProfileEnabled === "boolean"/);
+    assert.match(source, /const availability = DAYS\.flatMap/);
+    assert.match(source, /notificationsEnabled,\s*notificationMethod: notificationsEnabled \?/);
+    assert.match(source, /autoDetectRegion: document\.getElementById\("autoDetectRegion"\)\.checked/);
+    assert.match(source, /settingsKnown = \["autoDetectRegion", "showOnlineStatus", "findProfileEnabled", "notificationsEnabled"\]/);
+    for (const id of ["preferredMode", "myProfileAvailability", "profileEmail", "profilePhone", "notificationMethod", "reminderMode"]) {
+        assert.match(html, new RegExp(`id="${id}"`));
+    }
+    assert.match(source, /method,\s*credentials: "same-origin"/);
 });
 
 test("public profile is unavailable unless Find Profile is explicitly enabled", async () => {
@@ -330,9 +368,23 @@ test("public profile is unavailable unless Find Profile is explicitly enabled", 
 });
 
 test("public presence renders the explicit private label, not Offline", () => {
-    assert.equal(getPublicPresenceLabel({ presence_shared: false, presence_state: "Offline" }), "Presence not shared");
+    assert.equal(getPublicPresenceLabel({ presence_shared: false, presence_state: "Offline" }), "Presence not shared.");
     assert.equal(getPublicPresenceLabel({ presence_shared: true, presence_state: "Online" }), "Online");
+    assert.equal(getPublicPresenceLabel({ presence_shared: true, presence_state: "online" }), "Online");
+    assert.equal(getPublicPresenceLabel({ presence_shared: true, presence_state: "unknown" }), "Status unavailable");
     assert.equal(getPublicProfilePageUrl(PROFILE_ID), `/RocketLeague/Player?id=${PROFILE_ID}`);
+});
+
+test("Find Players cards stay compact and use three, two, then one responsive columns", async () => {
+    const source = await readFile(new URL("../../public/Tabs/RocketLeague/FindPlayers/JS/index.js", import.meta.url), "utf8");
+    const css = await readFile(new URL("../../public/Tabs/RocketLeague/FindPlayers/CSS/index.css", import.meta.url), "utf8");
+    assert.match(css, /grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\)/);
+    assert.match(css, /@media \(max-width: 900px\)[\s\S]*?repeat\(2, minmax\(0, 1fr\)\)/);
+    assert.match(css, /@media \(max-width: 620px\)[\s\S]*?minmax\(0, 1fr\)/);
+    assert.match(source, /addFact\(ranks, "1v1"/);
+    assert.match(source, /addFact\(ranks, "2v2"/);
+    assert.match(source, /addFact\(ranks, "3v3"/);
+    assert.doesNotMatch(source, /career|aliases|accountId|rlPlayerId/i);
 });
 
 test("public browser modules do not receive Supabase credentials", async () => {

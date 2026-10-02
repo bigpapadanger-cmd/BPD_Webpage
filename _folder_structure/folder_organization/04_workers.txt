@@ -36,9 +36,10 @@ workers/
 |
 +-- rl-presence-monitor/
 |   +-- wrangler.jsonc
+|   +-- README.md             15-minute opt-in presence cycle, provider contract, privacy and stale policy.
 |   +-- src/
 |   |   +-- index.js             /health, protected /admin/health, authorized /wake, cron dispatcher, presence heartbeat.
-|   |   +-- presence_cycle.js    Candidate selection, presence fetch/save cycle.
+|   |   +-- presence_cycle.js    Supabase-eligible candidates, normalized MMR capability fetch/save cycle.
 |   |   +-- scheduled_mmr.js     Scheduled MMR candidate refresh and persistence.
 |   |   +-- taskboard_summary.js Taskboard aggregate load and Discord delivery.
 |   +-- tests/
@@ -46,6 +47,7 @@ workers/
 |       +-- epic_entry_paths.test.mjs
 |       +-- oauth_navigation.test.mjs
 |       +-- oauth_provider_flows.test.mjs
+|       +-- presence_cycle.test.mjs Normalized MMR presence contract, persistence guards, and error isolation.
 |       +-- provider_authorization.test.mjs
 |       +-- task_rpc_contract.test.mjs
 |       +-- task_service_contract.test.mjs
@@ -101,11 +103,12 @@ Runtime relationships
     POST /admin/run-scheduled
         -> PRESENCE_TRIGGER_KEY-protected explicit presence/MMR/Taskboard run;
            returns aggregate-only summary; rejects overlapping same-isolate job
-    15-minute cron
+    15-minute cron (unchanged)
         -> presence_cycle.js
-        -> Supabase RPC candidate/state operations
-        -> external presence lookup
-        -> saves presence and completes the cycle
+        -> API candidate RPC excludes opted-out/ineligible players
+        -> authorization recheck and /get-player-data?capabilities=presence
+        -> persists only successful normalized online/offline outcomes
+        -> provider errors/unknown preserve prior state
     weekly cron
         -> scheduled_mmr.js
         -> selects eligible candidates, calls MMR API, saves snapshots/state

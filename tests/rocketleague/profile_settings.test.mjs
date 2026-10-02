@@ -65,14 +65,33 @@ test("RPC projection is explicit and excludes read-only provider, stats, and unk
     assert.equal(JSON.stringify(mapped).includes("never-save"), false);
 });
 
-test("completed registration routes to My Profile while setup keeps normalized settings", async () => {
+test("setup redirects completed players to the standalone My Profile route", async () => {
     const source = await readFile(new URL("../../public/Tabs/RocketLeague/Registration/JS/index.js", import.meta.url), "utf8");
+    const myProfile = await readFile(new URL("../../public/Tabs/RocketLeague/MyProfile/JS/index.js", import.meta.url), "utf8");
     assert.match(source, /profileComplete && rocketLeagueAccess/);
     assert.match(source, /navigate\("\/RocketLeague\/MyProfile", \{ replace: true \}\)/);
-    assert.match(source, /profileUpdateMode = isMyProfileRoute && profileComplete && rocketLeagueAccess/);
-    assert.match(source, /profileUpdateMode \? "Update Profile" : "Complete Registration"/);
+    assert.doesNotMatch(source, /isMyProfileRoute|profileUpdateMode|renderMyProfileReadOnlyData/);
     assert.match(source, /const settings = profile\.settings \|\| profile/);
-    assert.match(source, /missingBooleanSettings/);
+    assert.match(myProfile, /findProfileEnabled/);
+    assert.match(myProfile, /showOnlineStatus/);
     const payloadBuilder = source.slice(source.indexOf("function buildRegistrationPayload"), source.indexOf("function validateRegistrationPayload"));
     assert.doesNotMatch(payloadBuilder, /provider|careerStats|stats|ranked/i);
+});
+
+test("private profile reads are persisted-data-only and never wake or call presence provider", async () => {
+    const service = await readFile(new URL("../../functions/services/rl/profile.js", import.meta.url), "utf8");
+    const readers = [
+        "../../public/Tabs/RocketLeague/MyProfile/JS/index.js",
+        "../../public/Tabs/RocketLeague/Registration/JS/index.js",
+        "../../public/Tabs/RocketLeague/Index/JS/profile.js",
+        "../../public/Tabs/RocketLeague/WeeklyMatches/JS/index.js",
+        "../../public/Tabs/RocketLeague/MatchResults/JS/index.js",
+        "../../public/Tabs/RocketLeague/PrivateMatches/JS/index.js"
+    ];
+    const getHandler = service.slice(service.indexOf("async function handleProfileGet"), service.indexOf("async function handleProfilePost"));
+    assert.doesNotMatch(getHandler, /fetchRocketLeaguePresence|activateRocketLeaguePresenceMonitor|wakeRocketLeaguePresenceMonitor/);
+    for (const file of readers) {
+        const source = await readFile(new URL(file, import.meta.url), "utf8");
+        assert.match(source, /includePresence=false/);
+    }
 });
