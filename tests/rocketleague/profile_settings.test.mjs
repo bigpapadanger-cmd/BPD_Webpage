@@ -65,9 +65,11 @@ test("RPC projection is explicit and excludes read-only provider, stats, and unk
     assert.equal(JSON.stringify(mapped).includes("never-save"), false);
 });
 
-test("completed registration switches to Update Profile and profile form reads normalized settings", async () => {
+test("completed registration routes to My Profile while setup keeps normalized settings", async () => {
     const source = await readFile(new URL("../../public/Tabs/RocketLeague/Registration/JS/index.js", import.meta.url), "utf8");
-    assert.match(source, /profileUpdateMode = profileResult\.profile\?\.profileComplete === true/);
+    assert.match(source, /profileComplete && rocketLeagueAccess/);
+    assert.match(source, /navigate\("\/RocketLeague\/MyProfile", \{ replace: true \}\)/);
+    assert.match(source, /profileUpdateMode = isMyProfileRoute && profileComplete && rocketLeagueAccess/);
     assert.match(source, /profileUpdateMode \? "Update Profile" : "Complete Registration"/);
     assert.match(source, /const settings = profile\.settings \|\| profile/);
     assert.match(source, /missingBooleanSettings/);

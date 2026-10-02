@@ -31,6 +31,28 @@ test("registered page targets exist and have lowercase lookup keys", () => {
     }
 });
 
+test("Rocket League setup and established My Profile routes stay distinct and gated", () => {
+    const setup = ROUTES["/RocketLeague/Profile"];
+    const mine = ROUTES["/RocketLeague/MyProfile"];
+    assert.equal(setup.requiresAuth, true);
+    assert.equal(setup.sidebar, null);
+    assert.equal(setup.sitemap, false);
+    assert.equal(mine.requiresAuth, true);
+    assert.deepEqual(mine.auth, { required: true, provider: "epic", rocketLeague: true });
+    assert.equal(mine.sidebar, "/Framework/Shell/HTML/Sidebar/rl_menu.html");
+    assert.equal(mine.sitemap, false);
+    assert.equal(mine.body, setup.body);
+    assert.equal(mine.module, setup.module);
+
+    const registration = readFileSync(resolve(repoRoot, "public/Tabs/RocketLeague/Registration/JS/index.js"), "utf8");
+    const sidebar = readFileSync(resolve(repoRoot, "public/Framework/Shell/JS/Sidebar/RocketLeague/sidebar_auth.js"), "utf8");
+    const menu = readFileSync(resolve(repoRoot, "public/Framework/Shell/HTML/Sidebar/rl_menu.html"), "utf8");
+    assert.match(registration, /isSetupRoute && profileComplete && rocketLeagueAccess/);
+    assert.match(registration, /isMyProfileRoute && !\(profileComplete && rocketLeagueAccess\)/);
+    assert.match(sidebar, /profileComplete && rocketLeagueAccess/);
+    assert.match(menu, /href="\/RocketLeague\/MyProfile"[\s\S]*?data-rl-access="required"/);
+});
+
 test("generated API inventory is complete, exact-case, and points to real handlers", () => {
     const paths = new Set();
     for (const route of API_ROUTE_INVENTORY) {

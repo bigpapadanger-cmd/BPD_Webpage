@@ -1,11 +1,17 @@
 WORKERS/: INDEPENDENT CLOUDFLARE WORKERS
-Snapshot: 2026-09-28
+Snapshot: 2026-10-02
 
 ROLE
 
 workers/ contains four separately configured Worker deployments. They do not use
 the root Pages wrangler.jsonc at deployment time; each child owns its entrypoint,
 bindings, routes, triggers, and observability settings.
+
+Discord MatchBot runtime status: none of these Workers owns a persistent Discord
+Gateway session or guild registry. MatchBot REST services and signed interaction
+routes currently live under functions/; they are request-driven and do not
+receive Gateway READY/GUILD_CREATE/GUILD_DELETE lifecycle events. A future
+Gateway runtime is only a proposal in _structure_details/system-map.md.
 
 HIERARCHY
 

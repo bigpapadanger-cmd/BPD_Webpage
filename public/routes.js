@@ -218,7 +218,34 @@ export const ROUTES = {
             "/Tabs/RocketLeague/Registration/JS/index.js",
 
         sitemap:
-            true,
+            false,
+
+        requiresAuth:
+            true
+    },
+
+    "/RocketLeague/MyProfile": {
+        auth: { required: true, provider: "epic", rocketLeague: true },
+        title:
+            "My Rocket League Profile | BPD Gaming Network",
+
+        body:
+            "/Tabs/RocketLeague/Registration/HTML/index.html",
+
+        header:
+            "/Framework/Shell/HTML/Header/header.html",
+
+        sidebar:
+            "/Framework/Shell/HTML/Sidebar/rl_menu.html",
+
+        footer:
+            "/Framework/Shell/HTML/Footer/footer.html",
+
+        module:
+            "/Tabs/RocketLeague/Registration/JS/index.js",
+
+        sitemap:
+            false,
 
         requiresAuth:
             true
@@ -1041,6 +1068,9 @@ export const HEADER_MAP = {
         false,
 
     "/RocketLeague/Profile":
+        false,
+
+    "/RocketLeague/MyProfile":
         false,
 
     "/RocketLeague/SubmitMatchResults":

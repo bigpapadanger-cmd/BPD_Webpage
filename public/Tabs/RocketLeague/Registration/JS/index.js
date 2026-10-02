@@ -71,6 +71,8 @@ import {
     getProvider
 } from "../../../../Framework/Auth/auth.js";
 
+import { formatRocketLeagueTimestamp } from "../../shared/profilePresentation.js";
+
 /* =========================================================
 CONFIGURATION
 ========================================================= */
@@ -137,6 +139,9 @@ let currentLocation = {
 let discordNotificationState = {
     checked:
         false,
+
+    status:
+        "checking",
 
     discordLinked:
         false,
@@ -1726,12 +1731,13 @@ function applyDiscordNotificationState() {
             );
     }
 
+    const selectedDiscord = discordInput?.checked === true;
     if (
         discordInput
     ) {
         discordInput.disabled =
             !getNotificationsEnabled()
-            || !state.eligible;
+            || (!state.eligible && !selectedDiscord);
     }
 
     if (
@@ -1748,6 +1754,9 @@ function applyDiscordNotificationState() {
         botRequired.hidden =
             !state.checked
             || !state.discordLinked
+            || !getNotificationsEnabled()
+            || getNotificationMethod() !== "discord"
+            || state.status !== "available"
             || state.matchBotAvailable;
     }
 
@@ -1765,6 +1774,10 @@ function applyDiscordNotificationState() {
             !(
                 state.checked
                 && state.discordLinked
+                && getNotificationsEnabled()
+                && getNotificationMethod() === "discord"
+                && state.status === "available"
+                && state.reason === "MATCHBOT_REQUIRED"
                 && !state.matchBotAvailable
                 && state.installUrl
             );
@@ -1786,10 +1799,17 @@ function applyDiscordNotificationState() {
                 "Discord is not linked to this BPD account.";
         }
         else if (
+            state.status === "unavailable"
+            || state.status === "partial"
+        ) {
+            status.textContent =
+                "Discord availability could not be verified right now. Your profile settings remain available; notification delivery may be delayed until Discord can be checked.";
+        }
+        else if (
             !state.matchBotAvailable
         ) {
             status.textContent =
-                "Your Discord account does not currently share a server with BPD MatchBot.";
+                "MatchBot is no longer available in a Discord server you share. Add MatchBot to a server again to continue using Discord match notifications.";
         }
         else if (
             state.eligible
@@ -1800,25 +1820,6 @@ function applyDiscordNotificationState() {
         else {
             status.textContent =
                 "Discord notifications are currently unavailable.";
-        }
-    }
-
-    if (
-        getNotificationMethod() ===
-            "discord"
-        && !state.eligible
-    ) {
-        const emailInput =
-            document.getElementById(
-                "notificationMethodEmail"
-            );
-
-        if (
-            emailInput
-            && !emailInput.disabled
-        ) {
-            emailInput.checked =
-                true;
         }
     }
 
@@ -1859,6 +1860,11 @@ async function checkDiscordNotificationEligibility() {
         discordNotificationState = {
             checked:
                 true,
+
+            status:
+                response.ok && result?.success === true
+                    ? normalizeString(result?.status) || "available"
+                    : "unavailable",
 
             discordLinked:
                 result?.discordLinked ===
@@ -1903,6 +1909,9 @@ async function checkDiscordNotificationEligibility() {
         discordNotificationState = {
             checked:
                 true,
+
+            status:
+                "unavailable",
 
             discordLinked:
                 false,
@@ -2076,8 +2085,74 @@ function normalizeProfile(
             || profile.profileComplete === true
             || profile.profile_complete === true,
 
+        provider: normalizeObject(profile.provider),
+        stats: normalizeObject(profile.stats),
+        ranks: normalizeObject(profile.ranks),
+        latestMmr: normalizeObject(result?.latestMmr),
+
         settings
     };
+}
+
+function renderMyProfileReadOnlyData(profile) {
+    const section = document.getElementById("rlMyProfileReadOnlyData");
+    const providerName = document.getElementById("rlMyProfileProviderName");
+    const providerFreshness = document.getElementById("rlMyProfileProviderUpdated");
+    const ranksGrid = document.getElementById("rlMyProfileRanks");
+    const mmrFreshness = document.getElementById("rlMyProfileMmrUpdated");
+    const careerGrid = document.getElementById("rlMyProfileCareerStats");
+    const careerFreshness = document.getElementById("rlMyProfileCareerUpdated");
+    if (!section || !providerName || !ranksGrid || !careerGrid) return;
+
+    const provider = normalizeObject(profile?.provider);
+    providerName.textContent = normalizeString(provider.displayUsername) || "Not available";
+    const providerTime = formatRocketLeagueTimestamp(provider.providerUpdatedAt || provider.capturedAt);
+    providerFreshness.textContent = providerTime ? `Provider data updated ${providerTime}` : "";
+    providerFreshness.hidden = !providerTime;
+
+    const latestMmr = normalizeObject(profile?.latestMmr);
+    const currentRanks = normalizeObject(profile?.ranks?.current);
+    const rankData = latestMmr.available === true ? latestMmr : currentRanks;
+    ranksGrid.replaceChildren();
+    for (const [key, label] of [["ones", "1v1"], ["twos", "2v2"], ["threes", "3v3"]]) {
+        const rank = normalizeObject(rankData[key]);
+        const tierValue = rank.tier?.label || rank.tier?.name || rank.tier;
+        const tier = normalizeString(tierValue);
+        const mmr = Number.isSafeInteger(rank.mmr) && rank.mmr >= 0 ? rank.mmr : null;
+        const value = tier
+            ? `${tier}${mmr === null ? "" : ` · ${mmr.toLocaleString()} MMR`}`
+            : mmr === null ? "—" : `${mmr.toLocaleString()} MMR`;
+        const item = document.createElement("div");
+        item.className = "rl-profile-rank-item";
+        const name = document.createElement("span");
+        name.textContent = label;
+        const total = document.createElement("strong");
+        total.textContent = value;
+        item.append(name, total);
+        ranksGrid.append(item);
+    }
+
+    const mmrTime = formatRocketLeagueTimestamp(latestMmr.capturedAt || currentRanks.capturedAt);
+    mmrFreshness.textContent = mmrTime ? `MMR last updated ${mmrTime}` : "";
+    mmrFreshness.hidden = !mmrTime;
+
+    const career = normalizeObject(profile?.stats?.career);
+    careerGrid.replaceChildren();
+    for (const [key, label] of [["wins", "Wins"], ["goals", "Goals"], ["assists", "Assists"], ["saves", "Saves"], ["shots", "Shots"], ["mvps", "MVPs"]]) {
+        const value = career[key];
+        const item = document.createElement("div");
+        item.className = "rl-profile-career-item";
+        const name = document.createElement("span");
+        name.textContent = label;
+        const total = document.createElement("strong");
+        total.textContent = Number.isSafeInteger(value) && value >= 0 ? value.toLocaleString() : "—";
+        item.append(name, total);
+        careerGrid.append(item);
+    }
+    const careerTime = formatRocketLeagueTimestamp(career.capturedAt);
+    careerFreshness.textContent = careerTime ? `Career totals captured ${careerTime}` : "";
+    careerFreshness.hidden = !careerTime;
+    section.hidden = false;
 }
 
 /* =========================================================
@@ -2088,8 +2163,10 @@ function populateProfileForm(
     profile
 ) {
     const settings = profile.settings || profile;
-    missingBooleanSettings = new Set(["autoDetectRegion", "showOnlineStatus", "findProfileEnabled", "notificationsEnabled"])
-        .filter(key => typeof settings[key] !== "boolean");
+    missingBooleanSettings = new Set(
+        ["autoDetectRegion", "showOnlineStatus", "findProfileEnabled", "notificationsEnabled"]
+            .filter(key => typeof settings[key] !== "boolean")
+    );
     setInputValue(
         "epicDisplayName",
         profile.EpicDisplayName
@@ -3313,14 +3390,13 @@ export async function initializePage() {
     LOAD PROFILE + DISCORD STATUS
     ===================================================== */
 
-    const [
-        profileResult
-    ] =
-        await Promise.all([
-            loadRocketLeagueProfile(),
+    const [profileOutcome] = await Promise.allSettled([
+        loadRocketLeagueProfile(),
+        checkDiscordNotificationEligibility()
+    ]);
 
-            checkDiscordNotificationEligibility()
-        ]);
+    if (profileOutcome.status === "rejected") throw profileOutcome.reason;
+    const profileResult = profileOutcome.value;
 
     if (
         !profileResult
@@ -3328,11 +3404,49 @@ export async function initializePage() {
         return;
     }
 
+    const profileComplete = profileResult.profileComplete === true
+        || profileResult.profile?.profileComplete === true;
+    const rocketLeagueAccess = profileResult.rocketLeagueAccess === true;
+    const path = window.location.pathname.replace(/\/+$/u, "").toLowerCase();
+    const isSetupRoute = path === "/rocketleague/profile";
+    const isMyProfileRoute = path === "/rocketleague/myprofile";
+
+    if (isSetupRoute && profileComplete && rocketLeagueAccess) {
+        if (window.BPDRouter?.navigate) {
+            await window.BPDRouter.navigate("/RocketLeague/MyProfile", { replace: true });
+        } else {
+            window.location.replace("/RocketLeague/MyProfile");
+        }
+        return;
+    }
+
+    if (isMyProfileRoute && !(profileComplete && rocketLeagueAccess)) {
+        if (window.BPDRouter?.navigate) {
+            await window.BPDRouter.navigate("/RocketLeague/Profile", { replace: true });
+        } else {
+            window.location.replace("/RocketLeague/Profile");
+        }
+        return;
+    }
+
+    if (isMyProfileRoute) {
+        const intro = document.querySelector(".registration-intro");
+        const eyebrow = intro?.querySelector("[data-copy='eyebrow']");
+        const title = intro?.querySelector("[data-copy='title']");
+        const description = intro?.querySelector("p[data-copy='intro']");
+        if (eyebrow) eyebrow.textContent = "ROCKET LEAGUE SETTINGS";
+        if (title) title.textContent = "My Rocket League Profile";
+        if (description) description.textContent = "Manage your player preferences and notification settings. Provider name, career totals, and competitive ranks are read-only and refresh separately.";
+        const onboardingConsent = document.querySelector(".eligibility-section");
+        if (onboardingConsent) onboardingConsent.hidden = true;
+        renderMyProfileReadOnlyData(profileResult.profile);
+    }
+
     populateProfileForm(
         profileResult.profile
     );
 
-    profileUpdateMode = profileResult.profile?.profileComplete === true;
+    profileUpdateMode = isMyProfileRoute && profileComplete && rocketLeagueAccess;
     const submitButton = document.getElementById("registrationSubmit");
     if (submitButton) submitButton.textContent = profileUpdateMode ? "Update Profile" : "Complete Registration";
     for (const settingName of ["autoDetectRegion", "showOnlineStatus", "findProfileEnabled", "notificationsEnabled"]) {

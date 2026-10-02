@@ -120,7 +120,8 @@ Main/global routes
 
 Rocket League routes
     /RocketLeague             Tabs/RocketLeague/Index.
-    /RocketLeague/Profile     Tabs/RocketLeague/Registration; completed profiles update saved settings.
+    /RocketLeague/Profile     Tabs/RocketLeague/Registration; onboarding/setup route, redirects established players to MyProfile.
+    /RocketLeague/MyProfile   Tabs/RocketLeague/Registration; authenticated established-player settings and private read-only provider/MMR/stats.
     /RocketLeague/FindPlayers Public opt-in player search through Pages API.
     /RocketLeague/Player      Public-safe profile by public_profile_id; hidden profiles unavailable.
     /RocketLeague/SubmitMatchResults

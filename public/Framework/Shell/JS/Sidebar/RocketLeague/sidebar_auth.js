@@ -165,24 +165,19 @@ authorization.
 function canShowFullRocketLeagueNavigation(
     authSession
 ) {
-    const rocketLeagueAccess =
-        authSession?.rocketLeagueAccess ===
-        true;
-
-    if (
-        rocketLeagueAccess
-    ) {
-        return true;
-    }
-
     const profileComplete =
         authSession?.profileComplete ===
         true;
 
-    if (
-        profileComplete
-        && isRocketLeagueOcrRoute()
-    ) {
+    const rocketLeagueAccess =
+        authSession?.rocketLeagueAccess ===
+        true;
+
+    if (profileComplete && rocketLeagueAccess) {
+        return true;
+    }
+
+    if (profileComplete && isRocketLeagueOcrRoute()) {
         return true;
     }
 

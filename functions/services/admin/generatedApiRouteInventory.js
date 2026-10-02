@@ -229,6 +229,46 @@ export const PAGE_ROUTE_INVENTORY = Object.freeze([
     ]
   },
   {
+    "path": "/RocketLeague/MyProfile",
+    "lookupKey": "/rocketleague/myprofile",
+    "canonicalPath": "/RocketLeague/MyProfile",
+    "routeType": "page",
+    "casePolicy": "human-insensitive",
+    "sourceFiles": [
+      "public/routes.js"
+    ],
+    "handler": "functions/[[path]].js",
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "authRequired": true,
+    "healthStatus": "registered",
+    "deepLinkSupported": true,
+    "targets": [
+      {
+        "path": "/Tabs/RocketLeague/Registration/HTML/index.html",
+        "exists": true
+      },
+      {
+        "path": "/Framework/Shell/HTML/Header/header.html",
+        "exists": true
+      },
+      {
+        "path": "/Framework/Shell/HTML/Sidebar/rl_menu.html",
+        "exists": true
+      },
+      {
+        "path": "/Framework/Shell/HTML/Footer/footer.html",
+        "exists": true
+      },
+      {
+        "path": "/Tabs/RocketLeague/Registration/JS/index.js",
+        "exists": true
+      }
+    ]
+  },
+  {
     "path": "/RocketLeague/FindPlayers",
     "lookupKey": "/rocketleague/findplayers",
     "canonicalPath": "/RocketLeague/FindPlayers",

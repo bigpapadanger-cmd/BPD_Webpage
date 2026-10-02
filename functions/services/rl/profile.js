@@ -570,6 +570,14 @@ function normalizeDatabaseProfile(
             providerUpdatedAt:
                 provider.providerUpdatedAt
                 || provider.provider_updated_at
+                || null,
+            capturedAt:
+                provider.capturedAt
+                || provider.captured_at
+                || null,
+            updatedAt:
+                provider.updatedAt
+                || provider.updated_at
                 || null
         },
 
@@ -1137,6 +1145,17 @@ async function verifyDiscordNotificationAccess(
         }
 
         if (
+            isAuthorizationError(error)
+            && (error.status >= 500 || error.code === "AUTHORIZATION_UNAVAILABLE")
+        ) {
+            return {
+                valid: true,
+                status: "unavailable",
+                reason: error.code || "DISCORD_AUTHORIZATION_UNAVAILABLE"
+            };
+        }
+
+        if (
             isAuthorizationError(
                 error
             )
@@ -1184,6 +1203,15 @@ async function verifyDiscordNotificationAccess(
             env,
             discordUserId
         );
+
+    if (eligibility?.status === "unavailable" || eligibility?.status === "partial") {
+        return {
+            valid: true,
+            status: eligibility.status,
+            reason: eligibility.reason,
+            eligibility
+        };
+    }
 
     if (
         eligibility?.eligible !==

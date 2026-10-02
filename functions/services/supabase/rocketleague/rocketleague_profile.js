@@ -422,9 +422,12 @@ export async function getRocketLeagueProfileByAccountId(
     const careerFields = ["wins", "goals", "assists", "saves", "shots", "mvps"];
     const careerStats = Object.fromEntries(careerFields.map(field => [field, normalizeSafeCount(careerData[field])]));
     careerStats.capturedAt = normalizeTimestamp(careerData.captured_at);
+    careerStats.updatedAt = normalizeTimestamp(careerData.updated_at);
     const provider = {
         displayUsername: normalizeNullableString(providerData.display_username),
-        providerUpdatedAt: normalizeTimestamp(providerData.provider_updated_at)
+        providerUpdatedAt: normalizeTimestamp(providerData.provider_updated_at),
+        capturedAt: normalizeTimestamp(providerData.captured_at),
+        updatedAt: normalizeTimestamp(providerData.updated_at)
     };
     const settings = normalizeProfileSettings(responseData);
 

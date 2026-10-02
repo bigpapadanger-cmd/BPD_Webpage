@@ -117,6 +117,21 @@ function discordNotLinkedResponse(
             reason:
                 "DISCORD_NOT_LINKED",
 
+            status:
+                "not_linked",
+
+            mutualGuildCount:
+                0,
+
+            countComplete:
+                true,
+
+            checkedAt:
+                new Date().toISOString(),
+
+            eligibilityLost:
+                false,
+
             installUrl:
                 getMatchBotInstallUrl(
                     env
@@ -242,6 +257,25 @@ export async function onRequestGet(
 
                 eligible,
 
+                status:
+                    normalizeString(eligibility?.status)
+                    || "available",
+
+                mutualGuildCount:
+                    Number.isSafeInteger(eligibility?.mutualGuildCount)
+                    ? eligibility.mutualGuildCount
+                    : null,
+
+                countComplete:
+                    eligibility?.countComplete === true,
+
+                checkedAt:
+                    normalizeString(eligibility?.checkedAt)
+                    || null,
+
+                eligibilityLost:
+                    eligibility?.eligibilityLost === true,
+
                 reason:
                     normalizeString(
                         eligibility?.reason
@@ -258,9 +292,7 @@ export async function onRequestGet(
                         eligibility
                     ),
 
-                mutualGuild:
-                    eligibility?.mutualGuild
-                    || null
+                mutualGuild: null
             }
         );
     }
@@ -331,28 +363,40 @@ export async function onRequestGet(
         SERVICE FAILURE
         ===================================================== */
 
-        const status =
-            Number.isInteger(
-                error?.status
-            )
-                && error.status >= 400
-                && error.status <= 599
-                    ? error.status
-                    : 500;
-
         return jsonResponse(
             {
-                success:
-                    false,
+                success: true,
+
+                discordLinked: true,
+
+                matchBotAvailable: false,
+
+                eligible: false,
+
+                status: "unavailable",
+
+                mutualGuildCount: null,
+
+                countComplete: false,
+
+                checkedAt: new Date().toISOString(),
+
+                eligibilityLost: false,
 
                 code:
                     error?.code
                     || "DISCORD_NOTIFICATION_CHECK_FAILED",
 
+                reason:
+                    error?.code
+                    || "DISCORD_NOTIFICATION_CHECK_FAILED",
+
                 message:
-                    "Discord notification availability could not be checked."
-            },
-            status
+                    "Discord notification availability could not be checked.",
+
+                installUrl:
+                    getMatchBotInstallUrl(env)
+            }
         );
     }
 }

@@ -11,6 +11,7 @@ import {
 import { getRocketLeagueProfileByAccountId } from "../../functions/services/supabase/rocketleague/rocketleague_profile.js";
 import { saveRocketLeagueProfile } from "../../functions/services/supabase/rocketleague/save_profile.js";
 import { getPublicPresenceLabel, getPublicProfilePageUrl } from "../../public/Tabs/RocketLeague/shared/profileView.js";
+import { formatRocketLeagueTimestamp } from "../../public/Tabs/RocketLeague/shared/profilePresentation.js";
 import { ROUTES } from "../../public/routes.js";
 
 const ENV = {
@@ -84,7 +85,9 @@ test("private profile getter maps persisted provider name and career totals rega
         assert.equal(profile.settings.showOnlineStatus, false);
         assert.deepEqual(profile.provider, {
             displayUsername: "InGamePilot",
-            providerUpdatedAt: "2026-09-30T12:00:00Z"
+            providerUpdatedAt: "2026-09-30T12:00:00Z",
+            capturedAt: "2026-09-30T12:00:00Z",
+            updatedAt: "2026-09-30T12:00:00Z"
         });
         assert.deepEqual(profile.careerStats, {
             wins: 100,
@@ -93,7 +96,8 @@ test("private profile getter maps persisted provider name and career totals rega
             saves: 40,
             shots: 500,
             mvps: 8,
-            capturedAt: "2026-09-29T12:00:00Z"
+            capturedAt: "2026-09-29T12:00:00Z",
+            updatedAt: "2026-09-29T12:00:00Z"
         });
         assert.equal("level" in profile.provider, false);
         assert.equal("xp" in profile.provider, false);
@@ -294,10 +298,26 @@ test("signed-in Rocket League card renders only present safe totals and keeps pr
     assert.match(source, /profile\?\.provider\?\.providerUpdatedAt/);
     assert.match(source, /profile\?\.stats\?\.career\?\.capturedAt/);
     assert.match(source, /renderCareerStats\(\{\}\)/);
-    assert.match(source, /formatMmrTimestamp\(currentRanked\?\.capturedAt\)/);
-    assert.match(source, /weekday: "short"[\s\S]*hourCycle: "h23"/);
+    assert.match(source, /formatRocketLeagueTimestamp\(currentRanked\?\.capturedAt\)/);
+    assert.match(source, /shared\/profilePresentation\.js/);
     assert.match(source, /MMR last updated/);
     assert.doesNotMatch(source, /profile\?\.provider\?\.(?:level|xp|creatorCode)/);
+});
+
+test("MMR timestamp formatter shows weekday/date and 24-hour time, without inventing a missing value", () => {
+    const formatted = formatRocketLeagueTimestamp("2026-10-02T08:05:00Z");
+    assert.match(formatted, /\d{1,2}:\d{2}/);
+    assert.match(formatted, /[A-Za-z]{3}/);
+    assert.equal(formatRocketLeagueTimestamp(null), "");
+    assert.equal(formatRocketLeagueTimestamp("not-a-date"), "");
+});
+
+test("private My Profile read-only fields preserve unknown totals and never expose unsupported provider values", async () => {
+    const source = await readFile(new URL("../../public/Tabs/RocketLeague/Registration/JS/index.js", import.meta.url), "utf8");
+    assert.match(source, /renderMyProfileReadOnlyData\(profileResult\.profile\)/);
+    assert.match(source, /Number\.isSafeInteger\(value\) && value >= 0 \? value\.toLocaleString\(\) : "—"/);
+    assert.match(source, /provider\.displayUsername/);
+    assert.doesNotMatch(source, /provider\.(?:level|xp|creatorCode)/);
 });
 
 test("public profile is unavailable unless Find Profile is explicitly enabled", async () => {

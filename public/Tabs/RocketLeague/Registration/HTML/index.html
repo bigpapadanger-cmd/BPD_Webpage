@@ -66,6 +66,28 @@ Security:
             </p>
         </header>
 
+        <section id="rlMyProfileReadOnlyData" class="rl-profile-readonly" aria-labelledby="rlMyProfileReadOnlyTitle" hidden>
+            <h2 id="rlMyProfileReadOnlyTitle">Rocket League data</h2>
+            <p class="section-description">Provider data and competitive results are read-only here; this page does not trigger a provider refresh.</p>
+            <div class="rl-profile-readonly-grid">
+                <article class="rl-profile-readonly-card">
+                    <h3>Provider profile</h3>
+                    <p id="rlMyProfileProviderName">Not available</p>
+                    <p id="rlMyProfileProviderUpdated" class="rl-profile-readonly-freshness" hidden></p>
+                </article>
+                <article class="rl-profile-readonly-card">
+                    <h3>Competitive ranks</h3>
+                    <div id="rlMyProfileRanks" class="rl-profile-rank-list"></div>
+                    <p id="rlMyProfileMmrUpdated" class="rl-profile-readonly-freshness" hidden></p>
+                </article>
+                <article class="rl-profile-readonly-card">
+                    <h3>Career totals</h3>
+                    <div id="rlMyProfileCareerStats" class="rl-profile-career-list"></div>
+                    <p id="rlMyProfileCareerUpdated" class="rl-profile-readonly-freshness" hidden></p>
+                </article>
+            </div>
+        </section>
+
         <!-- =================================================
         GLOBAL MESSAGE
         ================================================= -->

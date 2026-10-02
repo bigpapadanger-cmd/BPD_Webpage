@@ -1,6 +1,6 @@
 # DomainData System Map
 
-Snapshot: 2026-09-29
+Snapshot: 2026-10-02
 
 ## Runtime overview
 
@@ -29,6 +29,103 @@ admin-only `/api/ocr/debug/mtls-probe` remains a diagnostic-only direct binding
 probe and is not used for normal processing.
 
 ## Rocket League provider data
+
+### Private profile routes and Discord notification eligibility
+
+`/RocketLeague/Profile` is the setup/onboarding route. Once the authenticated
+private profile confirms both completion and Rocket League access, the browser
+replaces the route with `/RocketLeague/MyProfile`. The latter reuses the same
+Registration page controller and private profile RPC, but presents established
+player settings plus read-only provider display name, persisted MMR ranks, and
+available career totals. Unknown numeric totals remain unavailable rather than
+rendering as zero. Normal profile reads remain provider-call-free; no direct
+Supabase table access was added. The established route is auth-gated and
+redirects incomplete/ineligible profiles back to setup.
+
+Discord MatchBot eligibility currently returns a scoped `unavailable` result
+from `functions/services/auth/providers/discord_matchbot/eligibility.js` for
+linked Discord accounts. Static `DISCORD_GUILD_ID(S)` configuration is no
+longer read by that service. The candidate `/users/@me/guilds` route requires a
+user OAuth token with the `guilds` scope; it is not an authoritative bot guild
+inventory and must not be called with `DISCORD_MATCHBOT_TOKEN`. DomainData has
+request-driven MatchBot REST services and signed interaction handlers, but no
+persistent Discord Gateway runtime, lifecycle-event receiver, reconnect owner,
+or authoritative guild-registry writer. Profile reads and settings remain
+usable while this optional check is unavailable. Registration initialization
+isolates the check from profile loading, and the invalid `Set.filter()` call
+was fixed by filtering the array before constructing the set.
+
+#### Confirmed gap and proposed future boundary (not implemented)
+
+The known BPD repositories have no owner for Gateway `READY`, `GUILD_CREATE`,
+`GUILD_DELETE`, reconnect/session state, or startup guild reconciliation. Do not
+simulate these events in Pages Functions. The current integration intentionally
+does not claim mutual-guild eligibility until a persistent runtime is approved
+and exists.
+
+Recommended future owner: a standalone `bpd-matchbot-gateway` container project,
+deployed as a single-instance Google Cloud Run worker pool in the existing
+Google Cloud environment. This workload is continuous background work, needs
+no public HTTP endpoint, and can initiate the Discord Gateway WebSocket
+outbound. Configure exactly one active instance initially; reconnects and
+replayed lifecycle events must be handled idempotently. Cloud Run worker pools
+are intended for continuous background processes and have no load-balanced
+HTTP endpoint; instances must be kept above zero and are restarted periodically,
+so Gateway reconnect plus full startup reconciliation are mandatory. See [Cloud Run worker
+pools](https://docs.cloud.google.com/run/docs/deploy-worker-pools) and [Cloud
+Run resource types](https://docs.cloud.google.com/run/docs/overview/what-is-cloud-run).
+
+Proposed responsibilities and data boundary:
+
+- Gateway container: own the Discord Gateway session; request only the guild
+  lifecycle intent; after a fully ready session, reconcile its complete current
+  guild set, then emit lifecycle events. Keep the bot token in Google Secret
+  Manager. Never write user membership data or hold a copy of Supabase's
+  service-role credential.
+- Durable source of truth: a future Supabase registry table, for example
+  `core.discord_matchbot_guild_registry`, with `guild_id` as the key and only
+  operational fields (`active`, temporary-unavailable state, `joined_at`,
+  `left_at`, `last_seen_at`, `updated_at`, reconciliation/event identifiers).
+  Do not store bot credentials or unnecessary guild/member data. This requires
+  a separately reviewed Supabase migration; none is part of the current work.
+- Write contract: the Gateway calls a new narrowly scoped DomainData Pages
+  ingestion endpoint over HTTPS. Sign method, path, timestamp, event ID, and
+  raw body with a dedicated rotated HMAC secret held in Google Secret Manager
+  and as a Cloudflare Pages secret. Enforce a short clock-skew window,
+  idempotent event IDs, strict Discord snowflake validation, payload limits,
+  and rate limits. Pages validates the signature and writes only through
+  service-side Supabase RPCs under the existing server credential. The Gateway
+  receives no registry read access and no database credential. These endpoint,
+  secret, RPC, and table contracts are proposed only; no binding or secret has
+  been added.
+- Event semantics: `GUILD_CREATE` upserts active; `GUILD_DELETE` with
+  `unavailable=true` marks temporarily unavailable without recording a
+  permanent leave; other deletes mark inactive and set `left_at`. A startup
+  reconcile is accepted only after Gateway READY and complete guild-cache
+  hydration, then atomically marks the supplied set active and stale entries
+  inactive. Serialize reconciliation and event writes by event/reconcile ID.
+- Read contract: the existing authenticated DomainData eligibility service
+  reads only active guild IDs server-side, intersects them with the linked
+  user's current membership using the existing bot member lookup, and returns
+  safe status/count metadata only. A confirmed zero after a complete check may
+  raise the existing eligibility-loss warning; partial REST failures remain
+  unavailable, never “removed.” One surviving mutual guild keeps eligibility.
+- Storage/bindings: the proposed design uses the existing Pages-side
+  `SUPABASE_AUTH` server credential and adds a dedicated Supabase table/RPC
+  contract plus a Cloudflare secret; it needs no new KV binding and does not
+  reuse `AUTH_SESSIONS` or `RL_STATS_CACHE` for guild state. The Cloud Run
+  worker pool has no inbound binding/route. No Guild Members intent or full
+  member mirror is proposed.
+- Rate/scale guard: current membership checks cost up to one Discord REST lookup
+  per active bot guild to compute an exact count. Keep bounded concurrency and
+  shared short-lived caching; if the guild count exceeds a configured safe
+  scan budget, return `partial/unavailable` rather than false ineligibility.
+  A reverse membership index is a later design only if measured traffic or
+  Discord rate limits require it.
+
+The repository inventory in `_folder_structure/folder_organization/04_workers.txt`
+records that no Discord Gateway Worker currently exists. This proposal does
+not establish that an external `bpd-matchbot-gateway` repository already exists.
 
 Authenticated account activity and a successful, complete Rocket League
 registration use the existing MMR refresh flow. Only when that flow completes
