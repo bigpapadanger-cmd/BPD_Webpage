@@ -110,6 +110,9 @@ export const ADMIN_PERMISSIONS =
         MMR_DEPLOY:
             "admin.mmr.deploy",
 
+        RL_FORCE_REFRESH:
+            "admin.rocketleague.force-refresh",
+
         SUGGESTIONS_MANAGE:
             "admin.suggestions.manage"
     });

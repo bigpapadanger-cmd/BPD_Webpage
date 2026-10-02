@@ -1203,6 +1203,22 @@ export const API_ROUTE_INVENTORY = Object.freeze([
     "deepLinkSupported": false
   },
   {
+    "path": "/api/admin/rocketleague/force-refresh",
+    "lookupKey": null,
+    "routeType": "api",
+    "casePolicy": "exact",
+    "sourceFiles": [
+      "functions/api/admin/rocketleague/force-refresh.js"
+    ],
+    "handler": "functions/api/admin/rocketleague/force-refresh.js",
+    "methods": [
+      "POST"
+    ],
+    "authRequired": "handler-defined",
+    "healthStatus": "valid",
+    "deepLinkSupported": false
+  },
+  {
     "path": "/api/admin/suggestions/:suggestionId/review",
     "lookupKey": null,
     "routeType": "api",

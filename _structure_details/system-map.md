@@ -52,6 +52,21 @@ call its persistence RPC; historical rows are retained. `SUPABASE_AUTH` and
 MMR / Skills, display-name Player Profile, and Player Stats active; XP /
 Progression and Match History are not represented as supported.
 
+Admin-only force refresh is available from `/Admin/WorkerStatus`. It accepts a
+BPD account UUID, then the existing server-side refresh state and authorization
+services resolve/check the active account, Rocket League player, linked Epic
+identity, and fresh Epic authorization. The action runs MMR / Skills and
+provider profile/stats independently, bypassing only the normal BPD freshness
+gates. It does not call Match History, alter editable profile settings, or
+bypass MMR Worker rate limits. Same-isolate concurrent requests for one account
+share an in-flight operation; this is not a cross-isolate distributed lock.
+
+Private profile reads now carry a normalized `settings` object alongside legacy
+flat fields for compatibility. A single server-side allow-list maps those
+editable settings into the private profile response and the explicit save-RPC
+arguments. Provider identity, MMR, and career stats remain outside that
+allow-list and the profile form payload. Profile GET remains provider-call-free.
+
 ## Configuration ownership
 
 - Root `wrangler.jsonc` owns Pages bindings, including

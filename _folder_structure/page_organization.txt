@@ -120,7 +120,7 @@ Main/global routes
 
 Rocket League routes
     /RocketLeague             Tabs/RocketLeague/Index.
-    /RocketLeague/Profile     Tabs/RocketLeague/Registration.
+    /RocketLeague/Profile     Tabs/RocketLeague/Registration; completed profiles update saved settings.
     /RocketLeague/FindPlayers Public opt-in player search through Pages API.
     /RocketLeague/Player      Public-safe profile by public_profile_id; hidden profiles unavailable.
     /RocketLeague/SubmitMatchResults
@@ -143,9 +143,10 @@ Other game routes
 Administration routes
     /Admin                    Global/Admin/Home.
     /Admin/Taskboard          Global/Admin/TaskBoard and its multi-view modules.
-    /Admin/WorkerStatus       Permission-gated diagnostics and Rocket League registry; MMR / Skills, display-name Profile, and Player Stats are active; XP / Progression and Match History are inactive/unsupported.
+    /Admin/WorkerStatus       Permission-gated diagnostics and Rocket League registry; Admin-only Force Rocket League Refresh; MMR / Skills, display-name Profile, and Player Stats are active; XP / Progression and Match History are inactive/unsupported.
         /api/admin/system-status/mmr-deploy
             Dedicated fixed-target MMR production workflow dispatch/status.
+        /api/admin/rocketleague/force-refresh (admin.rocketleague.force-refresh)
     /Admin/PageSettings       Compatibility alias for the unified System Status page.
     /Admin/SuggestionReview   Pending suggestion moderation; admins and moderators only.
 

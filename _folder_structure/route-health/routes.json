@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-02T02:50:35.900Z",
+  "generatedAt": "2026-10-02T12:18:39.719Z",
   "policy": {
     "humanPagePaths": "case-insensitive lookup; canonical TitleCase path",
     "apiAndAssetPaths": "exact-case; never normalized by the human-page router",
@@ -1203,6 +1203,22 @@
       "handler": "functions/api/admin/page-settings/route-health.js",
       "methods": [
         "GET"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/admin/rocketleague/force-refresh",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/admin/rocketleague/force-refresh.js"
+      ],
+      "handler": "functions/api/admin/rocketleague/force-refresh.js",
+      "methods": [
+        "POST"
       ],
       "authRequired": "handler-defined",
       "healthStatus": "valid",

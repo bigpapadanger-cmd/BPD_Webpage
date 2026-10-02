@@ -37,6 +37,7 @@ functions/
 |   +-- rocketleague/players/search.js, players/profile/[publicProfileId].js
 |   +-- admin/page-settings/route-health.js, system-status.js, suggestions/index.js
 |   |   +-- suggestions/[suggestionId]/review.js
+|   +-- admin/rocketleague/force-refresh.js
 |   +-- curseforge/mods.js
 |   +-- suggestions/index.js, [suggestionId]/vote.js
 |   +-- health/apihealth.js
@@ -79,7 +80,7 @@ functions/
     |   +-- confirm.js, handler.js, localize.js, storage.js
     |   +-- storeMatch.js, training.js, trainingCandidates.js, trainingStorage.js
     +-- rl/
-    |   +-- authorization.js, profile.js, session.js
+    |   +-- authorization.js, profile.js, profile_settings.js, admin_force_refresh.js, session.js
     |   +-- presence/fetch_presence.js, wake_monitor.js
     |   +-- provider_data/refresh.js        Gated MMR Worker capability fetch and server-side persistence.
     |   +-- stats/

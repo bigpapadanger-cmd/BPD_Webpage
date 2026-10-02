@@ -79,6 +79,8 @@ const REGISTRATION_DRAFT_KEY =
     "bpdRocketLeagueRegistrationDraft";
 
 let registrationDraftAccountId = "";
+let profileUpdateMode = false;
+let missingBooleanSettings = new Set();
 
 function getRegistrationDraftKey() {
     return registrationDraftAccountId
@@ -1958,17 +1960,21 @@ function normalizeProfile(
             result?.user
             || authUser
         );
+    const settings = normalizeObject(profile.settings);
+    const setting = (key, legacyKey = key) => Object.prototype.hasOwnProperty.call(settings, key)
+        ? settings[key]
+        : profile[legacyKey];
 
     /*
      * Normal profile loading must use only previously stored
      * profile location data. Top-level request location is
      * reserved for the explicit detectLocation=true request.
      */
-    const location =
-        normalizeLocation(
-            {},
-            profile
-        );
+    const location = normalizeLocation({}, { location: {
+        region: setting("region"),
+        countryCode: setting("countryCode"),
+        timezone: setting("displayTimezone")
+    } });
 
     return {
         EpicUniqueId:
@@ -1995,37 +2001,30 @@ function normalizeProfile(
 
         email:
             normalizeString(
-                profile.email
+                setting("email")
             ),
 
         phone:
             normalizeString(
-                profile.phone
+                setting("phone")
             ),
 
         preferredMode:
             normalizeString(
-                profile.preferredMode
-                || profile.preferred_mode
+                setting("preferredMode")
             ),
 
         otherMode:
             normalizeString(
-                profile.otherMode
-                || profile.other_mode
+                setting("otherMode")
             ),
 
         autoDetectRegion:
-            profile.autoDetectRegion ===
-                true
-            || profile.auto_detect_region ===
-                true,
+            setting("autoDetectRegion", "autoDetectRegion") === true,
 
         timezone:
             normalizeString(
-                profile.timezone
-                || profile.displayTimezone
-                || profile.display_timezone
+                setting("displayTimezone")
                 || location.timezone
             ),
 
@@ -2033,43 +2032,31 @@ function normalizeProfile(
 
         availability:
             Array.isArray(
-                profile.availability
+                setting("availability")
             )
-                ? profile.availability
+                ? setting("availability")
                 : [],
 
         showOnlineStatus:
-            profile.showOnlineStatus ===
-                true
-            || profile.show_online_status ===
-                true,
+            setting("showOnlineStatus") === true,
 
         findProfileEnabled:
-            profile.findProfileEnabled ===
-                true
-            || profile.find_profile_enabled ===
-                true,
+            typeof setting("findProfileEnabled", "find_profile_enabled") === "boolean"
+                ? setting("findProfileEnabled", "find_profile_enabled")
+                : null,
 
         notificationsEnabled:
-            profile.notificationsEnabled !==
-                false
-            && profile.notifications_enabled !==
-                false,
+            typeof setting("notificationsEnabled") === "boolean" ? setting("notificationsEnabled") : null,
 
         notificationMethod:
             normalizeString(
-                profile.notificationMethod
-                || profile.notification_method
+                setting("notificationMethod")
             ),
 
         reminderMode:
             normalizeString(
-                profile.reminderMode
-                || profile.reminder_mode
-                || profile.reminderTiming
-                || profile.reminder_timing
-            )
-            || "24-hours",
+                setting("reminderMode")
+            ),
 
         ageConsent:
             profile.ageConsent ===
@@ -2086,10 +2073,10 @@ function normalizeProfile(
         profileComplete:
             result?.profileComplete ===
                 true
-            || profile.profileComplete ===
-                true
-            || profile.profile_complete ===
-                true
+            || profile.profileComplete === true
+            || profile.profile_complete === true,
+
+        settings
     };
 }
 
@@ -2100,6 +2087,9 @@ POPULATE PROFILE
 function populateProfileForm(
     profile
 ) {
+    const settings = profile.settings || profile;
+    missingBooleanSettings = new Set(["autoDetectRegion", "showOnlineStatus", "findProfileEnabled", "notificationsEnabled"])
+        .filter(key => typeof settings[key] !== "boolean");
     setInputValue(
         "epicDisplayName",
         profile.EpicDisplayName
@@ -2126,85 +2116,63 @@ function populateProfileForm(
         profile.policyConsent
     );
 
-    /*
-     * Region detection is session-explicit.
-     *
-     * Even if a previous profile had automatic detection
-     * enabled, loading this registration page does not treat
-     * that old setting as permission to perform another
-     * location lookup.
-     *
-     * The user must explicitly check the box during the
-     * current page session.
-     */
-    setCheckboxValue(
-        "autoDetectRegion",
-        false
-    );
+    if (typeof settings.autoDetectRegion === "boolean") setCheckboxValue("autoDetectRegion", settings.autoDetectRegion);
 
     clearDetectedRegion();
+    if (settings.autoDetectRegion === true && hasLocationData(profile.location)) {
+        applyLocation(profile.location);
+        applyTimezone(settings.displayTimezone);
+        setDetectedRegionFieldsVisible(true);
+    }
 
     setInputValue(
         "email",
-        profile.email
+        settings.email
     );
 
     setInputValue(
         "phone",
-        profile.phone
+        settings.phone
     );
 
     if (
-        profile.preferredMode
+        settings.preferredMode
     ) {
         setRadioValue(
             "preferredMode",
-            profile.preferredMode
+            settings.preferredMode
         );
     }
 
     setInputValue(
         "otherMode",
-        profile.otherMode
+        settings.otherMode
     );
 
-    setCheckboxValue(
-        "showOnlineStatus",
-        profile.showOnlineStatus
-    );
+    if (typeof settings.showOnlineStatus === "boolean") setCheckboxValue("showOnlineStatus", settings.showOnlineStatus);
 
-    setCheckboxValue(
-        "findProfileEnabled",
-        profile.findProfileEnabled
-    );
+    if (typeof settings.findProfileEnabled === "boolean") setCheckboxValue("findProfileEnabled", settings.findProfileEnabled);
 
-    setRadioValue(
-        "notificationsEnabled",
-        profile.notificationsEnabled
-            ? "true"
-            : "false"
-    );
+    if (typeof settings.notificationsEnabled === "boolean") setRadioValue("notificationsEnabled", settings.notificationsEnabled ? "true" : "false");
 
-    notificationsOptOutConfirmed =
-        profile.notificationsEnabled ===
-        false;
+    notificationsOptOutConfirmed = settings.notificationsEnabled === false;
 
     if (
-        profile.notificationMethod
+        settings.notificationMethod
     ) {
         setRadioValue(
             "notificationMethod",
-            profile.notificationMethod
+            settings.notificationMethod
         );
     }
 
     setRadioValue(
         "reminderMode",
-        profile.reminderMode
+        settings.reminderMode
     );
 
     populateAvailability(
-        profile.availability
+        settings.availability
     );
 
     updateModeField();
@@ -2736,14 +2704,7 @@ function buildRegistrationPayload(
 
         reminderMode:
             notificationsEnabled
-                ? (
-                    normalizeString(
-                        data.get(
-                            "reminderMode"
-                        )
-                    )
-                    || "24-hours"
-                )
+                ? normalizeString(data.get("reminderMode"))
                 : null
     };
 }
@@ -2912,6 +2873,11 @@ async function submitRegistration(
         return;
     }
 
+    if (profileUpdateMode && missingBooleanSettings.size) {
+        showMessage(`One or more saved settings could not be loaded (${[...missingBooleanSettings].join(", ")}). Choose each setting before saving so an unknown value is not overwritten.`, "error");
+        return;
+    }
+
     const payload =
         buildRegistrationPayload(
             form
@@ -3051,14 +3017,13 @@ async function submitRegistration(
         );
 
         showMessage(
-            "Rocket League registration completed. Redirecting…",
+            profileUpdateMode ? "Rocket League profile settings updated." : "Rocket League registration completed. Redirecting…",
             "success"
         );
 
-        window.location.replace(
-            result.redirectTo
-            || "/RocketLeague"
-        );
+        if (!profileUpdateMode) {
+            window.location.replace(result.redirectTo || "/RocketLeague");
+        }
     }
     catch (
         error
@@ -3089,7 +3054,7 @@ async function submitRegistration(
                 false;
 
             submitButton.textContent =
-                "Complete Registration";
+                profileUpdateMode ? "Update Profile" : "Complete Registration";
         }
     }
 }
@@ -3366,6 +3331,13 @@ export async function initializePage() {
     populateProfileForm(
         profileResult.profile
     );
+
+    profileUpdateMode = profileResult.profile?.profileComplete === true;
+    const submitButton = document.getElementById("registrationSubmit");
+    if (submitButton) submitButton.textContent = profileUpdateMode ? "Update Profile" : "Complete Registration";
+    for (const settingName of ["autoDetectRegion", "showOnlineStatus", "findProfileEnabled", "notificationsEnabled"]) {
+        form.querySelectorAll(`[name="${settingName}"]`).forEach(control => control.addEventListener("change", () => missingBooleanSettings.delete(settingName)));
+    }
 
     if (
         profileResult.profileLoaded ===

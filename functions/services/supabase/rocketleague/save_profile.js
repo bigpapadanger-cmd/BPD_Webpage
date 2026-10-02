@@ -1,5 +1,7 @@
 "use strict";
 
+import { mapProfileSettingsToRpcArgs } from "../../rl/profile_settings.js";
+
 /* =========================================================
 BPD GAMING NETWORK
 ROCKET LEAGUE PROFILE SAVE CLIENT
@@ -422,6 +424,21 @@ export async function saveRocketLeagueProfile(
             )
             : null;
 
+    const rpcSettings = mapProfileSettingsToRpcArgs({
+        ...registration,
+        autoDetectRegion,
+        region,
+        countryCode,
+        displayTimezone,
+        preferredMode,
+        otherMode,
+        location: null,
+        notificationsEnabled,
+        notificationMethod,
+        reminderMode,
+        availability: registration.availability
+    });
+
     const payload = {
         s_account_id:
             normalizedAccountId,
@@ -436,61 +453,7 @@ export async function saveRocketLeagueProfile(
         s_policy_consent:
             true,
 
-        s_auto_detect_region:
-            autoDetectRegion,
-
-        /*
-         * These become null whenever automatic region
-         * detection is disabled.
-         */
-        s_region:
-            region,
-
-        s_country_code:
-            countryCode,
-
-        s_display_timezone:
-            displayTimezone,
-
-        s_show_online_status:
-            registration.showOnlineStatus ===
-            true,
-
-        s_email_address:
-            normalizeNullableString(
-                registration.email
-            ),
-
-        s_phone_number:
-            normalizeNullableString(
-                registration.phone
-            ),
-
-        s_preferred_mode:
-            preferredMode,
-
-        s_other_mode:
-            otherMode,
-
-        s_availability:
-            Array.isArray(
-                registration.availability
-            )
-                ? registration.availability
-                : [],
-
-        s_notifications_enabled:
-            notificationsEnabled,
-
-        s_notification_method:
-            notificationMethod,
-
-        s_reminder_mode:
-            reminderMode,
-
-        s_find_profile_enabled:
-            registration.findProfileEnabled ===
-            true
+        ...rpcSettings
     };
 
     const url =

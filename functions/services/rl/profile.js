@@ -119,6 +119,7 @@ import {
 import {
     getDiscordMatchBotEligibility
 } from "../auth/providers/discord_matchbot/eligibility.js";
+import { normalizeProfileSettings } from "./profile_settings.js";
 
 /* =========================================================
 CONSTANTS
@@ -409,6 +410,7 @@ function normalizeDatabaseProfile(
         );
     const provider = normalizeObject(databaseProfile.provider);
     const careerStats = normalizeObject(databaseProfile.careerStats);
+    const settings = normalizeProfileSettings(databaseProfile);
 
     return {
         accountId,
@@ -473,106 +475,66 @@ function normalizeDatabaseProfile(
                 true,
 
         autoDetectRegion:
-            databaseProfile
-                .autoDetectRegion ===
-                true
-            || databaseProfile
-                .auto_detect_region ===
-                true,
+            settings.autoDetectRegion === true,
 
-        location:
-            normalizeObject(
-                databaseProfile.location
-            ),
+        location: {
+            region: settings.region ?? "",
+            countryCode: settings.countryCode ?? "",
+            timezone: settings.displayTimezone ?? ""
+        },
 
         timezone:
-            normalizeString(
-                databaseProfile
-                    .displayTimezone
-                || databaseProfile
-                    .display_timezone
-                || databaseProfile
-                    .timezone
-            ),
+            settings.displayTimezone ?? "",
 
         showOnlineStatus:
-            databaseProfile
-                .showOnlineStatus ===
-                true
-            || databaseProfile
-                .show_online_status ===
-                true,
+            settings.showOnlineStatus === true,
 
         findProfileEnabled:
-            databaseProfile
-                .findProfileEnabled ===
-                true
-            || databaseProfile
-                .find_profile_enabled ===
-                true,
+            settings.findProfileEnabled,
 
         email:
             normalizeString(
-                databaseProfile.email,
+                settings.email,
                 254
             ),
 
         phone:
             normalizeString(
-                databaseProfile.phone,
+                settings.phone,
                 24
             ),
 
         preferredMode:
             normalizeString(
-                databaseProfile
-                    .preferredMode
-                || databaseProfile
-                    .preferred_mode,
+                settings.preferredMode,
                 20
             ),
 
         otherMode:
             normalizeString(
-                databaseProfile
-                    .otherMode
-                || databaseProfile
-                    .other_mode,
+                settings.otherMode,
                 50
             ),
 
         availability:
             Array.isArray(
-                databaseProfile
-                    .availability
+                settings.availability
             )
-                ? databaseProfile
-                    .availability
+                ? settings.availability
                 : [],
 
         notificationsEnabled:
-            databaseProfile
-                .notificationsEnabled ===
-                true
-            || databaseProfile
-                .notifications_enabled ===
-                true,
+            settings.notificationsEnabled === true,
 
         notificationMethod:
             normalizeNullableString(
-                databaseProfile
-                    .notificationMethod
-                || databaseProfile
-                    .notification_method,
+                settings.notificationMethod,
                 20
             ),
 
         reminderMode:
             normalizeNullableString(
-                databaseProfile
-                    .reminderMode
-                || databaseProfile
-                    .reminder_mode,
+                settings.reminderMode,
                 30
             ),
 
@@ -622,7 +584,9 @@ function normalizeDatabaseProfile(
                 ...careerStats,
                 capturedAt: careerStats.capturedAt || careerStats.captured_at || null
             }
-        }
+        },
+
+        settings
     };
 }
 
@@ -751,7 +715,23 @@ function buildFallbackProfile(
         provider: {
             displayUsername: null,
             providerUpdatedAt: null
-        }
+        },
+        settings: normalizeProfileSettings({
+            autoDetectRegion: false,
+            region: null,
+            countryCode: null,
+            displayTimezone: null,
+            preferredMode: "",
+            otherMode: "",
+            showOnlineStatus: false,
+            findProfileEnabled: false,
+            email: "",
+            phone: "",
+            availability: [],
+            notificationsEnabled: true,
+            notificationMethod: null,
+            reminderMode: "24-hours"
+        })
     };
 }
 
@@ -950,8 +930,7 @@ function normalizeRegistrationPayload(
         reminderMode:
             notificationsEnabled
                 ? normalizeString(
-                    body?.reminderMode
-                    || "24-hours",
+                    body?.reminderMode,
                     30
                 )
                     .toLowerCase()

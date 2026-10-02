@@ -1,5 +1,7 @@
 "use strict";
 
+import { normalizeProfileSettings } from "../../rl/profile_settings.js";
+
 /* =========================================================
 BPD GAMING NETWORK
 ROCKET LEAGUE PROFILE LOOKUP
@@ -424,6 +426,7 @@ export async function getRocketLeagueProfileByAccountId(
         displayUsername: normalizeNullableString(providerData.display_username),
         providerUpdatedAt: normalizeTimestamp(providerData.provider_updated_at)
     };
+    const settings = normalizeProfileSettings(responseData);
 
     /* =====================================================
     NORMALIZED PROFILE
@@ -519,8 +522,7 @@ export async function getRocketLeagueProfileByAccountId(
             ),
 
         findProfileEnabled:
-            responseData.find_profile_enabled ===
-            true,
+            settings.findProfileEnabled,
 
         showOnlineStatus:
             responseData.show_online_status ===
@@ -585,6 +587,8 @@ export async function getRocketLeagueProfileByAccountId(
         stats: {
             ranked:
                 currentRanked
-        }
+        },
+
+        settings
     };
 }

@@ -199,6 +199,30 @@ function formatProfileTimestamp(value) {
     return Number.isFinite(date.getTime()) ? date.toLocaleString() : "";
 }
 
+function formatMmrTimestamp(value) {
+    if (typeof value !== "string" || !value.trim()) return "";
+    const date = new Date(value);
+    if (!Number.isFinite(date.getTime())) return "";
+
+    return new Intl.DateTimeFormat(undefined, {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        hourCycle: "h23"
+    }).format(date);
+}
+
+function renderMmrFreshness(currentRanked) {
+    const freshness = document.getElementById("rocketLeagueMmrFreshness");
+    if (!freshness) return;
+
+    const capturedAt = formatMmrTimestamp(currentRanked?.capturedAt);
+    freshness.textContent = capturedAt ? `MMR last updated ${capturedAt}` : "";
+    freshness.hidden = !capturedAt;
+}
+
 function renderCareerStats(profile) {
     const section = document.getElementById("rocketLeagueCareerStats");
     const grid = document.getElementById("rocketLeagueCareerStatsGrid");
@@ -444,6 +468,8 @@ function renderRocketLeagueProfile(
             profile
         );
 
+    renderMmrFreshness(currentRanked);
+
     applyRankDatasets(
         inputRanked,
         currentRanked
@@ -487,6 +513,7 @@ function resetProfileDisplay(
 ) {
     renderProviderDisplayName({}, "");
     renderCareerStats({});
+    renderMmrFreshness({});
     document.body.dataset.rlInputRankAvailable =
         "false";
 
@@ -542,6 +569,7 @@ function createMissingProfileResult(
 ) {
     renderProviderDisplayName({}, "");
     renderCareerStats({});
+    renderMmrFreshness({});
     setProfileWarning(
         false
     );
@@ -660,6 +688,7 @@ LOAD ROCKET LEAGUE PROFILE
 export async function loadRocketLeagueProfile(
     authUser
 ) {
+    renderMmrFreshness({});
     setPlayerName(
         ""
     );

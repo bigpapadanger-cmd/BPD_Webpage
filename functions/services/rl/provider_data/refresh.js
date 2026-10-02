@@ -106,7 +106,11 @@ export async function persistProviderCapabilities(env, accountId, capabilities) 
                     p_creator_code: data.creator_code,
                     p_provider_updated_at: data.provider_updated_at
                 });
-                results.profile = { status: "persisted" };
+                results.profile = {
+                    status: "persisted",
+                    capturedAt: typeof profile.captured_at === "string" ? profile.captured_at : null,
+                    providerUpdatedAt: data.provider_updated_at
+                };
             } catch {
                 results.profile = { status: "persistence_failed" };
             }
@@ -132,7 +136,7 @@ export async function persistProviderCapabilities(env, accountId, capabilities) 
                     p_mvps: data.mvps,
                     p_captured_at: typeof stats.captured_at === "string" ? stats.captured_at : null
                 });
-                results.stats = { status: "persisted" };
+                results.stats = { status: "persisted", capturedAt: typeof stats.captured_at === "string" ? stats.captured_at : null };
             } catch {
                 results.stats = { status: "persistence_failed" };
             }
@@ -155,6 +159,18 @@ async function refreshProviderData(env, accountId) {
     const capabilities = await fetchProviderCapabilities(env, state.epicAccountId);
     const persisted = await persistProviderCapabilities(env, accountId, capabilities);
     return { refreshed: true, persisted };
+}
+
+// Admin-triggered refresh shares the exact authorization, Worker, and persistence
+// path, but deliberately does not consult or mutate the normal freshness gate.
+export async function refreshProviderDataForced(env, accountId) {
+    const normalizedAccountId = cleanString(accountId);
+    if (!normalizedAccountId) return { refreshed: false, reason: "ACCOUNT_ID_REQUIRED" };
+    const key = `rl-provider-data-refresh:${normalizedAccountId}`;
+    if (inFlight.has(key)) return inFlight.get(key);
+    const task = refreshProviderData(env, normalizedAccountId).finally(() => inFlight.delete(key));
+    inFlight.set(key, task);
+    return task;
 }
 
 export async function refreshProviderDataWithGate(env, accountId, mmrRefresh) {

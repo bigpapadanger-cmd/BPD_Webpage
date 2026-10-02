@@ -6,9 +6,12 @@ import { ROCKET_LEAGUE_CAPABILITIES, ROCKET_LEAGUE_CAPABILITY_CATEGORIES } from 
 
 const REQUIRED_PERMISSION = "admin.settings.manage";
 const DEPLOY_PERMISSION = "admin.mmr.deploy";
+const RL_FORCE_REFRESH_PERMISSION = "admin.rocketleague.force-refresh";
 let requestInFlight = null;
 let actionInFlight = false;
 let canDeployMmr = false;
+let canForceRocketLeagueRefresh = false;
+let forceRefreshInFlight = false;
 let deploymentPollTimer = null;
 let lastDeploymentState = null;
 let operationPollTimer = null;
@@ -249,6 +252,51 @@ function readableTime(value) {
     if (!value) return null;
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString();
+}
+
+function renderForceRefreshResults(result) {
+    const list = document.getElementById("rlForceRefreshResults");
+    if (!list) return;
+    const labels = { skills: "MMR / Skills", profile: "Player Profile", stats: "Career Stats", history: "Match History" };
+    const capabilities = result?.capabilities || {};
+    list.replaceChildren(...Object.entries(labels).map(([key, label]) => {
+        const item = document.createElement("li");
+        const capability = capabilities[key] || { status: "unknown" };
+        const detail = [capability.status || "unknown", capability.capturedAt ? `captured ${readableTime(capability.capturedAt)}` : null, capability.reason ? `(${capability.reason})` : null].filter(Boolean).join(" · ");
+        item.append(textElement("strong", label), textElement("span", detail));
+        return item;
+    }));
+}
+
+async function forceRocketLeagueRefresh(event) {
+    event.preventDefault();
+    if (!canForceRocketLeagueRefresh || forceRefreshInFlight) return;
+    const form = event.currentTarget;
+    const accountId = String(form.elements.accountId.value || "").trim();
+    if (!form.reportValidity() || !window.confirm(`Refresh Rocket League data for BPD account ${accountId}? This calls the MMR Worker and may make six provider requests for career stats.`)) return;
+    const button = document.getElementById("rlForceRefreshButton");
+    const message = document.getElementById("rlForceRefreshMessage");
+    forceRefreshInFlight = true;
+    button.disabled = true;
+    button.textContent = "Refreshing…";
+    message.textContent = "Running one server-side refresh. This can take a short while…";
+    try {
+        const response = await fetch("/api/admin/rocketleague/force-refresh", {
+            method: "POST", credentials: "same-origin", cache: "no-store",
+            headers: { "Content-Type": "application/json", Accept: "application/json" },
+            body: JSON.stringify({ accountId, confirm: true })
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.error || "RL_FORCE_REFRESH_FAILED");
+        renderForceRefreshResults(result);
+        message.textContent = result.success ? `Refresh finished for BPD account ${accountId}. Review each capability result below.` : `Refresh finished for BPD account ${accountId} without a capability update. Review individual results below.`;
+    } catch (error) {
+        message.textContent = `Refresh could not complete (${/^[A-Z0-9_]{3,80}$/.test(error.message) ? error.message : "RL_FORCE_REFRESH_FAILED"}).`;
+    } finally {
+        forceRefreshInFlight = false;
+        button.disabled = false;
+        button.textContent = "Force Rocket League Refresh";
+    }
 }
 
 function renderRocketLeagueCapabilities(services) {
@@ -545,6 +593,10 @@ export async function initializePage() {
         const auth = await getAuthState({ force: true });
         if (!hasAdminPermission(REQUIRED_PERMISSION, auth)) { message.textContent = "You do not have permission to view worker status."; return; }
         canDeployMmr = hasAdminPermission(DEPLOY_PERMISSION, auth);
+        canForceRocketLeagueRefresh = hasAdminPermission(RL_FORCE_REFRESH_PERMISSION, auth);
+        const forceRefreshPanel = document.getElementById("rocketLeagueForceRefresh");
+        if (forceRefreshPanel) forceRefreshPanel.hidden = !canForceRocketLeagueRefresh;
+        if (canForceRocketLeagueRefresh) document.getElementById("rlForceRefreshForm")?.addEventListener("submit", forceRocketLeagueRefresh);
         refresh.disabled = false;
         refresh.addEventListener("click", () => {
             message.textContent = "Refreshing status…";

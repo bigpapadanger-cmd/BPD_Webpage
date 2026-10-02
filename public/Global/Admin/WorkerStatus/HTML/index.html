@@ -17,6 +17,17 @@
         </header>
         <div id="rocketLeagueCapabilities" class="rocket-capability-categories"></div>
     </section>
+    <section id="rocketLeagueForceRefresh" class="rl-force-refresh" aria-labelledby="rlForceRefreshTitle" hidden>
+        <h2 id="rlForceRefreshTitle">Force Rocket League Refresh</h2>
+        <p>Refresh MMR / Skills, provider display name, and complete career stats for one active account. This makes provider requests and still respects upstream protection.</p>
+        <form id="rlForceRefreshForm" class="rl-force-refresh-form">
+            <label for="rlForceRefreshAccountId">BPD account UUID</label>
+            <input id="rlForceRefreshAccountId" name="accountId" type="text" autocomplete="off" inputmode="text" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" required pattern="[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}">
+            <button id="rlForceRefreshButton" type="submit">Force Rocket League Refresh</button>
+        </form>
+        <p id="rlForceRefreshMessage" role="status" aria-live="polite"></p>
+        <ul id="rlForceRefreshResults" class="rl-force-refresh-results" aria-label="Refresh capability results"></ul>
+    </section>
     <details class="system-diagnostics" id="systemDiagnostics">
         <summary>Pages, routes &amp; configuration</summary>
         <p id="routeDiagnosticsStatus" role="status" aria-live="polite">Loading route diagnostics…</p>

@@ -46,6 +46,8 @@ test("profile load exposes find_profile_enabled as a boolean", async () => {
         const profile = await getRocketLeagueProfileByAccountId(ENV, "f6332c75-771a-46bc-ae09-ef5d886a4c35");
         assert.equal(profile.findProfileEnabled, true);
         assert.equal(profile.showOnlineStatus, false);
+        assert.equal(profile.settings.findProfileEnabled, true);
+        assert.equal(profile.settings.showOnlineStatus, false);
     });
 });
 
@@ -78,6 +80,8 @@ test("private profile getter maps persisted provider name and career totals rega
         const profile = await getRocketLeagueProfileByAccountId(ENV, "f6332c75-771a-46bc-ae09-ef5d886a4c35");
         assert.equal(profile.findProfileEnabled, false);
         assert.equal(profile.showOnlineStatus, false);
+        assert.equal(profile.settings.findProfileEnabled, false);
+        assert.equal(profile.settings.showOnlineStatus, false);
         assert.deepEqual(profile.provider, {
             displayUsername: "InGamePilot",
             providerUpdatedAt: "2026-09-30T12:00:00Z"
@@ -290,6 +294,9 @@ test("signed-in Rocket League card renders only present safe totals and keeps pr
     assert.match(source, /profile\?\.provider\?\.providerUpdatedAt/);
     assert.match(source, /profile\?\.stats\?\.career\?\.capturedAt/);
     assert.match(source, /renderCareerStats\(\{\}\)/);
+    assert.match(source, /formatMmrTimestamp\(currentRanked\?\.capturedAt\)/);
+    assert.match(source, /weekday: "short"[\s\S]*hourCycle: "h23"/);
+    assert.match(source, /MMR last updated/);
     assert.doesNotMatch(source, /profile\?\.provider\?\.(?:level|xp|creatorCode)/);
 });
 

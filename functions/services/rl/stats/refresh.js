@@ -98,9 +98,10 @@ function normalizeDate(
 REFRESH ELIGIBILITY
 ========================================================= */
 
-function getRefreshEligibility(
+export function getRefreshEligibility(
     state,
-    now = Date.now()
+    now = Date.now(),
+    force = false
 ) {
     if (
         !state
@@ -114,6 +115,10 @@ function getRefreshEligibility(
             reason:
                 "ACCOUNT_INACTIVE"
         };
+    }
+
+    if (force === true) {
+        return { allowed: true, reason: "ADMIN_FORCE_REFRESH" };
     }
 
     const lastSeenAt =
@@ -183,8 +188,10 @@ REFRESH STATS
 
 export async function refreshStats(
     env,
-    accountId
+    accountId,
+    options = {}
 ) {
+    const force = options?.force === true;
     const normalizedAccountId =
         normalizeString(
             accountId
@@ -331,10 +338,7 @@ export async function refreshStats(
         };
     }
 
-    const eligibility =
-        getRefreshEligibility(
-            state
-        );
+    const eligibility = getRefreshEligibility(state, Date.now(), force);
 
     console.info(
         "STATS REFRESH: Eligibility evaluated.",
@@ -540,6 +544,9 @@ export async function refreshStats(
 
         refreshed:
             true,
+
+            forced:
+                force,
 
         accountId:
             normalizedAccountId,

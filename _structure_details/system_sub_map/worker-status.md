@@ -18,6 +18,19 @@ Repository, branch, workflow, and Worker are fixed server-side. It dispatches
 the existing MMR repository workflow and stores sanitized run state in
 `RL_STATS_CACHE`; `MMR_DEPLOY_GITHUB_TOKEN` never reaches the browser.
 
+An Admin-only `Force Rocket League Refresh` panel accepts a BPD account UUID
+(never an Epic ID) and requires browser confirmation. Its dedicated
+`/api/admin/rocketleague/force-refresh` route requires
+`admin.rocketleague.force-refresh`, which is granted to Admin only, not
+moderators or league staff. The server re-resolves the account/player/Epic
+link and verifies active state plus fresh Epic authorization before invoking
+the existing MMR and provider refresh services. It bypasses their normal BPD
+freshness gates only. The MMR Worker continues to enforce its existing
+upstream limits; complete stats may require six PsyNet requests. MMR, provider
+profile, stats, and unsupported history outcomes are shown separately. A
+per-isolate in-flight map prevents duplicate simultaneous requests for the
+same account in that isolate, not as a global lock.
+
 ## Health sources
 
 | Service | Routine source | Explicit Recheck | Last-known state |
