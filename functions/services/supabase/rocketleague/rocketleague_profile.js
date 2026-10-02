@@ -41,6 +41,7 @@ Expected RPC Return Fields:
     auto_detect_region
     preferred_mode
     other_mode
+    find_profile_enabled
     show_online_status
     age_consent
     policy_consent
@@ -53,6 +54,8 @@ Expected RPC Return Fields:
     availability
     input_ranked
     current_ranked
+    provider
+    stats
 ========================================================= */
 
 /* =========================================================
@@ -93,6 +96,20 @@ function normalizeObject(
     )
         ? value
         : {};
+}
+
+function normalizeSafeCount(value) {
+    if (value === null || value === undefined || value === "") return null;
+    const number = typeof value === "number" || typeof value === "string"
+        ? Number(value)
+        : NaN;
+    return Number.isSafeInteger(number) && number >= 0 ? number : null;
+}
+
+function normalizeTimestamp(value) {
+    if (typeof value !== "string" || !value.trim()) return null;
+    const timestamp = value.trim();
+    return Number.isFinite(Date.parse(timestamp)) ? timestamp : null;
 }
 
 /* =========================================================
@@ -398,6 +415,16 @@ export async function getRocketLeagueProfileByAccountId(
                     : {}
             );
 
+    const providerData = normalizeObject(responseData.provider);
+    const careerData = normalizeObject(responseData.stats);
+    const careerFields = ["wins", "goals", "assists", "saves", "shots", "mvps"];
+    const careerStats = Object.fromEntries(careerFields.map(field => [field, normalizeSafeCount(careerData[field])]));
+    careerStats.capturedAt = normalizeTimestamp(careerData.captured_at);
+    const provider = {
+        displayUsername: normalizeNullableString(providerData.display_username),
+        providerUpdatedAt: normalizeTimestamp(providerData.provider_updated_at)
+    };
+
     /* =====================================================
     NORMALIZED PROFILE
     ===================================================== */
@@ -491,6 +518,10 @@ export async function getRocketLeagueProfileByAccountId(
                 responseData.other_mode
             ),
 
+        findProfileEnabled:
+            responseData.find_profile_enabled ===
+            true,
+
         showOnlineStatus:
             responseData.show_online_status ===
             true,
@@ -539,6 +570,10 @@ export async function getRocketLeagueProfileByAccountId(
             current:
                 currentRanked
         },
+
+        provider,
+
+        careerStats,
 
         /*
          * Compatibility aliases while older UI components

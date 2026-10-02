@@ -486,7 +486,11 @@ export async function saveRocketLeagueProfile(
             notificationMethod,
 
         s_reminder_mode:
-            reminderMode
+            reminderMode,
+
+        s_find_profile_enabled:
+            registration.findProfileEnabled ===
+            true
     };
 
     const url =

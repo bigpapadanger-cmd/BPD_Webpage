@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-30T02:03:16.660Z",
+  "generatedAt": "2026-10-02T02:50:35.900Z",
   "policy": {
     "humanPagePaths": "case-insensitive lookup; canonical TitleCase path",
     "apiAndAssetPaths": "exact-case; never normalized by the human-page router",
@@ -230,6 +230,86 @@
         },
         {
           "path": "/Tabs/RocketLeague/Registration/JS/index.js",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "path": "/RocketLeague/FindPlayers",
+      "lookupKey": "/rocketleague/findplayers",
+      "canonicalPath": "/RocketLeague/FindPlayers",
+      "routeType": "page",
+      "casePolicy": "human-insensitive",
+      "sourceFiles": [
+        "public/routes.js"
+      ],
+      "handler": "functions/[[path]].js",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "authRequired": false,
+      "healthStatus": "registered",
+      "deepLinkSupported": true,
+      "targets": [
+        {
+          "path": "/Tabs/RocketLeague/FindPlayers/HTML/index.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Header/header.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Sidebar/rl_menu.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Footer/footer.html",
+          "exists": true
+        },
+        {
+          "path": "/Tabs/RocketLeague/FindPlayers/JS/index.js",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "path": "/RocketLeague/Player",
+      "lookupKey": "/rocketleague/player",
+      "canonicalPath": "/RocketLeague/Player",
+      "routeType": "page",
+      "casePolicy": "human-insensitive",
+      "sourceFiles": [
+        "public/routes.js"
+      ],
+      "handler": "functions/[[path]].js",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "authRequired": false,
+      "healthStatus": "registered",
+      "deepLinkSupported": true,
+      "targets": [
+        {
+          "path": "/Tabs/RocketLeague/PublicProfile/HTML/index.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Header/header.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Sidebar/rl_menu.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Footer/footer.html",
+          "exists": true
+        },
+        {
+          "path": "/Tabs/RocketLeague/PublicProfile/JS/index.js",
           "exists": true
         }
       ]
@@ -2040,6 +2120,38 @@
       "handler": "functions/api/ocr/training.js",
       "methods": [
         "ALL"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/rocketleague/players/profile/:publicProfileId",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/rocketleague/players/profile/[publicProfileId].js"
+      ],
+      "handler": "functions/api/rocketleague/players/profile/[publicProfileId].js",
+      "methods": [
+        "GET"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/rocketleague/players/search",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/rocketleague/players/search.js"
+      ],
+      "handler": "functions/api/rocketleague/players/search.js",
+      "methods": [
+        "GET"
       ],
       "authRequired": "handler-defined",
       "healthStatus": "valid",

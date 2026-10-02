@@ -26,6 +26,9 @@ Important:
 import {
     refreshStatsWithGate
 } from "../../rl/stats/refresh_with_gate.js";
+import {
+    refreshProviderDataWithGate
+} from "../../rl/provider_data/refresh.js";
 
 /* =========================================================
 NORMALIZATION
@@ -265,6 +268,8 @@ export async function handleAccountLastLogin(
 
     let statsRefresh =
         null;
+    let providerDataRefresh =
+        null;
 
     try {
         statsRefresh =
@@ -329,8 +334,29 @@ export async function handleAccountLastLogin(
         };
     }
 
+    // Provider capabilities have their own cooldown and failure boundary. Their
+    // failures must not change the result of account activity or the MMR refresh.
+    try {
+        providerDataRefresh = await refreshProviderDataWithGate(
+            env,
+            normalizedAccountId,
+            statsRefresh
+        );
+        console.info("LAST LOGIN SERVICE: Provider capability refresh completed.", {
+            refreshed: providerDataRefresh?.refreshed === true,
+            gated: providerDataRefresh?.gated === true,
+            reason: providerDataRefresh?.reason || null,
+            persisted: providerDataRefresh?.persisted || null
+        });
+    } catch (error) {
+        console.warn("LAST LOGIN SERVICE: Provider capability refresh failed.", {
+            code: error?.code || "PROVIDER_REFRESH_FAILED"
+        });
+    }
+
     return {
         lastSeenAt,
-        statsRefresh
+        statsRefresh,
+        providerDataRefresh
     };
 }

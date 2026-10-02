@@ -178,6 +178,73 @@ function setPlayerName(
         || "Epic Player";
 }
 
+function renderProviderDisplayName(profile, primaryName) {
+    const nameElement = document.getElementById("rocketLeagueProviderDisplayName");
+    const freshnessElement = document.getElementById("rocketLeagueProviderFreshness");
+    if (!nameElement || !freshnessElement) return;
+
+    const providerName = normalizeString(profile?.provider?.displayUsername);
+    const showProviderName = providerName && providerName !== primaryName;
+    nameElement.textContent = showProviderName ? `Rocket League: ${providerName}` : "";
+    nameElement.hidden = !showProviderName;
+
+    const updatedAt = formatProfileTimestamp(profile?.provider?.providerUpdatedAt);
+    freshnessElement.textContent = providerName && updatedAt ? `Rocket League name updated ${updatedAt}` : "";
+    freshnessElement.hidden = !(providerName && updatedAt);
+}
+
+function formatProfileTimestamp(value) {
+    if (typeof value !== "string" || !value.trim()) return "";
+    const date = new Date(value);
+    return Number.isFinite(date.getTime()) ? date.toLocaleString() : "";
+}
+
+function renderCareerStats(profile) {
+    const section = document.getElementById("rocketLeagueCareerStats");
+    const grid = document.getElementById("rocketLeagueCareerStatsGrid");
+    const freshness = document.getElementById("rocketLeagueCareerStatsFreshness");
+    if (!section || !grid || !freshness) return;
+
+    const labels = [
+        ["wins", "Wins"], ["goals", "Goals"], ["assists", "Assists"],
+        ["saves", "Saves"], ["shots", "Shots"], ["mvps", "MVPs"]
+    ];
+    grid.replaceChildren();
+    for (const [key, label] of labels) {
+        const value = profile?.stats?.career?.[key];
+        if (!Number.isSafeInteger(value) || value < 0) continue;
+
+        const item = document.createElement("div");
+        item.className = "career-stat";
+        const name = document.createElement("span");
+        name.textContent = label;
+        const total = document.createElement("strong");
+        total.textContent = value.toLocaleString();
+        item.append(name, total);
+        grid.append(item);
+    }
+
+    section.hidden = grid.childElementCount === 0;
+    const capturedAt = formatProfileTimestamp(profile?.stats?.career?.capturedAt);
+    freshness.textContent = capturedAt ? `Career totals captured ${capturedAt}` : "";
+    freshness.hidden = section.hidden || !capturedAt;
+}
+
+function renderProfilePrivacy(profile) {
+    const summary = document.getElementById("rocketLeaguePrivacySummary");
+    const findProfile = document.getElementById("rocketLeagueFindPlayersPrivacy");
+    const presence = document.getElementById("rocketLeaguePresencePrivacy");
+    if (!summary || !findProfile || !presence) return;
+
+    findProfile.textContent = profile?.findProfileEnabled === true
+        ? "Find Players: On"
+        : "Find Players: Off — your profile is not listed.";
+    presence.textContent = profile?.showOnlineStatus === true
+        ? "Online presence sharing: On"
+        : "Presence not shared";
+    summary.hidden = false;
+}
+
 /* =========================================================
 PROFILE EXISTENCE
 ========================================================= */
@@ -362,13 +429,10 @@ function renderRocketLeagueProfile(
     authUser,
     profile
 ) {
-    setPlayerName(
-        getProfileDisplayName(
-            result,
-            profile,
-            authUser
-        )
-    );
+    const displayName = getProfileDisplayName(result, profile, authUser);
+    setPlayerName(displayName);
+    renderProviderDisplayName(profile, displayName);
+    renderCareerStats(profile);
 
     const inputRanked =
         getInputRanked(
@@ -384,6 +448,8 @@ function renderRocketLeagueProfile(
         inputRanked,
         currentRanked
     );
+
+    renderProfilePrivacy(profile);
 
     return {
         inputRanked,
@@ -419,6 +485,8 @@ function resetProfileDisplay(
     message =
         "Profile data unavailable"
 ) {
+    renderProviderDisplayName({}, "");
+    renderCareerStats({});
     document.body.dataset.rlInputRankAvailable =
         "false";
 
@@ -472,6 +540,8 @@ created/completed a Rocket League profile.
 function createMissingProfileResult(
     authUser
 ) {
+    renderProviderDisplayName({}, "");
+    renderCareerStats({});
     setProfileWarning(
         false
     );

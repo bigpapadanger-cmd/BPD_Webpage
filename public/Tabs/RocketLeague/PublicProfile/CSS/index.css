@@ -1,0 +1,96 @@
+.public-profile-page .rl-discovery-shell {
+    max-width: 880px;
+}
+
+.rl-back-link {
+    display: inline-flex;
+    margin-bottom: 28px;
+    color: #a9cfff;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.rl-back-link:hover,
+.rl-back-link:focus-visible {
+    color: #fff;
+    text-decoration: underline;
+}
+
+.rl-public-profile-card {
+    overflow: hidden;
+    border: 1px solid rgba(181, 206, 242, 0.2);
+    border-radius: 20px;
+    background: rgba(13, 22, 36, 0.9);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.rl-public-profile-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    padding: clamp(22px, 5vw, 38px);
+    background:
+        radial-gradient(circle at 85% 15%, rgba(81, 155, 238, 0.2), transparent 40%),
+        linear-gradient(135deg, rgba(37, 69, 108, 0.45), rgba(13, 22, 36, 0.3));
+}
+
+.rl-profile-kicker {
+    margin: 0 0 8px;
+    color: #9fcaff;
+    font-size: 0.7rem;
+    font-weight: 800;
+    letter-spacing: 0.16em;
+}
+
+.rl-public-profile-header h1 {
+    margin: 0;
+    color: #fff;
+    font-size: clamp(1.9rem, 5vw, 3rem);
+    overflow-wrap: anywhere;
+}
+
+.rl-public-profile-header .rl-player-secondary {
+    margin: 8px 0 0;
+}
+
+.rl-platform-badge {
+    flex: 0 0 auto;
+    padding: 8px 12px;
+    border: 1px solid rgba(169, 207, 255, 0.28);
+    border-radius: 999px;
+    background: rgba(4, 10, 18, 0.42);
+    color: #d5e8ff;
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+.rl-profile-section {
+    padding: 22px clamp(22px, 5vw, 38px);
+    border-top: 1px solid rgba(181, 206, 242, 0.12);
+}
+
+.rl-profile-section h2 {
+    margin: 0 0 14px;
+    color: #eaf2ff;
+    font-size: 1.05rem;
+}
+
+.rl-profile-presence {
+    margin: 0;
+    color: #d5e8ff;
+    font-weight: 700;
+}
+
+.rl-profile-muted {
+    margin: 8px 0 0;
+    color: #9eadc3;
+    font-size: 0.82rem;
+}
+
+@media (max-width: 560px) {
+    .rl-public-profile-header {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+}

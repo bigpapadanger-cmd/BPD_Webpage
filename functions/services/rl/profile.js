@@ -82,6 +82,9 @@ import {
     refreshStatsWithGate
 } from "./stats/refresh_with_gate.js";
 import {
+    refreshProviderDataWithGate
+} from "./provider_data/refresh.js";
+import {
     getLatestMmr
 } from "./stats/latest_mmr.js";
 import {
@@ -404,6 +407,8 @@ function normalizeDatabaseProfile(
         normalizeRanks(
             databaseProfile
         );
+    const provider = normalizeObject(databaseProfile.provider);
+    const careerStats = normalizeObject(databaseProfile.careerStats);
 
     return {
         accountId,
@@ -498,6 +503,14 @@ function normalizeDatabaseProfile(
                 .show_online_status ===
                 true,
 
+        findProfileEnabled:
+            databaseProfile
+                .findProfileEnabled ===
+                true
+            || databaseProfile
+                .find_profile_enabled ===
+                true,
+
         email:
             normalizeString(
                 databaseProfile.email,
@@ -586,14 +599,29 @@ function normalizeDatabaseProfile(
                 .rocket_league_access ===
                 true,
 
+        provider: {
+            displayUsername:
+                normalizeNullableString(
+                    provider.displayUsername
+                    || provider.display_username
+                ),
+            providerUpdatedAt:
+                provider.providerUpdatedAt
+                || provider.provider_updated_at
+                || null
+        },
+
         ranks,
 
         ranked:
             ranks.current,
 
         stats: {
-            ranked:
-                ranks.current
+            ranked: ranks.current,
+            career: {
+                ...careerStats,
+                capturedAt: careerStats.capturedAt || careerStats.captured_at || null
+            }
         }
     };
 }
@@ -661,6 +689,9 @@ function buildFallbackProfile(
         showOnlineStatus:
             false,
 
+        findProfileEnabled:
+            false,
+
         email:
             "",
 
@@ -706,8 +737,20 @@ function buildFallbackProfile(
             {},
 
         stats: {
-            ranked:
-                {}
+            ranked: {},
+            career: {
+                wins: null,
+                goals: null,
+                assists: null,
+                saves: null,
+                shots: null,
+                mvps: null,
+                capturedAt: null
+            }
+        },
+        provider: {
+            displayUsername: null,
+            providerUpdatedAt: null
         }
     };
 }
@@ -839,6 +882,12 @@ function normalizeRegistrationPayload(
         showOnlineStatus:
             normalizeBoolean(
                 body?.showOnlineStatus,
+                false
+            ),
+
+        findProfileEnabled:
+            normalizeBoolean(
+                body?.findProfileEnabled,
                 false
             ),
 
@@ -1718,103 +1767,9 @@ async function handleProfileGet(
         && profile.rocketLeagueAccess ===
             true;
 
-    /* =====================================================
-    MMR REFRESH GATE CHECK
-    ===================================================== */
-
-    let statsRefresh =
-        null;
-
-    console.info(
-        "ROCKET LEAGUE PROFILE: Stats refresh eligibility.",
-        {
-            accountId,
-
-            profileExists,
-
-            profileActive:
-                profile?.active ===
-                true,
-
-            epicLinked:
-                epicUser?.linked ===
-                true,
-
-            rocketLeagueAccess
-        }
-    );
-
-    if (
-        profileExists
-        && profile.active ===
-            true
-        && epicUser.linked ===
-            true
-    ) {
-        try {
-            statsRefresh =
-                await refreshStatsWithGate(
-                    env,
-                    accountId
-                );
-
-            console.info(
-                "ROCKET LEAGUE PROFILE: Background stats check completed.",
-                {
-                    accountId,
-
-                    result:
-                        statsRefresh
-                }
-            );
-        }
-        catch (
-            error
-        ) {
-            console.error(
-                "ROCKET LEAGUE PROFILE: Background stats check failed.",
-                {
-                    accountId,
-
-                    name:
-                        error?.name
-                        || "Error",
-
-                    code:
-                        error?.code
-                        || null,
-
-                    status:
-                        error?.status
-                        || null,
-
-                    upstreamCode:
-                        error?.upstreamCode
-                        || null,
-
-                    upstreamStatus:
-                        error?.upstreamStatus
-                        || null,
-
-                    message:
-                        error?.message
-                        || "Unknown error"
-                }
-            );
-
-            statsRefresh = {
-                success:
-                    false,
-
-                refreshed:
-                    false,
-
-                code:
-                    error?.code
-                    || "STATS_REFRESH_FAILED"
-            };
-        }
-    }
+    // Normal profile reads stay read-only: refresh jobs are triggered by
+    // explicit/session lifecycle paths, not by every page load.
+    const statsRefresh = null;
 
     /* =====================================================
     LATEST RECORDED MMR
@@ -2720,6 +2675,8 @@ async function handleProfilePost(
 
     let statsRefresh =
         null;
+    let providerDataRefresh =
+        null;
 
     if (
         profileSaved ===
@@ -2794,6 +2751,21 @@ async function handleProfilePost(
                     || "STATS_REFRESH_FAILED"
             };
         }
+
+        if (statsRefresh?.refreshed === true) {
+            try {
+                providerDataRefresh = await refreshProviderDataWithGate(
+                    env,
+                    accountId,
+                    statsRefresh
+                );
+            } catch (error) {
+                providerDataRefresh = {
+                    refreshed: false,
+                    reason: error?.code || "PROVIDER_REFRESH_FAILED"
+                };
+            }
+        }
     }
 
     const rlPlayerId =
@@ -2848,6 +2820,8 @@ async function handleProfilePost(
                 true,
 
             statsRefresh,
+
+            providerDataRefresh,
 
             user: {
                 accountId,

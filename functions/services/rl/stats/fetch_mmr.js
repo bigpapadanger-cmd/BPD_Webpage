@@ -198,6 +198,61 @@ function normalizePlaylist(
 }
 
 /* =========================================================
+FETCH PROVIDER CAPABILITIES
+========================================================= */
+
+export async function fetchMmrProviderData(
+    env,
+    epicAccountId,
+    capabilities = ["profile", "stats"]
+) {
+    const normalizedEpicAccountId = normalizeEpicAccountId(epicAccountId);
+    const playerId = `Epic|${normalizedEpicAccountId}|0`;
+    const url = new URL("/get-player-data", getMmrApiUrl(env));
+    url.searchParams.set("playerId", playerId);
+    url.searchParams.set("capabilities", capabilities.join(","));
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    let response;
+    try {
+        response = await fetch(url.href, {
+            method: "GET",
+            headers: { Authorization: `Bearer ${getMmrApiKey(env)}`, Accept: "application/json" },
+            signal: controller.signal
+        });
+    } catch (error) {
+        const failure = new Error(error?.name === "AbortError" ? "Provider Worker request timed out." : "Provider Worker is unavailable.");
+        failure.code = error?.name === "AbortError" ? "PROVIDER_WORKER_TIMEOUT" : "PROVIDER_WORKER_UNAVAILABLE";
+        failure.status = error?.name === "AbortError" ? 504 : 502;
+        throw failure;
+    } finally {
+        clearTimeout(timeout);
+    }
+    if (!response.ok) {
+        const failure = new Error("Provider Worker request failed.");
+        failure.code = "PROVIDER_WORKER_REQUEST_FAILED";
+        failure.status = 502;
+        throw failure;
+    }
+    let payload;
+    try {
+        payload = await response.json();
+    } catch {
+        const failure = new Error("Provider Worker response is invalid.");
+        failure.code = "PROVIDER_WORKER_RESPONSE_INVALID";
+        failure.status = 502;
+        throw failure;
+    }
+    if (payload?.success !== true || !payload.capabilities || typeof payload.capabilities !== "object") {
+        const failure = new Error("Provider Worker response is invalid.");
+        failure.code = "PROVIDER_WORKER_RESPONSE_INVALID";
+        failure.status = 502;
+        throw failure;
+    }
+    return payload.capabilities;
+}
+
+/* =========================================================
 FETCH MMR
 ========================================================= */
 

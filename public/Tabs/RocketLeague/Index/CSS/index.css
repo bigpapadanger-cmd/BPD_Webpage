@@ -362,6 +362,64 @@ PLAYER PROFILE
     font-size: clamp(1.2rem, 3vw, 1.8rem);
 }
 
+.rocket-league-page .player-provider-name,
+.rocket-league-page .player-data-freshness {
+    margin: 5px 0 0;
+    color: var(--rl-text-muted);
+    font-size: 0.76rem;
+}
+
+.rocket-league-page .player-provider-name {
+    color: var(--rl-accent-light);
+}
+
+.rocket-league-page .career-stats-panel {
+    margin-top: 22px;
+    padding-top: 18px;
+    border-top: 1px solid var(--rl-border);
+}
+
+.rocket-league-page .career-stats-panel h2 {
+    margin: 0 0 12px;
+    color: #fff;
+    font-size: 0.85rem;
+    letter-spacing: 0.1em;
+    text-align: left;
+    text-transform: uppercase;
+}
+
+.rocket-league-page .career-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.rocket-league-page .career-stat {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px 12px;
+    border: 1px solid var(--rl-border);
+    border-radius: 10px;
+    background: rgba(8, 10, 20, 0.48);
+    text-align: left;
+}
+
+.rocket-league-page .career-stat span {
+    color: var(--rl-text-muted);
+    font-size: 0.65rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.rocket-league-page .career-stat strong {
+    color: #fff;
+    font-size: 1.05rem;
+    font-variant-numeric: tabular-nums;
+}
+
 .rocket-league-page .rank-row {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -411,6 +469,28 @@ PLAYER PROFILE
 
 .rocket-league-page .rank-status[data-state="error"] {
     color: #ff9ba8;
+}
+
+.rocket-league-page .rl-privacy-summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 8px 18px;
+    margin: 18px auto 0;
+    color: var(--rl-text-muted);
+    font-size: 0.82rem;
+}
+
+.rocket-league-page .rl-privacy-summary p {
+    margin: 0;
+}
+
+.rocket-league-page .rl-privacy-summary a {
+    color: var(--rl-accent-light);
+    font-weight: 700;
+    text-decoration: underline;
+    text-underline-offset: 3px;
 }
 
 .rocket-league-page .rank-loading,
@@ -911,6 +991,10 @@ RESPONSIVE
 
     .rocket-league-page .hero-player-profile {
         padding: 16px;
+    }
+
+    .rocket-league-page .career-stats-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
     .rocket-league-content {

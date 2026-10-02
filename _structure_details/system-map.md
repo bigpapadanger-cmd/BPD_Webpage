@@ -28,6 +28,30 @@ because it has a second, not-yet-documented Cloud Run test target. The
 admin-only `/api/ocr/debug/mtls-probe` remains a diagnostic-only direct binding
 probe and is not used for normal processing.
 
+## Rocket League provider data
+
+Authenticated account activity and a successful, complete Rocket League
+registration use the existing MMR refresh flow. Only when that flow completes
+an actual MMR refresh (the existing per-account 24-hour MMR gate allowed it)
+does Pages make one server-side request to the protected MMR Worker
+`/get-player-data` endpoint for `profile,stats`. Ordinary Rocket League profile
+GET requests never call the provider. A separate `RL_STATS_CACHE` cooldown
+deduplicates provider-data work per isolate and retries failures after 15
+minutes; successful work is held for 24 hours. As with the existing KV gates,
+cross-isolate cooldown checks are best-effort. The Worker may make six PsyNet
+requests for career stats, and incomplete totals are never persisted.
+
+Successful display-name data is written through
+`api.save_rl_player_provider_profile`; the live RPC uses `COALESCE` so the
+currently unsupported `level`, `xp`, `creator_code`, and provider timestamp
+nulls preserve existing values. Complete six-field career totals are written
+through `api.save_rl_player_stats`. Skills continue through the existing MMR
+snapshot RPC/path. Match History is unsupported for other players and does not
+call its persistence RPC; historical rows are retained. `SUPABASE_AUTH` and
+`MMR_API_KEY` are used only server-side. The Admin capability registry marks
+MMR / Skills, display-name Player Profile, and Player Stats active; XP /
+Progression and Match History are not represented as supported.
+
 ## Configuration ownership
 
 - Root `wrangler.jsonc` owns Pages bindings, including

@@ -2044,6 +2044,12 @@ function normalizeProfile(
             || profile.show_online_status ===
                 true,
 
+        findProfileEnabled:
+            profile.findProfileEnabled ===
+                true
+            || profile.find_profile_enabled ===
+                true,
+
         notificationsEnabled:
             profile.notificationsEnabled !==
                 false
@@ -2165,6 +2171,11 @@ function populateProfileForm(
     setCheckboxValue(
         "showOnlineStatus",
         profile.showOnlineStatus
+    );
+
+    setCheckboxValue(
+        "findProfileEnabled",
+        profile.findProfileEnabled
     );
 
     setRadioValue(
@@ -2455,6 +2466,10 @@ function saveRegistrationDraft(
             payload?.showOnlineStatus ===
             true,
 
+        findProfileEnabled:
+            payload?.findProfileEnabled ===
+            true,
+
         email:
             normalizeString(
                 payload?.email
@@ -2581,6 +2596,11 @@ function populateDraft(
         draft.showOnlineStatus
     );
 
+    setCheckboxValue(
+        "findProfileEnabled",
+        draft.findProfileEnabled
+    );
+
     setRadioValue(
         "notificationsEnabled",
         draft.notificationsEnabled
@@ -2651,6 +2671,12 @@ function buildRegistrationPayload(
         showOnlineStatus:
             data.get(
                 "showOnlineStatus"
+            ) ===
+            "on",
+
+        findProfileEnabled:
+            data.get(
+                "findProfileEnabled"
             ) ===
             "on",
 

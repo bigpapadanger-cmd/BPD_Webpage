@@ -8,10 +8,10 @@ export const ROCKET_LEAGUE_CAPABILITY_CATEGORIES = [
 ];
 
 export const ROCKET_LEAGUE_CAPABILITIES = [
-    { id: "player-profile", label: "Player Profile", category: "players", capability: "player.profile.read", status: "placeholder", access: "read-only", priority: 1, purpose: "Profile information, metadata, progression, and supported account state." },
-    { id: "xp-progression", label: "XP / Progression", category: "players", capability: "player.progression.read", status: "placeholder", access: "read-only", priority: null, purpose: "Player XP, level, and progression information." },
-    { id: "player-stats", label: "Player Stats", category: "players", capability: "player.stats.read", status: "placeholder", access: "read-only", priority: 2, purpose: "Career statistics and future website profile enrichment." },
-    { id: "match-history", label: "Match History", category: "players", capability: "matches.history.read", status: "placeholder", access: "read-only", priority: 3, purpose: "Recent matches and metadata for possible OCR match-record correlation." },
+    { id: "player-profile", label: "Player Profile", category: "players", capability: "player.profile.read", status: "active", access: "read-only", priority: 1, purpose: "Authoritative provider display username only; level, XP, and creator code are unavailable from this Worker path.", serviceId: "mmr-api" },
+    { id: "xp-progression", label: "XP / Progression", category: "players", capability: "player.progression.read", status: "placeholder", access: "read-only", priority: null, purpose: "Provider level and XP are not currently available from this Worker response." },
+    { id: "player-stats", label: "Player Stats", category: "players", capability: "player.stats.read", status: "active", access: "read-only", priority: 2, purpose: "Complete authoritative career totals: wins, goals, assists, saves, shots, and MVPs.", serviceId: "mmr-api" },
+    { id: "match-history", label: "Match History", category: "players", capability: "matches.history.read", status: "unsupported", access: "read-only", priority: 3, purpose: "Unsupported: PsyNet history is limited to the authenticated service account; existing stored rows are retained." },
     { id: "mmr-skills", label: "MMR / Skills", category: "competitive", capability: "mmr.skills.read", status: "active", access: "read-only", priority: null, purpose: "Current production MMR / Skills integration.", serviceId: "mmr-api" },
     { id: "leaderboards", label: "Leaderboards", category: "competitive", capability: "leaderboards.read", status: "placeholder", access: "read-only", priority: 6, purpose: "Supported skill/MMR or statistics leaderboards." },
     { id: "playlists", label: "Playlists", category: "competitive", capability: "playlists.read", status: "placeholder", access: "read-only", priority: 4, purpose: "Playlist metadata, names, availability, and MMR mode labels." },

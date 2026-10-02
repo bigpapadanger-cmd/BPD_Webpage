@@ -104,8 +104,10 @@ public/Tabs/
 |   |   +-- JS/index.js, auth.js, connect_epic.js, profile.js, ranks.js,
 |   |           submenu.js
 |   +-- Registration/    CSS/index.css, HTML/index.html, JS/index.js, timezone.js
+|   +-- PublicProfile/   Public-safe profile by public_profile_id.
+|   +-- shared/          Profile visibility/presence presentation helpers.
 |   +-- MatchResults/    CSS/index.css, HTML/index.html, JS/index.js
-|   +-- FindPlayers/     CSS/index.css, HTML/index.html, JS/index.js
+|   +-- FindPlayers/     Public opt-in search; CSS/index.css, HTML/index.html, JS/index.js
 |   +-- PrivateMatches/  CSS/index.css, HTML/index.html, JS/index.js
 |   +-- WeeklyMatches/   CSS/index.css, HTML/index.html, JS/index.js
 +-- Future/              Present empty placeholder directory.

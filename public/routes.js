@@ -224,6 +224,52 @@ export const ROUTES = {
             true
     },
 
+    "/RocketLeague/FindPlayers": {
+        title:
+            "Find Rocket League Players | BPD Gaming Network",
+
+        body:
+            "/Tabs/RocketLeague/FindPlayers/HTML/index.html",
+
+        header:
+            "/Framework/Shell/HTML/Header/header.html",
+
+        sidebar:
+            "/Framework/Shell/HTML/Sidebar/rl_menu.html",
+
+        footer:
+            "/Framework/Shell/HTML/Footer/footer.html",
+
+        module:
+            "/Tabs/RocketLeague/FindPlayers/JS/index.js",
+
+        sitemap:
+            true
+    },
+
+    "/RocketLeague/Player": {
+        title:
+            "Rocket League Player Profile | BPD Gaming Network",
+
+        body:
+            "/Tabs/RocketLeague/PublicProfile/HTML/index.html",
+
+        header:
+            "/Framework/Shell/HTML/Header/header.html",
+
+        sidebar:
+            "/Framework/Shell/HTML/Sidebar/rl_menu.html",
+
+        footer:
+            "/Framework/Shell/HTML/Footer/footer.html",
+
+        module:
+            "/Tabs/RocketLeague/PublicProfile/JS/index.js",
+
+        sitemap:
+            false
+    },
+
     "/RocketLeague/SubmitMatchResults": {
         auth: { required: true, provider: "epic", rocketLeague: true },
         title:

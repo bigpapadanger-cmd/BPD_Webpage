@@ -497,8 +497,7 @@ Security:
             </legend>
 
             <p class="section-description">
-                Choose whether other BPD Rocket League players may
-                see your current online status.
+                Control player discovery and online visibility independently.
             </p>
 
             <div class="form-field toggle-field">
@@ -527,7 +526,37 @@ Security:
                 </label>
 
                 <small>
-                    Disabled by default.
+                    When off, your presence is never shown as Offline.
+                </small>
+            </div>
+
+            <div class="form-field toggle-field">
+                <span>
+                    Find Players visibility
+                </span>
+
+                <label
+                    class="toggle-row"
+                    for="findProfileEnabled"
+                >
+                    <input
+                        id="findProfileEnabled"
+                        name="findProfileEnabled"
+                        type="checkbox"
+                    >
+
+                    <span
+                        class="toggle-control"
+                        aria-hidden="true"
+                    ></span>
+
+                    <span>
+                        Allow my profile to appear in Find Players
+                    </span>
+                </label>
+
+                <small>
+                    Off by default. This does not control leaderboard visibility.
                 </small>
             </div>
         </fieldset>

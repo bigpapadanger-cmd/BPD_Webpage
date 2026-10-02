@@ -76,6 +76,8 @@
                             <strong id="rocketLeaguePlayerName">
                                 Loading player...
                             </strong>
+                            <p id="rocketLeagueProviderDisplayName" class="player-provider-name" hidden></p>
+                            <p id="rocketLeagueProviderFreshness" class="player-data-freshness" hidden></p>
                         </div>
 
                         <div
@@ -153,12 +155,27 @@
                             </article>
                         </div>
 
+                        <section id="rocketLeagueCareerStats" class="career-stats-panel" aria-labelledby="rocketLeagueCareerStatsTitle" hidden>
+                            <h2 id="rocketLeagueCareerStatsTitle">Career totals</h2>
+                            <div id="rocketLeagueCareerStatsGrid" class="career-stats-grid"></div>
+                            <p id="rocketLeagueCareerStatsFreshness" class="player-data-freshness" hidden></p>
+                        </section>
+
                         <p
                             class="rank-status"
                             id="rocketLeagueRankStatus"
                         >
                             Loading competitive ranks...
                         </p>
+                        <div
+                            class="rl-privacy-summary"
+                            id="rocketLeaguePrivacySummary"
+                            hidden
+                        >
+                            <p id="rocketLeagueFindPlayersPrivacy"></p>
+                            <p id="rocketLeaguePresencePrivacy"></p>
+                            <a href="/RocketLeague/Profile">Manage profile visibility</a>
+                        </div>
                     </section>
                 </div>
             </header>

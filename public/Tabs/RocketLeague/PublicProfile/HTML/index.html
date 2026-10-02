@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rocket League Player Profile | BPD Gaming Network</title>
+    <link rel="stylesheet" href="../../FindPlayers/CSS/index.css">
+    <link rel="stylesheet" href="../CSS/index.css">
+</head>
+<body class="rocket-league-page public-profile-page">
+    <main class="rl-discovery-shell">
+        <a class="rl-back-link" href="/RocketLeague/FindPlayers">← Back to Find Players</a>
+        <p class="rl-eyebrow">PUBLIC PLAYER PROFILE</p>
+        <p id="publicProfileStatus" class="rl-discovery-status" role="status" aria-live="polite">
+            Loading player profile…
+        </p>
+        <article id="publicProfileContent" class="rl-public-profile-card" hidden>
+            <header class="rl-public-profile-header">
+                <div>
+                    <p class="rl-profile-kicker">ROCKET LEAGUE PLAYER</p>
+                    <h1 id="publicProfileName">Player</h1>
+                    <p id="publicProfileEpicName" class="rl-player-secondary" hidden></p>
+                </div>
+                <span id="publicProfilePlatform" class="rl-platform-badge"></span>
+            </header>
+
+            <section class="rl-profile-section" aria-labelledby="publicPresenceTitle">
+                <h2 id="publicPresenceTitle">Presence</h2>
+                <p id="publicProfilePresence" class="rl-profile-presence"></p>
+                <p id="publicPresenceCheckedAt" class="rl-profile-muted" hidden></p>
+            </section>
+
+            <section class="rl-profile-section" aria-labelledby="publicRankTitle">
+                <h2 id="publicRankTitle">Current ranks</h2>
+                <div id="publicProfileRanks" class="rl-player-ranks"></div>
+                <p id="publicRankCapturedAt" class="rl-profile-muted" hidden></p>
+            </section>
+
+            <section class="rl-profile-section" aria-labelledby="publicProviderTitle">
+                <h2 id="publicProviderTitle">Rocket League profile</h2>
+                <div id="publicProfileProvider" class="rl-player-meta"></div>
+            </section>
+
+            <section class="rl-profile-section" aria-labelledby="publicStatsTitle">
+                <h2 id="publicStatsTitle">Career stats</h2>
+                <div id="publicProfileStats" class="rl-player-stats"></div>
+            </section>
+        </article>
+    </main>
+</body>
+</html>

@@ -82,7 +82,7 @@ export async function onRequestPost(
         }
 
         // Activity must not advance the successful BPD login timestamp.
-        const { lastSeenAt, statsRefresh } = await handleAccountLastLogin(env, authorization.accountId);
+        const { lastSeenAt, statsRefresh, providerDataRefresh } = await handleAccountLastLogin(env, authorization.accountId);
 
         return json(
             {
@@ -91,6 +91,7 @@ export async function onRequestPost(
 
                 lastSeenAt,
                 statsRefresh,
+                providerDataRefresh,
 
                 debugId
             }

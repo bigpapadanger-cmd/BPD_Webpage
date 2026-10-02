@@ -263,8 +263,8 @@ function renderRocketLeagueCapabilities(services) {
         group.className = "rocket-capability-category worker-status-row";
         const summary = document.createElement("summary");
         const activeCount = capabilities.filter(capability => capability.status === "active").length;
-        const plannedCount = capabilities.length - activeCount;
-        const summaryLabel = activeCount ? `${activeCount} active · ${plannedCount} planned` : `${capabilities.length} planned`;
+        const inactiveCount = capabilities.length - activeCount;
+        const summaryLabel = activeCount ? `${activeCount} active · ${inactiveCount} inactive` : `${capabilities.length} inactive`;
         const categoryState = activeCount ? "healthy" : "unknown";
         const categoryIndicator = textElement("span", activeCount ? "✓" : "…", `worker-status-indicator worker-status-${categoryState} rocket-capability-category-indicator`);
         categoryIndicator.setAttribute("aria-hidden", "true");
@@ -279,12 +279,12 @@ function renderRocketLeagueCapabilities(services) {
         for (const capability of capabilities) {
             const service = capability.serviceId ? serviceById.get(capability.serviceId) : null;
             const isActive = capability.status === "active";
-            const displayStatus = isActive ? `Active · ${service?.status || "unknown"}` : capability.status === "future" ? "Future" : "Coming Soon";
+            const displayStatus = isActive ? `Active · ${service?.status || "unknown"}` : capability.status === "future" ? "Future" : capability.status === "unsupported" ? "Unsupported" : "Coming Soon";
             const item = document.createElement("li");
             item.className = `rocket-capability-card rocket-capability-${capability.status}${isActive && service ? ` worker-status-${service.status}` : ""}`;
             if (!isActive) item.setAttribute("aria-disabled", "true");
             const state = isActive ? String(service?.status || "unknown").toLowerCase() : "unknown";
-            const indicator = textElement("span", isActive ? statusIcon(state) : capability.status === "future" ? "◇" : "…", `worker-status-indicator worker-status-${state}`);
+            const indicator = textElement("span", isActive ? statusIcon(state) : capability.status === "future" ? "◇" : capability.status === "unsupported" ? "—" : "…", `worker-status-indicator worker-status-${state}`);
             indicator.setAttribute("role", "img");
             indicator.setAttribute("aria-label", displayStatus);
             const titleRow = document.createElement("div");
