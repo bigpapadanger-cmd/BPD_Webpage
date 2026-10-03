@@ -1,5 +1,5 @@
 PUBLIC/: BROWSER APPLICATION, PAGES, AND STATIC ASSETS
-Snapshot: 2026-09-26
+Snapshot: 2026-10-02
 
 ROLE
 
@@ -32,8 +32,8 @@ public/Framework/
 +-- Shell/
     +-- CSS/
     |   +-- Callers/
-    |   |   +-- master.css, master_admin.css, master_ark.css
-    |   |   +-- master_mc.css, master_rl.css
+|   |   +-- master.css, master_admin.css, master_ark.css
+|   |   +-- master_mc.css, master_rl.css; master_rl imports Rocket League page CSS
     |   +-- General/
     |   |   +-- body.css, footer.css, header.css, ocr_popup.css, shell.css
     |   +-- Sidebar/
@@ -54,7 +54,8 @@ public/Framework/
         +-- ocr_results.js          OCR result handling.
         +-- ocr_review_policy.js    OCR review decision policy.
         +-- Admin/sidebar.js
-        +-- Sidebar/admin_navigation.js, sidebar.js, submenu.js
+        +-- Sidebar/admin_navigation.js, sidebar.js, submenu.js, state.js
+        +-- preferences.js    Shared browser-local appearance preference applicator.
         +-- Sidebar/RocketLeague/sidebar_auth.js
 
 PAGE GROUPS
@@ -78,14 +79,13 @@ public/Global/
 |                        HTML/home.html and JS/index.js (personal dashboard)
 +-- Links/               links.css, links.html, links.js
 +-- Login/               CSS/index.css, HTML/index.html, JS/index.js
-+-- Settings/            CSS/settings-page.css, HTML/settings.html, JS/settings.js
++-- Settings/            CSS/settings-page.css, HTML/settings.html, JS/settings.js and display_name_cooldown.js
 +-- Suggestions/         CSS/index.css, HTML/index.html, JS/index.js (canonical public route)
 
 public/Required/
 +-- About/               CSS/index.css, HTML/index.html, JS/index.js
-+-- FAQ/                 CSS/index.css, HTML/index.html, JS/index.js
++-- FAQ/                 CSS/index.css, HTML/index.html; curated static answers
 +-- PrivacyPolicy/       CSS/index.css, HTML/index.html, JS/index.js
-+-- Suggestions/         Legacy FAQ-form copy; no registered route
 +-- TOS/                 CSS/index.css, HTML/index.html, JS/index.js
 
 public/Tabs/
@@ -104,13 +104,15 @@ public/Tabs/
 |   |   +-- JS/index.js, auth.js, connect_epic.js, profile.js, ranks.js,
 |   |           submenu.js, mmr_dashboard.js; saved MMR progression/history UI
 |   +-- Registration/    CSS/index.css, HTML/index.html, JS/index.js, timezone.js; setup/onboarding only
-|   +-- MyProfile/       CSS/index.css, HTML/index.html, JS/index.js, settings_view.js; private settings editor, fail-closed unknown values
-|   +-- PublicProfile/   Public-safe profile by public_profile_id.
+|   +-- MyProfile/       CSS/index.css, HTML/index.html, JS/index.js, settings_view.js; private field-aware settings verification
+|   +-- PublicProfile/   Public-safe profile by public_profile_id; shell fragment, styles via master_rl.css
 |   +-- shared/          Profile visibility/presence (normalized online/offline only) and timestamp presentation helpers.
-|   +-- MatchResults/    CSS/index.css, HTML/index.html, JS/index.js
-|   +-- FindPlayers/     Public opt-in search; CSS/index.css, HTML/index.html, JS/index.js, view.js
-|   +-- PrivateMatches/  CSS/index.css, HTML/index.html, JS/index.js
-|   +-- WeeklyMatches/   CSS/index.css, HTML/index.html, JS/index.js
+|   +-- MatchResults/, PrivateMatches/, WeeklyMatches/ Legacy full-page sources; routes use shell fragments below
+|   +-- FindPlayers/     Public opt-in search; CSS/index.css, HTML/index.html, JS/index.js, view.js; responsive cards
+|   +-- Features/
+|       +-- CSS/index.css; shared Rocket League destination/status card styling
+|       +-- HTML/shop.html, match-history.html, leaderboards.html, match-results.html,
+|                  weekly-matches.html, my-matches.html, private-matches.html
 +-- Future/              Present empty placeholder directory.
 
 OCR PAGE
@@ -153,8 +155,12 @@ ROUTE-TO-FOLDER MAP
     /Account, /Login      -> Global/Account and Global/Login
     /Admin*               -> Global/Admin/Home and Global/Admin/TaskBoard
 /RocketLeague/Profile -> Registration onboarding; established accounts redirect to /RocketLeague/MyProfile
-/RocketLeague/MyProfile -> MyProfile standalone private settings and read-only persisted provider/MMR/career data and snapshot-to-snapshot progression
-    /RocketLeague*        -> Other Rocket League pages plus public/ocr for submission
+/RocketLeague/MyProfile -> Private field-aware settings editor; full-save action fails closed on any unconfirmed RPC field
+/RocketLeague/FindPlayers -> Public opt-in directory search and public profile links
+/RocketLeague/Shop -> Public information page; no live shop data/provider integration
+/RocketLeague/MatchHistory -> Auth-gated status page; arbitrary linked-player match history is unsupported
+/RocketLeague/Leaderboards, /MatchResults, /WeeklyMatches, /MyMatches, /PrivateMatches -> Shell-integrated status pages until verified data workflows exist
+    /RocketLeague*        -> Rocket League home/profile/discovery/feature pages plus public/ocr submission workflow
     /Minecraft*           -> Tabs/Minecraft
     /Ark*                 -> Tabs/Ark
     /About, /FAQ,

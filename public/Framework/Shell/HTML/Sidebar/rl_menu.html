@@ -41,9 +41,9 @@ Notes:
             aria-label="Toggle navigation"
             aria-expanded="true"
         >
-            <span aria-hidden="true">\</span>
-            <span aria-hidden="true">\</span>
-            <span aria-hidden="true">\</span>
+            <span aria-hidden="true"></span>
+            <span aria-hidden="true"></span>
+            <span aria-hidden="true"></span>
         </button>
     </div>
 
@@ -79,6 +79,17 @@ Notes:
                 <span class="nav-text">
                     <span class="nav-label">Rocket League</span>
                 </span>
+            </a>
+
+            <a
+                href="/RocketLeague/Shop"
+                class="nav-item"
+                data-router-link
+                data-nav-route="/RocketLeague/Shop"
+                data-tooltip="Rocket League Shop"
+            >
+                <span class="nav-icon" aria-hidden="true">🛒</span>
+                <span class="nav-text"><span class="nav-label">Shop</span></span>
             </a>
 
             <a
@@ -138,12 +149,24 @@ Notes:
                 </a>
 
                 <a
-                    href="/RocketLeague/Leaderboards/MatchResults"
+                    href="/RocketLeague/MatchResults"
                     class="submenu-item"
                     data-router-link
-                    data-nav-route="/RocketLeague/Leaderboards/MatchResults"
+                    data-nav-route="/RocketLeague/MatchResults"
                 >
                     Match Results
+                </a>
+
+                <a
+                    href="/RocketLeague/MatchHistory"
+                    class="submenu-item"
+                    data-router-link
+                    data-nav-route="/RocketLeague/MatchHistory"
+                    data-auth="authenticated"
+                    data-rl-access="required"
+                    hidden
+                >
+                    My Match History
                 </a>
 
                 <a
@@ -152,6 +175,7 @@ Notes:
                     data-router-link
                     data-nav-route="/RocketLeague/WeeklyMatches"
                     data-auth="authenticated"
+                    data-rl-access="required"
                     hidden
                 >
                     Join Weekly Matches
@@ -163,6 +187,7 @@ Notes:
                     data-router-link
                     data-nav-route="/RocketLeague/MyMatches"
                     data-auth="authenticated"
+                    data-rl-access="required"
                     hidden
                 >
                     My Matches
@@ -174,6 +199,7 @@ Notes:
                     data-router-link
                     data-nav-route="/RocketLeague/PrivateMatches"
                     data-auth="authenticated"
+                    data-rl-access="required"
                     hidden
                 >
                     Private Matches
@@ -229,6 +255,7 @@ Notes:
             class="sidebar-group sidebar-menu"
             data-sidebar-menu
             data-auth="authenticated"
+            data-rl-access="required"
             hidden
         >
             <span class="sidebar-group-label">
@@ -259,6 +286,9 @@ Notes:
                     class="submenu-item"
                     data-router-link
                     data-nav-route="/RocketLeague/SubmitMatchResults"
+                    data-auth="authenticated"
+                    data-rl-access="required"
+                    hidden
                 >
                     Submit Scoreboard
                 </a>

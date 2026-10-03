@@ -71,8 +71,6 @@ export function buildRouteHealthPayload(env, generatedAt = new Date().toISOStrin
         ],
         connections,
         knownFindings: [
-            { category: "design-decision-required", path: "/api/faq", detail: "Frontend callers exist; no local handler or authoritative data contract is established." },
-            { category: "design-decision-required", path: "/api/faq/upvote", detail: "Frontend callers exist; no local handler or authoritative data contract is established." },
             { category: "unregistered-page", path: "/RocketLeague/WeeklyMatches", detail: "Legacy standalone files and navigation references exist; no SPA route registration is present." },
             { category: "unregistered-page", path: "/RocketLeague/PrivateMatches", detail: "Legacy standalone files and navigation references exist; no SPA route registration is present." },
             { category: "unregistered-page", path: "/Admin/MatchManagement", detail: "Admin sidebar reference is not in the human route registry." },

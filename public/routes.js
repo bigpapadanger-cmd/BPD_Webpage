@@ -251,6 +251,56 @@ export const ROUTES = {
             true
     },
 
+    "/RocketLeague/MatchHistory": {
+        auth: { required: true, provider: "epic", rocketLeague: true },
+        title:
+            "Rocket League Match History | BPD Gaming Network",
+
+        body:
+            "/Tabs/RocketLeague/Features/HTML/match-history.html",
+
+        header:
+            "/Framework/Shell/HTML/Header/header.html",
+
+        sidebar:
+            "/Framework/Shell/HTML/Sidebar/rl_menu.html",
+
+        footer:
+            "/Framework/Shell/HTML/Footer/footer.html",
+
+        module:
+            null,
+
+        requiresAuth:
+            true,
+
+        sitemap:
+            false
+    },
+
+    "/RocketLeague/Shop": {
+        title:
+            "Rocket League Shop | BPD Gaming Network",
+
+        body:
+            "/Tabs/RocketLeague/Features/HTML/shop.html",
+
+        header:
+            "/Framework/Shell/HTML/Header/header.html",
+
+        sidebar:
+            "/Framework/Shell/HTML/Sidebar/rl_menu.html",
+
+        footer:
+            "/Framework/Shell/HTML/Footer/footer.html",
+
+        module:
+            null,
+
+        sitemap:
+            true
+    },
+
     "/RocketLeague/FindPlayers": {
         title:
             "Find Rocket League Players | BPD Gaming Network",
@@ -325,6 +375,7 @@ export const ROUTES = {
     },
 
     "/RocketLeague/ImageScanning": {
+        redirectTo: "/RocketLeague/SubmitMatchResults",
         auth: { required: true, provider: "epic", rocketLeague: true },
         title:
             "Rocket League Image Scanning | BPD Gaming Network",
@@ -356,7 +407,7 @@ export const ROUTES = {
             "Rocket League Leaderboards | BPD Gaming Network",
 
         body:
-            "/Tabs/RocketLeague/Index/HTML/index.html",
+            "/Tabs/RocketLeague/Features/HTML/leaderboards.html",
 
         header:
             "/Framework/Shell/HTML/Header/header.html",
@@ -368,19 +419,18 @@ export const ROUTES = {
             "/Framework/Shell/HTML/Footer/footer.html",
 
         module:
-            "/Tabs/RocketLeague/Index/JS/index.js",
+            null,
 
         sitemap:
-            true
+            false
     },
 
     "/RocketLeague/MatchResults": {
-        auth: { required: true, provider: "epic", rocketLeague: true },
         title:
             "Match Results | BPD Gaming Network",
 
         body:
-            "/Tabs/RocketLeague/MatchResults/HTML/index.html",
+            "/Tabs/RocketLeague/Features/HTML/match-results.html",
 
         header:
             "/Framework/Shell/HTML/Header/header.html",
@@ -392,7 +442,85 @@ export const ROUTES = {
             "/Framework/Shell/HTML/Footer/footer.html",
 
         module:
-            "/Tabs/RocketLeague/MatchResults/JS/index.js",
+            null,
+
+        sitemap:
+            false
+    },
+
+    "/RocketLeague/WeeklyMatches": {
+        auth: { required: true, provider: "epic", rocketLeague: true },
+        title:
+            "Rocket League Weekly Matches | BPD Gaming Network",
+
+        body:
+            "/Tabs/RocketLeague/Features/HTML/weekly-matches.html",
+
+        header:
+            "/Framework/Shell/HTML/Header/header.html",
+
+        sidebar:
+            "/Framework/Shell/HTML/Sidebar/rl_menu.html",
+
+        footer:
+            "/Framework/Shell/HTML/Footer/footer.html",
+
+        module:
+            null,
+
+        requiresAuth:
+            true,
+
+        sitemap:
+            false
+    },
+
+    "/RocketLeague/MyMatches": {
+        auth: { required: true, provider: "epic", rocketLeague: true },
+        title:
+            "My Rocket League Matches | BPD Gaming Network",
+
+        body:
+            "/Tabs/RocketLeague/Features/HTML/my-matches.html",
+
+        header:
+            "/Framework/Shell/HTML/Header/header.html",
+
+        sidebar:
+            "/Framework/Shell/HTML/Sidebar/rl_menu.html",
+
+        footer:
+            "/Framework/Shell/HTML/Footer/footer.html",
+
+        module:
+            null,
+
+        requiresAuth:
+            true,
+
+        sitemap:
+            false
+    },
+
+    "/RocketLeague/PrivateMatches": {
+        auth: { required: true, provider: "epic", rocketLeague: true },
+        title:
+            "Rocket League Private Matches | BPD Gaming Network",
+
+        body:
+            "/Tabs/RocketLeague/Features/HTML/private-matches.html",
+
+        header:
+            "/Framework/Shell/HTML/Header/header.html",
+
+        sidebar:
+            "/Framework/Shell/HTML/Sidebar/rl_menu.html",
+
+        footer:
+            "/Framework/Shell/HTML/Footer/footer.html",
+
+        module:
+            null,
 
         requiresAuth:
             true,
@@ -445,7 +573,7 @@ export const ROUTES = {
             "/Framework/Shell/HTML/Footer/footer.html",
 
         module:
-            "/Required/FAQ/JS/index.js",
+            null,
 
         sitemap:
             true
@@ -1083,6 +1211,21 @@ export const HEADER_MAP = {
         false,
 
     "/RocketLeague/MatchResults":
+        false,
+
+    "/RocketLeague/MatchHistory":
+        false,
+
+    "/RocketLeague/Shop":
+        false,
+
+    "/RocketLeague/WeeklyMatches":
+        false,
+
+    "/RocketLeague/MyMatches":
+        false,
+
+    "/RocketLeague/PrivateMatches":
         false,
 
     "/About":

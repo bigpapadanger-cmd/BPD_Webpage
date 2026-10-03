@@ -835,6 +835,12 @@ function normalizeAuthenticatedResponse(
                 data?.user?.displayName
             ),
 
+        ...(Object.hasOwn(data?.user || {}, "displayNameChangedAt")
+            ? { displayNameChangedAt: normalizeTimestamp(data.user.displayNameChangedAt) } : {}),
+
+        ...(Object.hasOwn(data?.user || {}, "displayNameChangeAvailableAt")
+            ? { displayNameChangeAvailableAt: normalizeTimestamp(data.user.displayNameChangeAvailableAt) } : {}),
+
         role:
             normalizeRole(
                 data?.user?.role

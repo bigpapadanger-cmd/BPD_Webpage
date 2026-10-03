@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import { getProfileSettingsAvailability, mapProfileSettingsToRpcArgs, normalizeProfileSettings, PROFILE_SETTING_FIELDS } from "../../functions/services/rl/profile_settings.js";
-import { buildSettingsPayload, getConfirmedSettings } from "../../public/Tabs/RocketLeague/MyProfile/JS/settings_view.js";
+import { buildSettingsPayload, getConfirmedSettings, getSettingsConfirmationState, isSettingConfirmed } from "../../public/Tabs/RocketLeague/MyProfile/JS/settings_view.js";
 
 test("central settings mapping preserves false, empty, null, and availability values", () => {
     const settings = normalizeProfileSettings({
@@ -35,6 +35,46 @@ test("central settings mapping preserves false, empty, null, and availability va
 test("missing privacy setting remains unavailable rather than silently becoming false", () => {
     assert.equal(normalizeProfileSettings({ show_online_status: false }).findProfileEnabled, null);
     assert.equal(normalizeProfileSettings({ find_profile_enabled: true }).findProfileEnabled, true);
+});
+
+test("nested Supabase settings recognize find_profile_enabled without coercing its boolean", () => {
+    const source = { settings: { find_profile_enabled: false, show_online_status: true } };
+    const settings = normalizeProfileSettings(source);
+    const availability = getProfileSettingsAvailability(source);
+
+    assert.equal(settings.findProfileEnabled, false);
+    assert.equal(availability.findProfileEnabled, true);
+    assert.equal(settings.showOnlineStatus, true);
+    assert.equal(availability.showOnlineStatus, true);
+});
+
+test("Find Players true, false, and null remain distinct from online-status preference", () => {
+    for (const findProfileEnabled of [true, false]) {
+        const source = { settings: { find_profile_enabled: findProfileEnabled, show_online_status: !findProfileEnabled } };
+        const settings = normalizeProfileSettings(source);
+        const availability = getProfileSettingsAvailability(source);
+        const rpcArgs = mapProfileSettingsToRpcArgs(settings);
+        assert.equal(settings.findProfileEnabled, findProfileEnabled);
+        assert.equal(availability.findProfileEnabled, true);
+        assert.equal(rpcArgs.s_find_profile_enabled, findProfileEnabled);
+        assert.equal(rpcArgs.s_show_online_status, !findProfileEnabled);
+    }
+
+    const unavailable = normalizeProfileSettings({ settings: { find_profile_enabled: null } });
+    assert.equal(unavailable.findProfileEnabled, null);
+    assert.equal(mapProfileSettingsToRpcArgs({ findProfileEnabled: null }).s_find_profile_enabled, null);
+    const nullSetting = { settings: { find_profile_enabled: null } };
+    assert.equal(getProfileSettingsAvailability(nullSetting).findProfileEnabled, true);
+    assert.equal(getProfileSettingsAvailability({ settings: {} }).findProfileEnabled, false);
+    const nullProfile = {
+        ageConsent: true,
+        policyConsent: true,
+        settings: { ...unavailable, autoDetectRegion: false, showOnlineStatus: false, notificationsEnabled: false,
+            preferredMode: null, otherMode: null, availability: [], email: null, phone: null,
+            notificationMethod: null, reminderMode: null },
+        settingsAvailability: Object.fromEntries([...Object.keys(PROFILE_SETTING_FIELDS), "ageConsent", "policyConsent"].map(key => [key, true]))
+    };
+    assert.equal(getSettingsConfirmationState(nullProfile).canSave, false);
 });
 
 test("availability tracks missing separately from explicit null, false, and empty values", () => {
@@ -79,6 +119,60 @@ test("My Profile edits only confirmed values and preserves explicit nulls", () =
     assert.equal(Object.hasOwn(payload, "provider"), false);
 });
 
+test("My Profile updates Find Players independently while preserving the saved boolean", () => {
+    const baseSettings = {
+        autoDetectRegion: false,
+        showOnlineStatus: true,
+        findProfileEnabled: false,
+        preferredMode: "2s",
+        otherMode: null,
+        availability: [],
+        email: null,
+        phone: null,
+        notificationsEnabled: false,
+        notificationMethod: null,
+        reminderMode: null
+    };
+    const profile = {
+        ageConsent: true,
+        policyConsent: true,
+        settings: baseSettings,
+        settingsAvailability: Object.fromEntries([...Object.keys(PROFILE_SETTING_FIELDS), "ageConsent", "policyConsent"].map(key => [key, true]))
+    };
+
+    const payload = buildSettingsPayload(profile, {
+        autoDetectRegion: false,
+        showOnlineStatus: true,
+        findProfileEnabled: false,
+        preferredMode: "2s",
+        otherMode: "",
+        availability: [],
+        email: "",
+        phone: "",
+        notificationsEnabled: false,
+        notificationMethod: "",
+        reminderMode: ""
+    });
+    assert.equal(payload.findProfileEnabled, false);
+    assert.equal(payload.showOnlineStatus, true);
+
+    const enabledPayload = buildSettingsPayload({ ...profile, settings: { ...baseSettings, findProfileEnabled: true } }, {
+        autoDetectRegion: false,
+        showOnlineStatus: false,
+        findProfileEnabled: true,
+        preferredMode: "2s",
+        otherMode: "",
+        availability: [],
+        email: "",
+        phone: "",
+        notificationsEnabled: false,
+        notificationMethod: "",
+        reminderMode: ""
+    });
+    assert.equal(enabledPayload.findProfileEnabled, true);
+    assert.equal(enabledPayload.showOnlineStatus, false);
+});
+
 test("My Profile fails closed when a setting or consent source is not confirmed", () => {
     const complete = {
         ageConsent: true,
@@ -90,6 +184,35 @@ test("My Profile fails closed when a setting or consent source is not confirmed"
     assert.ok(getConfirmedSettings(complete));
     assert.equal(getConfirmedSettings({ ...complete, settingsAvailability: { ...complete.settingsAvailability, email: false } }), null);
     assert.equal(getConfirmedSettings({ ...complete, policyConsent: undefined }), null);
+});
+
+test("a missing optional setting identifies only its own control while preserving the full-save safety gate", () => {
+    const fields = Object.keys(PROFILE_SETTING_FIELDS);
+    const settings = { autoDetectRegion: false, showOnlineStatus: false, findProfileEnabled: false, notificationsEnabled: false,
+        preferredMode: null, otherMode: null, availability: [], email: null, phone: null, notificationMethod: null, reminderMode: null };
+    const profile = {
+        ageConsent: true,
+        policyConsent: true,
+        settings,
+        settingsAvailability: Object.fromEntries([...fields, "ageConsent", "policyConsent"].map(key => [key, true]))
+    };
+    delete profile.settingsAvailability.email;
+
+    const state = getSettingsConfirmationState(profile);
+    assert.deepEqual(state.unconfirmedFields, ["email"]);
+    assert.equal(isSettingConfirmed(profile, "preferredMode"), true);
+    assert.equal(isSettingConfirmed(profile, "email"), false);
+    assert.equal(state.canSave, false);
+    assert.equal(getConfirmedSettings(profile), null);
+});
+
+test("an unconfirmed read-only location field does not lock editable settings", () => {
+    const settings = { autoDetectRegion: false, showOnlineStatus: false, findProfileEnabled: false, notificationsEnabled: false,
+        preferredMode: null, otherMode: null, availability: [], email: null, phone: null, notificationMethod: null, reminderMode: null };
+    const availability = Object.fromEntries([...Object.keys(PROFILE_SETTING_FIELDS), "ageConsent", "policyConsent"].map(key => [key, true]));
+    availability.region = false;
+    const profile = { ageConsent: true, policyConsent: true, settings, settingsAvailability: availability };
+    assert.equal(getSettingsConfirmationState(profile).canSave, true);
 });
 
 test("RPC projection is explicit and excludes read-only provider, stats, and unknown fields", () => {
@@ -124,12 +247,22 @@ test("RPC projection is explicit and excludes read-only provider, stats, and unk
 test("setup redirects completed players to the standalone My Profile route", async () => {
     const source = await readFile(new URL("../../public/Tabs/RocketLeague/Registration/JS/index.js", import.meta.url), "utf8");
     const myProfile = await readFile(new URL("../../public/Tabs/RocketLeague/MyProfile/JS/index.js", import.meta.url), "utf8");
+    const profileService = await readFile(new URL("../../functions/services/rl/profile.js", import.meta.url), "utf8");
     assert.match(source, /profileComplete && rocketLeagueAccess/);
     assert.match(source, /navigate\("\/RocketLeague\/MyProfile", \{ replace: true \}\)/);
     assert.doesNotMatch(source, /isMyProfileRoute|profileUpdateMode|renderMyProfileReadOnlyData/);
     assert.match(source, /const settings = profile\.settings \|\| profile/);
     assert.match(myProfile, /findProfileEnabled/);
     assert.match(myProfile, /showOnlineStatus/);
+    assert.match(source, /settingsAvailability: normalizeObject\(profile\.settingsAvailability\)/);
+    assert.match(source, /settings\[snakeKey\]/);
+    assert.match(source, /profileLookupConfirmed !== "true"/);
+    assert.match(source, /findProfileEnabledConfirmed/);
+    assert.match(source, /checkbox\.checked = confirmed && settings\.findProfileEnabled === true/);
+    assert.match(source, /profileLookupConfirmed:?[\s\S]{0,100}true/);
+    assert.match(profileService, /typeof body\.findProfileEnabled === "boolean"/);
+    assert.match(profileService, /getProfileSettingsAvailability\(databaseProfile\)/);
+    assert.match(source, /profileExists === true[\s\S]{0,360}settingsAvailability\?\.findProfileEnabled/);
     const payloadBuilder = source.slice(source.indexOf("function buildRegistrationPayload"), source.indexOf("function validateRegistrationPayload"));
     assert.doesNotMatch(payloadBuilder, /provider|careerStats|stats|ranked/i);
 });

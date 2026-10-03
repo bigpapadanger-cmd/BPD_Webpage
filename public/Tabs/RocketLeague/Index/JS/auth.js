@@ -73,6 +73,10 @@ import {
     renderUnavailableRanks
 } from "./ranks.js";
 
+import {
+    getRocketLeagueAccessPresentation
+} from "./access_presentation.js";
+
 /* =========================================================
 ROUTES
 ========================================================= */
@@ -88,6 +92,7 @@ const PROTECTED_ROCKET_LEAGUE_ROUTES =
         "/RocketLeague/WeeklyMatches",
         "/RocketLeague/MyMatches",
         "/RocketLeague/PrivateMatches",
+        "/RocketLeague/MatchHistory",
         "/RocketLeague/SubmitMatchResults"
     ]);
 
@@ -339,7 +344,7 @@ function applyRocketLeagueAccessButtonState(
             buttonText
         ) {
             buttonText.textContent =
-                "Verify Epic Again for Full Access";
+                "Verify Epic Again";
         }
 
         return;
@@ -375,7 +380,7 @@ function applyRocketLeagueAccessButtonState(
             buttonText
         ) {
             buttonText.textContent =
-                "Create Rocket League Profile for Full Access";
+                "Complete Rocket League Profile";
         }
 
         return;
@@ -403,8 +408,8 @@ function applyRocketLeagueAccessButtonState(
     ) {
         buttonText.textContent =
             authenticated
-                ? "Connect Epic for Full Access"
-                : "Login with Epic for Full Access";
+                ? "Connect Epic"
+                : "Sign In with Epic";
     }
 }
 
@@ -518,6 +523,7 @@ function createRocketLeagueSession(
         epicAuthorized = false,
         requiresEpicReauthorization = false,
         profileExists = false,
+        profileLoaded = false,
         registrationAccepted = false,
         profileComplete = false,
         rocketLeagueAccess = false
@@ -571,6 +577,10 @@ function createRocketLeagueSession(
 
         profileExists:
             profileExists ===
+            true,
+
+        profileLoaded:
+            profileLoaded ===
             true,
 
         profileComplete:
@@ -712,6 +722,30 @@ function applyRocketLeagueAuthView(
             "rocketLeagueAccessCallout"
         );
 
+    const accessPresentation =
+        getRocketLeagueAccessPresentation(rocketLeagueSession);
+
+    const accessHeading =
+        document.getElementById("rocketLeagueAccessHeading");
+
+    const accessMessage =
+        document.getElementById("rocketLeagueAccessMessage");
+
+    const profileNotice =
+        document.getElementById("rocketLeagueProfileNotice");
+
+    if (accessHeading) accessHeading.textContent = accessPresentation.title;
+    if (accessMessage) accessMessage.textContent = accessPresentation.message;
+    if (profileNotice) {
+        profileNotice.hidden = !(
+            authenticated
+            && epicLinked
+            && epicAuthorized
+            && rocketLeagueSession?.profileLoaded === true
+            && !rocketLeagueAccess
+        );
+    }
+
     if (
         loggedOutContent
     ) {
@@ -732,7 +766,8 @@ function applyRocketLeagueAuthView(
         playerProfile.hidden =
             !authenticated
             || !epicLinked
-            || !epicAuthorized;
+            || !epicAuthorized
+            || !rocketLeagueAccess;
     }
 
     if (
@@ -828,6 +863,13 @@ function applyRocketLeagueUnavailableView(
         playerProfile.hidden =
             true;
     }
+
+    const accessHeading = document.getElementById("rocketLeagueAccessHeading");
+    const accessMessage = document.getElementById("rocketLeagueAccessMessage");
+    const profileNotice = document.getElementById("rocketLeagueProfileNotice");
+    if (accessHeading) accessHeading.textContent = "Rocket League access check unavailable";
+    if (accessMessage) accessMessage.textContent = message;
+    if (profileNotice) profileNotice.hidden = true;
 
     document.body.dataset.authenticated =
         "unknown";
@@ -1070,6 +1112,9 @@ async function loadProfileState(
 
             requiresEpicReauthorization:
                 false,
+
+            profileLoaded:
+                true,
 
             profileExists,
 

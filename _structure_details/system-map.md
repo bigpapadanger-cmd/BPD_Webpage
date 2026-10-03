@@ -11,6 +11,28 @@ Snapshot: 2026-10-02
 - `ocr_cloudData/` is a separate Google Cloud Run Python OCR service and is
   ignored by Git as intended.
 
+## Authentication and browser navigation
+
+Google and Discord login use same-window redirects through Pages provider-start
+routes and the shared Supabase OAuth callback. Cookie-backed PKCE state is
+validated server-side before account resolution and BPD session finalization.
+Epic has a separate direct OAuth callback and server-only credential exchange.
+OAuth/session cookies are Secure, HttpOnly, host-only, `Path=/`, and
+`SameSite=Lax`; browser storage and popups are not part of the auth contract.
+Discord account linking is independent of the currently unavailable MatchBot
+mutual-guild check. See [authentication and mobile compatibility](auth-mobile-compatibility.md)
+for the detailed flow map, provider-console checks, and physical-device matrix.
+
+The shared Rocket League sidebar is implemented in
+`public/Framework/Shell/JS/Sidebar/`. A collapsed sidebar temporarily expands
+when a submenu is opened, then returns to the saved preference when the menu is
+closed or a destination is selected. This temporary state is not persisted.
+Competition, Players, and Tools use the shared submenu controller, and Rocket
+League access visibility refreshes on Rocket League subroutes while server
+route/API authorization remains authoritative. Settings and the router share
+browser-local `bpdTheme`, `bpdAnimations`, and `bpdSidebar` preferences; Settings
+changes apply immediately and appearance is reapplied on SPA and direct loads.
+
 ## OCR execution
 
 Browser -> Pages OCR submission -> R2 + queue -> `workers/ocr-job-consumer/`
@@ -30,24 +52,31 @@ probe and is not used for normal processing.
 
 ## Rocket League provider data
 
-### Private profile routes and Discord notification eligibility
+### Rocket League pages and Discord notification eligibility
 
 `/RocketLeague/Profile` is the setup/onboarding route. Once the authenticated
 private profile confirms both completion and Rocket League access, the browser
-replaces the route with `/RocketLeague/MyProfile`. My Profile now has its own
-HTML, JavaScript module, and CSS under `public/Tabs/RocketLeague/MyProfile/`;
-it renders the authenticated private profile, three playlist ranks, known
-career totals, and independent profile-discovery/presence settings. Unknown
-numeric totals remain unavailable rather than rendering as zero. Private
-profile GETs read persisted data only: they do not wake the presence monitor or
-call the MMR/provider Worker. No direct Supabase table access was added. The
-established route is auth-gated and redirects incomplete/ineligible profiles
-back to setup.
+replaces the route with `/RocketLeague/MyProfile`. My Profile has its own HTML,
+JavaScript module, and CSS under `public/Tabs/RocketLeague/MyProfile/`; it is
+the authenticated settings editor. The private getter supplies saved settings
+and consent values. Unconfirmed settings are named and their individual
+controls disabled. Because the current save RPC replaces the complete settings
+set, submission remains disabled until every editable argument and both
+server-managed consents are confirmed. Provider/MMR/stat fields never enter the
+settings payload. Private profile GETs read persisted data only: they do not
+wake the presence monitor or call the MMR/provider Worker. No direct Supabase
+table access was added. The public Rocket League hub remains visible for
+incomplete profiles and presents a setup notice/CTA; protected features retain
+their own access requirements. Notifications may be disabled without blocking
+profile completion, with an informational warning shown in both setup and My
+Profile.
 
-My Profile additionally requests `includeMmrProgression=true`. The authenticated
-Pages profile service uses the server-only Supabase credential to call the
-service-role-only `api.get_rl_player_mmr_progression(uuid)` RPC; the browser
-never calls Supabase directly. The RPC read is independent of the MMR Worker,
+The signed-in `/RocketLeague` home displays current saved ranks, career totals,
+per-playlist capture-to-capture changes, and a graph of up to the latest 15 MMR
+captures. The authenticated Pages profile service uses the server-only
+Supabase credential to call the service-role-only
+`api.get_rl_player_mmr_progression(uuid)` and history RPCs; the browser never
+calls Supabase directly. These reads are independent of the MMR Worker,
 provider refresh, and latest-rank display. Each playlist delta is computed only
 when both captures contain a valid value; missing values affect only that
 playlist. The UI labels these as snapshot-to-snapshot changes and identifies
@@ -55,6 +84,19 @@ the previous capture time when available. A missing previous capture is shown
 as “No previous capture yet”; RPC/shape failures leave My Profile usable and
 show a temporary-unavailable message. Other private profile GETs do not request
 this RPC.
+
+Public `/RocketLeague/FindPlayers` uses the Rocket League master CSS caller and
+searches only opt-in public profiles. Result cards remain lightweight and show
+three compact playlist ranks with neutral handling for unknown presence.
+`/RocketLeague/Shop` is public and currently an informational unavailable state:
+no shop API, provider calls, items, prices, or artwork are implemented.
+`/RocketLeague/ImageScanning` is retained as a compatibility route that replaces
+the URL with `/RocketLeague/SubmitMatchResults`; it no longer renders the hub.
+`/RocketLeague/MatchHistory` is a real auth-gated page that explains
+match-by-match provider history is unsupported; it never treats MMR captures
+as matches. Leaderboards, public Match Results, Weekly Matches, My Matches, and
+Private Matches have shell-integrated status pages rather than reusing the
+Rocket League landing page or displaying fabricated records.
 
 Discord MatchBot eligibility currently returns a scoped `unavailable` result
 from `functions/services/auth/providers/discord_matchbot/eligibility.js` for
@@ -206,6 +248,11 @@ allow-list and the profile form payload. Presence is separate: GET requests are
 persisted-data-only; explicit opt-in on a successful profile save activates only
 the scheduled monitor.
 
+The `find_profile_enabled` mapping recognizes the authoritative nested snake_case
+field returned by the live private profile RPC, so a real `false` is available
+without defaulting an unavailable value in the browser. Discovery opt-in remains
+independent from `show_online_status`.
+
 ## Configuration ownership
 
 - Root `wrangler.jsonc` owns Pages bindings, including
@@ -267,3 +314,26 @@ transport contract, boundaries, and operator sequence.
   action limits, and dependency semantics.
 - See [request-frequency inventory](request-frequency-inventory.md) for audited
   callers, controls, and known measurement gaps.
+
+## Public help and account settings
+
+`/FAQ` is curated static content describing only implemented behavior. It does
+not request `/api/faq` or `/api/faq/upvote`; community submissions and votes
+remain on the separate `/Suggestions` page. The footer links to FAQ but does not
+invent a Contact route or support destination.
+
+`/Settings` retains browser-local appearance controls and AdSense Privacy &
+Messaging revocation for optional advertising choices. When signed in, it edits
+only the canonical BPD display name through the existing same-origin account
+mutation. The server resolves the account from the current session and exposes
+the display name and its change/cooldown timestamps only. Names are globally
+unique without case sensitivity; DomainData performs conservative server-side
+appropriateness checks, while Supabase remains authoritative for final validation,
+uniqueness, and the 30-day change cooldown. Settings presents the authoritative
+unlock time in the browser's local timezone and refreshes the remaining-time
+display once per minute; this display is not authorization. An explicit `null`
+availability timestamp means no active cooldown, while a missing or malformed
+field keeps an existing name locked until the account contract is confirmed.
+Image fallback requests use the existing `/Assets/images/bad_image/fallback.png`;
+the unavailable Steam icon has no image request. See
+[Account Settings sub-map](system_sub_map/account-settings.md).

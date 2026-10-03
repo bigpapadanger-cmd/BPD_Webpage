@@ -18,11 +18,23 @@ is retained, including `s_find_profile_enabled`. Unknown browser properties
 are not forwarded. Provider identity, MMR, and career statistics are read-only
 and never enter the settings write payload.
 
-The update form uses persisted settings from the private GET. Completed
-registration displays “Update Profile”; incomplete registration displays
-“Complete Registration”. Normal profile GET does not call MMR or the provider
+The My Profile editor renders the saved values from the private GET and reports
+unconfirmed editable fields by name. A field is individually disabled when its
+availability flag or value type is not confirmed. The current RPC is a full
+settings replacement, so the Update Profile action stays disabled until every
+editable RPC value and both server-managed consent values can be confirmed; this
+prevents an unknown value from being submitted as a default. Explicit `false`,
+empty string, empty array, and nullable text values remain distinct. Server-owned
+consents are never editable. Normal profile GET does not call MMR or the provider
 Worker. The separate Admin force-refresh operation changes only provider-derived
 MMR/profile/stats records; it does not change registration settings.
+
+The editor supports the current persisted settings: automatic region detection,
+preferred/other mode, weekly availability, online-status sharing, Find Players
+visibility, email/phone contact values, notification enablement, notification
+method, and reminder timing. Region/country/time zone and consent status remain
+read-only. Provider identity, rank/MMR, career stats, and presence are not save
+fields.
 
 ## Database contract changes
 

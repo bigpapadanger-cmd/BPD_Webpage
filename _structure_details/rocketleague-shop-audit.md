@@ -1,6 +1,8 @@
 # Rocket League Item Shop Source Audit
 
-Snapshot: 2026-10-02. Source review only. No shop service, page UI, endpoint,
+Snapshot: 2026-10-02. This remains a source review of the upstream shop
+protocol. DomainData now has a public `/RocketLeague/Shop` information page,
+but no shop service, endpoint, data ingestion, or live inventory UI. No
 Supabase change, MMR Worker change, or deployment was made.
 
 ## Upstream source and trust boundary
@@ -12,9 +14,10 @@ WebSocket. The shop RPCs execute on that authenticated session. Do not put its
 credentials/session tokens in DomainData browser code or return authenticated
 raw responses to clients.
 
-The repository exposes only an informational Admin capability placeholder for
-`item-shop.read`; there is no provider, persistence, route, or frontend shop
-skeleton to extend. The current MMR Worker is explicitly out of scope.
+The repository exposes an informational Admin capability placeholder for
+`item-shop.read`. The public Shop page states that live data is not yet
+available; it does not call a provider or display fabricated inventory. The
+current MMR Worker remains explicitly out of scope.
 
 ## Shop RPCs inspected
 

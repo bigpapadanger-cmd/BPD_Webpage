@@ -1025,3 +1025,11 @@ AUTHORIZATION VISIBILITY
 .site-sidebar .nav-item[hidden] {
     display: none !important;
 }
+
+.site-sidebar .nav-item[aria-current="page"],
+.site-sidebar .nav-item.active,
+.site-sidebar .sidebar-submenu .submenu-item[aria-current="page"] {
+    color: var(--site-accent);
+    border-color: var(--site-accent);
+    background-color: var(--site-accent-soft);
+}

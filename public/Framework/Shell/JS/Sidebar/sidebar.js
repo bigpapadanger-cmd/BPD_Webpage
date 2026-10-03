@@ -33,8 +33,19 @@ import {
 } from "./admin_navigation.js";
 
 import {
+    closeSidebarSubmenus,
     initializeSidebarSubmenus
 } from "./submenu.js";
+
+import {
+    setSidebarCollapsed
+} from "./state.js";
+
+import {
+    applyAppearancePreferences,
+    readPreferences,
+    readSidebarPreference
+} from "../preferences.js";
 
 /* =========================================================
 MODULE STATE
@@ -92,6 +103,12 @@ INTERACTIVE INITIALIZATION
 
 function initializeInteractiveSidebar() {
     initializeSidebarSubmenus();
+    const path = window.location.pathname.toLowerCase();
+    if (path.startsWith("/rocketleague/") && path !== "/rocketleague") {
+        void import("/Tabs/RocketLeague/Index/JS/auth.js")
+            .then(module => module.initializeRocketLeagueAuthView())
+            .catch(error => console.error("ROCKET LEAGUE SIDEBAR AUTH: Unable to refresh access visibility.", { message: error?.message || "Unknown error" }));
+    }
 
     /*
      * Authorization is asynchronous.
@@ -213,6 +230,9 @@ Sidebar preference is respected at every viewport size.
 ========================================================= */
 
 function applyGlobalSettings() {
+    const preferences = readPreferences();
+    preferences.sidebar = readSidebarPreference();
+    applyAppearancePreferences(preferences);
     const sidebar =
         document.getElementById(
             "sidebar"
@@ -229,22 +249,7 @@ function applyGlobalSettings() {
         return;
     }
 
-    const savedSidebar =
-        localStorage.getItem(
-            "bpdSidebar"
-        );
-
-    const savedTheme =
-        localStorage.getItem(
-            "bpdTheme"
-        )
-        || "blue";
-
-    const savedAnimations =
-        localStorage.getItem(
-            "bpdAnimations"
-        )
-        || "on";
+    const savedSidebar = preferences.sidebar;
 
     /*
      * Existing users keep their preference.
@@ -284,66 +289,6 @@ function applyGlobalSettings() {
         shouldCollapse
     );
 
-    document.body.dataset.theme =
-        savedTheme;
-
-    document.body.dataset.animations =
-        savedAnimations;
-
-    document.body.classList.toggle(
-        "animations-off",
-        savedAnimations ===
-            "off"
-    );
-}
-
-/* =========================================================
-SET SIDEBAR STATE
-========================================================= */
-
-function setSidebarCollapsed(
-    sidebar,
-    sidebarToggle,
-    collapsed
-) {
-    if (
-        !sidebar
-    ) {
-        return;
-    }
-
-    sidebar.classList.toggle(
-        "collapsed",
-        collapsed
-    );
-
-    document.body.classList.toggle(
-        "sidebar-collapsed",
-        collapsed
-    );
-
-    document.body.dataset.sidebar =
-        collapsed
-            ? "collapsed"
-            : "open";
-
-    if (
-        sidebarToggle
-    ) {
-        sidebarToggle.setAttribute(
-            "aria-expanded",
-            String(
-                !collapsed
-            )
-        );
-
-        sidebarToggle.setAttribute(
-            "aria-label",
-            collapsed
-                ? "Expand navigation"
-                : "Collapse navigation"
-        );
-    }
 }
 
 /* =========================================================
@@ -394,6 +339,10 @@ function setupSidebarToggle() {
 
             const willCollapse =
                 !isCollapsed;
+
+            if (willCollapse) {
+                closeSidebarSubmenus({ restoreSidebar: false });
+            }
 
             setSidebarCollapsed(
                 sidebar,
@@ -455,6 +404,7 @@ function handleSidebarResize() {
 
     if (
         !sidebar
+        || document.body.dataset.sidebarTemporaryExpanded === "true"
     ) {
         return;
     }

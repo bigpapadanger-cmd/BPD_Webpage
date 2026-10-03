@@ -1,6 +1,8 @@
 /* BPD GAMING NETWORK - GLOBAL SHELL */
 
 :root {
+    --site-accent: #4da3ff;
+    --site-accent-soft: rgba(77, 163, 255, 0.18);
     --sidebar-width: 210px;
     --sidebar-collapsed-width: 56px;
     --sidebar-icon-width: 50px;
@@ -39,6 +41,28 @@
             - var(--app-top-offset)
             - var(--app-bottom-gap)
         );
+}
+
+body[data-theme="orange"] { --site-accent: #ffad5c; --site-accent-soft: rgba(255, 173, 92, 0.18); }
+body[data-theme="purple"] { --site-accent: #c69bff; --site-accent-soft: rgba(198, 155, 255, 0.18); }
+body[data-theme="green"] { --site-accent: #62dfa0; --site-accent-soft: rgba(98, 223, 160, 0.18); }
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+    outline: 2px solid var(--site-accent);
+    outline-offset: 3px;
+}
+
+body.animations-off *,
+body.animations-off *::before,
+body.animations-off *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
 }
 
 *,

@@ -15,8 +15,12 @@ export function consumeOAuthError() {
     const url = new URL(window.location.href);
     if (!url.searchParams.has("error")) return "";
     const code = url.searchParams.get("error");
-    const message = Object.hasOwn(MESSAGES, code)
+    let message = Object.hasOwn(MESSAGES, code)
         ? MESSAGES[code] : "Sign-in could not be completed. Please try again from this page.";
+    const debugId = url.searchParams.get("debugId");
+    if (code === "AUTH_SERVICE_UNAVAILABLE" && /^[0-9a-f-]{36}$/iu.test(debugId || "")) {
+        message += ` Reference ID: ${debugId}`;
+    }
     url.searchParams.delete("error");
     url.searchParams.delete("debugId");
     window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);

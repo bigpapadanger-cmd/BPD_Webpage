@@ -558,6 +558,7 @@ Security:
                 <small>
                     Off by default. This does not control leaderboard visibility.
                 </small>
+                <small id="findProfileAvailabilityNotice" hidden></small>
             </div>
         </fieldset>
 
@@ -615,7 +616,7 @@ Security:
             <div
                 id="noDirectContactWarning"
                 class="inline-warning"
-                role="alert"
+                role="status"
                 hidden
             >
                 <strong>
@@ -698,19 +699,11 @@ Security:
             <div
                 id="notificationOptOutWarning"
                 class="inline-warning"
-                role="alert"
+                role="status"
                 hidden
             >
-                <strong>
-                    Notifications are disabled
-                </strong>
-
-                <span>
-                    You remain responsible for every match you join.
-                    Missing too many scheduled matches may result in
-                    removal from matches or loss of eligibility to
-                    join Rocket League seasons.
-                </span>
+                <strong>Notifications are off</strong>
+                <span>You may miss scheduled reminders and other alerts while notifications are disabled. This does not prevent profile completion.</span>
             </div>
 
             <!-- =============================================
@@ -1002,54 +995,4 @@ Security:
         </div>
     </form>
 
-    <!-- =====================================================
-    NOTIFICATION OPT-OUT MODAL
-    ====================================================== -->
-
-    <div
-        id="notificationOptOutModal"
-        class="registration-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="notificationOptOutModalTitle"
-        hidden
-    >
-        <div
-            class="registration-modal-backdrop"
-            data-modal-close
-        ></div>
-
-        <div class="registration-modal-card">
-            <strong
-                id="notificationOptOutModalTitle"
-            >
-                Turn off match notifications?
-            </strong>
-
-            <p>
-                If you opt out, you remain responsible for joined
-                matches. Missing too many scheduled matches may
-                result in removal from matches or loss of
-                eligibility to join Rocket League seasons.
-            </p>
-
-            <div class="registration-modal-actions">
-                <button
-                    id="keepNotificationsButton"
-                    class="secondary-button"
-                    type="button"
-                >
-                    Keep notifications on
-                </button>
-
-                <button
-                    id="confirmNotificationsOffButton"
-                    class="danger-button"
-                    type="button"
-                >
-                    Turn notifications off
-                </button>
-            </div>
-        </div>
-    </div>
 </section>

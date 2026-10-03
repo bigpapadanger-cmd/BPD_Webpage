@@ -168,6 +168,17 @@ function normalizeTimestamp(
         : null;
 }
 
+function normalizeAccountTimestampField(account, snakeCase, camelCase) {
+    const key = Object.hasOwn(account, snakeCase) ? snakeCase : Object.hasOwn(account, camelCase) ? camelCase : null;
+    if (!key) return null;
+    const value = account[key];
+    if (value === null) return { value: null };
+    if (typeof value === "number" && Number.isFinite(value) && value > 0) return { value };
+    if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/i.test(value)) return null;
+    const timestamp = Date.parse(value);
+    return Number.isFinite(timestamp) ? { value: timestamp } : null;
+}
+
 /* =========================================================
 SAFE PROVIDER
 ========================================================= */
@@ -534,6 +545,9 @@ export async function getCanonicalAccount(
         );
     }
 
+    const displayNameChangedAt = normalizeAccountTimestampField(account, "display_name_changed_at", "displayNameChangedAt");
+    const displayNameChangeAvailableAt = normalizeAccountTimestampField(account, "display_name_change_available_at", "displayNameChangeAvailableAt");
+
     return {
         userId:
             resolvedAccountId,
@@ -542,6 +556,10 @@ export async function getCanonicalAccount(
             normalizeNullableString(
                 account.display_name
             ),
+
+        ...(displayNameChangedAt ? { displayNameChangedAt: displayNameChangedAt.value } : {}),
+
+        ...(displayNameChangeAvailableAt ? { displayNameChangeAvailableAt: displayNameChangeAvailableAt.value } : {}),
 
         role:
             normalizeString(
@@ -1042,6 +1060,12 @@ export async function handleAuthSession(
 
                     displayName:
                         account.displayName,
+
+                    ...(Object.hasOwn(account, "displayNameChangedAt")
+                        ? { displayNameChangedAt: account.displayNameChangedAt } : {}),
+
+                    ...(Object.hasOwn(account, "displayNameChangeAvailableAt")
+                        ? { displayNameChangeAvailableAt: account.displayNameChangeAvailableAt } : {}),
 
                     role:
                         account.role

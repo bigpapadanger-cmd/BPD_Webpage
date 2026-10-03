@@ -67,7 +67,7 @@ const DEFAULT_AUTHENTICATED_REDIRECT =
     "/Account";
 
 const FALLBACK_IMAGE_URL =
-    "/images/bad_image/fallback.png";
+    "/Assets/images/bad_image/fallback.png";
 
 const TURNSTILE_SCRIPT_URL =
     "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";

@@ -94,7 +94,7 @@ const ACCOUNT_CAPABILITIES = Object.freeze({
 });
 
 const FALLBACK_IMAGE_URL =
-    "/images/bad_image/fallback.png";
+    "/Assets/images/bad_image/fallback.png";
 
 /* =========================================================
 PROVIDER CONFIGURATION
@@ -129,10 +129,7 @@ const PROVIDER_CONFIG =
         steam: {
             authorizationAvailable: false,
             label:
-                "Steam",
-
-            icon:
-                "/Assets/images/framework_icons/steam-symbol-white.png"
+                "Steam"
         }
     });
 

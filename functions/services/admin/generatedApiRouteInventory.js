@@ -269,6 +269,78 @@ export const PAGE_ROUTE_INVENTORY = Object.freeze([
     ]
   },
   {
+    "path": "/RocketLeague/MatchHistory",
+    "lookupKey": "/rocketleague/matchhistory",
+    "canonicalPath": "/RocketLeague/MatchHistory",
+    "routeType": "page",
+    "casePolicy": "human-insensitive",
+    "sourceFiles": [
+      "public/routes.js"
+    ],
+    "handler": "functions/[[path]].js",
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "authRequired": true,
+    "healthStatus": "registered",
+    "deepLinkSupported": true,
+    "targets": [
+      {
+        "path": "/Tabs/RocketLeague/Features/HTML/match-history.html",
+        "exists": true
+      },
+      {
+        "path": "/Framework/Shell/HTML/Header/header.html",
+        "exists": true
+      },
+      {
+        "path": "/Framework/Shell/HTML/Sidebar/rl_menu.html",
+        "exists": true
+      },
+      {
+        "path": "/Framework/Shell/HTML/Footer/footer.html",
+        "exists": true
+      }
+    ]
+  },
+  {
+    "path": "/RocketLeague/Shop",
+    "lookupKey": "/rocketleague/shop",
+    "canonicalPath": "/RocketLeague/Shop",
+    "routeType": "page",
+    "casePolicy": "human-insensitive",
+    "sourceFiles": [
+      "public/routes.js"
+    ],
+    "handler": "functions/[[path]].js",
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "authRequired": false,
+    "healthStatus": "registered",
+    "deepLinkSupported": true,
+    "targets": [
+      {
+        "path": "/Tabs/RocketLeague/Features/HTML/shop.html",
+        "exists": true
+      },
+      {
+        "path": "/Framework/Shell/HTML/Header/header.html",
+        "exists": true
+      },
+      {
+        "path": "/Framework/Shell/HTML/Sidebar/rl_menu.html",
+        "exists": true
+      },
+      {
+        "path": "/Framework/Shell/HTML/Footer/footer.html",
+        "exists": true
+      }
+    ]
+  },
+  {
     "path": "/RocketLeague/FindPlayers",
     "lookupKey": "/rocketleague/findplayers",
     "canonicalPath": "/RocketLeague/FindPlayers",
@@ -447,7 +519,7 @@ export const PAGE_ROUTE_INVENTORY = Object.freeze([
     "deepLinkSupported": true,
     "targets": [
       {
-        "path": "/Tabs/RocketLeague/Index/HTML/index.html",
+        "path": "/Tabs/RocketLeague/Features/HTML/leaderboards.html",
         "exists": true
       },
       {
@@ -460,10 +532,6 @@ export const PAGE_ROUTE_INVENTORY = Object.freeze([
       },
       {
         "path": "/Framework/Shell/HTML/Footer/footer.html",
-        "exists": true
-      },
-      {
-        "path": "/Tabs/RocketLeague/Index/JS/index.js",
         "exists": true
       }
     ]
@@ -482,12 +550,12 @@ export const PAGE_ROUTE_INVENTORY = Object.freeze([
       "GET",
       "HEAD"
     ],
-    "authRequired": true,
+    "authRequired": false,
     "healthStatus": "registered",
     "deepLinkSupported": true,
     "targets": [
       {
-        "path": "/Tabs/RocketLeague/MatchResults/HTML/index.html",
+        "path": "/Tabs/RocketLeague/Features/HTML/match-results.html",
         "exists": true
       },
       {
@@ -501,9 +569,113 @@ export const PAGE_ROUTE_INVENTORY = Object.freeze([
       {
         "path": "/Framework/Shell/HTML/Footer/footer.html",
         "exists": true
+      }
+    ]
+  },
+  {
+    "path": "/RocketLeague/WeeklyMatches",
+    "lookupKey": "/rocketleague/weeklymatches",
+    "canonicalPath": "/RocketLeague/WeeklyMatches",
+    "routeType": "page",
+    "casePolicy": "human-insensitive",
+    "sourceFiles": [
+      "public/routes.js"
+    ],
+    "handler": "functions/[[path]].js",
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "authRequired": true,
+    "healthStatus": "registered",
+    "deepLinkSupported": true,
+    "targets": [
+      {
+        "path": "/Tabs/RocketLeague/Features/HTML/weekly-matches.html",
+        "exists": true
       },
       {
-        "path": "/Tabs/RocketLeague/MatchResults/JS/index.js",
+        "path": "/Framework/Shell/HTML/Header/header.html",
+        "exists": true
+      },
+      {
+        "path": "/Framework/Shell/HTML/Sidebar/rl_menu.html",
+        "exists": true
+      },
+      {
+        "path": "/Framework/Shell/HTML/Footer/footer.html",
+        "exists": true
+      }
+    ]
+  },
+  {
+    "path": "/RocketLeague/MyMatches",
+    "lookupKey": "/rocketleague/mymatches",
+    "canonicalPath": "/RocketLeague/MyMatches",
+    "routeType": "page",
+    "casePolicy": "human-insensitive",
+    "sourceFiles": [
+      "public/routes.js"
+    ],
+    "handler": "functions/[[path]].js",
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "authRequired": true,
+    "healthStatus": "registered",
+    "deepLinkSupported": true,
+    "targets": [
+      {
+        "path": "/Tabs/RocketLeague/Features/HTML/my-matches.html",
+        "exists": true
+      },
+      {
+        "path": "/Framework/Shell/HTML/Header/header.html",
+        "exists": true
+      },
+      {
+        "path": "/Framework/Shell/HTML/Sidebar/rl_menu.html",
+        "exists": true
+      },
+      {
+        "path": "/Framework/Shell/HTML/Footer/footer.html",
+        "exists": true
+      }
+    ]
+  },
+  {
+    "path": "/RocketLeague/PrivateMatches",
+    "lookupKey": "/rocketleague/privatematches",
+    "canonicalPath": "/RocketLeague/PrivateMatches",
+    "routeType": "page",
+    "casePolicy": "human-insensitive",
+    "sourceFiles": [
+      "public/routes.js"
+    ],
+    "handler": "functions/[[path]].js",
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "authRequired": true,
+    "healthStatus": "registered",
+    "deepLinkSupported": true,
+    "targets": [
+      {
+        "path": "/Tabs/RocketLeague/Features/HTML/private-matches.html",
+        "exists": true
+      },
+      {
+        "path": "/Framework/Shell/HTML/Header/header.html",
+        "exists": true
+      },
+      {
+        "path": "/Framework/Shell/HTML/Sidebar/rl_menu.html",
+        "exists": true
+      },
+      {
+        "path": "/Framework/Shell/HTML/Footer/footer.html",
         "exists": true
       }
     ]
@@ -580,10 +752,6 @@ export const PAGE_ROUTE_INVENTORY = Object.freeze([
       },
       {
         "path": "/Framework/Shell/HTML/Footer/footer.html",
-        "exists": true
-      },
-      {
-        "path": "/Required/FAQ/JS/index.js",
         "exists": true
       }
     ]

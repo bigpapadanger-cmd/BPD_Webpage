@@ -7,6 +7,23 @@
         aria-hidden="true"
     ></div>
 
+    <aside
+        id="rocketLeagueProfileNotice"
+        class="rocket-league-profile-notice"
+        role="status"
+        aria-live="polite"
+        hidden
+    >
+        <a href="/RocketLeague/Profile" data-router-link class="rocket-league-profile-notice-link">
+            <span class="rocket-league-profile-notice-dot" aria-hidden="true"></span>
+            <span class="rocket-league-profile-notice-content">
+                <strong>Complete your Rocket League profile</strong>
+                <span>Your Epic account is linked. Finish setup for full Player Hub access, including preferences, privacy, availability, and notifications.</span>
+                <span class="rocket-league-profile-notice-action">Complete profile <span aria-hidden="true">→</span></span>
+            </span>
+        </a>
+    </aside>
+
     <div class="rocket-league-panel">
         <div class="rocket-league-page-content">
 
@@ -26,9 +43,8 @@
                     </p>
 
                     <p class="hero-description">
-                        Community-driven Rocket League seasons,
-                        scheduled matches, competitive statistics,
-                        leaderboards, events, and player discovery.
+                        Linked-player ranks, saved MMR progression,
+                        supported career totals, and opt-in player discovery.
                     </p>
 
                     <!-- Guest / incomplete access CTA -->
@@ -36,6 +52,7 @@
                         class="hero-action-row"
                         id="rocketLeagueAccessCallout"
                     >
+                        <h2 class="hero-access-heading" id="rocketLeagueAccessHeading">Sign in to enter the Rocket League Player Hub</h2>
                         <button
                             class="auth-login-button"
                             id="mainRLLoginButton"
@@ -54,9 +71,9 @@
                             </span>
                         </button>
 
-                        <span class="hero-access-note">
-                            Leaderboards, match results, and player
-                            discovery are available without full Rocket League access.
+                        <span class="hero-access-note" id="rocketLeagueAccessMessage">
+                            Explore opted-in public profiles and the shop page. Your
+                            private competitive data requires a linked account.
                         </span>
                     </div>
 
@@ -155,6 +172,8 @@
                             </article>
                         </div>
 
+                        <p class="rl-home-data-note">Your latest saved competitive rankings across supported playlists.</p>
+
                         <p id="rocketLeagueMmrFreshness" class="player-data-freshness" aria-live="polite" hidden></p>
 
                         <section class="rl-home-data-panel" aria-labelledby="rocketLeagueRecentChangeTitle">
@@ -178,6 +197,7 @@
 
                         <section id="rocketLeagueCareerStats" class="career-stats-panel" aria-labelledby="rocketLeagueCareerStatsTitle" hidden>
                             <h2 id="rocketLeagueCareerStatsTitle">Career totals</h2>
+                            <p class="rl-home-data-note">Supported aggregate totals include wins, goals, assists, saves, shots, and MVPs. Missing values remain unavailable.</p>
                             <div id="rocketLeagueCareerStatsGrid" class="career-stats-grid"></div>
                             <p id="rocketLeagueCareerStatsFreshness" class="player-data-freshness" hidden></p>
                         </section>
@@ -295,18 +315,17 @@
                     </h2>
 
                     <p>
-                        The BPD Gaming Network Rocket League hub brings
-                        organized competition, player statistics,
-                        scheduled matches, community events, and
-                        competitive history into one place.
+                        This hub brings linked-player rankings, saved MMR
+                        changes, supported career totals, profile settings,
+                        and opt-in player discovery into one place.
                     </p>
 
                     <p>
-                        Anyone can explore public leaderboards, review
-                        match results, and discover players. Connecting
-                        an Epic Games account unlocks participation in
-                        seasons, weekly matchmaking, private matches,
-                        profile tracking, and scoreboard submission.
+                        Public visitors can browse opted-in player profiles
+                        and check the Rocket League Shop page. Connected
+                        players can review persisted profile data and manage
+                        privacy choices. Unsupported values are left unavailable,
+                        not estimated.
                     </p>
                 </section>
 
@@ -402,14 +421,14 @@
                             </strong>
 
                             <span>
-                                Explore player rankings, standings,
-                                performance statistics, and season data.
+                                BPD does not currently publish community
+                                leaderboard standings here.
                             </span>
                         </a>
 
                         <a
                             class="rocket-league-feature-link"
-                            href="/RocketLeague/Leaderboards/MatchResults"
+                            href="/RocketLeague/MatchResults"
                             data-router-link
                         >
                             <span class="feature-link-label">
@@ -421,8 +440,8 @@
                             </strong>
 
                             <span>
-                                Browse completed matches and recorded
-                                game statistics.
+                                Public match-by-match results are not
+                                currently published here.
                             </span>
                         </a>
 
@@ -444,7 +463,24 @@
                                 across the BPD Gaming Network.
                             </span>
                         </a>
+
+                        <a
+                            class="rocket-league-feature-link"
+                            href="/RocketLeague/Shop"
+                            data-router-link
+                        >
+                            <span class="feature-link-label">ITEM SHOP</span>
+                            <strong>Rocket League Shop</strong>
+                            <span>Live item data is not available yet. This page will show verified cached rotation details when ready.</span>
+                        </a>
                     </div>
+                </section>
+
+                <section class="content-card" aria-labelledby="rocketLeagueDataNotesTitle">
+                    <span class="card-label">ABOUT YOUR DATA</span>
+                    <h2 id="rocketLeagueDataNotesTitle">Saved, explained, and never estimated</h2>
+                    <p>Rankings, MMR changes, and career totals come from persisted captures. A normal page visit reads saved data and does not trigger a provider refresh.</p>
+                    <p>MMR changes compare one capture with the previous capture. The history chart shows up to 15 saved captures, not individual matches. Freshness labels use capture timestamps where available; unsupported or missing values stay unavailable.</p>
                 </section>
 
                 <!-- Middle advertisement -->

@@ -10,19 +10,60 @@ function isNullableString(value) {
 }
 
 export function getConfirmedSettings(profile) {
+    return getSettingsConfirmationState(profile).canSave
+        ? profile.settings
+        : null;
+}
+
+const SETTING_LABELS = Object.freeze({
+    autoDetectRegion: "region detection",
+    showOnlineStatus: "online status sharing",
+    findProfileEnabled: "Find Players visibility",
+    preferredMode: "preferred mode",
+    otherMode: "other mode details",
+    availability: "weekly availability",
+    email: "email",
+    phone: "phone",
+    notificationsEnabled: "match notifications",
+    notificationMethod: "delivery method",
+    reminderMode: "reminder timing"
+});
+
+function hasValidSettingValue(settings, key) {
+    const value = settings?.[key];
+    if (["autoDetectRegion", "showOnlineStatus", "findProfileEnabled", "notificationsEnabled"].includes(key)) {
+        return typeof value === "boolean";
+    }
+    if (key === "availability") return Array.isArray(value);
+    return isNullableString(value);
+}
+
+export function isSettingConfirmed(profile, key) {
     const settings = profile?.settings;
     const availability = profile?.settingsAvailability;
-    if (!settings || typeof settings !== "object" || Array.isArray(settings)
-        || !availability || typeof availability !== "object" || Array.isArray(availability)
-        || !EDITABLE_FIELDS.every(key => availability[key] === true)
-        || availability.ageConsent !== true || availability.policyConsent !== true
-        || typeof profile.ageConsent !== "boolean" || typeof profile.policyConsent !== "boolean") return null;
+    return Boolean(settings && availability
+        && typeof settings === "object" && !Array.isArray(settings)
+        && typeof availability === "object" && !Array.isArray(availability)
+        && availability[key] === true && hasValidSettingValue(settings, key));
+}
 
-    if (!["autoDetectRegion", "showOnlineStatus", "findProfileEnabled", "notificationsEnabled"].every(key => typeof settings[key] === "boolean")
-        || !Array.isArray(settings.availability)
-        || !["preferredMode", "otherMode", "email", "phone", "notificationMethod", "reminderMode"].every(key => isNullableString(settings[key]))) return null;
+export function getSettingsConfirmationState(profile) {
+    const settings = profile?.settings;
+    const availability = profile?.settingsAvailability;
+    const hasAvailability = availability && typeof availability === "object" && !Array.isArray(availability);
+    const unconfirmedFields = EDITABLE_FIELDS.filter(key => !isSettingConfirmed(profile, key));
+    const consentsConfirmed = hasAvailability
+        && availability.ageConsent === true
+        && availability.policyConsent === true
+        && typeof profile?.ageConsent === "boolean"
+        && typeof profile?.policyConsent === "boolean";
 
-    return settings;
+    return {
+        unconfirmedFields,
+        unconfirmedLabels: unconfirmedFields.map(key => SETTING_LABELS[key]),
+        consentsConfirmed,
+        canSave: unconfirmedFields.length === 0 && consentsConfirmed
+    };
 }
 
 function preserveNull(original, value) {

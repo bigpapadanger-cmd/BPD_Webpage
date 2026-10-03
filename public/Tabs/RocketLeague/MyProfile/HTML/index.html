@@ -1,4 +1,3 @@
-<link rel="stylesheet" href="/Tabs/RocketLeague/MyProfile/CSS/index.css">
 <main class="rl-my-profile" aria-labelledby="myProfileTitle">
     <header class="my-profile-heading">
         <p class="my-profile-eyebrow">ROCKET LEAGUE · PLAYER HUB</p>
@@ -19,7 +18,8 @@
         <div class="my-profile-section-heading">
             <div><p class="my-profile-eyebrow">YOUR PREFERENCES</p><h2 id="mySettingsTitle">Profile settings</h2></div>
         </div>
-        <p class="my-profile-note">Profile discovery and online-presence sharing are independent. Unknown saved values lock editing to prevent accidental overwrites.</p>
+        <p class="my-profile-note">Profile discovery and online-presence sharing are independent. Unconfirmed controls remain locked, and updates wait until the full saved settings set can be verified.</p>
+        <p id="myProfileVerificationNotice" class="my-profile-note my-profile-verification" role="status" hidden></p>
         <form id="myProfileSettingsForm" class="my-profile-settings" hidden>
             <fieldset class="my-profile-settings-group">
                 <legend>Visibility and location</legend>
@@ -42,6 +42,7 @@
                     <label class="my-profile-field" for="profilePhone"><span>Phone</span><input id="profilePhone" type="tel" maxlength="24" autocomplete="tel"></label>
                 </div>
                 <label class="my-profile-toggle"><input id="notificationsEnabled" type="checkbox"><span><strong>Match notifications</strong><small>Choose where and when to receive match reminders.</small></span></label>
+                <p id="notificationsOptOutNote" class="my-profile-note" role="status" hidden>You may miss scheduled reminders and other alerts while notifications are disabled. This does not prevent profile completion.</p>
                 <div id="notificationFields" class="my-profile-settings-fields">
                     <label class="my-profile-field" for="notificationMethod"><span>Delivery method</span><select id="notificationMethod"><option value="">Choose a method</option><option value="email">Email</option><option value="phone">Phone</option><option value="discord">Discord (existing preference)</option></select></label>
                     <label class="my-profile-field" for="reminderMode"><span>Reminder timing</span><select id="reminderMode"><option value="">Choose timing</option><option value="24-hours">24 hours before</option><option value="1-hour">1 hour before</option><option value="both">Both</option></select></label>

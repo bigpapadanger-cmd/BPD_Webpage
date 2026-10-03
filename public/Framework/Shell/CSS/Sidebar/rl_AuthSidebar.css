@@ -445,17 +445,8 @@ COLLAPSED STATE
 =========================================================
 */
 
-body.sidebar-collapsed
-.sidebar-view-rocketleague
-.sidebar-group-label,
-
-body.sidebar-collapsed
-.sidebar-view-rocketleague
-.submenu-arrow,
-
-body.sidebar-collapsed
-.sidebar-view-rocketleague
-.sidebar-submenu {
+body.sidebar-collapsed .sidebar-view-rocketleague .sidebar-group-label,
+body.sidebar-collapsed .sidebar-view-rocketleague .submenu-arrow {
     display: none;
 }
 

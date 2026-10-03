@@ -32,9 +32,9 @@ export async function initializePage() {
     const submit = document.getElementById("playerSearchSubmit");
     if (!form || !queryInput || !results || !status || !submit) return;
 
-    status.textContent = "Search for a Rocket League player.";
+    status.textContent = "";
     status.dataset.state = "ready";
-    renderSearchState(document, results, "initial", "Search for a Rocket League player.");
+    renderSearchState(document, results, "initial", "Search above to find players who enabled profile discovery.");
 
     let activeController = null;
     form.addEventListener("submit", async (event) => {

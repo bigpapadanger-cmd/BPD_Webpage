@@ -28,7 +28,7 @@ function getPath(source, path) {
 export function getProfileSettingsAvailability(source) {
     const input = source && typeof source === "object" && !Array.isArray(source) ? source : {};
     const availability = Object.fromEntries(Object.entries(PROFILE_SETTING_FIELDS).map(([key, definition]) => {
-        const paths = [`settings.${key}`, key, definition.db, ...(definition.aliases || [])];
+        const paths = [`settings.${key}`, `settings.${definition.db}`, key, definition.db, ...(definition.aliases || [])];
         return [key, paths.some(path => getPath(input, path) !== undefined)];
     }));
     availability.ageConsent = ["ageConsent", "age_consent"].some(path => getPath(input, path) !== undefined);
@@ -47,7 +47,7 @@ export function normalizeProfileSettings(source) {
     const input = source && typeof source === "object" && !Array.isArray(source) ? source : {};
     const settings = {};
     for (const [key, definition] of Object.entries(PROFILE_SETTING_FIELDS)) {
-        const paths = [`settings.${key}`, key, definition.db, ...(definition.aliases || [])];
+        const paths = [`settings.${key}`, `settings.${definition.db}`, key, definition.db, ...(definition.aliases || [])];
         let value;
         for (const path of paths) {
             const candidate = getPath(input, path);
@@ -65,7 +65,7 @@ export function mapProfileSettingsToRpcArgs(settings) {
     const normalized = normalizeProfileSettings({ settings });
     return Object.fromEntries(Object.entries(PROFILE_SETTING_FIELDS).map(([key, definition]) => {
         const value = normalized[key];
-        const mapped = definition.type === "boolean" ? value === true
+        const mapped = definition.type === "boolean" ? value
             : definition.type === "array" ? (Array.isArray(value) ? value : [])
                 : value;
         return [definition.rpc, mapped];

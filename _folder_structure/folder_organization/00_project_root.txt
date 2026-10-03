@@ -1,5 +1,5 @@
 PROJECT ROOT: CURRENT STRUCTURE
-Snapshot: 2026-09-26
+Snapshot: 2026-10-02
 
 DomainData/  (saved in Codex as the RLFolderStructuring project)
 |
@@ -8,6 +8,8 @@ DomainData/  (saved in Codex as the RLFolderStructuring project)
 +-- public/              Static site output, client router, pages, and assets.
 +-- workers/             Independently deployed Cloudflare Workers.
 +-- _structure_details/  Canonical system map and maintained subsystem maps.
+|   +-- auth-mobile-compatibility.md Provider flows, cookie boundaries, and manual test matrix.
+|   +-- system_sub_map/account-settings.md BPD display-name safety, session timestamps, and cooldown contract.
 +-- Notes/               Operational notes, schema scripts, and design material.
 |
 +-- .git/                Git repository metadata.
@@ -53,7 +55,11 @@ ROOT-LEVEL RUNTIME BOUNDARIES
 
     public/ + functions/
         One Cloudflare Pages application. The browser assets and file-based
-        functions share wrangler.jsonc bindings.
+        functions share wrangler.jsonc bindings. Auth submodules and callback
+        routes are described in _structure_details/auth-mobile-compatibility.md.
+        Sidebar submenu state is owned by public/Framework/Shell/JS/Sidebar/;
+        state.js shares collapsed-state updates with submenu.js; preferences.js
+        reapplies the browser-local theme and animation preferences.
 
     workers/*
         Separate Worker deployments. Each child has its own wrangler.jsonc.

@@ -864,62 +864,6 @@
         rgba(255, 102, 120, 0.18);
 }
 
-.registration-modal {
-    position: fixed;
-    inset: 0;
-    z-index: 10000;
-    display: grid;
-    place-items: center;
-    padding: 20px;
-}
-
-.registration-modal-backdrop {
-    position: absolute;
-    inset: 0;
-    background:
-        rgba(2, 3, 10, 0.8);
-    backdrop-filter:
-        blur(4px);
-}
-
-.registration-modal-card {
-    position: relative;
-    z-index: 1;
-    width: min(100%, 520px);
-    padding: 24px;
-    border:
-        1px solid
-        rgba(255, 102, 120, 0.4);
-    border-radius: 16px;
-    background: #121522;
-    box-shadow:
-        0 24px 80px
-        rgba(0, 0, 0, 0.52);
-}
-
-.registration-modal-card > strong {
-    display: block;
-    color: #ff9aa6;
-    font-size: 1.15rem;
-}
-
-.registration-modal-card p {
-    margin: 10px 0 0;
-    color: #d8dce8;
-    line-height: 1.6;
-}
-
-.registration-modal-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 10px;
-    margin-top: 20px;
-}
-
-.registration-modal-open {
-    overflow: hidden;
-}
-
 .rl-registration [hidden] {
     display: none !important;
 }
@@ -968,13 +912,6 @@
         display: none;
     }
 
-    .registration-modal-actions {
-        flex-direction: column;
-    }
-
-    .registration-modal-actions button {
-        width: 100%;
-    }
 }
 
 @media (

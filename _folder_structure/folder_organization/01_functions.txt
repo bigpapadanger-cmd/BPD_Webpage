@@ -55,6 +55,7 @@ functions/
     |   +-- authentication.js, authorization.js
     |   +-- account/
     |   |   +-- get_session.js, last_login.js, link_provider.js
+    |   |   +-- display_name_policy.js, display_name_validation.js
     |   |   +-- logout.js, mutations.js, unlink_provider.js
     |   +-- oauth/
     |   |   +-- callback.js, callback_response.js, provider_helpers.js, state.js

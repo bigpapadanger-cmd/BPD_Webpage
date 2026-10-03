@@ -66,7 +66,7 @@ const LOGIN_URL =
     "/Login";
 
 const FALLBACK_IMAGE_URL =
-    "/images/bad_image/fallback.png";
+    "/Assets/images/bad_image/fallback.png";
 
 /* =========================================================
 LOCAL BANNER MARKUP
@@ -133,10 +133,7 @@ const PROVIDER_CONFIG =
 
         steam: {
             label:
-                "Steam",
-
-            icon:
-                "/Assets/images/framework_icons/steam-symbol-white.png"
+                "Steam"
         }
     });
 
@@ -549,6 +546,15 @@ function createProviderIcon(
             "aria-label",
             `${config.label} connected`
         );
+    }
+
+    if (!config.icon) {
+        const fallback = document.createElement("span");
+        fallback.className = "bpd-account-banner__provider-icon";
+        fallback.textContent = config.label.slice(0, 1);
+        fallback.setAttribute("aria-hidden", "true");
+        wrapper.appendChild(fallback);
+        return wrapper;
     }
 
     const image =

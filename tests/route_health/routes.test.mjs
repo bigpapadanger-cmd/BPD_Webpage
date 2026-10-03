@@ -146,7 +146,7 @@ test("route-health diagnostics report binding presence only and no credential va
     assert.ok(payload.routes.some((route) => route.path === "/Settings" && !route.authRequired));
     assert.ok(payload.routes.some((route) => route.path === "/Suggestions" && !route.authRequired));
     assert.ok(payload.routes.some((route) => route.path === "/Admin/SuggestionReview" && route.authRequired));
-    assert.match(serialized, /admin\.settings\.manage|design-decision-required/);
+    assert.doesNotMatch(serialized, /\/api\/faq(?:\/upvote)?/);
     assert.doesNotMatch(serialized, /do-not-return|secret-value/);
     assert.equal(payload.connections.find((item) => item.name === "OCR storage").status, "Configured");
 });

@@ -97,6 +97,14 @@ import {
     authorizeRoute
 } from "../../Auth/auth.js";
 
+import {
+    applyAppearancePreferences
+} from "./preferences.js";
+
+import {
+    readSidebarPreference
+} from "./preferences.js";
+
 /* =========================================================
 ROUTER CONFIGURATION
 ========================================================= */
@@ -125,10 +133,8 @@ INITIAL SHELL STATE
 ========================================================= */
 
 function applyInitialSidebarLayoutState() {
-    const savedSidebar =
-        localStorage.getItem(
-            "bpdSidebar"
-        );
+    applyAppearancePreferences();
+    const savedSidebar = readSidebarPreference();
 
     let collapsed;
 
@@ -2081,6 +2087,8 @@ async function loadShell() {
     const currentNavigationId =
         ++navigationId;
 
+    applyAppearancePreferences();
+
     setPageLoading(
         true
     );
@@ -2089,6 +2097,13 @@ async function loadShell() {
         resolveRoute(
             window.location.pathname
         );
+
+    if (route.config?.redirectTo) {
+        const redirectUrl = new URL(window.location.href);
+        redirectUrl.pathname = route.config.redirectTo;
+        window.history.replaceState({}, "", redirectUrl.href);
+        route = resolveRoute(redirectUrl.pathname);
+    }
 
     if (
         route.found

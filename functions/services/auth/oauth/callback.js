@@ -1404,11 +1404,8 @@ function getAuthenticationStateErrorResponse(
 
             code:
                 error?.code
-                || null,
-
-            message:
-                error?.message
-                || "Unknown error"
+                || error?.upstreamCode
+                || null
         }
     );
 
@@ -1719,11 +1716,7 @@ async function executeCallback(
 
                     upstreamStatus:
                         error?.upstreamStatus
-                        || null,
-
-                    message:
-                        error?.message
-                        || "Unknown error"
+                        || null
                 }
             );
 
@@ -1769,11 +1762,7 @@ async function executeCallback(
 
                     upstreamStatus:
                         error?.upstreamStatus
-                        || null,
-
-                    message:
-                        error?.message
-                        || "Unknown error"
+                        || null
                 }
             );
 
@@ -1886,11 +1875,7 @@ async function executeCallback(
 
                         upstreamCode:
                             error?.upstreamCode
-                            || null,
-
-                        message:
-                            error?.message
-                            || "Unknown error"
+                            || null
                     }
                 );
 
@@ -2017,11 +2002,7 @@ async function executeCallback(
 
                         status:
                             error?.status
-                            || null,
-
-                        message:
-                            error?.message
-                            || "Unknown error"
+                            || null
                     }
                 );
 
@@ -2127,11 +2108,7 @@ async function executeCallback(
 
                     upstreamCode:
                         error?.upstreamCode
-                        || null,
-
-                    message:
-                        error?.message
-                        || "Unknown error"
+                        || null
                 }
             );
 
@@ -2339,11 +2316,8 @@ async function executeCallback(
 
                 code:
                     error?.code
-                    || null,
-
-                message:
-                    error?.message
-                    || "Unknown error"
+                    || error?.upstreamCode
+                    || null
             }
         );
 

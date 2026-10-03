@@ -1,134 +1,57 @@
 <main class="faq-page">
-
-    <section class="faq-header">
-
+    <header class="faq-header">
         <div class="faq-header-content">
-
-            <span class="faq-eyebrow">
-                SUPPORT
-            </span>
-
-            <h1>
-                Frequently Asked Questions
-            </h1>
-
-            <p>
-                Find answers to common questions about BPD Gaming Network,
-                accounts, competitive features, supported games, and site tools.
-            </p>
-
+            <span class="faq-eyebrow">HELP &amp; INFORMATION</span>
+            <h1>Frequently Asked Questions</h1>
+            <p>Quick answers about the features currently available on BPD Gaming Network.</p>
         </div>
+    </header>
 
+    <section class="faq-content" aria-label="Frequently asked questions">
+        <div class="faq-list">
+            <details class="faq-item">
+                <summary>What is my BPD display name?</summary>
+                <p>Your BPD display name is the name shown for your site account. It is separate from your Epic Games, Discord, Google, or other linked-provider names.</p>
+            </details>
+            <details class="faq-item">
+                <summary>How do I link an account provider?</summary>
+                <p>Sign in to your BPD account, open Account, and use the provider-linking controls there. A linked provider and a currently authorized provider are separate states; the page will offer a verification action if authorization needs refreshing.</p>
+            </details>
+            <details class="faq-item">
+                <summary>Why do I need a Rocket League profile?</summary>
+                <p>A completed Rocket League profile enables the Rocket League features that require registration. The Rocket League hub remains visible, and it will explain when profile setup is needed.</p>
+            </details>
+            <details class="faq-item">
+                <summary>Can I choose whether my profile is discoverable?</summary>
+                <p>Yes. In your Rocket League profile settings, “Allow users to find my profile” controls Find Players visibility independently from online-presence visibility.</p>
+            </details>
+            <details class="faq-item">
+                <summary>What does “Recent MMR Change” mean?</summary>
+                <p>It compares the latest stored MMR snapshot with the previous stored snapshot for each playlist. It is not a last-match result. If there is no previous capture, the page says so rather than showing a zero change.</p>
+            </details>
+            <details class="faq-item">
+                <summary>How does scoreboard OCR work?</summary>
+                <p>Submit a scoreboard image through Submit Match Results. OCR extracts values for review; values that need confirmation are shown for verification before the result is finalized.</p>
+            </details>
+            <details class="faq-item">
+                <summary>Where can I share an idea?</summary>
+                <p>Suggestions are separate from this FAQ. Open the Suggestions page to view approved ideas or, while signed in, submit and vote on suggestions.</p>
+            </details>
+            <details class="faq-item">
+                <summary>Where do my appearance settings apply?</summary>
+                <p>Theme, animation, and sidebar preferences are saved in this browser. They do not sync between devices.</p>
+            </details>
+        </div>
     </section>
-
-
-    <section
-        class="faq-content"
-        aria-label="Frequently asked questions"
-    >
-
-        <div
-            class="faq-list"
-            id="faqList"
-        ></div>
-
-    </section>
-
 
     <section class="faq-suggestion">
-
         <div class="faq-suggestion-content">
-
             <div>
-
-                <span class="faq-suggestion-label">
-                    COMMUNITY FEEDBACK
-                </span>
-
-                <h2>
-                    Have an idea for the network?
-                </h2>
-
-                <p>
-                    Share a feature or improvement idea with the community.
-                </p>
-
+                <span class="faq-suggestion-label">COMMUNITY FEEDBACK</span>
+                <h2>Have an idea for the network?</h2>
+                <p>Suggestions are reviewed separately from help information.</p>
             </div>
-
-            <button
-                class="faq-suggestion-button"
-                id="faqSuggestionButton"
-                type="button"
-            >
-                Suggest an idea
-            </button>
-
+            <a class="faq-suggestion-button" href="/Suggestions" data-router-link>View suggestions</a>
         </div>
-
     </section>
-
-
-    <div
-        class="faq-login-modal"
-        id="faqLoginModal"
-        hidden
-    >
-
-        <div
-            class="faq-login-backdrop"
-            data-close-login
-        ></div>
-
-        <div
-            class="faq-login-dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="faqLoginTitle"
-        >
-
-            <button
-                class="faq-login-close"
-                type="button"
-                aria-label="Close login prompt"
-                data-close-login
-            >
-                ×
-            </button>
-
-            <span class="faq-login-eyebrow">
-                ACCOUNT REQUIRED
-            </span>
-
-            <h2 id="faqLoginTitle">
-                Sign in to continue
-            </h2>
-
-            <p id="faqLoginMessage">
-                You need to be signed in to perform this action.
-            </p>
-
-            <div class="faq-login-actions">
-
-                <button
-                    class="faq-login-primary"
-                    id="faqLoginButton"
-                    type="button"
-                >
-                    Sign In
-                </button>
-
-                <button
-                    class="faq-login-secondary"
-                    type="button"
-                    data-close-login
-                >
-                    Cancel
-                </button>
-
-            </div>
-
-        </div>
-
-    </div>
-
 </main>

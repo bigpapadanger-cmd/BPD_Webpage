@@ -229,6 +229,83 @@ HERO ACCESS CTA
     line-height: 1.5;
 }
 
+.rocket-league-page .hero-access-heading {
+    margin: 0;
+    color: #f5f3ff;
+    font-size: clamp(1.05rem, 2.4vw, 1.35rem);
+}
+
+.rocket-league-profile-notice {
+    position: fixed;
+    z-index: 10020;
+    top: 18px;
+    right: 18px;
+    width: min(390px, calc(100vw - 36px));
+    padding: 0;
+    border: 1px solid rgba(255, 178, 36, 0.72);
+    border-radius: 12px;
+    background: rgba(20, 19, 23, 0.97);
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.42);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+}
+
+.rocket-league-profile-notice-link {
+    display: flex;
+    gap: 12px;
+    padding: 16px 18px;
+    border-radius: inherit;
+    color: #f6f3eb;
+    text-decoration: none;
+}
+
+.rocket-league-profile-notice[hidden] {
+    display: none;
+}
+
+.rocket-league-profile-notice:focus-visible {
+    outline: 3px solid #ffd17a;
+    outline-offset: 3px;
+}
+
+.rocket-league-profile-notice-link:focus-visible {
+    outline: 3px solid #ffd17a;
+    outline-offset: 3px;
+}
+
+.rocket-league-profile-notice-dot {
+    flex: 0 0 10px;
+    width: 10px;
+    height: 10px;
+    margin-top: 5px;
+    border-radius: 50%;
+    background: #ffb224;
+    box-shadow: 0 0 14px rgba(255, 178, 36, 0.7);
+}
+
+.rocket-league-profile-notice-content,
+.rocket-league-profile-notice-content > span {
+    display: flex;
+    flex-direction: column;
+}
+
+.rocket-league-profile-notice-content {
+    gap: 6px;
+}
+
+.rocket-league-profile-notice-content > span:not(.rocket-league-profile-notice-action) {
+    color: #c8c4bc;
+    font-size: 0.82rem;
+    line-height: 1.45;
+}
+
+.rocket-league-profile-notice-action {
+    margin-top: 2px;
+    color: #ffd17a;
+    font-size: 0.8rem;
+    font-weight: 800;
+}
+
 /*
 =========================================================
 EPIC ACCESS BUTTON
@@ -1096,6 +1173,17 @@ RESPONSIVE
 }
 
 @media (max-width: 700px) {
+    .rocket-league-profile-notice {
+        top: 10px;
+        right: 10px;
+        width: calc(100vw - 20px);
+        padding: 0;
+    }
+
+    .rocket-league-profile-notice-link {
+        padding: 13px 14px;
+    }
+
     .rocket-league-page {
         padding: 8px;
     }

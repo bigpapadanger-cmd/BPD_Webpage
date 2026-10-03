@@ -183,16 +183,6 @@ export const OCR_JOB_STATUS_URL =
 export const OCR_CONFIRM_URL =
     "/api/ocr/confirm";
 
-/* =========================================================
-FAQ
-========================================================= */
-
-export const FAQ_API_URL =
-    "/api/faq";
-
-export const FAQ_UPVOTE_URL =
-    "/api/faq/upvote";
-
 export const SUGGESTIONS_API_URL =
     "/api/suggestions";
 

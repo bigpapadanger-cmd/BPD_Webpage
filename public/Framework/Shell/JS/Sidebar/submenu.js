@@ -1,410 +1,108 @@
 "use strict";
 
-/*
-=========================================================
-BPD GAMING NETWORK
-SIDEBAR SUBMENU MODULE
+import { setSidebarCollapsed } from "./state.js";
 
-File:
-    /Framework/Shell/JS/Sidebar/submenu.js
+let globalListenersInitialized = false;
+let temporarilyExpandedFromCollapsed = false;
 
-Purpose:
-    Provides shared sidebar submenu behavior.
-
-Responsibilities:
-    - Opens and closes sidebar submenus.
-    - Closes other open submenus.
-    - Closes submenus when clicking outside the sidebar.
-    - Repositions submenus when the sidebar is collapsed.
-    - Repositions open submenus on resize and scroll.
-    - Prevents duplicate event-listener initialization.
-
-Usage:
-    Call initializeSidebarSubmenus() after sidebar HTML
-    has been loaded into the DOM.
-=========================================================
-*/
-
-let globalListenersInitialized =
-    false;
-
-/*
-=========================================================
-CLOSE SUBMENU
-=========================================================
-*/
-
-function closeSubmenu(
-    button
-) {
-    const submenuId =
-        button.getAttribute(
-            "aria-controls"
-        );
-
-    const submenu =
-        document.getElementById(
-            submenuId
-        );
-
-    button.setAttribute(
-        "aria-expanded",
-        "false"
-    );
-
-    if (
-        submenu
-    ) {
-        submenu.hidden =
-            true;
-
-        submenu.style.top =
-            "";
-
-        submenu.style.left =
-            "";
-    }
+function getMenu(button) {
+    const submenuId = button.getAttribute("aria-controls");
+    return submenuId ? document.getElementById(submenuId) : null;
 }
 
-/*
-=========================================================
-CLOSE OTHER SUBMENUS
-=========================================================
-*/
-
-function closeOtherSubmenus(
-    currentButton
-) {
-    document
-        .querySelectorAll(
-            "#sidebar .sidebar-menu-toggle"
-        )
-        .forEach(
-            function(
-                button
-            ) {
-                if (
-                    button !==
-                    currentButton
-                ) {
-                    closeSubmenu(
-                        button
-                    );
-                }
-            }
-        );
+function closeSubmenu(button) {
+    const submenu = getMenu(button);
+    button.setAttribute("aria-expanded", "false");
+    if (submenu) submenu.hidden = true;
 }
 
-/*
-=========================================================
-POSITION COLLAPSED SUBMENU
-=========================================================
-*/
+function updateSidebarState(collapsed) {
+    const sidebar = document.getElementById("sidebar");
+    const sidebarToggle = document.getElementById("sidebarToggle");
+    setSidebarCollapsed(sidebar, sidebarToggle, collapsed);
+}
 
-function positionCollapsedSubmenu(
-    button,
-    submenu
-) {
-    const sidebar =
-        document.getElementById(
-            "sidebar"
-        );
+function expandTemporarilyForSubmenu() {
+    if (!document.body.classList.contains("sidebar-collapsed")) return;
 
-    if (
-        !sidebar
-    ) {
+    temporarilyExpandedFromCollapsed = true;
+    document.body.dataset.sidebarTemporaryExpanded = "true";
+    updateSidebarState(false);
+}
+
+function restoreTemporarySidebarState(restoreSidebar) {
+    if (!temporarilyExpandedFromCollapsed) return;
+
+    temporarilyExpandedFromCollapsed = false;
+    delete document.body.dataset.sidebarTemporaryExpanded;
+
+    if (!restoreSidebar || localStorage.getItem("bpdSidebar") === "open") return;
+    updateSidebarState(true);
+}
+
+function closeOtherSubmenus(currentButton) {
+    document.querySelectorAll("#sidebar .sidebar-menu-toggle").forEach(button => {
+        if (button !== currentButton) closeSubmenu(button);
+    });
+}
+
+function toggleSubmenu(button) {
+    const submenu = getMenu(button);
+    if (!submenu) return;
+
+    const opening = button.getAttribute("aria-expanded") !== "true";
+    if (!opening) {
+        closeSubmenu(button);
+        restoreTemporarySidebarState(true);
         return;
     }
 
-    const collapsed =
-        document.body.classList.contains(
-            "sidebar-collapsed"
-        );
-
-    if (
-        !collapsed
-    ) {
-        submenu.style.top =
-            "";
-
-        submenu.style.left =
-            "";
-
-        return;
-    }
-
-    const buttonRect =
-        button.getBoundingClientRect();
-
-    const sidebarRect =
-        sidebar.getBoundingClientRect();
-
-    const viewportPadding =
-        10;
-
-    let top =
-        buttonRect.top;
-
-    const left =
-        sidebarRect.right + 8;
-
-    submenu.style.left =
-        `${left}px`;
-
-    submenu.style.top =
-        `${top}px`;
-
-    const submenuRect =
-        submenu.getBoundingClientRect();
-
-    const maxBottom =
-        window.innerHeight -
-        viewportPadding;
-
-    if (
-        submenuRect.bottom >
-        maxBottom
-    ) {
-        top -=
-            submenuRect.bottom -
-            maxBottom;
-    }
-
-    if (
-        top <
-        viewportPadding
-    ) {
-        top =
-            viewportPadding;
-    }
-
-    submenu.style.top =
-        `${top}px`;
+    closeOtherSubmenus(button);
+    expandTemporarilyForSubmenu();
+    button.setAttribute("aria-expanded", "true");
+    submenu.hidden = false;
 }
 
-/*
-=========================================================
-TOGGLE SUBMENU
-=========================================================
-*/
-
-function toggleSubmenu(
-    button
-) {
-    const submenuId =
-        button.getAttribute(
-            "aria-controls"
-        );
-
-    const submenu =
-        document.getElementById(
-            submenuId
-        );
-
-    if (
-        !submenu
-    ) {
-        console.error(
-            "SIDEBAR SUBMENU: Submenu not found.",
-            submenuId
-        );
-
-        return;
-    }
-
-    const opening =
-        button.getAttribute(
-            "aria-expanded"
-        ) !==
-        "true";
-
-    closeOtherSubmenus(
-        button
-    );
-
-    button.setAttribute(
-        "aria-expanded",
-        String(
-            opening
-        )
-    );
-
-    submenu.hidden =
-        !opening;
-
-    if (
-        opening
-    ) {
-        positionCollapsedSubmenu(
-            button,
-            submenu
-        );
-    }
+export function closeSidebarSubmenus({ restoreSidebar = true } = {}) {
+    document.querySelectorAll("#sidebar .sidebar-menu-toggle").forEach(closeSubmenu);
+    restoreTemporarySidebarState(restoreSidebar);
 }
 
-/*
-=========================================================
-CLOSE ALL SUBMENUS
-=========================================================
-*/
-
-function closeAllSubmenus() {
-    document
-        .querySelectorAll(
-            "#sidebar .sidebar-menu-toggle"
-        )
-        .forEach(
-            function(
-                button
-            ) {
-                closeSubmenu(
-                    button
-                );
-            }
-        );
+function handleOutsideClick(event) {
+    if (event.target.closest?.("#sidebar .sidebar-menu")) return;
+    closeSidebarSubmenus();
 }
 
-/*
-=========================================================
-OUTSIDE CLICK
-=========================================================
-*/
-
-function handleOutsideClick(
-    event
-) {
-    const sidebar =
-        document.getElementById(
-            "sidebar"
-        );
-
-    if (
-        !sidebar
-    ) {
-        return;
-    }
-
-    if (
-        event.target.closest(
-            "#sidebar .sidebar-menu"
-        )
-    ) {
-        return;
-    }
-
-    closeAllSubmenus();
+function handleKeydown(event) {
+    if (event.key === "Escape") closeSidebarSubmenus();
 }
-
-/*
-=========================================================
-VIEWPORT CHANGE
-=========================================================
-*/
-
-function handleViewportChange() {
-    document
-        .querySelectorAll(
-            '#sidebar .sidebar-menu-toggle[aria-expanded="true"]'
-        )
-        .forEach(
-            function(
-                button
-            ) {
-                const submenuId =
-                    button.getAttribute(
-                        "aria-controls"
-                    );
-
-                const submenu =
-                    document.getElementById(
-                        submenuId
-                    );
-
-                if (
-                    !submenu
-                ) {
-                    return;
-                }
-
-                positionCollapsedSubmenu(
-                    button,
-                    submenu
-                );
-            }
-        );
-}
-
-/*
-=========================================================
-INITIALIZE SIDEBAR SUBMENUS
-=========================================================
-*/
 
 export function initializeSidebarSubmenus() {
-    const sidebar =
-        document.getElementById(
-            "sidebar"
-        );
+    const sidebar = document.getElementById("sidebar");
+    if (!sidebar) return;
 
-    if (
-        !sidebar
-    ) {
-        return;
-    }
+    sidebar.querySelectorAll(".sidebar-menu-toggle").forEach(button => {
+        if (button.dataset.submenuInitialized === "true") return;
 
-    sidebar
-        .querySelectorAll(
-            ".sidebar-menu-toggle"
-        )
-        .forEach(
-            function(
-                button
-            ) {
-                if (
-                    button.dataset.submenuInitialized ===
-                    "true"
-                ) {
-                    return;
-                }
+        button.addEventListener("click", event => {
+            event.stopPropagation();
+            toggleSubmenu(button);
+        });
+        button.dataset.submenuInitialized = "true";
+    });
 
-                button.addEventListener(
-                    "click",
-                    function(
-                        event
-                    ) {
-                        event.stopPropagation();
-
-                        toggleSubmenu(
-                            button
-                        );
-                    }
-                );
-
-                button.dataset.submenuInitialized =
-                    "true";
+    if (!sidebar.dataset.submenuLinksInitialized) {
+        sidebar.addEventListener("click", event => {
+            if (event.target.closest?.(".sidebar-submenu .submenu-item")) {
+                closeSidebarSubmenus();
             }
-        );
-
-    if (
-        !globalListenersInitialized
-    ) {
-        document.addEventListener(
-            "click",
-            handleOutsideClick
-        );
-
-        window.addEventListener(
-            "resize",
-            handleViewportChange
-        );
-
-        window.addEventListener(
-            "scroll",
-            handleViewportChange,
-            true
-        );
-
-        globalListenersInitialized =
-            true;
+        });
+        sidebar.dataset.submenuLinksInitialized = "true";
     }
+
+    if (globalListenersInitialized) return;
+
+    document.addEventListener("click", handleOutsideClick);
+    document.addEventListener("keydown", handleKeydown);
+    globalListenersInitialized = true;
 }

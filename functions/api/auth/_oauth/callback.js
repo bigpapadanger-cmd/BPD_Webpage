@@ -110,13 +110,8 @@ export async function onRequestGet(
                     error?.name
                     || "Error",
 
-                message:
-                    error?.message
-                    || "Unknown error",
-
-                stack:
-                    error?.stack
-                    || null
+                stage:
+                    "callback_route"
             }
         );
 

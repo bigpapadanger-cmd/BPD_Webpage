@@ -118,9 +118,8 @@ export async function onRequestGet(
                     error?.name
                     || "Error",
 
-                message:
-                    error?.message
-                    || "Unknown error"
+                stage:
+                    "callback_route"
             }
         );
 

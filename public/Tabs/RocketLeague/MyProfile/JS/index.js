@@ -2,7 +2,7 @@
 
 import { apiFetch } from "/scripts/apiConnection.js";
 import { ROCKET_LEAGUE_PROFILE_URL } from "/scripts/apiRoutes.js";
-import { buildSettingsPayload, getConfirmedSettings } from "./settings_view.js";
+import { buildSettingsPayload, getSettingsConfirmationState, isSettingConfirmed } from "./settings_view.js";
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 let profileSnapshot = null;
@@ -14,7 +14,7 @@ function setStatus(message, state = "ready") {
     status.dataset.state = state;
 }
 
-function renderAvailability(availability) {
+function renderAvailability(availability, editable) {
     const target = document.getElementById("myProfileAvailability");
     const byDay = new Map(availability.map(item => [String(item.day || "").toLowerCase(), item]));
     target.replaceChildren();
@@ -27,6 +27,7 @@ function renderAvailability(availability) {
         checkbox.type = "checkbox";
         checkbox.dataset.day = day;
         checkbox.checked = Boolean(saved);
+        checkbox.disabled = !editable;
         const dayName = document.createElement("span");
         dayName.textContent = day;
         label.append(checkbox, dayName);
@@ -36,11 +37,11 @@ function renderAvailability(availability) {
         const end = document.createElement("input");
         Object.assign(end, { type: "time", min: "17:00", max: "23:00", step: 1800, value: saved?.end || "23:00" });
         end.dataset.end = day;
-        start.disabled = !checkbox.checked;
-        end.disabled = !checkbox.checked;
+        start.disabled = !editable || !checkbox.checked;
+        end.disabled = !editable || !checkbox.checked;
         checkbox.addEventListener("change", () => {
-            start.disabled = !checkbox.checked;
-            end.disabled = !checkbox.checked;
+            start.disabled = !editable || !checkbox.checked;
+            end.disabled = !editable || !checkbox.checked;
         });
         row.append(label, start, end);
         target.append(row);
@@ -50,6 +51,32 @@ function renderAvailability(availability) {
 function displayLocation(settings, settingsAvailability, key) {
     if (settingsAvailability?.[key] !== true) return "Not confirmed";
     return settings[key] === null ? "Not recorded" : settings[key] || "Not recorded";
+}
+
+function applyEditableFieldAvailability(profile) {
+    const fields = {
+        autoDetectRegion: ["autoDetectRegion"],
+        showOnlineStatus: ["showOnlineStatus"],
+        findProfileEnabled: ["findProfileEnabled"],
+        preferredMode: ["preferredMode"],
+        otherMode: ["otherMode"],
+        email: ["profileEmail"],
+        phone: ["profilePhone"],
+        notificationsEnabled: ["notificationsEnabled"],
+        notificationMethod: ["notificationMethod"],
+        reminderMode: ["reminderMode"]
+    };
+    for (const [key, ids] of Object.entries(fields)) {
+        const confirmed = isSettingConfirmed(profile, key);
+        for (const id of ids) {
+            const control = document.getElementById(id);
+            if (!control) continue;
+            control.disabled = !confirmed;
+            if (control.type === "checkbox") {
+                control.indeterminate = !confirmed || profile.settings[key] === null;
+            }
+        }
+    }
 }
 
 function renderProfile(result) {
@@ -68,27 +95,35 @@ function renderProfile(result) {
     document.getElementById("findProfileEnabled").checked = settings.findProfileEnabled === true;
     document.getElementById("preferredMode").value = typeof settings.preferredMode === "string" ? settings.preferredMode : "";
     document.getElementById("otherMode").value = typeof settings.otherMode === "string" ? settings.otherMode : "";
-    document.getElementById("otherModeField").hidden = settings.preferredMode !== "other";
+    document.getElementById("otherModeField").hidden = settings.preferredMode !== "other" && isSettingConfirmed(profile, "preferredMode");
     document.getElementById("profileEmail").value = typeof settings.email === "string" ? settings.email : "";
     document.getElementById("profilePhone").value = typeof settings.phone === "string" ? settings.phone : "";
     document.getElementById("notificationsEnabled").checked = settings.notificationsEnabled === true;
     document.getElementById("notificationMethod").value = typeof settings.notificationMethod === "string" ? settings.notificationMethod : "";
     document.getElementById("reminderMode").value = typeof settings.reminderMode === "string" ? settings.reminderMode : "";
-    document.getElementById("notificationFields").hidden = settings.notificationsEnabled !== true;
+    document.getElementById("notificationFields").hidden = settings.notificationsEnabled !== true && isSettingConfirmed(profile, "notificationsEnabled");
+    document.getElementById("notificationsOptOutNote").hidden = settings.notificationsEnabled === true;
     document.getElementById("discordSettingsNote").hidden = settings.notificationMethod !== "discord";
-    renderAvailability(Array.isArray(settings.availability) ? settings.availability : []);
+    const availabilityEditable = isSettingConfirmed(profile, "availability");
+    renderAvailability(Array.isArray(settings.availability) ? settings.availability : [], availabilityEditable);
+    applyEditableFieldAvailability(profile);
 
-    const confirmedSettings = getConfirmedSettings(profile);
+    const confirmation = getSettingsConfirmationState(profile);
     const form = document.getElementById("myProfileSettingsForm");
-    form.hidden = !confirmedSettings;
-    document.getElementById("myProfileSave").disabled = !confirmedSettings;
-    if (!confirmedSettings) setStatus("Some saved settings could not be confirmed. Editing is locked so unknown values are not overwritten.", "error");
-    return Boolean(confirmedSettings);
+    form.hidden = false;
+    document.getElementById("myProfileSave").disabled = !confirmation.canSave;
+    const notice = document.getElementById("myProfileVerificationNotice");
+    notice.hidden = confirmation.canSave;
+    notice.textContent = confirmation.unconfirmedLabels.length
+        ? `Could not confirm: ${confirmation.unconfirmedLabels.join(", ")}. These controls are locked. The existing save replaces the complete settings set, so updates stay disabled until all saved values are available.`
+        : "Consent verification is unavailable. Updates stay disabled because consent is server-managed.";
+    if (!confirmation.canSave) setStatus("Your saved settings are shown below; unconfirmed controls and saving are locked to protect existing values.", "error");
+    return confirmation.canSave;
 }
 
 function settingsPayload() {
     const profile = profileSnapshot.profile;
-    const settings = profile.settings;
+    if (!getSettingsConfirmationState(profile).canSave) throw new Error("Saved settings are not fully confirmed.");
     const notificationsEnabled = document.getElementById("notificationsEnabled").checked;
     const availability = DAYS.flatMap(day => {
         if (!document.querySelector(`[data-day="${day}"]`)?.checked) return [];
@@ -125,7 +160,7 @@ async function requestProfile(method = "GET", body) {
 function lockSettings() {
     profileSnapshot = null;
     const form = document.getElementById("myProfileSettingsForm");
-    form.hidden = true;
+    form.querySelectorAll("input, select, button").forEach(control => { control.disabled = true; });
     document.getElementById("myProfileSave").disabled = true;
 }
 
@@ -140,6 +175,7 @@ export async function initializePage() {
     const notificationsEnabled = document.getElementById("notificationsEnabled");
     notificationsEnabled.addEventListener("change", () => {
         document.getElementById("notificationFields").hidden = !notificationsEnabled.checked;
+        document.getElementById("notificationsOptOutNote").hidden = notificationsEnabled.checked;
     });
     document.getElementById("notificationMethod").addEventListener("change", event => {
         document.getElementById("discordSettingsNote").hidden = event.currentTarget.value !== "discord";
@@ -172,7 +208,7 @@ export async function initializePage() {
             return;
         }
         const confirmed = renderProfile(result);
-        setStatus(confirmed ? "Manage your Rocket League profile settings and privacy." : "Saved settings need verification before they can be edited.", confirmed ? "ready" : "error");
+        if (confirmed) setStatus("Manage your Rocket League profile settings and privacy.");
     } catch {
         lockSettings();
         setStatus("Your profile could not be loaded right now. Settings remain locked.", "error");

@@ -156,8 +156,6 @@ let discordNotificationState = {
         null
 };
 
-let notificationsOptOutConfirmed =
-    false;
 
 /* =========================================================
 NORMALIZATION
@@ -1379,69 +1377,6 @@ function getNotificationMethod() {
     );
 }
 
-function openNotificationOptOutModal() {
-    const modal =
-        document.getElementById(
-            "notificationOptOutModal"
-        );
-
-    if (
-        !modal
-    ) {
-        return;
-    }
-
-    modal.hidden =
-        false;
-
-    document.body.classList.add(
-        "registration-modal-open"
-    );
-}
-
-function closeNotificationOptOutModal() {
-    const modal =
-        document.getElementById(
-            "notificationOptOutModal"
-        );
-
-    if (
-        !modal
-    ) {
-        return;
-    }
-
-    modal.hidden =
-        true;
-
-    document.body.classList.remove(
-        "registration-modal-open"
-    );
-}
-
-function setNotificationsEnabled(
-    enabled
-) {
-    const value =
-        enabled
-            ? "true"
-            : "false";
-
-    const input =
-        document.querySelector(
-            `input[name="notificationsEnabled"][value="${value}"]`
-        );
-
-    if (
-        input
-    ) {
-        input.checked =
-            true;
-    }
-
-    updateNotificationState();
-}
-
 function updateNotificationFieldRequirements() {
     const enabled =
         getNotificationsEnabled();
@@ -1568,26 +1503,8 @@ function updateNotificationState() {
 }
 
 function handleNotificationChoiceChange(
-    event
+    _event
 ) {
-    const input =
-        event.currentTarget;
-
-    if (
-        input.value ===
-            "false"
-        && input.checked
-        && !notificationsOptOutConfirmed
-    ) {
-        setNotificationsEnabled(
-            true
-        );
-
-        openNotificationOptOutModal();
-
-        return;
-    }
-
     updateNotificationState();
 }
 
@@ -1968,9 +1885,12 @@ function normalizeProfile(
             || authUser
         );
     const settings = normalizeObject(profile.settings);
-    const setting = (key, legacyKey = key) => Object.prototype.hasOwnProperty.call(settings, key)
-        ? settings[key]
-        : profile[legacyKey];
+    const setting = (key, legacyKey = key) => {
+        if (Object.prototype.hasOwnProperty.call(settings, key)) return settings[key];
+        const snakeKey = key.replace(/[A-Z]/gu, letter => `_${letter.toLowerCase()}`);
+        if (Object.prototype.hasOwnProperty.call(settings, snakeKey)) return settings[snakeKey];
+        return profile[legacyKey];
+    };
 
     /*
      * Normal profile loading must use only previously stored
@@ -2083,10 +2003,17 @@ function normalizeProfile(
             || profile.profileComplete === true
             || profile.profile_complete === true,
 
+        profileExists:
+            result?.profileExists === true
+            || profile.profileExists === true
+            || Boolean(profile.rlPlayerId || profile.rl_player_id),
+
         provider: normalizeObject(profile.provider),
         stats: normalizeObject(profile.stats),
         ranks: normalizeObject(profile.ranks),
         latestMmr: normalizeObject(result?.latestMmr),
+
+        settingsAvailability: normalizeObject(profile.settingsAvailability),
 
         settings
     };
@@ -2161,11 +2088,20 @@ function populateProfileForm(
 
     if (typeof settings.showOnlineStatus === "boolean") setCheckboxValue("showOnlineStatus", settings.showOnlineStatus);
 
-    if (typeof settings.findProfileEnabled === "boolean") setCheckboxValue("findProfileEnabled", settings.findProfileEnabled);
+    const findProfile = document.getElementById("findProfileEnabled");
+    const findProfileConfirmed = profile.settingsAvailability?.findProfileEnabled === true
+        && typeof settings.findProfileEnabled === "boolean";
+    findProfile.checked = findProfileConfirmed ? settings.findProfileEnabled : false;
+    findProfile.indeterminate = !findProfileConfirmed && profile.profileExists === true;
+    findProfile.disabled = !findProfileConfirmed && profile.profileExists === true;
+    const findProfileNotice = document.getElementById("findProfileAvailabilityNotice");
+    if (findProfileNotice) {
+        findProfileNotice.hidden = findProfileConfirmed || profile.profileExists !== true;
+        findProfileNotice.textContent = "Your saved Find Players preference could not be confirmed. It is locked and won’t be changed while you complete setup.";
+    }
 
     if (typeof settings.notificationsEnabled === "boolean") setRadioValue("notificationsEnabled", settings.notificationsEnabled ? "true" : "false");
 
-    notificationsOptOutConfirmed = settings.notificationsEnabled === false;
 
     if (
         settings.notificationMethod
@@ -2332,6 +2268,9 @@ async function loadRocketLeagueProfile() {
             profileLoaded:
                 false,
 
+            profileLookupConfirmed:
+                false,
+
             warning:
                 "Profile authorization or storage is currently unavailable, so your entries will be preserved locally."
         };
@@ -2364,6 +2303,9 @@ async function loadRocketLeagueProfile() {
             profileLoaded:
                 false,
 
+            profileLookupConfirmed:
+                false,
+
             warning:
                 result.message
                 || "Profile authorization or storage is currently unavailable."
@@ -2377,6 +2319,9 @@ async function loadRocketLeagueProfile() {
         profileLoaded:
             result.profileLoaded !==
             false,
+
+        profileLookupConfirmed:
+            true,
 
         warning:
             result.warning
@@ -2585,10 +2530,6 @@ function populateDraft(
             ? "true"
             : "false"
     );
-
-    notificationsOptOutConfirmed =
-        draft.notificationsEnabled ===
-        false;
 
     if (
         draft.notificationMethod
@@ -2868,6 +2809,16 @@ async function submitRegistration(
 
     const form =
         event.currentTarget;
+
+    if (form.dataset.profileLookupConfirmed !== "true") {
+        showMessage("We couldn’t confirm your saved Rocket League profile. Your entries remain in this browser; reload and try again before submitting.", "error");
+        return;
+    }
+
+    if (form.dataset.profileExists === "true" && form.dataset.findProfileEnabledConfirmed !== "true") {
+        showMessage("Your saved Find Players preference is unavailable right now. It has been protected from accidental changes; reload and try again before submitting.", "error");
+        return;
+    }
 
     form.classList.add(
         "validation-attempted"
@@ -3238,68 +3189,6 @@ export async function initializePage() {
             checkDiscordNotificationEligibility
         );
 
-    /* =====================================================
-    OPT-OUT MODAL
-    ===================================================== */
-
-    document
-        .querySelectorAll(
-            "[data-modal-close]"
-        )
-        .forEach(
-            element => {
-                element.addEventListener(
-                    "click",
-                    () => {
-                        notificationsOptOutConfirmed =
-                            false;
-
-                        setNotificationsEnabled(
-                            true
-                        );
-
-                        closeNotificationOptOutModal();
-                    }
-                );
-            }
-        );
-
-    document
-        .getElementById(
-            "keepNotificationsButton"
-        )
-        ?.addEventListener(
-            "click",
-            () => {
-                notificationsOptOutConfirmed =
-                    false;
-
-                setNotificationsEnabled(
-                    true
-                );
-
-                closeNotificationOptOutModal();
-            }
-        );
-
-    document
-        .getElementById(
-            "confirmNotificationsOffButton"
-        )
-        ?.addEventListener(
-            "click",
-            () => {
-                notificationsOptOutConfirmed =
-                    true;
-
-                setNotificationsEnabled(
-                    false
-                );
-
-                closeNotificationOptOutModal();
-            }
-        );
-
     form.addEventListener("input", () => { form.dataset.draftDirty = "true"; });
     form.addEventListener("change", () => { form.dataset.draftDirty = "true"; });
     form.addEventListener(
@@ -3328,6 +3217,11 @@ export async function initializePage() {
     ) {
         return;
     }
+
+    form.dataset.profileLookupConfirmed = profileResult.profileLookupConfirmed === true ? "true" : "false";
+    form.dataset.profileExists = profileResult.profileExists === true || profileResult.profile?.profileExists === true ? "true" : "false";
+    form.dataset.findProfileEnabledConfirmed = profileResult.profile?.settingsAvailability?.findProfileEnabled === true
+        && typeof profileResult.profile?.settings?.findProfileEnabled === "boolean" ? "true" : "false";
 
     const profileComplete = profileResult.profileComplete === true
         || profileResult.profile?.profileComplete === true;
@@ -3376,6 +3270,16 @@ function restoreRegistrationDraft(profileResult) {
     const draft = readRegistrationDraft();
     if (!draft) return false;
     populateDraft(draft);
+    const profile = profileResult?.profile || {};
+    if (profile.profileExists === true) {
+        const settings = profile.settings || {};
+        const checkbox = document.getElementById("findProfileEnabled");
+        const confirmed = profile.settingsAvailability?.findProfileEnabled === true
+            && typeof settings.findProfileEnabled === "boolean";
+        checkbox.checked = confirmed && settings.findProfileEnabled === true;
+        checkbox.indeterminate = !confirmed;
+        checkbox.disabled = !confirmed;
+    }
     showMessage("Your locally saved registration draft has been restored. Please review it and confirm the required consent fields.", "info");
     return true;
 }

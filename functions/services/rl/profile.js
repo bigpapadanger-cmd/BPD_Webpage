@@ -407,7 +407,10 @@ function normalizeDatabaseProfile(
     const provider = normalizeObject(databaseProfile.provider);
     const careerStats = normalizeObject(databaseProfile.careerStats);
     const settings = normalizeProfileSettings(databaseProfile);
-    const settingsAvailability = normalizeObject(databaseProfile.settingsAvailability);
+    const settingsAvailability = {
+        ...getProfileSettingsAvailability(databaseProfile),
+        ...normalizeObject(databaseProfile.settingsAvailability)
+    };
 
     return {
         accountId,
@@ -886,10 +889,9 @@ function normalizeRegistrationPayload(
             ),
 
         findProfileEnabled:
-            normalizeBoolean(
-                body?.findProfileEnabled,
-                false
-            ),
+            Object.prototype.hasOwnProperty.call(body || {}, "findProfileEnabled")
+                ? (typeof body.findProfileEnabled === "boolean" ? body.findProfileEnabled : null)
+                : false,
 
         email:
             normalizeOptionalString(

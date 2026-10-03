@@ -8,13 +8,13 @@
 .user-settings__section {
     margin-block: 1rem;
     padding: clamp(1rem, 3vw, 2rem);
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    border: 1px solid color-mix(in srgb, var(--site-accent) 28%, transparent);
     border-radius: 1rem;
     background: rgba(12, 18, 30, 0.84);
 }
 
 .user-settings__eyebrow {
-    color: #83bfff;
+    color: var(--site-accent);
     letter-spacing: 0.12em;
     font-size: 0.75rem;
 }
@@ -43,21 +43,41 @@
     color: #b9c2d1;
 }
 
+.user-settings__cooldown {
+    margin: 0.4rem 0;
+    color: var(--site-accent, #65c8ff);
+    font-weight: 600;
+}
+
 .user-settings button,
-.user-settings select {
+.user-settings select,
+.user-settings input {
     min-height: 2.6rem;
     padding: 0.5rem 0.9rem;
-    border: 1px solid rgba(131, 191, 255, 0.6);
+    border: 1px solid color-mix(in srgb, var(--site-accent) 65%, transparent);
     border-radius: 0.5rem;
-    background: #152338;
+    background: var(--site-accent-soft);
     color: inherit;
     font: inherit;
+}
+
+.user-settings__name-field {
+    display: grid;
+    gap: 0.45rem;
+    max-width: 30rem;
+    margin: 1rem 0;
+}
+
+.user-settings button:disabled,
+.user-settings input:disabled {
+    cursor: not-allowed;
+    opacity: 0.58;
 }
 
 .user-settings a {
     display: inline-block;
     margin-top: 0.75rem;
-    color: #9acbff;
+    color: var(--site-accent);
 }
 
 @media (max-width: 600px) {

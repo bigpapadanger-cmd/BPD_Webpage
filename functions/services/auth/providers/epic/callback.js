@@ -264,27 +264,6 @@ function normalizeReturnTo(
 }
 
 /* =========================================================
-LIMIT LOG MESSAGE
-========================================================= */
-
-function limitMessage(
-    value
-) {
-    return String(
-        value
-        ?? ""
-    )
-        .replace(
-            /\s+/g,
-            " "
-        )
-        .slice(
-            0,
-            300
-        );
-}
-
-/* =========================================================
 SUPABASE CONFIGURATION
 ========================================================= */
 
@@ -695,12 +674,7 @@ async function exchangeEpicCode(
             "EPIC CALLBACK: Token exchange rejected.",
             {
                 status:
-                    response.status,
-
-                response:
-                    limitMessage(
-                        responseText
-                    )
+                    response.status
             }
         );
 
@@ -789,12 +763,7 @@ async function loadEpicProfile(
             "EPIC CALLBACK: Epic profile request rejected.",
             {
                 status:
-                    response.status,
-
-                response:
-                    limitMessage(
-                        responseText
-                    )
+                    response.status
             }
         );
 
@@ -1407,11 +1376,7 @@ async function recordCompletedAuthentication(
 
                     status:
                         error?.status
-                        || null,
-
-                    message:
-                        error?.message
-                        || "Unknown error"
+                        || null
                 }
             );
         }
@@ -1435,11 +1400,8 @@ function getAuthenticationStateErrorResponse(
 
             code:
                 error?.code
-                || null,
-
-            message:
-                error?.message
-                || "Unknown error"
+                || error?.upstreamCode
+                || null
         }
     );
 
@@ -1761,11 +1723,7 @@ async function executeCallback(
 
                         upstreamCode:
                             error?.upstreamCode
-                            || null,
-
-                        message:
-                            error?.message
-                            || "Unknown error"
+                            || null
                     }
                 );
 
@@ -1907,11 +1865,7 @@ async function executeCallback(
 
                         status:
                             error?.status
-                            || null,
-
-                        message:
-                            error?.message
-                            || "Unknown error"
+                            || null
                     }
                 );
 
@@ -2073,10 +2027,8 @@ async function executeCallback(
                         "EPIC CALLBACK: Failed to clean up session after auth-state failure.",
                         {
                             debugId,
-
-                            message:
-                                deleteError?.message
-                                || "Unknown error"
+                            stage: "session_cleanup_after_auth_state_failure",
+                            errorName: deleteError?.name || "Error"
                         }
                     );
                 }
@@ -2160,11 +2112,7 @@ async function executeCallback(
 
                 upstreamStatus:
                     error?.upstreamStatus
-                    || null,
-
-                message:
-                    error?.message
-                    || "Unknown error"
+                    || null
             }
         );
 

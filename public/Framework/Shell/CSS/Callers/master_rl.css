@@ -37,6 +37,10 @@ Used for all valid /RocketLeague routes.
 
 @import url("/Tabs/RocketLeague/Index/CSS/index.css");
 @import url("/Tabs/RocketLeague/Registration/CSS/index.css");
+@import url("/Tabs/RocketLeague/FindPlayers/CSS/index.css");
+@import url("/Tabs/RocketLeague/PublicProfile/CSS/index.css");
+@import url("/Tabs/RocketLeague/MyProfile/CSS/index.css");
+@import url("/Tabs/RocketLeague/Features/CSS/index.css");
 
 /* =========================================================
    OCR / MATCH RESULTS

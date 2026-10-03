@@ -56,6 +56,22 @@ test("profile load exposes find_profile_enabled as a boolean", async () => {
     });
 });
 
+test("private profile getter maps nested settings.find_profile_enabled and marks it confirmed", async () => {
+    await withFetch(async () => response({
+        account_id: "f6332c75-771a-46bc-ae09-ef5d886a4c35",
+        settings: {
+            find_profile_enabled: false,
+            show_online_status: true
+        }
+    }), async () => {
+        const profile = await getRocketLeagueProfileByAccountId(ENV, "f6332c75-771a-46bc-ae09-ef5d886a4c35");
+        assert.equal(profile.settings.findProfileEnabled, false);
+        assert.equal(profile.findProfileEnabled, false);
+        assert.equal(profile.settingsAvailability.findProfileEnabled, true);
+        assert.equal(profile.settingsAvailability.showOnlineStatus, true);
+    });
+});
+
 test("private profile getter maps persisted provider name and career totals regardless of public privacy flags", async () => {
     await withFetch(async () => response({
         account_id: "f6332c75-771a-46bc-ae09-ef5d886a4c35",
@@ -339,7 +355,7 @@ test("private My Profile is standalone, read-only provider data stays safe, and 
     const html = await readFile(new URL("../../public/Tabs/RocketLeague/MyProfile/HTML/index.html", import.meta.url), "utf8");
     assert.match(html, /myProfileSettingsForm/);
     assert.match(source, /buildSettingsPayload/);
-    assert.match(source, /getConfirmedSettings/);
+    assert.match(source, /getSettingsConfirmationState/);
     assert.doesNotMatch(html, /rocketLeagueMmrProgression|rocketLeagueMmrHistoryGraph/);
     assert.doesNotMatch(source, /provider\.(?:level|xp|creatorCode)|includeMmr(?:Progression|History)/);
     assert.doesNotMatch(source, /SUPABASE_(?:AUTH|URL)/);
@@ -349,11 +365,13 @@ test("private My Profile settings preserve persisted values and fail closed for 
     const source = await readFile(new URL("../../public/Tabs/RocketLeague/MyProfile/JS/index.js", import.meta.url), "utf8");
     const settingsView = await readFile(new URL("../../public/Tabs/RocketLeague/MyProfile/JS/settings_view.js", import.meta.url), "utf8");
     const html = await readFile(new URL("../../public/Tabs/RocketLeague/MyProfile/HTML/index.html", import.meta.url), "utf8");
-    assert.match(source, /getConfirmedSettings\(profile\)/);
+    assert.match(source, /getSettingsConfirmationState\(profile\)/);
+    assert.match(source, /isSettingConfirmed\(profile, key\)/);
     assert.match(source, /const availability = DAYS\.flatMap/);
     assert.match(settingsView, /notificationMethod: notificationsEnabled \?/);
     assert.match(source, /autoDetectRegion: document\.getElementById\("autoDetectRegion"\)\.checked/);
-    assert.match(source, /!confirmedSettings/);
+    assert.match(source, /form\.hidden = false/);
+    assert.match(source, /Could not confirm:/);
     for (const id of ["preferredMode", "myProfileAvailability", "profileEmail", "profilePhone", "notificationMethod", "reminderMode"]) {
         assert.match(html, new RegExp(`id="${id}"`));
     }
