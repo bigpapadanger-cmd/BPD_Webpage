@@ -88,7 +88,7 @@ export const ROUTES = {
             "/Framework/Shell/HTML/Footer/footer.html",
 
         module:
-            null,
+            "/Tabs/RocketLeague/Features/JS/shop.js",
 
         sitemap:
             true
@@ -295,7 +295,7 @@ export const ROUTES = {
             "/Framework/Shell/HTML/Footer/footer.html",
 
         module:
-            null,
+            "/Tabs/RocketLeague/Features/JS/shop.js",
 
         sitemap:
             true

@@ -1,7 +1,7 @@
 "use strict";
 
 const EDITABLE_FIELDS = [
-    "autoDetectRegion", "showOnlineStatus", "findProfileEnabled", "preferredMode", "otherMode",
+    "primaryPlatform", "autoDetectRegion", "showOnlineStatus", "findProfileEnabled", "preferredMode", "otherMode",
     "availability", "email", "phone", "notificationsEnabled", "notificationMethod", "reminderMode"
 ];
 
@@ -16,6 +16,7 @@ export function getConfirmedSettings(profile) {
 }
 
 const SETTING_LABELS = Object.freeze({
+    primaryPlatform: "primary platform",
     autoDetectRegion: "region detection",
     showOnlineStatus: "online status sharing",
     findProfileEnabled: "Find Players visibility",
@@ -74,8 +75,7 @@ export function buildSettingsPayload(profile, values) {
     const original = profile.settings;
     const notificationsEnabled = values.notificationsEnabled === true;
     return {
-        ageConsent: profile.ageConsent,
-        policyConsent: profile.policyConsent,
+        primaryPlatform: preserveNull(original.primaryPlatform, values.primaryPlatform),
         autoDetectRegion: values.autoDetectRegion === true,
         showOnlineStatus: values.showOnlineStatus === true,
         findProfileEnabled: values.findProfileEnabled === true,

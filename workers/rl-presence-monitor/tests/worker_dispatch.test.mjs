@@ -56,7 +56,7 @@ test("all Worker call schedules are bounded and diagnostic Worker is manual-only
     const ocrConfig = JSON.parse(await readFile(new URL("../../ocr-job-consumer/wrangler.jsonc", import.meta.url), "utf8"));
     const diagnosticConfig = JSON.parse(await readFile(new URL("../../google-mtls-diagnostic/wrangler.jsonc", import.meta.url), "utf8"));
 
-    assert.deepEqual(rlConfig.triggers.crons, ["*/15 * * * *", "5 11 * * SAT", "0 12 * * *"]);
+    assert.deepEqual(rlConfig.triggers.crons, ["*/15 * * * *", "0 * * * *", "0 12 * * *"]);
     assert.deepEqual(ocrConfig.triggers.crons, ["*/30 * * * *"]);
     assert.deepEqual(ocrConfig.queues.consumers.map(({ max_batch_size, max_retries, max_concurrency }) => ({ max_batch_size, max_retries, max_concurrency })), [
         { max_batch_size: 1, max_retries: 2, max_concurrency: 2 }
@@ -143,6 +143,84 @@ test("unknown scheduled trigger performs no work, and Worker has no queue handle
     assert.equal(tasks.length, 0);
     assert.equal(typeof worker.fetch, "function");
     assert.equal("queue" in worker, false);
+});
+
+test("hourly Rocket League schedule pages due candidates using the confirmed RPC contract", async () => {
+    const calls = [];
+    const kv = new Map();
+    const tasks = [];
+    globalThis.fetch = async (url, init) => {
+        const parsed = new URL(url);
+        if (parsed.hostname === "mmr.example.test") {
+            calls.push({ rpc: "get-shop-data", body: null });
+            return Response.json({ success: true, shops: [{ id: 7 }], catalogues: [{ shop_id: 7, items: [] }] });
+        }
+        const rpc = parsed.pathname.split("/").at(-1);
+        const body = init.body ? JSON.parse(init.body) : null;
+        calls.push({ rpc, body });
+        if (rpc === "get_rl_refresh_candidates") return Response.json([{
+            account_id: "account-1", player_id: "player-1", epic_account_id: "epic-1",
+            mmr_due: false, provider_due: false, match_history_due: true,
+            club_due: false, career_stats_due: false, discord_due: false
+        }]);
+        if (rpc === "save_rl_shop_snapshot") return Response.json({ saved: false, snapshot_id: 1 });
+        if (rpc === "record_rl_player_refresh_result" || rpc === "record_rl_global_refresh_result") return Response.json({ success: true });
+        throw new Error(`Unexpected request to ${rpc}`);
+    };
+    const scheduledEnv = {
+        ...env(),
+        MMR_API_URL: "https://mmr.example.test",
+        MMR_API_KEY: "mmr-test-secret",
+        SERVICE_STATUS: {
+            async get(key) { return kv.get(key) ?? null; },
+            async put(key, value) { kv.set(key, value); },
+            async delete(key) { kv.delete(key); }
+        }
+    };
+
+    await handleScheduled({ cron: "0 * * * *" }, scheduledEnv, { waitUntil: task => tasks.push(task) });
+    await Promise.all(tasks);
+
+    const callsByRpc = new Map();
+    for (const call of calls) callsByRpc.set(call.rpc, [...(callsByRpc.get(call.rpc) || []), call]);
+    assert.equal(callsByRpc.get("get_rl_refresh_candidates").length, 1);
+    assert.deepEqual(callsByRpc.get("get_rl_refresh_candidates")[0].body, { p_after_player_id: null, p_limit: 20 });
+    assert.equal(callsByRpc.get("get-shop-data").length, 1);
+    assert.equal(callsByRpc.get("save_rl_shop_snapshot").length, 1);
+    assert.match(callsByRpc.get("save_rl_shop_snapshot")[0].body.p_content_hash, /^[a-f0-9]{64}$/);
+    assert.deepEqual(callsByRpc.get("record_rl_player_refresh_result")[0].body, {
+        p_account_id: "account-1", p_component: "match_history", p_success: false,
+        p_error_code: "RL_MATCH_HISTORY_AUTHENTICATED_PLAYER_ONLY"
+    });
+    assert.deepEqual(callsByRpc.get("record_rl_global_refresh_result")[0].body, {
+        p_refresh_key: "shop", p_success: true, p_changed: false, p_error_code: null
+    });
+    assert.equal(kv.get("rl:scheduled-refresh:cursor"), "player-1");
+});
+
+test("protected manual Shop refresh uses the same cached snapshot pipeline", async () => {
+    const calls = [];
+    globalThis.fetch = async (url, init) => {
+        const parsed = new URL(url);
+        if (parsed.hostname === "mmr.example.test") {
+            calls.push("get-shop-data");
+            assert.equal(init.headers.Authorization, "Bearer mmr-test-secret");
+            return Response.json({ success: true, shops: [{ id: 7 }], catalogues: [{ shop_id: 7, items: [] }] });
+        }
+        const rpc = parsed.pathname.split("/").at(-1);
+        calls.push(rpc);
+        if (rpc === "save_rl_shop_snapshot") return Response.json({ saved: true, snapshot_id: 1 });
+        if (rpc === "record_rl_global_refresh_result") return Response.json({ success: true });
+        throw new Error(`Unexpected request to ${rpc}`);
+    };
+    const response = await handleFetch(adminRequest({ job: "shop" }), {
+        ...env(), MMR_API_URL: "https://mmr.example.test", MMR_API_KEY: "mmr-test-secret"
+    });
+    const result = await response.json();
+    assert.equal(response.status, 200);
+    assert.deepEqual(result.summary, { success: true, changed: true });
+    assert.deepEqual(calls, ["get-shop-data", "save_rl_shop_snapshot", "record_rl_global_refresh_result"]);
+    assert.equal(JSON.stringify(result).includes("service-secret"), false);
 });
 
 test("generated route inventory marks manual run protected", () => {

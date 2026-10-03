@@ -42,7 +42,7 @@ Rocket League background path
         <-> Supabase, external MMR service, and AUTH_SESSIONS
         <-> workers/rl-presence-monitor/
             - scheduled presence checks
-            - scheduled MMR refresh
+            - hourly due-aware MMR/profile/stats/club refresh
             - scheduled Taskboard summary
             - /health and authorized /wake endpoints
 
@@ -123,7 +123,7 @@ Rocket League routes
     /RocketLeague/MyProfile   Private settings editor; individual unconfirmed controls are named/locked and the full-settings save remains disabled until all fields are confirmed.
     /RocketLeague/FindPlayers Public opt-in search through Pages API; styled responsive cards, three compact ranks, neutral unknown presence.
     /RocketLeague/Player      Public-safe profile by public_profile_id; hidden profiles unavailable.
-    /RocketLeague/Shop        Public information page; live shop feed is explicitly unavailable, with no provider request or fabricated data.
+    /RocketLeague/Shop        Public cached shop carousel through the DomainData API; no provider call on page view.
     /RocketLeague/MatchHistory Auth-gated status page; match-by-match history for arbitrary linked players is unsupported; MMR captures are not matches.
     /RocketLeague/Leaderboards, /MatchResults
                               Public shell status pages; no fabricated standings or results.

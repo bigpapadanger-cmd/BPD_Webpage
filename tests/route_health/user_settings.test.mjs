@@ -7,6 +7,7 @@ import { existsSync } from "node:fs";
 
 import { ROUTES } from "../../public/routes.js";
 import { handleAccountMutation } from "../../functions/services/auth/account/mutations.js";
+import { hasReadableContrast } from "../../public/Framework/Shell/JS/preferences.js";
 
 function createElement(value = "") {
     return {
@@ -20,7 +21,9 @@ function createElement(value = "") {
             contains(name) { return this.values.has(name); }
         },
         addEventListener(name, handler) { this.listeners[name] = handler; },
-        setAttribute(name, value) { this.attributes[name] = value; }
+        setAttribute(name, value) { this.attributes[name] = value; },
+        style: {},
+        querySelectorAll() { return this.previewSpans || []; }
     };
 }
 
@@ -44,11 +47,19 @@ test("appearance preferences remain browser-local and preserve existing storage 
     const originalDocument = globalThis.document;
     const originalStorage = globalThis.localStorage;
     const originalWindow = globalThis.window;
-    const store = new Map([["bpdTheme", "purple"]]);
+    const store = new Map([["bpdTheme", "purple"], ["bpdBackgroundColor", "#121212"]]);
+    const backgroundPreview = createElement();
+    backgroundPreview.previewSpans = [createElement(), createElement()];
+    const hoverPreview = createElement();
+    hoverPreview.previewSpans = [createElement(), createElement()];
     const elements = {
         themeSetting: createElement(),
         animationSetting: createElement(),
         sidebarSetting: createElement(),
+        backgroundColorSetting: createElement(),
+        hoverTextColorSetting: createElement(),
+        backgroundColorPreview: backgroundPreview,
+        hoverTextColorPreview: hoverPreview,
         resetSettings: createElement(),
         privacySettings: createElement(),
         privacySettingsStatus: createElement(),
@@ -56,6 +67,7 @@ test("appearance preferences remain browser-local and preserve existing storage 
         sidebarToggle: createElement()
     };
     globalThis.document = {
+        documentElement: { style: { values: {}, setProperty(name, value) { this.values[name] = value; } } },
         body: { dataset: {}, classList: { toggle() {} } },
         getElementById(id) { return elements[id] || null; }
     };
@@ -75,9 +87,21 @@ test("appearance preferences remain browser-local and preserve existing storage 
 
         assert.equal(elements.themeSetting.value, "purple");
         assert.equal(document.body.dataset.theme, "purple");
+        assert.equal(elements.backgroundColorSetting.value, "#121212");
+        assert.equal(document.documentElement.style.values["--bpd-user-background"], "#121212");
         elements.themeSetting.value = "green";
         elements.themeSetting.listeners.change();
         assert.equal(store.get("bpdTheme"), "green");
+
+        elements.backgroundColorSetting.value = "#223344";
+        elements.backgroundColorSetting.listeners.input();
+        elements.hoverTextColorSetting.value = "#eeeeee";
+        elements.hoverTextColorSetting.listeners.input();
+        assert.equal(store.get("bpdBackgroundColor"), "#223344");
+        assert.equal(store.get("bpdHoverTextColor"), "#eeeeee");
+        assert.equal(document.documentElement.style.values["--bpd-user-background"], "#223344");
+        assert.equal(document.documentElement.style.values["--bpd-hover-text-color"], "#eeeeee");
+        assert.equal(backgroundPreview.previewSpans[1].textContent, "Current: #223344");
 
         elements.privacySettings.listeners.click();
         assert.equal(callbackQueue[0], callback);
@@ -91,11 +115,53 @@ test("appearance preferences remain browser-local and preserve existing storage 
         assert.equal(store.get("bpdTheme"), "blue");
         assert.equal(store.get("bpdAnimations"), "on");
         assert.equal(store.get("bpdSidebar"), "open");
+        assert.equal(store.get("bpdBackgroundColor"), "#0d0f13");
+        assert.equal(store.get("bpdHoverTextColor"), "#ffffff");
+        assert.equal(document.documentElement.style.values["--bpd-user-background"], "#0d0f13");
     } finally {
         globalThis.document = originalDocument;
         globalThis.localStorage = originalStorage;
         globalThis.window = originalWindow;
     }
+});
+
+test("sidebar icons use the shared accessible icon slot and consistent dashboard symbol", async () => {
+    const sidebarRoot = new URL("../../public/Framework/Shell/HTML/Sidebar/", import.meta.url);
+    const sharedSidebars = await Promise.all(["mainmenu.html", "admin.html", "rl_menu.html"].map(name => readFile(new URL(name, sidebarRoot), "utf8")));
+    for (const sidebar of sharedSidebars) {
+        assert.match(sidebar, /class="nav-icon"[\s\S]*?aria-hidden="true"/);
+        assert.match(sidebar, /data-tooltip="Dashboard"[\s\S]*?📊/);
+    }
+    const styles = await readFile(new URL("../../public/Framework/Shell/CSS/Sidebar/sidebar.css", import.meta.url), "utf8");
+    assert.match(styles, /\.site-sidebar \.nav-icon[\s\S]*?font-size: 1\.15rem/);
+});
+
+test("global color customizations use neutral shared variables and preserve Rocket League hover branding", async () => {
+    const preferences = await readFile(new URL("../../public/Framework/Shell/JS/preferences.js", import.meta.url), "utf8");
+    const shell = await readFile(new URL("../../public/Framework/Shell/CSS/General/shell.css", import.meta.url), "utf8");
+    const sidebar = await readFile(new URL("../../public/Framework/Shell/CSS/Sidebar/sidebar.css", import.meta.url), "utf8");
+    const rlSidebar = await readFile(new URL("../../public/Framework/Shell/CSS/Sidebar/rl_AuthSidebar.css", import.meta.url), "utf8");
+    const header = await readFile(new URL("../../public/Framework/Shell/CSS/General/header.css", import.meta.url), "utf8");
+    const footer = await readFile(new URL("../../public/Framework/Shell/CSS/General/footer.css", import.meta.url), "utf8");
+    const settings = await readFile(new URL("../../public/Global/Settings/HTML/settings.html", import.meta.url), "utf8");
+    const router = await readFile(new URL("../../public/Framework/Shell/JS/router.js", import.meta.url), "utf8");
+    const sidebarCoordinator = await readFile(new URL("../../public/Framework/Shell/JS/Sidebar/sidebar.js", import.meta.url), "utf8");
+    assert.match(preferences, /bpdBackgroundColor/);
+    assert.match(preferences, /bpdHoverTextColor/);
+    assert.match(preferences, /--bpd-user-background/);
+    assert.match(shell, /background: var\(--bpd-user-background/);
+    assert.match(sidebar, /color:\s*var\(--bpd-hover-text-color/);
+    assert.match(header, /\.header-tab:hover[\s\S]*?color: var\(--bpd-hover-text-color/);
+    assert.match(footer, /\.footer-navigation a:hover[\s\S]*?var\(--bpd-hover-text-color/);
+    assert.match(rlSidebar, /\.sidebar-view-rocketleague \.nav-item:hover[\s\S]*?color: #ffffff/);
+    assert.match(settings, /Background Color/);
+    assert.match(settings, /Hover Text Color/);
+    assert.match(router, /applyAppearancePreferences\(\)/);
+    assert.match(sidebarCoordinator, /applyAppearancePreferences\(preferences\)/);
+    assert.equal(hasReadableContrast("#ffffff", "#0d0f13"), true);
+    assert.equal(hasReadableContrast("#eeeeee", "#24202f"), true);
+    assert.equal(hasReadableContrast("#24202f", "#24202f"), false);
+    assert.equal(hasReadableContrast("#ffffff", "#eeeeee"), false);
 });
 
 test("FAQ is curated static content and Suggestions remains a separate destination", async () => {

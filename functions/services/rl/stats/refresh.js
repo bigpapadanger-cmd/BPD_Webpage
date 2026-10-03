@@ -94,6 +94,31 @@ function normalizeDate(
         : null;
 }
 
+async function recordRefreshResult(env, accountId, component, success, errorCode = null) {
+    const baseUrl = normalizeString(env?.SUPABASE_URL).replace(/\/+$/, "");
+    const apiKey = normalizeString(env?.SUPABASE_AUTH);
+    if (!baseUrl || !apiKey) throw new Error("SUPABASE_CONFIGURATION_MISSING");
+    const restUrl = /\/rest\/v1$/i.test(baseUrl) ? `${baseUrl}/` : `${baseUrl}/rest/v1/`;
+    const response = await fetch(new URL("rpc/record_rl_player_refresh_result", restUrl), {
+        method: "POST",
+        headers: {
+            apikey: apiKey,
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+            Accept: "application/json",
+            "Content-Profile": "api",
+            "Accept-Profile": "api"
+        },
+        body: JSON.stringify({
+            p_account_id: accountId,
+            p_component: component,
+            p_success: success,
+            p_error_code: success ? null : errorCode
+        })
+    });
+    if (!response.ok) throw new Error("REFRESH_RESULT_CHECKPOINT_FAILED");
+}
+
 /* =========================================================
 REFRESH ELIGIBILITY
 ========================================================= */
@@ -482,41 +507,30 @@ export async function refreshStats(
         }
     );
 
-    const stats =
-        await fetchMmrStats(
-            env,
-            epicAccountId
-        );
-
-    console.info(
-        "STATS REFRESH: MMR fetch completed.",
-        {
-            accountId:
-                normalizedAccountId,
-
+    let saved;
+    try {
+        const stats = await fetchMmrStats(env, epicAccountId);
+        console.info("STATS REFRESH: MMR fetch completed.", {
+            accountId: normalizedAccountId,
             rlPlayerId,
+            playlistCount: Array.isArray(stats?.playlists) ? stats.playlists.length : null
+        });
+        saved = await saveMmrStats(env, { accountId: normalizedAccountId, epicAccountId, stats });
+    } catch (error) {
+        try {
+            await recordRefreshResult(env, normalizedAccountId, "mmr", false,
+                /^[A-Z0-9_]{1,80}$/.test(error?.code || "") ? error.code : "MMR_REFRESH_FAILED");
+        } catch { /* Refresh failure remains the caller-visible outcome. */ }
+        throw error;
+    }
 
-            playlistCount:
-                Array.isArray(
-                    stats?.playlists
-                )
-                    ? stats.playlists.length
-                    : null
-        }
-    );
-
-    const saved =
-        await saveMmrStats(
-            env,
-            {
-                accountId:
-                    normalizedAccountId,
-
-                epicAccountId,
-
-                stats
-            }
-        );
+    try {
+        await recordRefreshResult(env, normalizedAccountId, "mmr", true);
+    } catch (error) {
+        console.warn("STATS REFRESH: MMR refresh checkpoint failed.", {
+            code: error?.message === "SUPABASE_CONFIGURATION_MISSING" ? error.message : "REFRESH_RESULT_CHECKPOINT_FAILED"
+        });
+    }
 
     console.info(
         "STATS REFRESH: Snapshot saved.",

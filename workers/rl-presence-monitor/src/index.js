@@ -18,8 +18,8 @@ Schedules:
     - Every 15 minutes:
           Rocket League presence monitoring.
 
-    - Every Saturday:
-          Inactive-player MMR refresh.
+    - Every hour:
+          Due-aware per-player Rocket League refresh and global Shop snapshot.
 
     - Once per day:
           Admin Taskboard aggregate summary.
@@ -34,8 +34,12 @@ import {
 } from "./presence_cycle.js";
 
 import {
-    runScheduledMmrRefresh
-} from "./scheduled_mmr.js";
+    runRocketLeagueRefreshCycle
+} from "./rl_refresh_cycle.js";
+
+import {
+    runRocketLeagueShopRefresh
+} from "./rl_shop_refresh.js";
 
 import {
     runTaskboardSummary
@@ -61,8 +65,8 @@ CRON DEFINITIONS
 const PRESENCE_CRON =
     "*/15 * * * *";
 
-const MMR_REFRESH_CRON =
-    "5 11 * * SAT";
+const ROCKET_LEAGUE_REFRESH_CRON =
+    "0 * * * *";
 
 /*
 Set this to the single UTC time you want the Taskboard
@@ -123,7 +127,10 @@ function getJobRunner(job, env) {
         return () => runPresenceCycle(env, { force: true });
     }
     if (job === "mmr") {
-        return () => runScheduledMmrRefresh(env);
+        return () => runRocketLeagueRefreshCycle(env);
+    }
+    if (job === "shop") {
+        return () => runRocketLeagueShopRefresh(env);
     }
     if (job === "taskboard") {
         return () => runTaskboardSummary(env);
@@ -141,7 +148,14 @@ function summarizeJobResult(job, result) {
     }
     if (job === "mmr") {
         return Object.fromEntries(
-            ["success", "candidateCount", "processedCount", "refreshedCount", "skippedCount", "failedCount"]
+            ["success", "candidateCount", "attempted", "succeeded", "failed", "cursorReset", "nextCursorStored"]
+                .filter(key => result?.[key] !== undefined)
+                .map(key => [key, result[key]])
+        );
+    }
+    if (job === "shop") {
+        return Object.fromEntries(
+            ["success", "changed", "saved", "errorCode"]
                 .filter(key => result?.[key] !== undefined)
                 .map(key => [key, result[key]])
         );
@@ -299,7 +313,7 @@ async function handleFetch(
         }
 
         const job = body?.job;
-        if (!["presence", "mmr", "taskboard"].includes(job)) {
+        if (!["presence", "mmr", "shop", "taskboard"].includes(job)) {
             return Response.json({ success: false, code: "INVALID_JOB" }, { status: 400 });
         }
         if (activeJobs.has(job)) {
@@ -350,9 +364,10 @@ async function handleScheduled(
 
     if (
         controller.cron ===
-        MMR_REFRESH_CRON
+        ROCKET_LEAGUE_REFRESH_CRON
     ) {
         runInBackground("mmr", env, ctx);
+        runInBackground("shop", env, ctx);
 
         return;
     }

@@ -1,5 +1,5 @@
 WORKERS/: INDEPENDENT CLOUDFLARE WORKERS
-Snapshot: 2026-10-02
+Snapshot: 2026-10-03
 
 ROLE
 
@@ -39,10 +39,15 @@ workers/
 |   +-- README.md             15-minute opt-in presence cycle, provider contract, privacy and stale policy.
 |   +-- src/
 |   |   +-- index.js             /health, protected /admin/health, authorized /wake, cron dispatcher, presence heartbeat.
-|   |   +-- presence_cycle.js    Supabase-eligible candidates, normalized MMR capability fetch/save cycle.
-|   |   +-- scheduled_mmr.js     Scheduled MMR candidate refresh and persistence.
+|   |   +-- presence_cycle.js    Supabase-eligible candidates, normalized presence fetch/save cycle.
+|   |   +-- rl_refresh_cycle.js  Due-aware paged MMR/profile/stats/club refresh orchestration.
+|   |   +-- rl_shop_refresh.js   Hourly global Shop snapshot fetch/hash/save/checkpoint.
+|   |   +-- scheduled_mmr.js     Legacy weekly MMR refresh implementation (retained, no longer scheduled).
 |   |   +-- taskboard_summary.js Taskboard aggregate load and Discord delivery.
 |   +-- tests/
+|       +-- rl_shop_refresh.test.mjs Global Shop hash/persist/checkpoint and failure-preservation tests.
+|       +-- rl_refresh_cycle.test.mjs Due capability authorization and independent persistence tests.
+|       +-- worker_dispatch.test.mjs Schedule dispatch and protected manual-run contract.
 |       +-- account_mutations.test.mjs
 |       +-- epic_entry_paths.test.mjs
 |       +-- oauth_navigation.test.mjs
@@ -91,8 +96,8 @@ Configuration
     Entry             src/index.js
     Custom domain     status.bpd-gaming-network.com
     KV binding        AUTH_SESSIONS
-    Schedules         every 15 minutes, weekly Saturday MMR refresh,
-                  and a daily Taskboard summary at 12:00 UTC
+    Schedules         every 15 minutes for presence, hourly due-aware Rocket
+                      League refresh, and a daily Taskboard summary at 12:00 UTC
     External systems  Supabase and the configured MMR API
 
 Runtime relationships
@@ -101,7 +106,7 @@ Runtime relationships
     POST /wake
         -> authorized on-demand presence cycle
     POST /admin/run-scheduled
-        -> PRESENCE_TRIGGER_KEY-protected explicit presence/MMR/Taskboard run;
+        -> PRESENCE_TRIGGER_KEY-protected explicit presence/MMR/Shop/Taskboard run;
            returns aggregate-only summary; rejects overlapping same-isolate job
     15-minute cron (unchanged)
         -> presence_cycle.js
@@ -109,9 +114,18 @@ Runtime relationships
         -> authorization recheck and /get-player-data?capabilities=presence
         -> persists only successful normalized online/offline outcomes
         -> provider errors/unknown preserve prior state
-    weekly cron
-        -> scheduled_mmr.js
-        -> selects eligible candidates, calls MMR API, saves snapshots/state
+    hourly cron
+        -> rl_refresh_cycle.js asks api.get_rl_refresh_candidates for up to 20
+           due candidates using a cursor in SERVICE_STATUS KV
+        -> requests only due MMR/profile/club/career_stats capabilities through
+           /get-player-data, persists successful values, and checkpoints each
+           component independently
+        -> rl_shop_refresh.js calls the protected MMR /get-shop-data endpoint
+           once; the MMR Worker makes two PsyNet shop reads
+        -> hashes the normalized response and calls api.save_rl_shop_snapshot
+           plus api.record_rl_global_refresh_result (key shop)
+        -> history remains unsupported for arbitrary scheduled player IDs;
+           Discord refresh remains unavailable without a Gateway runtime
     daily cron
         -> taskboard_summary.js
         -> loads Supabase Taskboard aggregates and sends Discord summary output

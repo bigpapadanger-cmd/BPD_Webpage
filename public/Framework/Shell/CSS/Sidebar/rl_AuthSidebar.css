@@ -411,6 +411,13 @@ SUBMENUS
         );
 }
 
+.sidebar-view-rocketleague .nav-item:hover,
+.sidebar-view-rocketleague .nav-item:focus-visible,
+.sidebar-view-rocketleague .nav-item.active,
+.sidebar-view-rocketleague .nav-item[aria-current="page"] {
+    color: #ffffff;
+}
+
 .sidebar-view-rocketleague .submenu-item:focus-visible {
     outline:
         2px solid

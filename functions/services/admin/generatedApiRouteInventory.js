@@ -33,6 +33,10 @@ export const PAGE_ROUTE_INVENTORY = Object.freeze([
       {
         "path": "/Framework/Shell/HTML/Footer/footer.html",
         "exists": true
+      },
+      {
+        "path": "/Tabs/RocketLeague/Features/JS/shop.js",
+        "exists": true
       }
     ]
   },
@@ -336,6 +340,10 @@ export const PAGE_ROUTE_INVENTORY = Object.freeze([
       },
       {
         "path": "/Framework/Shell/HTML/Footer/footer.html",
+        "exists": true
+      },
+      {
+        "path": "/Tabs/RocketLeague/Features/JS/shop.js",
         "exists": true
       }
     ]
@@ -2003,6 +2011,7 @@ export const API_ROUTE_INVENTORY = Object.freeze([
     "handler": "functions/api/auth/rocketleague/profile.js",
     "methods": [
       "GET",
+      "PATCH",
       "POST"
     ],
     "authRequired": "handler-defined",
@@ -2376,6 +2385,22 @@ export const API_ROUTE_INVENTORY = Object.freeze([
     "deepLinkSupported": false
   },
   {
+    "path": "/api/rocketleague/shop",
+    "lookupKey": null,
+    "routeType": "api",
+    "casePolicy": "exact",
+    "sourceFiles": [
+      "functions/api/rocketleague/shop.js"
+    ],
+    "handler": "functions/api/rocketleague/shop.js",
+    "methods": [
+      "GET"
+    ],
+    "authRequired": "handler-defined",
+    "healthStatus": "valid",
+    "deepLinkSupported": false
+  },
+  {
     "path": "/api/suggestions/:suggestionId/vote",
     "lookupKey": null,
     "routeType": "api",
@@ -2562,7 +2587,7 @@ export const WORKER_SCHEDULE_INVENTORY = Object.freeze([
     "ownerSystem": "bpd-rl-presence-monitor"
   },
   {
-    "path": "cron: 5 11 * * SAT",
+    "path": "cron: 0 * * * *",
     "routeType": "schedule",
     "casePolicy": "not-applicable",
     "sourceFiles": [

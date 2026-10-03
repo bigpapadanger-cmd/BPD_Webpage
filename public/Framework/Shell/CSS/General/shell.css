@@ -3,6 +3,8 @@
 :root {
     --site-accent: #4da3ff;
     --site-accent-soft: rgba(77, 163, 255, 0.18);
+    --bpd-user-background: #0d0f13;
+    --bpd-hover-text-color: #ffffff;
     --sidebar-width: 210px;
     --sidebar-collapsed-width: 56px;
     --sidebar-icon-width: 50px;
@@ -80,7 +82,7 @@ body {
 }
 
 html {
-    background: #0d0f13;
+    background: var(--bpd-user-background, #0d0f13);
 }
 
 body {
@@ -89,7 +91,7 @@ body {
 
     overflow-x: hidden;
 
-    background: #0d0f13;
+    background: var(--bpd-user-background, #0d0f13);
     color: #ffffff;
 
     font-family:

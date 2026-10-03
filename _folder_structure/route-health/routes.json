@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-03T01:06:24.093Z",
+  "generatedAt": "2026-10-03T21:23:15.129Z",
   "policy": {
     "humanPagePaths": "case-insensitive lookup; canonical TitleCase path",
     "apiAndAssetPaths": "exact-case; never normalized by the human-page router",
@@ -38,6 +38,10 @@
         },
         {
           "path": "/Framework/Shell/HTML/Footer/footer.html",
+          "exists": true
+        },
+        {
+          "path": "/Tabs/RocketLeague/Features/JS/shop.js",
           "exists": true
         }
       ]
@@ -342,6 +346,10 @@
         },
         {
           "path": "/Framework/Shell/HTML/Footer/footer.html",
+          "exists": true
+        },
+        {
+          "path": "/Tabs/RocketLeague/Features/JS/shop.js",
           "exists": true
         }
       ]
@@ -2009,6 +2017,7 @@
       "handler": "functions/api/auth/rocketleague/profile.js",
       "methods": [
         "GET",
+        "PATCH",
         "POST"
       ],
       "authRequired": "handler-defined",
@@ -2382,6 +2391,22 @@
       "deepLinkSupported": false
     },
     {
+      "path": "/api/rocketleague/shop",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/rocketleague/shop.js"
+      ],
+      "handler": "functions/api/rocketleague/shop.js",
+      "methods": [
+        "GET"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    },
+    {
       "path": "/api/suggestions/:suggestionId/vote",
       "lookupKey": null,
       "routeType": "api",
@@ -2568,7 +2593,7 @@
       "ownerSystem": "bpd-rl-presence-monitor"
     },
     {
-      "path": "cron: 5 11 * * SAT",
+      "path": "cron: 0 * * * *",
       "routeType": "schedule",
       "casePolicy": "not-applicable",
       "sourceFiles": [

@@ -5,6 +5,8 @@
  * Provider, MMR, and career-stat fields intentionally do not appear here.
  */
 export const PROFILE_SETTING_FIELDS = Object.freeze({
+    primaryPlatform: { group: "platform", db: "primary_platform", aliases: ["primaryPlatform"], rpc: "p_primary_platform", type: "nullable-string" },
+    notificationsV2: { group: "notifications", db: "notifications_v2", aliases: ["notificationsV2"], rpc: "p_notifications", type: "object" },
     autoDetectRegion: { group: "location", db: "auto_detect_region", aliases: ["autoDetectRegion"], rpc: "s_auto_detect_region", type: "boolean" },
     region: { group: "location", db: "region", aliases: ["location.region"], rpc: "s_region", type: "nullable-string" },
     countryCode: { group: "location", db: "country_code", aliases: ["countryCode", "location.countryCode", "location.country_code"], rpc: "s_country_code", type: "nullable-string" },
@@ -20,6 +22,9 @@ export const PROFILE_SETTING_FIELDS = Object.freeze({
     notificationMethod: { group: "notifications", db: "notification_method", aliases: ["notificationMethod"], rpc: "s_notification_method", type: "nullable-string" },
     reminderMode: { group: "notifications", db: "reminder_mode", aliases: ["reminderMode"], rpc: "s_reminder_mode", type: "nullable-string" }
 });
+
+export const NOTIFICATION_CHANNELS = Object.freeze(["email", "sms", "discord"]);
+export const REMINDER_LIMITS = Object.freeze({ minMinutes: 15, maxMinutes: 11460, maxPerChannel: 3 });
 
 function getPath(source, path) {
     return String(path).split(".").reduce((value, key) => value && typeof value === "object" ? value[key] : undefined, source);
@@ -63,11 +68,43 @@ export function normalizeProfileSettings(source) {
 
 export function mapProfileSettingsToRpcArgs(settings) {
     const normalized = normalizeProfileSettings({ settings });
-    return Object.fromEntries(Object.entries(PROFILE_SETTING_FIELDS).map(([key, definition]) => {
+    return Object.fromEntries(Object.entries(PROFILE_SETTING_FIELDS).filter(([, definition]) => typeof definition.rpc === "string" && definition.rpc.startsWith("s_")).map(([key, definition]) => {
         const value = normalized[key];
         const mapped = definition.type === "boolean" ? value
             : definition.type === "array" ? (Array.isArray(value) ? value : [])
                 : value;
         return [definition.rpc, mapped];
     }));
+}
+
+export function normalizeNotificationsV2(value) {
+    const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+    return Object.fromEntries(NOTIFICATION_CHANNELS.map(channel => {
+        const entry = source[channel] && typeof source[channel] === "object" && !Array.isArray(source[channel])
+            ? source[channel]
+            : {};
+        const reminders = Array.isArray(entry.reminders)
+            ? entry.reminders.filter(value => Number.isInteger(value) && value >= REMINDER_LIMITS.minMinutes && value <= REMINDER_LIMITS.maxMinutes).slice(0, REMINDER_LIMITS.maxPerChannel)
+            : [];
+        return [channel, { enabled: typeof entry.enabled === "boolean" ? entry.enabled : null, reminders }];
+    }));
+}
+
+export function mapProfileSettingsToV2RpcArgs(settings) {
+    const normalized = normalizeProfileSettings({ settings });
+    return {
+        p_auto_detect_region: normalized.autoDetectRegion,
+        p_region: normalized.autoDetectRegion ? normalized.region : null,
+        p_country_code: normalized.autoDetectRegion ? normalized.countryCode : null,
+        p_display_timezone: normalized.autoDetectRegion ? normalized.displayTimezone : null,
+        p_show_online_status: normalized.showOnlineStatus,
+        p_find_profile_enabled: normalized.findProfileEnabled,
+        p_email_address: normalized.email,
+        p_phone_number: normalized.phone,
+        p_preferred_mode: normalized.preferredMode,
+        p_other_mode: normalized.otherMode,
+        p_availability: Array.isArray(normalized.availability) ? normalized.availability : [],
+        p_primary_platform: normalized.primaryPlatform,
+        p_notifications: normalizeNotificationsV2(settings?.notificationsV2)
+    };
 }

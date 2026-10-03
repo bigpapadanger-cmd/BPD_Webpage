@@ -39,13 +39,18 @@ async function withFetch(fetchImplementation, callback) {
 }
 
 test("profile load exposes find_profile_enabled as a boolean", async () => {
-    await withFetch(async () => response({
+    let requestedUrl = "";
+    await withFetch(async url => {
+        requestedUrl = String(url);
+        return response({
         account_id: "f6332c75-771a-46bc-ae09-ef5d886a4c35",
         rl_player_id: "eb08189f-d425-48a3-a6aa-e23d0ef478d2",
         find_profile_enabled: true,
         show_online_status: false
-    }), async () => {
+        });
+    }, async () => {
         const profile = await getRocketLeagueProfileByAccountId(ENV, "f6332c75-771a-46bc-ae09-ef5d886a4c35");
+        assert.equal(requestedUrl, "https://supabase.example.test/rpc/get_rocketleague_profile_v2");
         assert.equal(profile.findProfileEnabled, true);
         assert.equal(profile.showOnlineStatus, false);
         assert.equal(profile.settings.findProfileEnabled, true);
@@ -53,6 +58,30 @@ test("profile load exposes find_profile_enabled as a boolean", async () => {
         assert.equal(profile.settingsAvailability.findProfileEnabled, true);
         assert.equal(profile.settingsAvailability.showOnlineStatus, true);
         assert.equal(profile.settingsAvailability.email, false);
+    });
+});
+
+test("private V2 profile maps platform and reminder channels without changing public privacy", async () => {
+    await withFetch(async () => response({
+        account_id: "f6332c75-771a-46bc-ae09-ef5d886a4c35",
+        rl_player_id: "eb08189f-d425-48a3-a6aa-e23d0ef478d2",
+        primary_platform: "steam",
+        notifications_v2: {
+            email: { enabled: true, reminders: [60, 60, 1440] },
+            sms: { enabled: false, reminders: [15] },
+            discord: { enabled: false, reminders: [] }
+        },
+        find_profile_enabled: false,
+        show_online_status: true
+    }), async () => {
+        const profile = await getRocketLeagueProfileByAccountId(ENV, "f6332c75-771a-46bc-ae09-ef5d886a4c35");
+        assert.equal(profile.primaryPlatform, "steam");
+        assert.deepEqual(profile.notificationsV2.email, { enabled: true, reminders: [60, 60, 1440] });
+        assert.deepEqual(profile.notificationsV2.sms, { enabled: false, reminders: [15] });
+        assert.equal(profile.settingsAvailability.notificationsV2, true);
+        assert.equal(profile.settingsAvailability.primaryPlatform, true);
+        assert.equal(profile.settings.findProfileEnabled, false);
+        assert.equal(profile.settings.showOnlineStatus, true);
     });
 });
 
@@ -125,10 +154,12 @@ test("private profile getter maps persisted provider name and career totals rega
     });
 });
 
-test("profile save sends the new 17th discovery argument and preserves existing fields", async () => {
+test("profile save uses the confirmed V2 RPC contract and preserves independent privacy settings", async () => {
     let rpcPayload;
-    await withFetch(async (_url, options) => {
-        rpcPayload = JSON.parse(options.body);
+    const requestedUrls = [];
+    await withFetch(async (url, options) => {
+        requestedUrls.push(String(url));
+        if (options.body) rpcPayload = JSON.parse(options.body);
         return response({ saved: true });
     }, async () => {
         await saveRocketLeagueProfile(ENV, "f6332c75-771a-46bc-ae09-ef5d886a4c35", {
@@ -140,10 +171,46 @@ test("profile save sends the new 17th discovery argument and preserves existing 
             notificationsEnabled: false
         });
     });
-    assert.equal(rpcPayload.s_find_profile_enabled, true);
-    assert.equal(rpcPayload.s_show_online_status, false);
-    assert.equal(rpcPayload.s_notifications_enabled, false);
-    assert.equal(Object.keys(rpcPayload).length, 17);
+    assert.equal(rpcPayload.p_find_profile_enabled, true);
+    assert.equal(rpcPayload.p_show_online_status, false);
+    assert.equal(rpcPayload.p_primary_platform, null);
+    assert.equal(rpcPayload.p_notifications.email.enabled, false);
+    assert.equal(rpcPayload.p_notifications.sms.enabled, false);
+    assert.equal(rpcPayload.p_notifications.discord.enabled, false);
+    assert.equal(Object.keys(rpcPayload).length, 16);
+    assert.equal(requestedUrls.at(-1), "https://supabase.example.test/rpc/save_rocketleague_profile_v2");
+});
+
+test("profile save preserves already-confirmed V2 platform and channels when an older client omits them", async () => {
+    let savedPayload;
+    await withFetch(async (url, options) => {
+        if (String(url).endsWith("get_rocketleague_profile_v2")) {
+            return response({
+                account_id: "f6332c75-771a-46bc-ae09-ef5d886a4c35",
+                rl_player_id: PROFILE_ID,
+                primary_platform: "playstation",
+                notifications_v2: {
+                    email: { enabled: true, reminders: [60, 60] },
+                    sms: { enabled: false, reminders: [1440] },
+                    discord: { enabled: false, reminders: [] }
+                }
+            });
+        }
+        savedPayload = JSON.parse(options.body);
+        return response({ saved: true });
+    }, async () => {
+        await saveRocketLeagueProfile(ENV, "f6332c75-771a-46bc-ae09-ef5d886a4c35", {
+            ageConsent: true,
+            policyConsent: true,
+            availability: [],
+            notificationsEnabled: false,
+            notificationMethod: null,
+            reminderMode: null
+        });
+    });
+    assert.equal(savedPayload.p_primary_platform, "playstation");
+    assert.deepEqual(savedPayload.p_notifications.email, { enabled: true, reminders: [60, 60] });
+    assert.deepEqual(savedPayload.p_notifications.sms, { enabled: false, reminders: [1440] });
 });
 
 test("search rejects short, long, duplicate, and unbounded queries before Supabase", async () => {

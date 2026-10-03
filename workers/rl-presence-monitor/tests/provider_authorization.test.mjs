@@ -44,9 +44,11 @@ function fixture({ providers = ["epic"], active = true, ageConsent = true } = {}
     for (const provider of providers) records.set(`provider_auth_id:account-1:${provider}`, {
         accountId: "account-1", provider, connectedAt: iso(NOW - DAY), expiresAt: iso(NOW + 30 * DAY)
     });
+    const status = new Map();
     const env = { SUPABASE_URL: "https://db.invalid/rest/v1/", SUPABASE_AUTH: "test",
         AUTH_SESSIONS: { get: async key => structuredClone(records.get(key) ?? null),
-            put: async (key, value) => records.set(key, JSON.parse(value)), delete: async key => records.delete(key) } };
+            put: async (key, value) => records.set(key, JSON.parse(value)), delete: async key => records.delete(key) },
+        SERVICE_STATUS: { get: async key => status.get(key) ?? null, put: async (key, value) => status.set(key, value), delete: async key => status.delete(key) } };
     globalThis.fetch = async (input, init = {}) => {
         const url = String(input); calls.push(url);
         const body = typeof init.body === "string" ? JSON.parse(init.body) : {};
@@ -237,30 +239,29 @@ test("OCR job API denies stale Epic before reading another user's job", async ()
     assert.equal((await response.json()).requiresEpicReauthorization, true);
 });
 
-test("configured Saturday cron dispatches MMR and stale candidates never call MMR", async () => {
-    const { env, records } = fixture();
-    records.delete("provider_auth_id:account-1:epic");
+test("configured hourly cron dispatches due-aware refresh and does not fetch non-due capabilities", async () => {
+    const { env } = fixture();
     const fallback = globalThis.fetch;
     let candidatesRead = false;
+    let providerCalls = 0;
     globalThis.fetch = async (url, init) => {
-        if (String(url).endsWith("get_scheduled_mmr_refresh_accounts")) {
+        if (String(url).endsWith("get_rl_refresh_candidates")) {
             candidatesRead = true;
-            return Response.json([{ account_id: "account-1", rl_player_id: "player-1", epic_account_id: "epic-subject" }]);
+            return Response.json([{ account_id: "account-1", player_id: "player-1", epic_account_id: "epic-subject",
+                mmr_due: false, provider_due: false, match_history_due: false, club_due: false, career_stats_due: false, discord_due: false }]);
         }
-        if (String(url).endsWith("get_stats_refresh_state")) return Response.json([{
-            account_id: "account-1", rl_player_id: "player-1", epic_account_id: "epic-subject", active: true,
-            last_seen_at: new Date(NOW - 8 * DAY).toISOString(), last_refresh_at: null
-        }]);
+        if (String(url).includes("mmr.invalid") || String(url).includes("get-player-data")) providerCalls++;
         return fallback(url, init);
     };
     const configuration = JSON.parse(await readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8"));
     const tasks = [];
-    await worker.scheduled({ cron: configuration.triggers.crons.find(cron => cron.includes("SAT")) }, env,
+    await worker.scheduled({ cron: configuration.triggers.crons.find(cron => cron === "0 * * * *") }, env,
         { waitUntil(task) { tasks.push(task); } });
     const [result] = await Promise.all(tasks);
     assert.equal(candidatesRead, true);
-    assert.equal(result.refreshedCount, 0);
-    assert.equal(result.skippedCount, 1);
+    assert.equal(result.attempted, 0);
+    assert.equal(result.failed, 0);
+    assert.equal(providerCalls, 0);
 });
 
 test("registration saves draft before reauthorization and does not redirect on outage", async () => {

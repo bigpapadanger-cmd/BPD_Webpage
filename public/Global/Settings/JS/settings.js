@@ -1,7 +1,7 @@
 "use strict";
 
 import { setSidebarCollapsed } from "../../../Framework/Shell/JS/Sidebar/state.js";
-import { applyAppearancePreferences, PREFERENCE_DEFAULTS, readPreferences, readSidebarPreference, savePreference } from "../../../Framework/Shell/JS/preferences.js";
+import { applyAppearancePreferences, hasReadableContrast, PREFERENCE_DEFAULTS, readPreferences, readSidebarPreference, savePreference } from "../../../Framework/Shell/JS/preferences.js";
 import { BPD_AUTH_ACCOUNT_PROFILE_URL } from "../../../scripts/apiRoutes.js";
 import { renderDisplayNameCooldown } from "./display_name_cooldown.js";
 
@@ -156,10 +156,20 @@ async function saveDisplayName() {
     }
 }
 
+function updateColorPreview(id, color) {
+    const preview = document.getElementById(id);
+    if (!preview) return;
+    const spans = preview.querySelectorAll("span");
+    if (spans[0]) spans[0].style.backgroundColor = color;
+    if (spans[1]) spans[1].textContent = `Current: ${color}`;
+}
+
 export async function initializePage() {
     const theme = document.getElementById("themeSetting");
     const animations = document.getElementById("animationSetting");
     const sidebar = document.getElementById("sidebarSetting");
+    const backgroundColor = document.getElementById("backgroundColorSetting");
+    const hoverTextColor = document.getElementById("hoverTextColorSetting");
     const reset = document.getElementById("resetSettings");
     const privacy = document.getElementById("privacySettings");
     const privacyStatus = document.getElementById("privacySettingsStatus");
@@ -168,6 +178,10 @@ export async function initializePage() {
 
     applyAppearancePreferences(preferences);
     if (theme) theme.value = preferences.theme;
+    if (backgroundColor) backgroundColor.value = preferences.backgroundColor;
+    if (hoverTextColor) hoverTextColor.value = preferences.hoverTextColor;
+    updateColorPreview("backgroundColorPreview", preferences.backgroundColor);
+    updateColorPreview("hoverTextColorPreview", preferences.hoverTextColor);
     if (animations) {
         animations.textContent = preferences.animations === "on" ? "On" : "Off";
         animations.setAttribute("aria-pressed", String(preferences.animations === "on"));
@@ -183,6 +197,36 @@ export async function initializePage() {
             preferences.theme = theme.value;
             applyAppearancePreferences(preferences);
         }
+    });
+
+    backgroundColor?.addEventListener("input", () => {
+        const color = backgroundColor.value.toLowerCase();
+        const status = document.getElementById("backgroundColorStatus");
+        if (!hasReadableContrast("#ffffff", color)) {
+            if (status) status.textContent = "That background is too light for readable page text. Choose a darker color.";
+            backgroundColor.value = preferences.backgroundColor;
+            return;
+        }
+        if (!savePreference("backgroundColor", color)) return;
+        preferences.backgroundColor = color;
+        applyAppearancePreferences(preferences);
+        updateColorPreview("backgroundColorPreview", color);
+        if (status) status.textContent = "";
+    });
+
+    hoverTextColor?.addEventListener("input", () => {
+        const color = hoverTextColor.value.toLowerCase();
+        const status = document.getElementById("hoverTextColorStatus");
+        if (!hasReadableContrast(color, "#24202f")) {
+            if (status) status.textContent = "That color is too close to the navigation hover background. Choose a color with more contrast.";
+            hoverTextColor.value = preferences.hoverTextColor;
+            return;
+        }
+        if (!savePreference("hoverTextColor", color)) return;
+        preferences.hoverTextColor = color;
+        applyAppearancePreferences(preferences);
+        updateColorPreview("hoverTextColorPreview", color);
+        if (status) status.textContent = "";
     });
 
     animations?.addEventListener("click", () => {
@@ -207,6 +251,10 @@ export async function initializePage() {
         applyAppearancePreferences(preferences);
         applySidebarPreference(preferences.sidebar);
         if (theme) theme.value = PREFERENCE_DEFAULTS.theme;
+        if (backgroundColor) backgroundColor.value = PREFERENCE_DEFAULTS.backgroundColor;
+        if (hoverTextColor) hoverTextColor.value = PREFERENCE_DEFAULTS.hoverTextColor;
+        updateColorPreview("backgroundColorPreview", PREFERENCE_DEFAULTS.backgroundColor);
+        updateColorPreview("hoverTextColorPreview", PREFERENCE_DEFAULTS.hoverTextColor);
         if (animations) {
             animations.textContent = "On";
             animations.setAttribute("aria-pressed", "true");

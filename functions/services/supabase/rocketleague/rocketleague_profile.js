@@ -1,6 +1,6 @@
 "use strict";
 
-import { getProfileSettingsAvailability, normalizeProfileSettings } from "../../rl/profile_settings.js";
+import { getProfileSettingsAvailability, normalizeNotificationsV2, normalizeProfileSettings } from "../../rl/profile_settings.js";
 
 /* =========================================================
 BPD GAMING NETWORK
@@ -15,7 +15,7 @@ Purpose:
 
 Description:
     - Uses identity.accounts.id as the lookup key.
-    - Calls api.get_rocketleague_profile.
+    - Calls api.get_rocketleague_profile_v2.
     - Keeps BPD and Epic display names separate.
     - Normalizes Supabase snake_case fields.
     - Exposes explicit profile existence and registration state.
@@ -177,7 +177,7 @@ export async function getRocketLeagueProfileByAccountId(
 
     const response =
         await fetch(
-            `${baseUrl}rpc/get_rocketleague_profile`,
+            `${baseUrl}rpc/get_rocketleague_profile_v2`,
             {
                 method:
                     "POST",
@@ -430,6 +430,9 @@ export async function getRocketLeagueProfileByAccountId(
         updatedAt: normalizeTimestamp(providerData.updated_at)
     };
     const settings = normalizeProfileSettings(responseData);
+    if (Object.hasOwn(responseData, "notifications_v2")) {
+        settings.notificationsV2 = normalizeNotificationsV2(responseData.notifications_v2);
+    }
     const settingsAvailability = getProfileSettingsAvailability(responseData);
 
     /* =====================================================
@@ -488,6 +491,19 @@ export async function getRocketLeagueProfileByAccountId(
             normalizeNullableString(
                 responseData.rl_platform
             ),
+
+        primaryPlatform:
+            normalizeNullableString(
+                responseData.primary_platform
+            ),
+
+        notificationsV2:
+            Object.hasOwn(responseData, "notifications_v2")
+                ? normalizeNotificationsV2(responseData.notifications_v2)
+                : null,
+
+        discordNotificationState:
+            normalizeObject(responseData.discord_notification_state),
 
         autoDetectRegion:
             responseData.auto_detect_region ===

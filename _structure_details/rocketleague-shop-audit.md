@@ -1,9 +1,11 @@
 # Rocket League Item Shop Source Audit
 
-Snapshot: 2026-10-02. This remains a source review of the upstream shop
-protocol. DomainData now has a public `/RocketLeague/Shop` information page,
-but no shop service, endpoint, data ingestion, or live inventory UI. No
-Supabase change, MMR Worker change, or deployment was made.
+Snapshot: 2026-10-03. This combines upstream protocol and local implementation
+review. The protected MMR Worker now exposes normalized global shop data, and
+the existing DomainData hourly Worker hashes/saves snapshots through the
+confirmed live write RPC. No Supabase schema change or deployment was made.
+The public Shop page still has no cached reader/carousel because the live
+read-side Supabase contract has not been confirmed.
 
 ## Upstream source and trust boundary
 
@@ -14,10 +16,12 @@ WebSocket. The shop RPCs execute on that authenticated session. Do not put its
 credentials/session tokens in DomainData browser code or return authenticated
 raw responses to clients.
 
-The repository exposes an informational Admin capability placeholder for
-`item-shop.read`. The public Shop page states that live data is not yet
-available; it does not call a provider or display fabricated inventory. The
-current MMR Worker remains explicitly out of scope.
+The MMR Worker endpoint requires its existing backend bearer key and uses the
+current Durable Object's authenticated PsyNet session. The two Shop RPCs take no
+player ID and do not request wallet or inventory. DomainData calls this endpoint
+only from its hourly background job; the browser never contacts the MMR Worker.
+The Admin capability entry remains a placeholder until the cached public read
+and Shop UI are complete.
 
 ## Shop RPCs inspected
 
@@ -72,35 +76,44 @@ when present.
 
 The shop methods require a live authenticated PsyNet WebSocket while the RPCs
 run. The SDK's `AuthPlayer` creates that socket, starts a ping/keepalive loop,
-and `PsyNetRPC.Close()` closes the socket and stops the ping timer. The SDK does
-not establish that one socket must stay alive between shop rotations. Therefore
-a scheduled job can authenticate, fetch the two shop responses, normalize and
-persist them, then close the socket; it does **not** need a continuously running
-Gateway-like socket owner between scheduled executions. The session must remain
-alive during both requests, and a short-lived scheduler/runtime must support
-outbound WebSockets. This is a conclusion about the inspected SDK lifecycle,
-not a guarantee about future provider-side policy or token/session behavior.
+and `PsyNetRPC.Close()` closes the socket and stops the ping timer. It does not
+establish that one socket must stay alive between rotations. The existing MMR
+Durable Object already owns a long-lived authenticated session, so the approved
+implementation reuses it for this global, no-player-ID read rather than adding a
+second Gateway/runtime. This does not make the MMR Worker a per-user history
+source: its session identity remains the Worker service account.
 
-## Recommended future design (not implemented)
+## Current scheduled and public-read implementation
 
-Use a separate Google Cloud Run Job invoked by Cloud Scheduler. It should own a
-dedicated operator-approved Epic/EOS account's server-side refresh credentials,
-open one PsyNet session per run, call `GetStandardShops` then one
-`GetShopCatalogue` for current public shop IDs, normalize an allow-listed public
-snapshot, compare a canonical content hash, persist only when changed, and close
-the socket. This remains separate from MMR/Skills and does not run from page
-views.
+The existing `bpd-rl-presence-monitor` hourly cron starts the Shop refresh as a
+separate job from per-player refresh. DomainData calls the protected
+`/get-shop-data` endpoint once per hour; that endpoint makes the two RPCs above
+and returns normalized data. DomainData computes a canonical SHA-256 over the
+normalized sections/catalogues, calls `api.save_rl_shop_snapshot`, then records
+`shop` success/change through `api.record_rl_global_refresh_result`. An
+unchanged hash is a successful refresh with `changed=false`; provider/save
+failures preserve the last saved snapshot. This is 24 scheduled opportunities
+per day and two PsyNet reads per opportunity, with no page-triggered polling.
+The scheduler does not yet use item end-times to alter its hourly cadence.
 
-Use item/cost/section end times and cost reset times as refresh hints. Because
-shop-level `EndDate` can be null and all timing fields can change, schedule a
-conservative **30-minute fallback** while a shop is active, with a single
-deduplicated refresh when the earliest verified item/cost expiry is approaching
-(for example, schedule near expiry but not more than once per 30-minute safety
-window). If no usable future expiry exists, remain on the 30-minute fallback.
-This is 48 scheduled opportunities/day, but only two RPCs per opportunity; the
-content hash prevents unchanged database writes. Reduce frequency if observed
-rotation windows are longer, and measure upstream limits before increasing it.
-Do not run a high-frequency countdown poll.
+The live read contract is `api.get_rl_current_shop()` with `available`,
+`snapshotId`, `contentHash`, `providerSchemaVersion`, `capturedAt`, `shops`,
+`catalogues`, and `notifications`. DomainData calls this RPC only from
+`functions/services/supabase/rocketleague/current_shop.js`, through the
+service-role credential. The public `GET /api/rocketleague/shop` returns a
+bounded allowlist and caches successful responses for 60 seconds in browsers
+and 300 seconds at shared edge caches. Failures return a generic, uncached
+response. No database diagnostics, session information, or unapproved provider
+fields are returned.
+
+The public `/RocketLeague/Shop` page loads that DomainData endpoint once when its
+page module initializes. It displays saved section/item data in a responsive
+carousel with previous/next controls, freshness, optional verified HTTPS
+artwork, and known numeric currency IDs (not guessed currency names). All text
+is inserted as text, not HTML. Missing snapshots, empty catalogues, and missing
+artwork have explicit fallback states. It does not wake the MMR Worker or call
+Rocket League on page views. Purchases, wallet information, and inventory state
+remain out of scope.
 
 ## Proposed contracts for a later approved implementation
 
@@ -144,35 +157,25 @@ by the background service, not copied from a provider field.
 
 ### Persistence/cache
 
-Preferred later contract: one current snapshot record/table, keyed by a constant
-shop dataset name, containing normalized JSON, `captured_at`, `valid_until`,
-`content_hash`, and last-success/error metadata. A background-only writer uses a
-service identity; a public-safe read RPC/API returns only the current normalized
-payload and freshness metadata. No individual account/wallet/inventory data is
-stored. A history table is unnecessary unless the product later asks for shop
-rotation history.
-
-This would require explicit approval before changing Supabase: a new snapshot
-table (or an explicitly approved existing cache contract), write/read RPCs,
-RLS, and grants. Alternative Cloudflare KV/R2 persistence would require a
-separate authenticated ingestion boundary and Pages binding changes. No choice
-has been applied.
+The live `api.save_rl_shop_snapshot` contract is already available and is called
+by the background-only writer with normalized shops/catalogues, an empty
+notifications array (the optional notification RPC is not called), schema
+version 1, capture timestamp, and content hash. The public-safe read RPC/table
+and exact return shape are not yet confirmed here. No table/schema, RLS, grants,
+or read RPC were changed. Do not expose the saved JSON until its live read
+contract is supplied and mapped through a server-side public-safe API.
 
 ### DomainData and UI
 
-Future public `GET /api/rocketleague/shop` should read only the cached snapshot,
-return `{ success, captured_at, valid_until, stale, sections }`, set an
-appropriate short public cache header, and never initialize/wake the background
-service. If the current provider read is unavailable, return the last-known
-snapshot with `stale: true`; if none exists, return a clean unavailable payload.
-The homepage card can navigate sections/items client-side without additional
-provider requests. Its freshness label should make stale data visible.
+The public cached read endpoint and carousel are implemented. Follow-up
+validation can refine the public projection only against a confirmed provider
+payload; do not add arbitrary provider fields or direct browser database access.
 
 ## Operator requirements and open dependencies
 
-- A separately managed Epic/EOS account and its approved server-side refresh
-  credential/token lifecycle. Do not use an end user's credential or the MMR
-  Worker's account without explicit authorization.
+- The current implementation uses the existing MMR Worker's authenticated
+  session only for the global shop methods that accept no player ID. Revisit this
+  choice if provider policy requires a dedicated shop identity.
 - A supported/current game build and PsyNet signing/session implementation; the
   SDK README warns these are reverse-engineered and can become stale.
 - Egress support for Epic/EOS HTTPS and authenticated PsyNet WebSocket.

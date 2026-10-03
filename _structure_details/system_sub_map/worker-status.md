@@ -83,6 +83,18 @@ readiness degraded until a successful PsyNet authentication validates it.
 Build ID/FeatureSet/source/timestamps are shown in Details; raw User-Agent,
 credentials, and provider response content are not exposed.
 
+Separately, `bpd-rl-presence-monitor` runs an hourly due-aware Rocket League
+refresh for at most 20 candidates per invocation. Supabase due flags govern
+MMR/profile/club/career-stat calls; normal page reads do not wake that work.
+Presence remains on its independent 15-minute opt-in schedule. The new refresh
+cycle rejects same-isolate overlap but has no distributed lock.
+
+The hourly trigger also starts an independent global Shop refresh. It calls the
+protected MMR Worker's `/get-shop-data` once (two PsyNet reads), hashes the
+normalized snapshot, saves through `api.save_rl_shop_snapshot`, and checkpoints
+the `shop` global refresh result. This Shop job is background-only; the current
+Shop page does not call the provider or expose a cached read yet.
+
 The main view uses compact status-icon rows; per-service metadata is collapsed
 under Details. Route, connection, and known-finding diagnostics share the same
 page in collapsed groups. The sidebar and Admin home provide one System Status

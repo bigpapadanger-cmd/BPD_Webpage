@@ -141,6 +141,10 @@ const ALLOWED_REMINDER_MODES = [
     "both"
 ];
 
+const ALLOWED_PRIMARY_PLATFORMS = ["epic", "steam", "playstation", "xbox", "nintendo_switch", "other"];
+const MAX_REMINDER_MINUTES = 11460;
+const MIN_REMINDER_MINUTES = 15;
+
 const ALLOWED_DAYS = [
     "monday",
     "tuesday",
@@ -874,6 +878,9 @@ function normalizeRegistrationPayload(
                 false
             ),
 
+        primaryPlatform:
+            normalizeOptionalString(body, "primaryPlatform", 32)?.toLowerCase() ?? null,
+
         policyConsent:
             normalizeBoolean(
                 body?.policyConsent,
@@ -961,6 +968,11 @@ function normalizeRegistrationPayload(
                     30
                 )
                     .toLowerCase()
+                : null,
+
+        notificationsV2:
+            body?.notificationsV2 && typeof body.notificationsV2 === "object" && !Array.isArray(body.notificationsV2)
+                ? body.notificationsV2
                 : null
     };
 }
@@ -982,6 +994,10 @@ function validateRegistrationPayload(
         return (
             "Eligibility confirmation is required."
         );
+    }
+
+    if (profile.primaryPlatform && !ALLOWED_PRIMARY_PLATFORMS.includes(profile.primaryPlatform)) {
+        return "Select a valid primary platform.";
     }
 
     /*
@@ -1050,6 +1066,20 @@ function validateRegistrationPayload(
         );
     }
 
+    if (profile.notificationsV2) {
+        for (const channel of ["email", "sms", "discord"]) {
+            const value = profile.notificationsV2[channel];
+            if (!value || typeof value.enabled !== "boolean" || !Array.isArray(value.reminders)
+                || value.reminders.length > 3
+                || value.reminders.some(minutes => !Number.isInteger(minutes) || minutes < MIN_REMINDER_MINUTES || minutes > MAX_REMINDER_MINUTES)) {
+                return "Check the notification channels and reminder times.";
+            }
+        }
+        if (profile.notificationsV2.email.enabled && !profile.email) return "Add an email address to enable email notifications.";
+        if (profile.notificationsV2.sms.enabled && !profile.phone) return "Add a phone number to enable SMS notifications.";
+        return null;
+    }
+
     if (
         profile.notificationsEnabled !==
         true
@@ -1111,14 +1141,10 @@ async function verifyDiscordNotificationAccess(
     env,
     registration
 ) {
-    if (
-        registration
-            .notificationsEnabled !==
-            true
-        || registration
-            .notificationMethod !==
-            "discord"
-    ) {
+    const discordNotificationsEnabled = registration.notificationsV2
+        ? registration.notificationsV2.discord?.enabled === true
+        : registration.notificationsEnabled === true && registration.notificationMethod === "discord";
+    if (!discordNotificationsEnabled) {
         return {
             valid:
                 true
@@ -2837,6 +2863,54 @@ async function handleProfilePost(
     );
 }
 
+async function handleProfilePatch(request, env, sessionContext, accountId) {
+    let body;
+    try {
+        body = await request.json();
+    } catch {
+        return json({ success: false, code: "INVALID_PROFILE_SETTINGS", message: "Profile settings were invalid." }, 400);
+    }
+
+    let current;
+    try {
+        current = await getRocketLeagueProfileByAccountId(env, accountId);
+    } catch {
+        return json({ success: false, code: "PROFILE_SETTINGS_UNAVAILABLE", message: "Your saved profile could not be verified." }, 503);
+    }
+    if (!current?.profileComplete || !current?.registrationAccepted || !current?.rocketLeagueAccess) {
+        return json({ success: false, code: "PROFILE_SETUP_REQUIRED", message: "Complete Rocket League profile setup before editing preferences." }, 409);
+    }
+
+    const settings = normalizeRegistrationPayload(body, request);
+    // Consent is setup-owned: preserve the authoritative saved values and never
+    // make a My Profile edit act as a fresh consent submission.
+    settings.ageConsent = current.ageConsent === true;
+    settings.policyConsent = current.policyConsent === true;
+    const validationError = validateRegistrationPayload(settings);
+    if (validationError) return json({ success: false, code: "INVALID_PROFILE_SETTINGS", message: validationError }, 400);
+
+    const discordAccess = await verifyDiscordNotificationAccess(request, env, settings);
+    if (discordAccess.valid !== true) {
+        return json({ success: false, code: discordAccess.code || "DISCORD_NOTIFICATION_NOT_AVAILABLE", message: discordAccess.message || "Discord notifications are not currently available." }, 400);
+    }
+
+    try {
+        const saved = await saveRocketLeagueProfile(env, accountId, settings);
+        return json({
+            success: saved?.saved !== false,
+            authenticated: true,
+            profileSaved: saved?.saved !== false,
+            registrationAccepted: true,
+            profileComplete: true,
+            rocketLeagueAccess: true,
+            message: saved?.saved === false ? "Your profile settings are unchanged." : "Your Rocket League profile settings were updated."
+        }, saved?.saved === false ? 200 : 200);
+    } catch (error) {
+        console.error("ROCKET LEAGUE PROFILE: Settings update failed.", { code: error?.code || null, status: error?.status || null });
+        return json({ success: false, authenticated: true, profileSaved: false, code: error?.code || "PROFILE_SETTINGS_SAVE_FAILED", message: "Your profile settings could not be saved." }, Number.isInteger(error?.status) ? error.status : 500);
+    }
+}
+
 /* =========================================================
 MAIN PROFILE HANDLER
 ========================================================= */
@@ -2894,6 +2968,10 @@ export async function handleRocketLeagueProfile(
             );
         }
 
+        if (request.method === "PATCH") {
+            return await handleProfilePatch(request, env, sessionContext, accountId);
+        }
+
         return json(
             {
                 success:
@@ -2928,7 +3006,7 @@ export async function handleRocketLeagueProfile(
             405,
             {
                 "Allow":
-                    "GET, POST"
+                    "GET, POST, PATCH"
             }
         );
     }

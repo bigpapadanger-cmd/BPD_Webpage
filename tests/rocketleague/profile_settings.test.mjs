@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-import { getProfileSettingsAvailability, mapProfileSettingsToRpcArgs, normalizeProfileSettings, PROFILE_SETTING_FIELDS } from "../../functions/services/rl/profile_settings.js";
+import { getProfileSettingsAvailability, mapProfileSettingsToRpcArgs, mapProfileSettingsToV2RpcArgs, normalizeNotificationsV2, normalizeProfileSettings, PROFILE_SETTING_FIELDS } from "../../functions/services/rl/profile_settings.js";
 import { buildSettingsPayload, getConfirmedSettings, getSettingsConfirmationState, isSettingConfirmed } from "../../public/Tabs/RocketLeague/MyProfile/JS/settings_view.js";
 
 test("central settings mapping preserves false, empty, null, and availability values", () => {
@@ -177,7 +177,7 @@ test("My Profile fails closed when a setting or consent source is not confirmed"
     const complete = {
         ageConsent: true,
         policyConsent: true,
-        settings: { autoDetectRegion: false, showOnlineStatus: false, findProfileEnabled: false, notificationsEnabled: false,
+        settings: { primaryPlatform: null, autoDetectRegion: false, showOnlineStatus: false, findProfileEnabled: false, notificationsEnabled: false,
             preferredMode: null, otherMode: null, availability: [], email: null, phone: null, notificationMethod: null, reminderMode: null },
         settingsAvailability: Object.fromEntries([...Object.keys(PROFILE_SETTING_FIELDS), "ageConsent", "policyConsent"].map(key => [key, true]))
     };
@@ -188,7 +188,7 @@ test("My Profile fails closed when a setting or consent source is not confirmed"
 
 test("a missing optional setting identifies only its own control while preserving the full-save safety gate", () => {
     const fields = Object.keys(PROFILE_SETTING_FIELDS);
-    const settings = { autoDetectRegion: false, showOnlineStatus: false, findProfileEnabled: false, notificationsEnabled: false,
+    const settings = { primaryPlatform: null, autoDetectRegion: false, showOnlineStatus: false, findProfileEnabled: false, notificationsEnabled: false,
         preferredMode: null, otherMode: null, availability: [], email: null, phone: null, notificationMethod: null, reminderMode: null };
     const profile = {
         ageConsent: true,
@@ -207,7 +207,7 @@ test("a missing optional setting identifies only its own control while preservin
 });
 
 test("an unconfirmed read-only location field does not lock editable settings", () => {
-    const settings = { autoDetectRegion: false, showOnlineStatus: false, findProfileEnabled: false, notificationsEnabled: false,
+    const settings = { primaryPlatform: null, autoDetectRegion: false, showOnlineStatus: false, findProfileEnabled: false, notificationsEnabled: false,
         preferredMode: null, otherMode: null, availability: [], email: null, phone: null, notificationMethod: null, reminderMode: null };
     const availability = Object.fromEntries([...Object.keys(PROFILE_SETTING_FIELDS), "ageConsent", "policyConsent"].map(key => [key, true]));
     availability.region = false;
@@ -238,10 +238,37 @@ test("RPC projection is explicit and excludes read-only provider, stats, and unk
     assert.equal(mapped.s_find_profile_enabled, false);
     assert.equal(mapped.s_show_online_status, false);
     assert.deepEqual(mapped.s_availability, []);
-    assert.equal(Object.keys(mapped).length, Object.keys(PROFILE_SETTING_FIELDS).length);
+    assert.equal(Object.keys(mapped).length, Object.values(PROFILE_SETTING_FIELDS).filter(field => field.rpc?.startsWith("s_")).length);
     assert.equal(JSON.stringify(mapped).includes("read-only"), false);
     assert.equal(JSON.stringify(mapped).includes("999"), false);
     assert.equal(JSON.stringify(mapped).includes("never-save"), false);
+});
+
+test("V2 settings preserve explicit channel choices, disabled reminder values, and duplicate timings", () => {
+    const notificationsV2 = normalizeNotificationsV2({
+        email: { enabled: true, reminders: [60, 60, 1440] },
+        sms: { enabled: false, reminders: [15] },
+        discord: { enabled: true, reminders: [11460, 0, 20, 30] }
+    });
+    assert.deepEqual(notificationsV2, {
+        email: { enabled: true, reminders: [60, 60, 1440] },
+        sms: { enabled: false, reminders: [15] },
+        discord: { enabled: true, reminders: [11460, 20, 30] }
+    });
+
+    const mapped = mapProfileSettingsToV2RpcArgs({
+        autoDetectRegion: false,
+        region: "ignored",
+        countryCode: "US",
+        displayTimezone: "America/New_York",
+        primaryPlatform: "steam",
+        notificationsV2
+    });
+    assert.equal(mapped.p_primary_platform, "steam");
+    assert.equal(mapped.p_region, null);
+    assert.equal(mapped.p_country_code, null);
+    assert.equal(mapped.p_display_timezone, null);
+    assert.deepEqual(mapped.p_notifications, notificationsV2);
 });
 
 test("setup redirects completed players to the standalone My Profile route", async () => {
@@ -265,6 +292,19 @@ test("setup redirects completed players to the standalone My Profile route", asy
     assert.match(source, /profileExists === true[\s\S]{0,360}settingsAvailability\?\.findProfileEnabled/);
     const payloadBuilder = source.slice(source.indexOf("function buildRegistrationPayload"), source.indexOf("function validateRegistrationPayload"));
     assert.doesNotMatch(payloadBuilder, /provider|careerStats|stats|ranked/i);
+});
+
+test("My Profile uses the post-registration PATCH contract and does not resubmit setup consent", async () => {
+    const view = await readFile(new URL("../../public/Tabs/RocketLeague/MyProfile/JS/settings_view.js", import.meta.url), "utf8");
+    const page = await readFile(new URL("../../public/Tabs/RocketLeague/MyProfile/JS/index.js", import.meta.url), "utf8");
+    const service = await readFile(new URL("../../functions/services/rl/profile.js", import.meta.url), "utf8");
+    const route = await readFile(new URL("../../functions/api/auth/rocketleague/profile.js", import.meta.url), "utf8");
+    assert.match(page, /requestProfile\("PATCH", settingsPayload\(\)\)/);
+    assert.doesNotMatch(view.slice(view.indexOf("export function buildSettingsPayload")), /ageConsent:|policyConsent:/);
+    assert.match(service, /request\.method === "PATCH"/);
+    assert.match(service, /settings\.ageConsent = current\.ageConsent === true/);
+    assert.match(service, /settings\.policyConsent = current\.policyConsent === true/);
+    assert.match(route, /onRequestPatch/);
 });
 
 test("private profile reads are persisted-data-only and never wake or call presence provider", async () => {

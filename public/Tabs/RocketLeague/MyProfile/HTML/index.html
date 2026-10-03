@@ -22,6 +22,11 @@
         <p id="myProfileVerificationNotice" class="my-profile-note my-profile-verification" role="status" hidden></p>
         <form id="myProfileSettingsForm" class="my-profile-settings" hidden>
             <fieldset class="my-profile-settings-group">
+                <legend>Platform</legend>
+                <label class="my-profile-field" for="primaryPlatform"><span>Primary platform</span><select id="primaryPlatform"><option value="">Choose a platform</option><option value="epic">Epic Games</option><option value="steam">Steam</option><option value="playstation">PlayStation</option><option value="xbox">Xbox</option><option value="nintendo_switch">Nintendo Switch</option><option value="other">Other</option></select></label>
+            </fieldset>
+
+            <fieldset class="my-profile-settings-group">
                 <legend>Visibility and location</legend>
                 <label class="my-profile-toggle"><input id="showOnlineStatus" type="checkbox"><span><strong>Share online status</strong><small>When disabled, public profiles show “Presence not shared.”</small></span></label>
                 <label class="my-profile-toggle"><input id="findProfileEnabled" type="checkbox"><span><strong>Appear in Find Players</strong><small>Allow other players to discover your opted-in public profile.</small></span></label>

@@ -89,7 +89,7 @@ body.sidebar-collapsed
 
 .header-title {
     margin: 0;
-    color: #ffffff;
+    color: var(--bpd-hover-text-color, #ffffff);
     font-size:
         clamp(
             1.1rem,
@@ -205,7 +205,7 @@ OPTIONAL TABS
             rgba(139, 92, 246, 0.20),
             rgba(59, 130, 246, 0.12)
         );
-    color: #ffffff;
+    color: var(--bpd-hover-text-color, #ffffff);
     box-shadow:
         0 0 14px
         rgba(139, 92, 246, 0.20),

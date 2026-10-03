@@ -38,6 +38,29 @@
     gap: 0.25rem;
 }
 
+.user-settings__color-row input[type="color"] {
+    width: 3.5rem;
+    min-width: 3.5rem;
+    min-height: 2.75rem;
+    padding: 0.25rem;
+    cursor: pointer;
+}
+
+.user-settings__row .user-settings__color-preview {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    color: #b9c2d1;
+    font-size: 0.875rem;
+}
+
+.user-settings__color-preview > span:first-child {
+    width: 1.25rem;
+    height: 1.25rem;
+    border: 1px solid rgba(255, 255, 255, 0.45);
+    border-radius: 0.3rem;
+}
+
 .user-settings small,
 .user-settings__section > p {
     color: #b9c2d1;

@@ -79,7 +79,9 @@ test("successful profile persists display name with supported nulls; complete st
 
     assert.deepEqual(writes.map(item => item.rpc), [
         "save_rl_player_provider_profile",
-        "save_rl_player_stats"
+        "record_rl_player_refresh_result",
+        "save_rl_player_stats",
+        "record_rl_player_refresh_result"
     ]);
     assert.deepEqual(writes[0].payload, {
         p_account_id: "account-1",
@@ -90,6 +92,18 @@ test("successful profile persists display name with supported nulls; complete st
         p_provider_updated_at: null
     });
     assert.deepEqual(writes[1].payload, {
+        p_account_id: "account-1",
+        p_component: "provider",
+        p_success: true,
+        p_error_code: null
+    });
+    assert.deepEqual(writes[3].payload, {
+        p_account_id: "account-1",
+        p_component: "career_stats",
+        p_success: true,
+        p_error_code: null
+    });
+    assert.deepEqual(writes[2].payload, {
         p_account_id: "account-1",
         p_wins: 1,
         p_goals: 2,
@@ -104,8 +118,8 @@ test("successful profile persists display name with supported nulls; complete st
 
 test("incomplete stats and unsupported history never mutate persisted rows", async () => {
     const writes = [];
-    await withFetch(async url => {
-        writes.push(new URL(url).pathname.split("/").at(-1));
+    await withFetch(async (url, init) => {
+        writes.push({ rpc: new URL(url).pathname.split("/").at(-1), payload: JSON.parse(init.body) });
         return new Response(null, { status: 204 });
     }, async () => {
         const result = await persistProviderCapabilities({
@@ -120,7 +134,13 @@ test("incomplete stats and unsupported history never mutate persisted rows", asy
         assert.equal(result.stats.status, "incomplete");
         assert.equal(result.history.status, "unsupported");
     });
-    assert.deepEqual(writes, ["save_rl_player_provider_profile"]);
+    assert.deepEqual(writes.map(item => item.rpc), [
+        "save_rl_player_provider_profile",
+        "record_rl_player_refresh_result",
+        "record_rl_player_refresh_result"
+    ]);
+    assert.equal(writes[2].payload.p_success, false);
+    assert.equal(writes[2].payload.p_component, "career_stats");
 });
 
 test("one persistence failure does not discard another successful capability", async () => {
@@ -143,7 +163,10 @@ test("one persistence failure does not discard another successful capability", a
         assert.equal(result.stats.status, "persisted");
         assert.equal(JSON.stringify(result).includes("must-not-leak"), false);
     });
-    assert.equal(writes.length, 2);
+    assert.deepEqual(writes, [
+        "save_rl_player_provider_profile", "record_rl_player_refresh_result",
+        "save_rl_player_stats", "record_rl_player_refresh_result"
+    ]);
 });
 
 test("Worker error diagnostics are sanitized", async () => {
@@ -171,6 +194,7 @@ test("ordinary reads and MMR-gated page activity do not call provider capabiliti
 
     const mmrRefreshSource = await readFile(new URL("../../functions/services/rl/stats/refresh.js", import.meta.url), "utf8");
     assert.match(mmrRefreshSource, /await saveMmrStats\(/);
+    assert.match(mmrRefreshSource, /record_rl_player_refresh_result/);
 });
 
 test("provider refresh cooldown suppresses a second Worker request", async () => {

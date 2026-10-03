@@ -1,13 +1,24 @@
-<main class="rl-feature-page" aria-labelledby="rlShopTitle">
+<main class="rl-feature-page" aria-labelledby="rlShopTitle" data-rl-shop>
     <header class="rl-feature-heading">
         <p class="rl-feature-eyebrow">ROCKET LEAGUE · COMMUNITY</p>
         <h1 id="rlShopTitle">Rocket League Shop</h1>
-        <p>A public place to check the current in-game item rotation when a verified shop feed is available.</p>
+        <p>Browse the latest saved in-game item rotation, organized by shop section.</p>
     </header>
-    <section class="rl-feature-card" aria-labelledby="rlShopStatusTitle">
-        <p class="rl-feature-status">Live shop data is not available yet</p>
-        <h2 id="rlShopStatusTitle">No current items to display</h2>
-        <p>BPD is not currently showing a verified Rocket League shop rotation. This page will use cached, checked item information when that data source is ready; it does not invent items, prices, or artwork.</p>
+    <section class="rl-feature-card rl-shop-card" aria-labelledby="rlShopStatusTitle">
+        <p class="rl-feature-status" data-shop-status role="status" aria-live="polite">Loading saved shop data…</p>
+        <h2 id="rlShopStatusTitle">Current item rotation</h2>
+        <p data-shop-capture>No shop request is made to Rocket League when this page is opened.</p>
+        <div class="rl-shop-panel" data-shop-panel hidden>
+            <div class="rl-shop-panel__heading">
+                <h3 data-shop-section-title></h3>
+                <span data-shop-position aria-live="polite"></span>
+            </div>
+            <div class="rl-shop-carousel-controls" aria-label="Shop section navigation">
+                <button type="button" class="rl-feature-link" data-shop-previous>Previous</button>
+                <button type="button" class="rl-feature-link" data-shop-next>Next</button>
+            </div>
+            <div class="rl-shop-items" data-shop-items></div>
+        </div>
         <p>This is an information page only. BPD does not sell items or make purchases for your Rocket League account.</p>
         <nav class="rl-feature-links" aria-label="Rocket League pages">
             <a class="rl-feature-link" href="/RocketLeague" data-router-link>Rocket League Home</a>

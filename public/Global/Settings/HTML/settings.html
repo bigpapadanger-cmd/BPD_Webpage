@@ -15,6 +15,14 @@
                 <option value="purple">Purple</option><option value="green">Green</option>
             </select>
         </label>
+        <label class="user-settings__row user-settings__color-row" for="backgroundColorSetting">
+            <span><strong>Background Color</strong><small>Changes the shared page background; Rocket League cards and branded accents stay the same. Colors that reduce text contrast are not applied.</small><output id="backgroundColorPreview" class="user-settings__color-preview" for="backgroundColorSetting"><span aria-hidden="true"></span><span>Current: #0d0f13</span></output><small id="backgroundColorStatus" role="status" aria-live="polite"></small></span>
+            <input id="backgroundColorSetting" type="color" value="#0d0f13" aria-describedby="backgroundColorPreview">
+        </label>
+        <label class="user-settings__row user-settings__color-row" for="hoverTextColorSetting">
+            <span><strong>Hover Text Color</strong><small>Changes generic site navigation hover text. Rocket League branding and warning/error colors are protected.</small><output id="hoverTextColorPreview" class="user-settings__color-preview" for="hoverTextColorSetting"><span aria-hidden="true"></span><span>Current: #ffffff</span></output><small id="hoverTextColorStatus" role="status" aria-live="polite"></small></span>
+            <input id="hoverTextColorSetting" type="color" value="#ffffff" aria-describedby="hoverTextColorPreview">
+        </label>
         <div class="user-settings__row">
             <span><strong>Animations</strong><small>Enable or reduce interface animations.</small></span>
             <button id="animationSetting" type="button" aria-pressed="true">On</button>
@@ -48,7 +56,7 @@
 
     <section class="user-settings__section" aria-labelledby="resetTitle">
         <h2 id="resetTitle">Reset this browser’s preferences</h2>
-        <p>Reset theme, animation, and sidebar preferences to their defaults.</p>
+        <p>Reset theme, animation, sidebar, and color preferences to their defaults.</p>
         <button id="resetSettings" type="button">Reset preferences</button>
     </section>
 </section>

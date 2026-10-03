@@ -55,6 +55,7 @@ function displayLocation(settings, settingsAvailability, key) {
 
 function applyEditableFieldAvailability(profile) {
     const fields = {
+        primaryPlatform: ["primaryPlatform"],
         autoDetectRegion: ["autoDetectRegion"],
         showOnlineStatus: ["showOnlineStatus"],
         findProfileEnabled: ["findProfileEnabled"],
@@ -89,6 +90,8 @@ function renderProfile(result) {
     document.getElementById("myProfileRegion").textContent = country !== "Not recorded" && country !== "Not confirmed" ? `${region} (${country})` : region;
     document.getElementById("myProfileTimezone").textContent = displayLocation(settings, profile.settingsAvailability, "displayTimezone");
     document.getElementById("myProfileConsent").textContent = profile.ageConsent === true && profile.policyConsent === true ? "Confirmed" : "Not confirmed";
+
+    document.getElementById("primaryPlatform").value = typeof settings.primaryPlatform === "string" ? settings.primaryPlatform : "";
 
     document.getElementById("autoDetectRegion").checked = settings.autoDetectRegion === true;
     document.getElementById("showOnlineStatus").checked = settings.showOnlineStatus === true;
@@ -130,6 +133,7 @@ function settingsPayload() {
         return [{ day, start: document.querySelector(`[data-start="${day}"]`).value, end: document.querySelector(`[data-end="${day}"]`).value }];
     });
     return buildSettingsPayload(profile, {
+        primaryPlatform: document.getElementById("primaryPlatform").value || null,
         autoDetectRegion: document.getElementById("autoDetectRegion").checked,
         showOnlineStatus: document.getElementById("showOnlineStatus").checked,
         findProfileEnabled: document.getElementById("findProfileEnabled").checked,
@@ -187,7 +191,7 @@ export async function initializePage() {
         save.disabled = true;
         save.textContent = "Saving…";
         try {
-            const saved = await requestProfile("POST", settingsPayload());
+            const saved = await requestProfile("PATCH", settingsPayload());
             const refreshed = await requestProfile();
             const settingsConfirmed = renderProfile(refreshed);
             setStatus(saved.profileSaved === true && settingsConfirmed ? "Profile settings updated." : "The saved settings could not be confirmed; editing is locked.", saved.profileSaved === true && settingsConfirmed ? "ready" : "error");

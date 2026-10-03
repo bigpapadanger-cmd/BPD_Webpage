@@ -82,6 +82,30 @@ async function callRpc(env, rpcName, payload) {
     }
 }
 
+async function recordRefreshResult(env, accountId, component, success, errorCode = null) {
+    await callRpc(env, "record_rl_player_refresh_result", {
+        p_account_id: accountId,
+        p_component: component,
+        p_success: success,
+        p_error_code: success ? null : String(errorCode || "PROVIDER_REFRESH_FAILED").slice(0, 80)
+    });
+}
+
+async function persistAndCheckpoint(env, accountId, component, rpcName, payload) {
+    try {
+        await callRpc(env, rpcName, payload);
+    } catch {
+        try { await recordRefreshResult(env, accountId, component, false, "PROVIDER_PERSIST_" + rpcName.toUpperCase() + "_FAILED"); } catch { /* Best effort. */ }
+        return "persistence_failed";
+    }
+    try {
+        await recordRefreshResult(env, accountId, component, true);
+        return "persisted";
+    } catch {
+        return "checkpoint_failed";
+    }
+}
+
 export async function fetchProviderCapabilities(env, epicAccountId) {
     return fetchMmrProviderData(env, epicAccountId, ["profile", "stats"]);
 }
@@ -96,9 +120,9 @@ export async function persistProviderCapabilities(env, accountId, capabilities) 
         const data = normalizeProfile(profile.data);
         if (!data) {
             results.profile = { status: "partial_not_persisted" };
+            try { await recordRefreshResult(env, accountId, "provider", false, "PROVIDER_PROFILE_INVALID"); } catch { /* Best effort. */ }
         } else {
-            try {
-                await callRpc(env, "save_rl_player_provider_profile", {
+            const status = await persistAndCheckpoint(env, accountId, "provider", "save_rl_player_provider_profile", {
                     p_account_id: accountId,
                     p_display_username: data.display_username,
                     p_level: data.level,
@@ -106,17 +130,19 @@ export async function persistProviderCapabilities(env, accountId, capabilities) 
                     p_creator_code: data.creator_code,
                     p_provider_updated_at: data.provider_updated_at
                 });
+            if (status === "persisted") {
                 results.profile = {
                     status: "persisted",
                     capturedAt: typeof profile.captured_at === "string" ? profile.captured_at : null,
                     providerUpdatedAt: data.provider_updated_at
                 };
-            } catch {
-                results.profile = { status: "persistence_failed" };
+            } else {
+                results.profile = { status };
             }
         }
     } else {
         results.profile = { status: profile?.status || "unavailable" };
+        try { await recordRefreshResult(env, accountId, "provider", false, profile?.error?.code || "PROVIDER_PROFILE_UNAVAILABLE"); } catch { /* Best effort. */ }
     }
 
     const stats = capabilities?.stats;
@@ -124,9 +150,9 @@ export async function persistProviderCapabilities(env, accountId, capabilities) 
         const data = normalizeStats(stats.data);
         if (!data) {
             results.stats = { status: "invalid_not_persisted" };
+            try { await recordRefreshResult(env, accountId, "career_stats", false, "RL_CAREER_STATS_INVALID"); } catch { /* Best effort. */ }
         } else {
-            try {
-                await callRpc(env, "save_rl_player_stats", {
+            const status = await persistAndCheckpoint(env, accountId, "career_stats", "save_rl_player_stats", {
                     p_account_id: accountId,
                     p_wins: data.wins,
                     p_goals: data.goals,
@@ -136,13 +162,15 @@ export async function persistProviderCapabilities(env, accountId, capabilities) 
                     p_mvps: data.mvps,
                     p_captured_at: typeof stats.captured_at === "string" ? stats.captured_at : null
                 });
+            if (status === "persisted") {
                 results.stats = { status: "persisted", capturedAt: typeof stats.captured_at === "string" ? stats.captured_at : null };
-            } catch {
-                results.stats = { status: "persistence_failed" };
+            } else {
+                results.stats = { status };
             }
         }
     } else {
         results.stats = { status: stats?.status || "unavailable" };
+        try { await recordRefreshResult(env, accountId, "career_stats", false, stats?.error?.code || (stats?.status === "incomplete" ? "RL_CAREER_STATS_INCOMPLETE" : "CAREER_STATS_UNAVAILABLE")); } catch { /* Best effort. */ }
     }
 
     return results;
@@ -222,7 +250,7 @@ export async function refreshProviderDataWithGate(env, accountId, mmrRefresh) {
             const ttl = result.refreshed ? SUCCESS_TTL_SECONDS : RETRY_TTL_SECONDS;
             await kv.put(key, JSON.stringify({ refreshedAt: new Date().toISOString() }), { expirationTtl: ttl });
             const hasCapabilityFailure = Object.values(result.persisted || {}).some(item =>
-                ["error", "persistence_failed", "invalid_not_persisted"].includes(item?.status)
+                ["error", "persistence_failed", "invalid_not_persisted", "checkpoint_failed", "partial_not_persisted"].includes(item?.status)
             );
             if (hasCapabilityFailure) {
                 await kv.put(key, JSON.stringify({ refreshedAt: new Date().toISOString() }), { expirationTtl: RETRY_TTL_SECONDS });

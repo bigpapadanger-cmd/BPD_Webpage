@@ -812,7 +812,7 @@ NAVIGATION ITEM
 .site-sidebar .nav-item.active,
 .site-sidebar .nav-item[aria-current="page"] {
     color:
-        #ffffff;
+        var(--bpd-hover-text-color, #ffffff);
 
     background:
         #24202f;
@@ -862,6 +862,10 @@ NAVIGATION ICON
         var(
             --sidebar-row-height
         );
+
+    font-size: 1.15rem;
+    line-height: 1;
+    text-align: center;
 
     transition:
         transform 0.25s ease;

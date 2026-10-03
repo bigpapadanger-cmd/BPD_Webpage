@@ -19,4 +19,22 @@
 .rl-feature-link:hover { border-color: #79b8ff; background: rgba(35, 84, 136, .38); }
 .rl-feature-link:focus-visible { outline: 3px solid rgba(121, 184, 255, .6); outline-offset: 3px; }
 
+.rl-shop-card > [data-shop-capture] { margin-bottom: 0; }
+.rl-shop-panel { margin-top: 24px; }
+.rl-shop-panel__heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.rl-shop-panel__heading h3 { margin: 0; color: #fff; font-size: 1.25rem; }
+.rl-shop-panel__heading span { color: #aebdd2; font-size: .9rem; }
+.rl-shop-carousel-controls { display: flex; justify-content: flex-end; gap: 10px; margin-bottom: 16px; }
+.rl-shop-carousel-controls button { color: #eaf4ff; font: inherit; cursor: pointer; }
+.rl-shop-carousel-controls button:disabled { opacity: .5; cursor: default; }
+.rl-shop-items { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr)); gap: 16px; }
+.rl-shop-item { overflow: hidden; border: 1px solid rgba(181, 206, 242, .14); border-radius: 14px; background: rgba(6, 13, 23, .48); }
+.rl-shop-item__image { display: grid; width: 100%; height: 170px; object-fit: contain; background: radial-gradient(ellipse at center, rgba(53, 81, 111, .4), rgba(8, 14, 23, .7)); color: #9eacc0; place-items: center; }
+.rl-shop-item__image--empty { font-size: .9rem; }
+.rl-shop-item__title { margin: 14px 14px 6px; color: #fff; font-size: 1rem; }
+.rl-shop-item__description,.rl-shop-item__price,.rl-shop-item__timing { margin: 0 14px 10px !important; font-size: .88rem; }
+.rl-shop-item__price { color: #b8dfff !important; font-weight: 750; }
+.rl-shop-item__timing { color: #9eacc0 !important; }
+@media (prefers-reduced-motion: reduce) { .rl-shop-card *, .rl-shop-card *::before, .rl-shop-card *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; } }
+
 @media (max-width: 600px) { .rl-feature-links { flex-direction: column; } .rl-feature-link { justify-content: center; } }

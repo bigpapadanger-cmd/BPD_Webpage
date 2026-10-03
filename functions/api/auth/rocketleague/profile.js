@@ -201,3 +201,7 @@ export async function onRequestPost(
         context
     );
 }
+
+export async function onRequestPatch(context) {
+    return handleRequest(context);
+}

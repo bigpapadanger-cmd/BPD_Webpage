@@ -2027,6 +2027,7 @@ function populateProfileForm(
     profile
 ) {
     const settings = profile.settings || profile;
+    setInputValue("primaryPlatform", settings.primaryPlatform);
     setInputValue(
         "epicDisplayName",
         profile.EpicDisplayName
@@ -2385,6 +2386,7 @@ function saveRegistrationDraft(
      *     timezone
      */
     const draft = {
+        primaryPlatform: normalizeString(payload?.primaryPlatform),
         showOnlineStatus:
             payload?.showOnlineStatus ===
             true,
@@ -2499,6 +2501,8 @@ function populateDraft(
         draft.email
     );
 
+    setInputValue("primaryPlatform", draft.primaryPlatform);
+
     setInputValue(
         "phone",
         draft.phone
@@ -2573,6 +2577,7 @@ function buildRegistrationPayload(
         getAutoDetectRegionEnabled();
 
     return {
+        primaryPlatform: normalizeString(data.get("primaryPlatform")),
         ageConsent:
             data.get(
                 "ageConsent"

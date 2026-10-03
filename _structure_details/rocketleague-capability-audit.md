@@ -1,7 +1,7 @@
 # Rocket League Provider Capability Audit
 
-Snapshot: 2026-10-02. This is a source-contract audit, not a live PsyNet
-measurement. No Worker calls or Supabase changes were made for this audit.
+Snapshot: 2026-10-03. This is a source-contract/code audit, not a live PsyNet
+measurement. No live Worker calls or Supabase changes were made.
 
 ## Support classifications
 
@@ -11,7 +11,7 @@ measurement. No Worker calls or Supabase changes were made for this audit.
 | `Skills/GetPlayersSkills v1` | SUPPORTED, arbitrary-player | Accepts a list of player IDs in the upstream request model; the current Worker endpoint does not batch multiple BPD targets. | Batch support is upstream evidence, not current Worker behavior. |
 | `Players/GetProfile v1` | SUPPORTED, arbitrary-player | `PlayerIDs[]` is supplied by caller; `REQUESTS.md` says any valid player ID. Returns player name and `PresenceState` / presence information. | Current normalized `/get-player-data` profile exposes display name only. Legacy `/get-profile` returns a coarse state. No level, XP, creator code, or provider update timestamp is returned by this profile projection. |
 | `Stats/GetStatLeaderboardValueForUser v1` | SUPPORTED, arbitrary-player | Worker issues six calls with requested `PlayerID`: wins, goals, assists, saves, shots, MVPs. | Persist only a complete aggregate; partial response is `incomplete`. |
-| `Matches/GetMatchHistory v1` | LOCAL-PLAYER-ONLY | Go implementation injects `localPlayerID`; request has no arbitrary target parameter. | Worker correctly reports unsupported for arbitrary target history; do not use service-account history for another user's profile. |
+| `Matches/GetMatchHistory v1` | LOCAL-PLAYER-ONLY | Go implementation injects the PsyNet session's `localPlayerID`; request has no arbitrary target parameter. | Current MMR Worker owns one shared service-account session, not a session per linked BPD account. Its history capability remains unsupported; never expose that account's matches as a user's private history. |
 | `Players/GetXP v1` | LOCAL-PLAYER-ONLY | Go method fills request `PlayerID` from `localPlayerID`, regardless of caller. | Does not support arbitrary-player XP through this path. |
 | `Players/GetCreatorCode v1` | LOCAL-PLAYER-ONLY | Go method sends an empty request and documents authenticated-player context. | Does not support arbitrary-player creator-code lookup. |
 | `Party/GetPlayerPartyInfo v1` | LOCAL-PLAYER-ONLY / LIMITED | Empty request; Go response contains invitations, not a target party roster or stable current-party/member contract. | Cannot discover arbitrary players' parties or prove same-party membership. |
@@ -24,11 +24,11 @@ measurement. No Worker calls or Supabase changes were made for this audit.
 | `Reservations/JoinMatch v1` | LOCAL-PLAYER-ONLY, MUTATION | Requires join/server parameters such as server name/password. | An action, not a reservation or current-match feed. Never use for discovery. |
 | `GameServer/GetClubPrivateMatches v1` | UNKNOWN / GLOBAL-SCOPE | Empty request returns server/private-match service data, not a target BPD player's current match. | Cannot associate a player with a private match. |
 | `GameServer/GetGameServerPingList v2` | SUPPORTED, GLOBAL | Region/server ping data. | Network diagnostics only; no participant or lobby signal. |
-| `Clubs/GetPlayerClubDetails v2` | SUPPORTED, arbitrary-player by explicit `PlayerID` | Request carries a caller-supplied player ID; returns club details including membership metadata. | One request if used. Member lists are potentially sensitive; not displayed or wired in this phase. |
+| `Clubs/GetPlayerClubDetails v2` | SUPPORTED, arbitrary-player by explicit `PlayerID` | Request carries a caller-supplied player ID; returns club details and a member list. The protected Worker now exposes only a normalized allowlist without that member list. | One request when the live `club_due` flag requires a refresh. Persisted through `api.save_rl_player_club`; never requested on page reads. |
 | `Clubs/GetClubDetails v1` | SUPPORTED, arbitrary-club by explicit `ClubID` | Request carries a club ID. | One request; access/privacy and safe output policy still need a product contract. |
 | `Clubs/GetStats v1` | LOCAL-PLAYER-ONLY | Empty request is scoped to the authenticated player's club context. | Not an arbitrary target's club-stat lookup. |
 | `Clubs/UpdateClub v2` | LOCAL-PLAYER-ONLY, MUTATION | Club update operation uses authenticated context. | No mutation surface should be exposed. |
-| Item Shop | PROVIDER NOT IMPLEMENTED / PUBLIC INFORMATION PAGE | The Admin registry entry remains informational. A public `/RocketLeague/Shop` page is routed through the Rocket League shell and states live shop data is unavailable. It has no provider calls, endpoint, persistence, item data, or carousel. | See [`rocketleague-shop-audit.md`](rocketleague-shop-audit.md); do not add shop duties to the MMR Worker. |
+| Item Shop | READ-ONLY CACHED DISPLAY ACTIVE | Protected MMR Worker `GET /get-shop-data` requests `GetStandardShops` then `GetShopCatalogue`; it has no player ID parameter and returns normalized public-safe sections/catalogues. DomainData hashes and saves the payload hourly. Public `/api/rocketleague/shop` reads confirmed `api.get_rl_current_shop()` server-side; `/RocketLeague/Shop` renders a keyboard-navigable cached section carousel. | No wallet, ownership, purchase, or mutation fields are exposed; page loads do not call the provider. See [`rocketleague-shop-audit.md`](rocketleague-shop-audit.md). |
 | WebSocket push / lifecycle events | UNKNOWN | Worker Durable Object correlates outbound RPC request IDs to responses; no provider event subscription or party/match event dispatcher was found. | PsyPing keepalive is not a presence event stream. No push-only capability is established. |
 
 The upstream contracts are documented in [`dank/rlapi REQUESTS.md`](https://github.com/dank/rlapi/blob/master/REQUESTS.md) and its Go request implementations for [players](https://github.com/dank/rlapi/blob/master/players.go), [skills](https://github.com/dank/rlapi/blob/master/skills.go), [stats](https://github.com/dank/rlapi/blob/master/stats.go), [matches](https://github.com/dank/rlapi/blob/master/matches.go), [party](https://github.com/dank/rlapi/blob/master/party.go), [matchmaking](https://github.com/dank/rlapi/blob/master/matchmaking.go), [clubs](https://github.com/dank/rlapi/blob/master/clubs.go), [playlists](https://github.com/dank/rlapi/blob/master/playlists.go), and [game-server methods](https://github.com/dank/rlapi/blob/master/misc.go). The MMR Worker code inspected was `worker/index.ts`, `worker/services/provider-data.ts`, and `worker/rl/socket.ts` in the separate `mmr-api-v2` checkout.
@@ -47,7 +47,8 @@ The upstream contracts are documented in [`dank/rlapi REQUESTS.md`](https://gith
 The authoritative display name from `Players/GetProfile` is a useful verified
 candidate source. The existing Worker does not provide a safe current-party or
 same-lobby roster. Club membership is technically queryable for an arbitrary
-player but is not wired and should not be used as an implicit public roster.
+player and is now used only for scheduled club metadata persistence; it must not
+be treated as a public roster or used to infer player identity.
 Future OCR assist may use a bounded set of linked/provider-verified names as
 review candidates. OCR or fuzzy similarity must never create an alias, link an
 account, or auto-accept a player identity; only an explicit human correction
@@ -66,12 +67,13 @@ refresh respectively.
 | Career stats | 6 | No batch path used by Worker | No | Existing 24-hour success / 15-minute failure gate; do not refresh on reads | No | Only with due refresh | Yes, explicit admin action |
 | Presence state | 1 `/get-player-data?capabilities=presence` call per eligible player | One target per request; max concurrency 5; 15-second delay between batches | No | 15-minute monitor; 30-minute public freshness threshold | No; persisted row only | Existing monitor only; explicit protected Run Now | No separate force action recommended |
 | Party | 1 empty-request call, limited to caller invitations | No arbitrary player batch | Yes / limited | Do not poll; if product-approved for the local account, cache at least 60 seconds and use an explicit view/action | No | No | No |
-| Club profile/details | 1 per player/club | No current Worker batch | Player-club lookup supports arbitrary ID; club stats do not | 7 days if later approved; hide member-level data by default | No | Not currently | Not currently |
+| Club profile/details | 1 per due player | No current Worker batch | Player-club lookup supports arbitrary ID; club stats do not | Live Supabase `club_due` flag; no page-triggered fetch | No | Yes, existing hourly due-aware scheduler only | Not separately forced |
+| Global item shop | 2 per hourly snapshot (one protected MMR Worker request) | `GetStandardShops` then one `GetShopCatalogue` using returned shop IDs | Global shop data; no wallet/player input in either RPC | Hourly background refresh; content hash prevents unchanged snapshot writes | No | Yes, separate independent Shop job on existing hourly Worker trigger | Protected manual `shop` job only |
 | XP | 1 | No | Yes | Unsupported for target lookup; if local account is later wired, at most daily | No | No | No for arbitrary targets |
 | Creator code | 1 empty request | No | Yes | Unsupported for target lookup; if local account is later wired, at most daily | No | No | No for arbitrary targets |
 | Population | 1 global request | Global result | No target | 15-minute shared cache | No direct per-player use | Yes only if a page/feature needs it | No per-account force |
 | Private match signals | No safe read request proven | No | Action/session scope | Do not poll; no valid read cadence until an authoritative endpoint is identified | No | No | No |
-| Match history | 1 local-player request | No arbitrary player batch | Yes | Keep current stored data; no arbitrary-player refresh | No | No for another user's history | No for arbitrary target |
+| Match history | 1 local-player request | No arbitrary player batch | Yes | No refresh through shared service-account session; personal history needs a session bound to that linked user | No | No until correct per-user provider session exists | No for arbitrary target |
 
 Avoid parallel fan-out that bypasses the current Worker request/rate gates. There
 is no production traffic/billing telemetry in this source audit, so cadences

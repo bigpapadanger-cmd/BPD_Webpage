@@ -1,6 +1,7 @@
 "use strict";
 
-import { mapProfileSettingsToRpcArgs } from "../../rl/profile_settings.js";
+import { mapProfileSettingsToV2RpcArgs, REMINDER_LIMITS } from "../../rl/profile_settings.js";
+import { getRocketLeagueProfileByAccountId } from "./rocketleague_profile.js";
 
 /* =========================================================
 BPD GAMING NETWORK
@@ -332,6 +333,17 @@ export async function saveRocketLeagueProfile(
         );
     }
 
+    let currentProfile;
+    try {
+        currentProfile = await getRocketLeagueProfileByAccountId(env, normalizedAccountId);
+    } catch (error) {
+        const readError = new Error("Current Rocket League settings could not be verified before saving.");
+        readError.code = "ROCKET_LEAGUE_PROFILE_READ_BEFORE_SAVE_FAILED";
+        readError.status = 503;
+        readError.cause = error;
+        throw readError;
+    }
+
     /*
      * Fail closed before any database write.
      */
@@ -424,7 +436,34 @@ export async function saveRocketLeagueProfile(
             )
             : null;
 
-    const rpcSettings = mapProfileSettingsToRpcArgs({
+    const legacyReminderValues = reminderMode === "both" ? [60, 1440]
+        : reminderMode === "1-hour" ? [60]
+            : reminderMode === "24-hours" ? [1440] : [];
+    const legacyNotifications = notificationsEnabled
+        ? {
+            email: { enabled: notificationMethod === "email", reminders: [...legacyReminderValues] },
+            sms: { enabled: notificationMethod === "phone", reminders: [...legacyReminderValues] },
+            discord: { enabled: notificationMethod === "discord", reminders: [...legacyReminderValues] }
+        }
+        : { email: { enabled: false, reminders: [] }, sms: { enabled: false, reminders: [] }, discord: { enabled: false, reminders: [] } };
+    const legacyNotificationsChanged = currentProfile && (
+        registration.notificationsEnabled !== currentProfile.notificationsEnabled
+        || registration.notificationMethod !== currentProfile.notificationMethod
+        || registration.reminderMode !== currentProfile.reminderMode
+    );
+    const notificationsV2 = registration.notificationsV2 && typeof registration.notificationsV2 === "object"
+        ? registration.notificationsV2
+        : (legacyNotificationsChanged ? legacyNotifications : currentProfile?.notificationsV2 ?? legacyNotifications);
+    for (const channel of ["email", "sms", "discord"]) {
+        const entry = notificationsV2[channel];
+        const reminders = entry?.reminders;
+        if (!entry || typeof entry.enabled !== "boolean" || !Array.isArray(reminders)
+            || reminders.length > REMINDER_LIMITS.maxPerChannel
+            || reminders.some(minutes => !Number.isInteger(minutes) || minutes < REMINDER_LIMITS.minMinutes || minutes > REMINDER_LIMITS.maxMinutes)) {
+            throw createValidationError("ROCKET_LEAGUE_NOTIFICATION_SETTINGS_INVALID", "Notification channels or reminder times are invalid.");
+        }
+    }
+    const rpcSettings = mapProfileSettingsToV2RpcArgs({
         ...registration,
         autoDetectRegion,
         region,
@@ -436,21 +475,23 @@ export async function saveRocketLeagueProfile(
         notificationsEnabled,
         notificationMethod,
         reminderMode,
-        availability: registration.availability
+        availability: registration.availability,
+        notificationsV2,
+        primaryPlatform: registration.primaryPlatform ?? currentProfile?.primaryPlatform ?? null
     });
 
     const payload = {
-        s_account_id:
+        p_account_id:
             normalizedAccountId,
 
         /*
          * Both values are guaranteed true here because
          * validateRegistration() rejects anything else.
          */
-        s_age_consent:
+        p_age_consent:
             true,
 
-        s_policy_consent:
+        p_policy_consent:
             true,
 
         ...rpcSettings
@@ -458,7 +499,7 @@ export async function saveRocketLeagueProfile(
 
     const url =
         new URL(
-            "rpc/save_rocketleague_profile",
+            "rpc/save_rocketleague_profile_v2",
             configuration.url
         );
 

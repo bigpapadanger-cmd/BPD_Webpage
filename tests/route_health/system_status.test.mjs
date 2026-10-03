@@ -126,15 +126,17 @@ test("Rocket League capability registry reflects supported Worker capabilities a
         { id: "player-profile", serviceId: "mmr-api" },
         { id: "presence", serviceId: "rl-presence" },
         { id: "player-stats", serviceId: "mmr-api" },
-        { id: "mmr-skills", serviceId: "mmr-api" }
+        { id: "mmr-skills", serviceId: "mmr-api" },
+        { id: "clubs", serviceId: "mmr-api" }
     ]);
     const placeholders = ROCKET_LEAGUE_CAPABILITIES.filter(capability => capability.status !== "active");
-    assert.equal(placeholders.length, 18);
+    assert.equal(placeholders.length, 17);
     assert.ok(placeholders.every(capability => ["placeholder", "future", "unsupported"].includes(capability.status)));
     assert.ok(placeholders.every(capability => ["read-only", "interactive"].includes(capability.access)));
     assert.ok(placeholders.every(capability => !("serviceId" in capability) && !("action" in capability) && !("endpoint" in capability)));
     assert.equal(ROCKET_LEAGUE_CAPABILITIES.find(capability => capability.id === "match-history").status, "unsupported");
     assert.equal(ROCKET_LEAGUE_CAPABILITIES.find(capability => capability.id === "presence").status, "active");
+    assert.equal(ROCKET_LEAGUE_CAPABILITIES.find(capability => capability.id === "clubs").status, "active");
     assert.match(ROCKET_LEAGUE_CAPABILITIES.find(capability => capability.id === "presence").purpose, /15-minute monitor/);
     assert.match(ROCKET_LEAGUE_CAPABILITIES.find(capability => capability.id === "player-profile").purpose, /display username only/);
     assert.deepEqual(ROCKET_LEAGUE_CAPABILITIES.filter(capability => capability.priority).sort((a, b) => a.priority - b.priority).slice(0, 6).map(capability => capability.id), ["player-profile", "player-stats", "match-history", "playlists", "population", "leaderboards"]);

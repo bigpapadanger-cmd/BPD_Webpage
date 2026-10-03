@@ -32,6 +32,31 @@ the monitor discover when a player returns. Normal profile/page GETs do not
 wake the Worker or call the provider. Admin Run Now is a separate protected
 action and does not change the normal schedule.
 
+The same Worker also runs one hourly due-aware refresh cycle for stored MMR,
+provider display name, club metadata, and career stats. It asks
+`api.get_rl_refresh_candidates(p_after_player_id, p_limit)` for at most 20 rows,
+follows the returned `player_id` cursor in `SERVICE_STATUS` KV, rechecks each
+candidate's canonical account/Epic link and fresh authorization, and requests
+only components whose `*_due` flags are true. Successful values are persisted
+through their existing `api.save_*` RPCs and checkpointed independently through
+`api.record_rl_player_refresh_result`. A capability failure does not discard
+another capability's result. Career stats require all six totals; incomplete
+data is never written. Match History remains unsupported for arbitrary
+scheduled player IDs, and Discord eligibility refresh remains unavailable
+until an authoritative persistent Gateway runtime exists.
+
+The same hourly schedule starts an independent global Shop refresh. It makes one
+protected `/get-shop-data` call (two PsyNet read RPCs), computes a SHA-256 hash
+of the normalized snapshot, and calls `api.save_rl_shop_snapshot(...)`. The
+`saved` result becomes `p_changed` in `api.record_rl_global_refresh_result` for
+the `shop` key. Shop failures do not block per-player refreshes. The public Shop
+page remains read-only/static until its confirmed cached Supabase reader contract
+is wired; it does not call the provider or wake this Worker.
+
+The previous Saturday MMR refresh schedule is removed; its legacy implementation
+file is retained but is no longer dispatched. This avoids keeping a competing
+MMR refresh path active.
+
 ## Public freshness and privacy
 
 Public discovery independently checks `show_online_status`. When disabled it
@@ -51,6 +76,14 @@ would exceed its schedule interval. Measure real eligible counts, duration,
 and shared MMR API rate-limit headroom before scaling; at that size consider at
 least a 30-minute cadence or bounded sharding. Do not shorten the schedule to
 10 or 5 minutes without measured capacity.
+
+The hourly data refresh pages at most 20 candidate rows per invocation. Provider
+requests are made only for due components; career stats consume six PsyNet
+requests when due. The database due flags, not the hourly trigger itself, govern
+each player's cadence. Same-isolate overlapping refresh jobs are rejected by
+the dispatch guard. A distributed lock is not configured, so multi-isolate
+overlap remains a known operational limitation to monitor before increasing the
+batch size or schedule frequency.
 
 ## Verification ownership
 

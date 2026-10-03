@@ -84,14 +84,16 @@ test("Rocket League fragment styles resolve through the master CSS caller", () =
     }
 });
 
-test("Shop is a public information page and Match History does not invent matches", () => {
+test("Shop reads cached public data and Match History does not invent matches", () => {
     const shop = readFileSync(resolve(publicRoot, "Tabs/RocketLeague/Features/HTML/shop.html"), "utf8");
+    const shopModule = readFileSync(resolve(publicRoot, "Tabs/RocketLeague/Features/JS/shop.js"), "utf8");
     const history = readFileSync(resolve(publicRoot, "Tabs/RocketLeague/Features/HTML/match-history.html"), "utf8");
-    assert.match(shop, /Live shop data is not available yet/);
+    assert.match(shop, /data-shop-items/);
     assert.match(shop, /does not sell items or make purchases/i);
-    assert.doesNotMatch(shop, /\/api\/|MMR Worker|Credits|ImageURL/i);
+    assert.match(shopModule, /fetch\("\/api\/rocketleague\/shop"/);
+    assert.doesNotMatch(shopModule, /SUPABASE_AUTH|\/get-shop-data|Shops\/Get/);
     assert.match(history, /periodic snapshots, not individual matches/i);
-    assert.equal(ROUTES["/RocketLeague/Shop"].module, null);
+    assert.equal(ROUTES["/RocketLeague/Shop"].module, "/Tabs/RocketLeague/Features/JS/shop.js");
     assert.equal(ROUTES["/RocketLeague/MatchHistory"].module, null);
 });
 

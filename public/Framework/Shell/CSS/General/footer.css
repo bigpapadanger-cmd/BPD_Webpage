@@ -246,7 +246,7 @@ BUTTON HOVER / FOCUS
 .footer-navigation a:hover,
 .footer-navigation a:focus-visible {
     color:
-        #ffffff;
+        var(--bpd-hover-text-color, #ffffff);
 
     border-color:
         #8b5cf6;

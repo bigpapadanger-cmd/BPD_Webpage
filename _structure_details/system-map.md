@@ -88,15 +88,22 @@ this RPC.
 Public `/RocketLeague/FindPlayers` uses the Rocket League master CSS caller and
 searches only opt-in public profiles. Result cards remain lightweight and show
 three compact playlist ranks with neutral handling for unknown presence.
-`/RocketLeague/Shop` is public and currently an informational unavailable state:
-no shop API, provider calls, items, prices, or artwork are implemented.
+`/RocketLeague/Shop` is public. A separate hourly background path fetches and
+persists a normalized global shop snapshot. Its page reads only the public
+DomainData `/api/rocketleague/shop` endpoint, which calls the confirmed
+`api.get_rl_current_shop()` RPC server-side and returns an allowlisted cached
+snapshot. A short shared cache reduces repeated database reads; no page view
+wakes the provider Worker.
 `/RocketLeague/ImageScanning` is retained as a compatibility route that replaces
 the URL with `/RocketLeague/SubmitMatchResults`; it no longer renders the hub.
 `/RocketLeague/MatchHistory` is a real auth-gated page that explains
-match-by-match provider history is unsupported; it never treats MMR captures
-as matches. Leaderboards, public Match Results, Weekly Matches, My Matches, and
-Private Matches have shell-integrated status pages rather than reusing the
-Rocket League landing page or displaying fabricated records.
+match-by-match provider history is unsupported; the MMR Worker has one shared
+service-account session, while `Matches/GetMatchHistory` reads only that
+session's `localPlayerID`. It cannot supply a linked BPD user's private history,
+and MMR captures are never presented as matches. Leaderboards, public Match
+Results, Weekly Matches, My Matches, and Private Matches have shell-integrated
+status pages rather than reusing the Rocket League landing page or displaying
+fabricated records.
 
 Discord MatchBot eligibility currently returns a scoped `unavailable` result
 from `functions/services/auth/providers/discord_matchbot/eligibility.js` for
@@ -183,26 +190,48 @@ The repository inventory in `_folder_structure/folder_organization/04_workers.tx
 records that no Discord Gateway Worker currently exists. This proposal does
 not establish that an external `bpd-matchbot-gateway` repository already exists.
 
+Normal page reads do not call the provider. A single hourly cron on the existing
+Rocket League background Worker asks the live
+`api.get_rl_refresh_candidates(p_after_player_id, p_limit)` RPC for up to 20
+eligible rows and follows due flags with a cursor stored in `SERVICE_STATUS` KV.
+It requests only due `skills`, `profile`, `club`, and `stats` capabilities from
+the protected MMR Worker. MMR, profile, complete aggregate stats, and club data
+are persisted through their existing server-side RPCs, then each component is
+checkpointed independently with `api.record_rl_player_refresh_result`. Incomplete
+career stats are never persisted. The Supabase due flags control per-capability
+cadence, so the hourly schedule does not imply an hourly request per player.
+History remains unsupported for linked users because the Worker only has its
+shared service-account PsyNet session; Discord refresh remains unavailable until
+a persistent Gateway/runtime provides authoritative state. The same hourly
+trigger starts an independent global Shop job: it calls the protected
+`/get-shop-data` endpoint, hashes the normalized catalogue, saves it through
+`api.save_rl_shop_snapshot`, and records the global `shop` refresh result. The
+public page does not call or wake this provider path.
+The prior Saturday MMR routine remains in the repository but is no longer
+scheduled, avoiding a second competing MMR refresh path.
+
 Authenticated account activity and a successful, complete Rocket League
-registration use the existing MMR refresh flow. Only when that flow completes
-an actual MMR refresh (the existing per-account 24-hour MMR gate allowed it)
-does Pages make one server-side request to the protected MMR Worker
-`/get-player-data` endpoint for `profile,stats`. A separate `RL_STATS_CACHE` cooldown
-deduplicates provider-data work per isolate and retries failures after 15
-minutes; successful work is held for 24 hours. As with the existing KV gates,
-cross-isolate cooldown checks are best-effort. The Worker may make six PsyNet
-requests for career stats, and incomplete totals are never persisted.
+registration may continue using the separate existing MMR refresh flow. The
+successful login-triggered MMR, provider-profile, and complete-stats writes also
+update the same per-component refresh ledger. This prevents the hourly candidate
+scan from re-fetching those components immediately after a successful foreground
+refresh. The scheduled due-aware system remains independent from page rendering
+and profile reads.
+The Worker may make six PsyNet requests for career stats, and incomplete totals
+are never persisted.
 
 Successful display-name data is written through
 `api.save_rl_player_provider_profile`; the live RPC uses `COALESCE` so the
 currently unsupported `level`, `xp`, `creator_code`, and provider timestamp
 nulls preserve existing values. Complete six-field career totals are written
 through `api.save_rl_player_stats`. Skills continue through the existing MMR
-snapshot RPC/path. Match History is unsupported for other players and does not
-call its persistence RPC; historical rows are retained. `SUPABASE_AUTH` and
+snapshot RPC/path. Club details are allowlisted by the MMR Worker and saved via
+`api.save_rl_player_club`; member lists and raw provider payloads are not
+returned. Match History is unsupported for other players and does not call its
+persistence RPC; historical rows are retained. `SUPABASE_AUTH` and
 `MMR_API_KEY` are used only server-side. The Admin capability registry marks
-MMR / Skills, display-name Player Profile, and Player Stats active; XP /
-Progression and Match History are not represented as supported.
+MMR / Skills, display-name Player Profile, Player Stats, and read-only Clubs
+active; XP / Progression and Match History are not represented as supported.
 
 ### Presence pipeline
 
