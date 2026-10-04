@@ -93,7 +93,7 @@ export async function persistCapability(env, candidate, component, capabilities)
         const result = capabilities?.skills;
         if (result?.status !== "success") throw failure(result?.error?.code || "MMR_CAPABILITY_UNAVAILABLE");
         const snapshot = skillSnapshot(result.data);
-        await callRpc(env, "save_rl_player_mmr_snapshot_v2", {
+        const persisted = await callRpc(env, "save_rl_player_mmr_snapshot_v2", {
             p_account_id: candidate.account_id,
             p_epic_account_id: candidate.epic_account_id,
             p_captured_at: capturedAt,
@@ -105,7 +105,8 @@ export async function persistCapability(env, candidate, component, capabilities)
             p_threes_tier: snapshot.threes_tier,
             p_source: "mmr-api-v2"
         });
-        return;
+        if (typeof persisted?.saved !== "boolean") throw failure("MMR_SNAPSHOT_RESPONSE_INVALID");
+        return { changed: persisted.saved };
     }
     if (component === "provider") {
         const result = capabilities?.profile;
@@ -192,7 +193,7 @@ export async function refreshCandidate(env, candidate) {
         match_history: candidate.match_history_due,
         discord: candidate.discord_due
     })[component] === true);
-    if (!due.length) return { attempted: 0, succeeded: 0, failed: 0 };
+    if (!due.length) return { attempted: 0, succeeded: 0, failed: 0, mmrChanged: 0, mmrUnchanged: 0 };
 
     const requested = requestedCapabilities(candidate);
     let capabilities = {};
@@ -206,13 +207,22 @@ export async function refreshCandidate(env, candidate) {
 
     let succeeded = 0;
     let failed = 0;
+    let mmrChanged = 0;
+    let mmrUnchanged = 0;
     for (const component of due) {
         let errorCode = sharedFailure;
         let success = false;
         if (component === "match_history") errorCode = "RL_MATCH_HISTORY_AUTHENTICATED_PLAYER_ONLY";
         else if (component === "discord") errorCode = "DISCORD_GATEWAY_RUNTIME_UNAVAILABLE";
         else if (!errorCode) {
-            try { await persistCapability(env, candidate, component, capabilities); success = true; }
+            try {
+                const persisted = await persistCapability(env, candidate, component, capabilities);
+                if (component === "mmr" && typeof persisted?.changed === "boolean") {
+                    if (persisted.changed) mmrChanged += 1;
+                    else mmrUnchanged += 1;
+                }
+                success = true;
+            }
             catch (error) { errorCode = error?.code || "REFRESH_PERSIST_FAILED"; }
         }
         try { await recordComponent(env, candidate, component, success, errorCode); }
@@ -220,7 +230,7 @@ export async function refreshCandidate(env, candidate) {
         if (success) succeeded += 1;
         else failed += 1;
     }
-    return { attempted: due.length, succeeded, failed };
+    return { attempted: due.length, succeeded, failed, mmrChanged, mmrUnchanged };
 }
 
 export async function runRocketLeagueRefreshCycle(env) {
@@ -234,11 +244,13 @@ export async function runRocketLeagueRefreshCycle(env) {
     if (!Array.isArray(rows)) throw failure("REFRESH_CANDIDATES_INVALID");
     if (!rows.length) {
         await kv.delete?.(CURSOR_KEY);
-        return { success: true, candidateCount: 0, attempted: 0, succeeded: 0, failed: 0, cursorReset: true };
+        return { success: true, candidateCount: 0, attempted: 0, succeeded: 0, failed: 0, mmrChanged: 0, mmrUnchanged: 0, cursorReset: true };
     }
     let attempted = 0;
     let succeeded = 0;
     let failed = 0;
+    let mmrChanged = 0;
+    let mmrUnchanged = 0;
     for (const candidate of rows) {
         if (!text(candidate?.account_id) || !text(candidate?.player_id) || !text(candidate?.epic_account_id)) {
             failed += 1;
@@ -249,8 +261,10 @@ export async function runRocketLeagueRefreshCycle(env) {
             attempted += result.attempted;
             succeeded += result.succeeded;
             failed += result.failed;
+            mmrChanged += result.mmrChanged;
+            mmrUnchanged += result.mmrUnchanged;
         } catch { failed += 1; }
     }
     await kv.put(CURSOR_KEY, text(rows.at(-1)?.player_id), { expirationTtl: 7 * 24 * 60 * 60 });
-    return { success: failed === 0, candidateCount: rows.length, attempted, succeeded, failed, nextCursorStored: true };
+    return { success: failed === 0, candidateCount: rows.length, attempted, succeeded, failed, mmrChanged, mmrUnchanged, nextCursorStored: true };
 }

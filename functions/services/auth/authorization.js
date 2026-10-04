@@ -790,6 +790,47 @@ export async function requireProvider(
     };
 }
 
+/* =====================================================
+REQUIRE A CURRENT PROVIDER FROM THIS SESSION
+
+Cached session metadata is only a candidate list. Each
+provider is revalidated through Supabase and provider-auth
+KV before it authorizes an account mutation.
+===================================================== */
+
+export async function requireCurrentSessionProvider(
+    authorization,
+    env
+) {
+    const supportedProviders = ["epic", "google", "discord", "steam"];
+    const sessionProviders = authorization?.sessionContext?.providers;
+    const candidates = supportedProviders.filter(provider =>
+        Object.hasOwn(sessionProviders || {}, provider));
+    let staleProviderError = null;
+    let unavailableProviderError = null;
+
+    for (const provider of candidates) {
+        try {
+            return await requireProvider(authorization, env, provider);
+        } catch (error) {
+            if (error?.code === "PROVIDER_REAUTHORIZATION_REQUIRED") {
+                staleProviderError ||= error;
+                continue;
+            }
+            if (error?.code === "PROVIDER_REQUIRED") continue;
+            if (Number(error?.status) >= 500) {
+                unavailableProviderError ||= error;
+                continue;
+            }
+            throw error;
+        }
+    }
+
+    if (unavailableProviderError) throw unavailableProviderError;
+    if (staleProviderError) throw staleProviderError;
+    throw new AuthorizationError("PROVIDER_REQUIRED", "A linked authentication provider is required.", 403);
+}
+
 /* =========================================================
 COMBINED AUTHORIZATION
 

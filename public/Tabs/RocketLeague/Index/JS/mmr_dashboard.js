@@ -3,7 +3,7 @@
 import { formatRocketLeagueTimestamp } from "../../shared/profilePresentation.js";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
-const HISTORY_LIMIT = 15;
+const HISTORY_LIMIT = 90;
 const SERIES = [
     { key: "ones", label: "1v1", color: "#b49aff" },
     { key: "twos", label: "2v2", color: "#68c5ff" },

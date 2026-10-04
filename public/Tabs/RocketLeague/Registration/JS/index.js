@@ -2226,7 +2226,7 @@ async function loadRocketLeagueProfile() {
     try {
         response =
             await apiFetch(
-                `${ROCKET_LEAGUE_PROFILE_URL}?includePresence=false`,
+                `${ROCKET_LEAGUE_PROFILE_URL}?includePresence=false&includeLegacyFindProfile=true`,
                 {
                     method:
                         "GET",

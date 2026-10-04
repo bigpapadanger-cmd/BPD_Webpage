@@ -1,6 +1,6 @@
 "use strict";
 
-const MAX_MMR_HISTORY_CAPTURES = 15;
+const MAX_MMR_HISTORY_CAPTURES = 90;
 const REQUEST_TIMEOUT_MS = 5000;
 
 function normalizeString(value) {

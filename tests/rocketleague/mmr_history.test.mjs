@@ -38,17 +38,17 @@ test("MMR history normalizes empty, one, and partial-playlist records", () => {
     assert.equal(chartRows[0].twos.mmr, null);
 });
 
-test("MMR history returns only the newest 15 captures in ascending time order", () => {
-    const input = Array.from({ length: 20 }, (_, index) => snapshot(index)).reverse();
+test("MMR history returns only the newest 90 captures in ascending time order", () => {
+    const input = Array.from({ length: 100 }, (_, index) => snapshot(index)).reverse();
     const normalized = normalizeMmrHistory(input);
-    assert.equal(normalized.length, 15);
-    assert.equal(normalized[0].capturedAt, snapshot(5).captured_at);
-    assert.equal(normalized.at(-1).capturedAt, snapshot(19).captured_at);
+    assert.equal(normalized.length, 90);
+    assert.equal(normalized[0].capturedAt, snapshot(10).captured_at);
+    assert.equal(normalized.at(-1).capturedAt, snapshot(99).captured_at);
 });
 
-test("MMR history preserves short histories and exactly 15 captures", () => {
+test("MMR history preserves short histories and exactly 90 captures", () => {
     assert.equal(normalizeMmrHistory([snapshot(2), snapshot(0), snapshot(1)]).length, 3);
-    assert.equal(normalizeMmrHistory(Array.from({ length: 15 }, (_, index) => snapshot(index))).length, 15);
+    assert.equal(normalizeMmrHistory(Array.from({ length: 90 }, (_, index) => snapshot(index))).length, 90);
 });
 
 test("MMR history rejects malformed payloads and snapshots", () => {
@@ -126,7 +126,7 @@ test("chart renders a single capture, preserves null gaps, and has safe unavaila
     assert.match(status.textContent, /temporarily unavailable/);
 });
 
-test("chart displays no more than the newest 15 captures", () => {
+test("chart displays no more than the newest 90 captures", () => {
     const graph = fakeElement("div");
     const status = fakeElement("p");
     const documentRef = {
@@ -134,7 +134,7 @@ test("chart displays no more than the newest 15 captures", () => {
         createElement: tag => fakeElement(tag),
         createElementNS: (_namespace, tag) => fakeElement(tag)
     };
-    renderMmrHistory(Array.from({ length: 20 }, (_, index) => {
+    renderMmrHistory(Array.from({ length: 100 }, (_, index) => {
         const row = snapshot(index);
         return {
             capturedAt: row.captured_at,
@@ -143,6 +143,7 @@ test("chart displays no more than the newest 15 captures", () => {
             threes: { mmr: row.threes_mmr, tier: row.threes_tier }
         };
     }), documentRef);
-    assert.match(status.textContent, /^15 saved captures/);
+    assert.match(status.textContent, /^90 saved captures/);
+    assert.equal(graph.children[0].children.filter(node => node.tagName === "circle").length, 270);
     assert.match(graph.children[0].children.find(node => node.tagName === "title").textContent, /history/i);
 });

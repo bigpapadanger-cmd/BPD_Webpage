@@ -149,7 +149,8 @@ function settingsPayload() {
 }
 
 async function requestProfile(method = "GET", body) {
-    const response = await apiFetch(ROCKET_LEAGUE_PROFILE_URL, {
+    const url = method === "GET" ? `${ROCKET_LEAGUE_PROFILE_URL}?includeLegacyFindProfile=true` : ROCKET_LEAGUE_PROFILE_URL;
+    const response = await apiFetch(url, {
         method,
         credentials: "same-origin",
         cache: "no-store",

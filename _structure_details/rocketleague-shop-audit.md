@@ -1,11 +1,10 @@
 # Rocket League Item Shop Source Audit
 
 Snapshot: 2026-10-03. This combines upstream protocol and local implementation
-review. The protected MMR Worker now exposes normalized global shop data, and
-the existing DomainData hourly Worker hashes/saves snapshots through the
-confirmed live write RPC. No Supabase schema change or deployment was made.
-The public Shop page still has no cached reader/carousel because the live
-read-side Supabase contract has not been confirmed.
+review. The protected MMR Worker exposes normalized global shop data, and the
+existing DomainData hourly Worker hashes/saves snapshots through the confirmed
+live write RPC. The live cached read RPC, server endpoint, and public carousel
+are implemented. No Supabase schema change or deployment was made.
 
 ## Upstream source and trust boundary
 
@@ -20,8 +19,8 @@ The MMR Worker endpoint requires its existing backend bearer key and uses the
 current Durable Object's authenticated PsyNet session. The two Shop RPCs take no
 player ID and do not request wallet or inventory. DomainData calls this endpoint
 only from its hourly background job; the browser never contacts the MMR Worker.
-The Admin capability entry remains a placeholder until the cached public read
-and Shop UI are complete.
+The Admin capability entry remains informational; it does not trigger Shop
+refreshes or provider calls.
 
 ## Shop RPCs inspected
 
@@ -108,12 +107,14 @@ fields are returned.
 
 The public `/RocketLeague/Shop` page loads that DomainData endpoint once when its
 page module initializes. It displays saved section/item data in a responsive
-carousel with previous/next controls, freshness, optional verified HTTPS
-artwork, and known numeric currency IDs (not guessed currency names). All text
-is inserted as text, not HTML. Missing snapshots, empty catalogues, and missing
-artwork have explicit fallback states. It does not wake the MMR Worker or call
-Rocket League on page views. Purchases, wallet information, and inventory state
-remain out of scope.
+carousel with previous/next controls, section and item timing, optional verified
+HTTPS artwork, and known numeric currency IDs (not guessed currency names).
+Snapshots older than two hours (one missed hourly refresh) or whose displayed
+sections have all expired are labeled as potentially out of date while remaining
+available to browse. All text is inserted as text, not HTML. Missing snapshots,
+empty catalogues, and missing artwork have explicit fallback states. It does not
+wake the MMR Worker or call Rocket League on page views. Purchases, wallet
+information, and inventory state remain out of scope.
 
 ## Proposed contracts for a later approved implementation
 
@@ -157,19 +158,18 @@ by the background service, not copied from a provider field.
 
 ### Persistence/cache
 
-The live `api.save_rl_shop_snapshot` contract is already available and is called
-by the background-only writer with normalized shops/catalogues, an empty
-notifications array (the optional notification RPC is not called), schema
-version 1, capture timestamp, and content hash. The public-safe read RPC/table
-and exact return shape are not yet confirmed here. No table/schema, RLS, grants,
-or read RPC were changed. Do not expose the saved JSON until its live read
-contract is supplied and mapped through a server-side public-safe API.
+The live `api.save_rl_shop_snapshot` and `api.get_rl_current_shop` contracts are
+available. The background-only writer saves normalized shops/catalogues, an
+empty notifications array (the optional notification RPC is not called), schema
+version 1, capture timestamp, and content hash. The public endpoint calls the
+read RPC server-side and returns only a bounded allowlist. No table/schema, RLS,
+grants, or RPC were changed in this pass.
 
 ### DomainData and UI
 
-The public cached read endpoint and carousel are implemented. Follow-up
-validation can refine the public projection only against a confirmed provider
-payload; do not add arbitrary provider fields or direct browser database access.
+The public cached read endpoint and carousel are implemented. Refine the public
+projection only against a confirmed provider payload; do not add arbitrary
+provider fields or direct browser database access.
 
 ## Operator requirements and open dependencies
 
@@ -179,12 +179,10 @@ payload; do not add arbitrary provider fields or direct browser database access.
 - A supported/current game build and PsyNet signing/session implementation; the
   SDK README warns these are reverse-engineered and can become stale.
 - Egress support for Epic/EOS HTTPS and authenticated PsyNet WebSocket.
-- Approved storage choice and grants before persistence/API work.
+- Current Shop read/write RPC and server-role grants are confirmed; any future
+  schema, grants, or RPC changes require separate review and approval.
 - Validate whether the provider's image URLs are currently populated and
   browser-accessible; present asset nulls safely.
-- Confirm whether the website should show shop section dates/timezone and which
-  shop types count as the main daily shop, since shop type semantics can vary.
-
-No shop provider service or homepage carousel was added in this pass because no
-existing isolated service skeleton exists and the requested provider-service
-work was explicitly deferred.
+- The page currently displays section/item dates in the visitor's local timezone;
+  shop type semantics are still not mapped, so do not label types as daily,
+  featured, or another named category without an authoritative mapping.

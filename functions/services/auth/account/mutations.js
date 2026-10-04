@@ -1,4 +1,4 @@
-import { authorizeRequest, isAuthorizationError } from "../authorization.js";
+import { authorizeRequest, isAuthorizationError, requireCurrentSessionProvider } from "../authorization.js";
 import { destroyRequestSession } from "../sessions/session.js";
 import { jsonResponse, methodNotAllowedResponse } from "../../http/responses.js";
 import { validateDisplayNameAppropriateness } from "./display_name_validation.js";
@@ -83,6 +83,7 @@ export async function handleAccountMutation(request, env, operation) {
     let authorization;
     try {
         authorization = await authorizeRequest(request, env, { account: true });
+        authorization = await requireCurrentSessionProvider(authorization, env);
     } catch (error) {
         if (!isAuthorizationError(error) || error.status >= 500) return failure("AUTH_SERVICE_UNAVAILABLE");
         return jsonResponse({ success: false, code: error.code, error: error.code,

@@ -70,7 +70,7 @@ function installHealthFetch(calls) {
         }
         calls.presence += 1;
         assert.equal(url.pathname, "/admin/health");
-        return Response.json({ success: true, status: "unknown", configuration: {} });
+        return Response.json({ success: true, status: "unknown", configuration: {}, scheduledJobs: { mmr: { lastInvocationAt: "2026-10-03T15:00:00Z", lastSummary: { attempted: 2, mmrChanged: 1, mmrUnchanged: 1 } }, shop: { lastInvocationAt: "2026-10-03T15:00:01Z", lastSummary: { changed: false } } } });
     };
     return () => { globalThis.fetch = originalFetch; };
 }
@@ -80,7 +80,11 @@ test("system health cache includes protected MMR readiness without starting MMR 
     const restore = installHealthFetch(calls);
     try {
         const [first, concurrent] = await Promise.all([getSystemStatus(env), getSystemStatus(env)]);
+        const monitor = first.services.find(item => item.id === "rl-presence");
         const mmr = first.services.find(item => item.id === "mmr-api");
+        assert.equal(monitor.scheduledJobs.shop.lastSummary.changed, false);
+        assert.equal(monitor.scheduledJobs.mmr.lastSummary.attempted, 2);
+        assert.equal(monitor.scheduledJobs.mmr.lastSummary.mmrChanged, 1);
         assert.equal(mmr.status, "degraded");
         assert.equal(mmr.rootCause, "PSYNET_AUTH_FAILED");
         assert.deepEqual(mmr.actions, ["recheck", "reconnect-psynet", "repair-session"]);
@@ -111,6 +115,10 @@ test("Worker Status UI is event-driven and exposes current MMR operations", asyn
     assert.match(source, /form\.elements\.buildSecret\.value = ""/);
     assert.match(source, /Historical diagnostics/);
     assert.match(source, /getMmrControlModel\(service, canDeployMmr\)/);
+    assert.match(source, /Hourly MMR refresh/);
+    assert.match(source, /Hourly Shop refresh/);
+    assert.match(source, /snapshot unchanged/);
+    assert.match(source, /MMR changed/);
 });
 
 test("Rocket League capability registry reflects supported Worker capabilities and keeps inactive entries inert", async () => {

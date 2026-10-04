@@ -11,14 +11,20 @@ const signedOut = { AUTH_SESSIONS: { get: async () => null } };
 test("cancelled Google/Discord callback redirects to a friendly Login error", async () => {
     const response = await handleOAuthCallback(request, signedOut);
     assert.equal(response.status, 302);
-    assert.equal(response.headers.get("location"), "/Login?error=OAUTH_PROVIDER_REJECTED");
+    const location = new URL(response.headers.get("location"), request.url);
+    assert.equal(location.pathname, "/Login");
+    assert.equal(location.searchParams.get("error"), "OAUTH_PROVIDER_REJECTED");
+    assert.match(location.searchParams.get("debugId") || "", /^[0-9a-f-]{36}$/iu);
     assert.match(response.headers.get("set-cookie"), /Max-Age=0/);
     assert.doesNotMatch(response.headers.get("set-cookie"), /bpd_session=/);
 });
 
 test("callback outage routes to recovery without clearing the BPD session", async () => {
     const response = await completeOAuthCallback(request, {}, async () => { throw Error("secret"); });
-    assert.equal(response.headers.get("location"), "/Account?error=AUTH_SERVICE_UNAVAILABLE");
+    const location = new URL(response.headers.get("location"), request.url);
+    assert.equal(location.pathname, "/Account");
+    assert.equal(location.searchParams.get("error"), "AUTH_SERVICE_UNAVAILABLE");
+    assert.match(location.searchParams.get("debugId") || "", /^[0-9a-f-]{36}$/iu);
     assert.doesNotMatch(response.headers.get("set-cookie"), /bpd_session=/);
     assert.equal(response.headers.get("cache-control"), "no-store");
 });

@@ -92,8 +92,9 @@ cycle rejects same-isolate overlap but has no distributed lock.
 The hourly trigger also starts an independent global Shop refresh. It calls the
 protected MMR Worker's `/get-shop-data` once (two PsyNet reads), hashes the
 normalized snapshot, saves through `api.save_rl_shop_snapshot`, and checkpoints
-the `shop` global refresh result. This Shop job is background-only; the current
-Shop page does not call the provider or expose a cached read yet.
+the `shop` global refresh result. The public Shop page reads the cached DomainData
+endpoint only; it does not call the provider. Old or expired snapshots are
+labeled potentially out of date.
 
 The main view uses compact status-icon rows; per-service metadata is collapsed
 under Details. Route, connection, and known-finding diagnostics share the same

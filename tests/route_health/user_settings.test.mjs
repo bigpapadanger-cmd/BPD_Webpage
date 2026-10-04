@@ -7,7 +7,7 @@ import { existsSync } from "node:fs";
 
 import { ROUTES } from "../../public/routes.js";
 import { handleAccountMutation } from "../../functions/services/auth/account/mutations.js";
-import { hasReadableContrast } from "../../public/Framework/Shell/JS/preferences.js";
+import { applyAppearancePreferences, hasReadableContrast } from "../../public/Framework/Shell/JS/preferences.js";
 
 function createElement(value = "") {
     return {
@@ -15,6 +15,7 @@ function createElement(value = "") {
         textContent: "",
         attributes: {},
         listeners: {},
+        hidden: false,
         classList: {
             values: new Set(),
             toggle(name, force) { if (force) this.values.add(name); else this.values.delete(name); },
@@ -50,16 +51,26 @@ test("appearance preferences remain browser-local and preserve existing storage 
     const store = new Map([["bpdTheme", "purple"], ["bpdBackgroundColor", "#121212"]]);
     const backgroundPreview = createElement();
     backgroundPreview.previewSpans = [createElement(), createElement()];
+    const backgroundPreviewPending = createElement();
+    backgroundPreviewPending.previewSpans = [createElement(), createElement()];
+    backgroundPreviewPending.hidden = true;
     const hoverPreview = createElement();
     hoverPreview.previewSpans = [createElement(), createElement()];
+    const hoverPreviewPending = createElement();
+    hoverPreviewPending.previewSpans = [createElement(), createElement()];
+    hoverPreviewPending.hidden = true;
     const elements = {
         themeSetting: createElement(),
         animationSetting: createElement(),
         sidebarSetting: createElement(),
         backgroundColorSetting: createElement(),
         hoverTextColorSetting: createElement(),
+        applyColors: createElement(),
+        applyColorsStatus: createElement(),
         backgroundColorPreview: backgroundPreview,
+        backgroundColorPreviewPending: backgroundPreviewPending,
         hoverTextColorPreview: hoverPreview,
+        hoverTextColorPreviewPending: hoverPreviewPending,
         resetSettings: createElement(),
         privacySettings: createElement(),
         privacySettingsStatus: createElement(),
@@ -97,11 +108,27 @@ test("appearance preferences remain browser-local and preserve existing storage 
         elements.backgroundColorSetting.listeners.input();
         elements.hoverTextColorSetting.value = "#eeeeee";
         elements.hoverTextColorSetting.listeners.input();
+        assert.equal(store.get("bpdBackgroundColor"), "#121212");
+        assert.equal(store.has("bpdHoverTextColor"), false);
+        assert.equal(document.documentElement.style.values["--bpd-user-background"], "#121212");
+        assert.equal(document.documentElement.style.values["--bpd-hover-text-color"], "#ffffff");
+        assert.equal(backgroundPreview.previewSpans[1].textContent, "Current: #121212");
+        assert.equal(backgroundPreviewPending.previewSpans[1].textContent, "Pending: #223344");
+        assert.equal(backgroundPreviewPending.hidden, false);
+        assert.equal(elements.applyColors.disabled, false);
+        assert.equal(elements.backgroundColorSetting.listeners.blur, undefined);
+        elements.animationSetting.listeners.click();
+        assert.equal(store.get("bpdBackgroundColor"), "#121212");
+        assert.equal(store.has("bpdHoverTextColor"), false);
+        assert.equal(document.documentElement.style.values["--bpd-user-background"], "#121212");
+        elements.applyColors.listeners.click();
         assert.equal(store.get("bpdBackgroundColor"), "#223344");
         assert.equal(store.get("bpdHoverTextColor"), "#eeeeee");
         assert.equal(document.documentElement.style.values["--bpd-user-background"], "#223344");
         assert.equal(document.documentElement.style.values["--bpd-hover-text-color"], "#eeeeee");
         assert.equal(backgroundPreview.previewSpans[1].textContent, "Current: #223344");
+        assert.equal(backgroundPreviewPending.hidden, true);
+        assert.equal(elements.applyColors.disabled, true);
 
         elements.privacySettings.listeners.click();
         assert.equal(callbackQueue[0], callback);
@@ -132,8 +159,25 @@ test("sidebar icons use the shared accessible icon slot and consistent dashboard
         assert.match(sidebar, /class="nav-icon"[\s\S]*?aria-hidden="true"/);
         assert.match(sidebar, /data-tooltip="Dashboard"[\s\S]*?📊/);
     }
+    const iconFor = (sidebar, tooltip) => {
+        const tooltipIndex = sidebar.indexOf(`data-tooltip="${tooltip}"`);
+        const itemStart = sidebar.lastIndexOf("<a", tooltipIndex);
+        const itemEnd = sidebar.indexOf("</a>", tooltipIndex) + 4;
+        const item = sidebar.slice(itemStart, itemEnd);
+        return item.match(/class="nav-icon"[^>]*>([\s\S]*?)<\/span>/)?.[1].trim();
+    };
+    for (const sidebar of sharedSidebars) {
+        assert.equal(iconFor(sidebar, "Dashboard"), "📊");
+    }
+    assert.equal(iconFor(sharedSidebars[0], "Rocket League"), "⚽");
+    assert.equal(iconFor(sharedSidebars[2], "Rocket League"), "⚽");
+    assert.equal(iconFor(sharedSidebars[0], "Settings"), "⚙️");
+    assert.equal(iconFor(sharedSidebars[1], "User Settings"), "⚙️");
+    assert.equal(iconFor(sharedSidebars[2], "Settings"), "⚙️");
     const styles = await readFile(new URL("../../public/Framework/Shell/CSS/Sidebar/sidebar.css", import.meta.url), "utf8");
+    const rocketLeagueStyles = await readFile(new URL("../../public/Framework/Shell/CSS/Sidebar/rl_AuthSidebar.css", import.meta.url), "utf8");
     assert.match(styles, /\.site-sidebar \.nav-icon[\s\S]*?font-size: 1\.15rem/);
+    assert.doesNotMatch(rocketLeagueStyles, /\.sidebar-view-rocketleague\s+\.nav-icon\s*\{/);
 });
 
 test("global color customizations use neutral shared variables and preserve Rocket League hover branding", async () => {
@@ -144,24 +188,58 @@ test("global color customizations use neutral shared variables and preserve Rock
     const header = await readFile(new URL("../../public/Framework/Shell/CSS/General/header.css", import.meta.url), "utf8");
     const footer = await readFile(new URL("../../public/Framework/Shell/CSS/General/footer.css", import.meta.url), "utf8");
     const settings = await readFile(new URL("../../public/Global/Settings/HTML/settings.html", import.meta.url), "utf8");
+    const settingsCss = await readFile(new URL("../../public/Global/Settings/CSS/settings-page.css", import.meta.url), "utf8");
+    const hover = await readFile(new URL("../../public/Framework/Shell/CSS/Sidebar/hover.css", import.meta.url), "utf8");
     const router = await readFile(new URL("../../public/Framework/Shell/JS/router.js", import.meta.url), "utf8");
     const sidebarCoordinator = await readFile(new URL("../../public/Framework/Shell/JS/Sidebar/sidebar.js", import.meta.url), "utf8");
+    const rocketLeagueMaster = await readFile(new URL("../../public/Framework/Shell/CSS/Callers/master_rl.css", import.meta.url), "utf8");
     assert.match(preferences, /bpdBackgroundColor/);
     assert.match(preferences, /bpdHoverTextColor/);
     assert.match(preferences, /--bpd-user-background/);
     assert.match(shell, /background: var\(--bpd-user-background/);
     assert.match(sidebar, /color:\s*var\(--bpd-hover-text-color/);
+    assert.match(sidebar, /\.site-sidebar \.nav-item:hover,[\s\S]*?\.site-sidebar \.nav-item:focus-visible \{\s*color: var\(--bpd-hover-text-color/);
+    assert.match(sidebar, /\.site-sidebar \.nav-item\[aria-current="page"\][\s\S]*?color: var\(--site-accent\)/);
     assert.match(header, /\.header-tab:hover[\s\S]*?color: var\(--bpd-hover-text-color/);
     assert.match(footer, /\.footer-navigation a:hover[\s\S]*?var\(--bpd-hover-text-color/);
     assert.match(rlSidebar, /\.sidebar-view-rocketleague \.nav-item:hover[\s\S]*?color: #ffffff/);
+    assert.match(rlSidebar, /\.sidebar-view-rocketleague \.submenu-item:hover[\s\S]*?color: #ffffff/);
+    assert.ok(rocketLeagueMaster.indexOf("../Sidebar/sidebar.css") < rocketLeagueMaster.indexOf("../Sidebar/rl_AuthSidebar.css"));
+    assert.doesNotMatch(rlSidebar, /--bpd-(?:user-background|hover-text-color)/);
     assert.match(settings, /Background Color/);
+    assert.match(settings, /shared page background; Rocket League cards and branded accents stay the same/);
+    assert.match(settings, /id="backgroundColorPreviewPending"[^>]*hidden/);
     assert.match(settings, /Hover Text Color/);
+    assert.match(settings, /generic site navigation hover text/);
+    assert.match(settings, /id="hoverTextColorPreviewPending"[^>]*hidden/);
+    assert.match(settings, /id="applyColors"[^>]*>Apply Colors/);
+    assert.match(hover, /#sidebarHoverText[\s\S]*?color:\s*inherit/);
+    assert.match(hover, /\.sidebar-tooltip[\s\S]*?color:\s*var\(--bpd-hover-text-color/);
+    assert.match(settingsCss, /#themeSetting option[\s\S]*?color:\s*#111827;[\s\S]*?background-color:\s*#ffffff/);
+    assert.match(settingsCss, /#themeSetting option:checked,[\s\S]*?#themeSetting option:hover,[\s\S]*?#themeSetting option:focus \{\s*color: #ffffff;\s*background-color: #1d4ed8/);
+    assert.match(shell, /a:focus-visible,[\s\S]*?select:focus-visible,[\s\S]*?\{\s*outline: 2px solid var\(--site-accent\)/);
     assert.match(router, /applyAppearancePreferences\(\)/);
     assert.match(sidebarCoordinator, /applyAppearancePreferences\(preferences\)/);
     assert.equal(hasReadableContrast("#ffffff", "#0d0f13"), true);
     assert.equal(hasReadableContrast("#eeeeee", "#24202f"), true);
+    assert.equal(hasReadableContrast("#b9c2d1", "#24202f"), true);
     assert.equal(hasReadableContrast("#24202f", "#24202f"), false);
     assert.equal(hasReadableContrast("#ffffff", "#eeeeee"), false);
+    const originalDocument = globalThis.document;
+    globalThis.document = {
+        body: { dataset: {}, classList: { toggle() {} } },
+        documentElement: { style: { values: {}, setProperty(name, value) { this.values[name] = value; } } }
+    };
+    try {
+        applyAppearancePreferences({ theme: "blue", animations: "on", backgroundColor: "#101820", hoverTextColor: "#b9c2d1" });
+        assert.equal(globalThis.document.documentElement.style.values["--bpd-user-background"], "#101820");
+        assert.equal(globalThis.document.documentElement.style.values["--bpd-hover-text-color"], "#b9c2d1");
+        applyAppearancePreferences({ theme: "blue", animations: "on", backgroundColor: "#0d0f13", hoverTextColor: "#ffffff" });
+        assert.equal(globalThis.document.documentElement.style.values["--bpd-user-background"], "#0d0f13");
+        assert.equal(globalThis.document.documentElement.style.values["--bpd-hover-text-color"], "#ffffff");
+    } finally {
+        globalThis.document = originalDocument;
+    }
 });
 
 test("FAQ is curated static content and Suggestions remains a separate destination", async () => {

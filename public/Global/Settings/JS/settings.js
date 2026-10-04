@@ -156,12 +156,18 @@ async function saveDisplayName() {
     }
 }
 
-function updateColorPreview(id, color) {
-    const preview = document.getElementById(id);
+function updateColorPreview(id, color, label = "Current") {
+    const previewId = label === "Pending" ? `${id}Pending` : id;
+    const preview = document.getElementById(previewId);
     if (!preview) return;
     const spans = preview.querySelectorAll("span");
     if (spans[0]) spans[0].style.backgroundColor = color;
-    if (spans[1]) spans[1].textContent = `Current: ${color}`;
+    if (spans[1]) spans[1].textContent = `${label}: ${color}`;
+    preview.hidden = false;
+    if (label === "Current") {
+        const pendingPreview = document.getElementById(`${id}Pending`);
+        if (pendingPreview) pendingPreview.hidden = true;
+    }
 }
 
 export async function initializePage() {
@@ -170,10 +176,13 @@ export async function initializePage() {
     const sidebar = document.getElementById("sidebarSetting");
     const backgroundColor = document.getElementById("backgroundColorSetting");
     const hoverTextColor = document.getElementById("hoverTextColorSetting");
+    const applyColors = document.getElementById("applyColors");
+    const applyColorsStatus = document.getElementById("applyColorsStatus");
     const reset = document.getElementById("resetSettings");
     const privacy = document.getElementById("privacySettings");
     const privacyStatus = document.getElementById("privacySettingsStatus");
     const preferences = readPreferences();
+    const pendingColors = { backgroundColor: preferences.backgroundColor, hoverTextColor: preferences.hoverTextColor };
     preferences.sidebar = readSidebarPreference() ?? (window.innerWidth <= 700 ? "collapsed" : "open");
 
     applyAppearancePreferences(preferences);
@@ -204,13 +213,14 @@ export async function initializePage() {
         const status = document.getElementById("backgroundColorStatus");
         if (!hasReadableContrast("#ffffff", color)) {
             if (status) status.textContent = "That background is too light for readable page text. Choose a darker color.";
-            backgroundColor.value = preferences.backgroundColor;
+            pendingColors.backgroundColor = color;
+            updateColorPreview("backgroundColorPreview", color, "Pending");
+            if (applyColors) applyColors.disabled = false;
             return;
         }
-        if (!savePreference("backgroundColor", color)) return;
-        preferences.backgroundColor = color;
-        applyAppearancePreferences(preferences);
-        updateColorPreview("backgroundColorPreview", color);
+        pendingColors.backgroundColor = color;
+        updateColorPreview("backgroundColorPreview", color, "Pending");
+        if (applyColors) applyColors.disabled = pendingColors.backgroundColor === preferences.backgroundColor && pendingColors.hoverTextColor === preferences.hoverTextColor;
         if (status) status.textContent = "";
     });
 
@@ -219,14 +229,40 @@ export async function initializePage() {
         const status = document.getElementById("hoverTextColorStatus");
         if (!hasReadableContrast(color, "#24202f")) {
             if (status) status.textContent = "That color is too close to the navigation hover background. Choose a color with more contrast.";
-            hoverTextColor.value = preferences.hoverTextColor;
+            pendingColors.hoverTextColor = color;
+            updateColorPreview("hoverTextColorPreview", color, "Pending");
+            if (applyColors) applyColors.disabled = false;
             return;
         }
-        if (!savePreference("hoverTextColor", color)) return;
-        preferences.hoverTextColor = color;
-        applyAppearancePreferences(preferences);
-        updateColorPreview("hoverTextColorPreview", color);
+        pendingColors.hoverTextColor = color;
+        updateColorPreview("hoverTextColorPreview", color, "Pending");
+        if (applyColors) applyColors.disabled = pendingColors.backgroundColor === preferences.backgroundColor && pendingColors.hoverTextColor === preferences.hoverTextColor;
         if (status) status.textContent = "";
+    });
+
+    applyColors?.addEventListener("click", () => {
+        if (!hasReadableContrast("#ffffff", pendingColors.backgroundColor)
+            || !hasReadableContrast(pendingColors.hoverTextColor, "#24202f")) {
+            if (applyColorsStatus) applyColorsStatus.textContent = "Choose colors with sufficient text contrast before applying.";
+            return;
+        }
+        const previousBackground = preferences.backgroundColor;
+        if (!savePreference("backgroundColor", pendingColors.backgroundColor)) {
+            if (applyColorsStatus) applyColorsStatus.textContent = "Colors could not be saved in this browser.";
+            return;
+        }
+        if (!savePreference("hoverTextColor", pendingColors.hoverTextColor)) {
+            savePreference("backgroundColor", previousBackground);
+            if (applyColorsStatus) applyColorsStatus.textContent = "Colors could not be saved in this browser.";
+            return;
+        }
+        preferences.backgroundColor = pendingColors.backgroundColor;
+        preferences.hoverTextColor = pendingColors.hoverTextColor;
+        applyAppearancePreferences(preferences);
+        updateColorPreview("backgroundColorPreview", preferences.backgroundColor);
+        updateColorPreview("hoverTextColorPreview", preferences.hoverTextColor);
+        if (applyColorsStatus) applyColorsStatus.textContent = "Colors applied to this browser.";
+        applyColors.disabled = true;
     });
 
     animations?.addEventListener("click", () => {
@@ -253,8 +289,12 @@ export async function initializePage() {
         if (theme) theme.value = PREFERENCE_DEFAULTS.theme;
         if (backgroundColor) backgroundColor.value = PREFERENCE_DEFAULTS.backgroundColor;
         if (hoverTextColor) hoverTextColor.value = PREFERENCE_DEFAULTS.hoverTextColor;
+        pendingColors.backgroundColor = PREFERENCE_DEFAULTS.backgroundColor;
+        pendingColors.hoverTextColor = PREFERENCE_DEFAULTS.hoverTextColor;
         updateColorPreview("backgroundColorPreview", PREFERENCE_DEFAULTS.backgroundColor);
         updateColorPreview("hoverTextColorPreview", PREFERENCE_DEFAULTS.hoverTextColor);
+        if (applyColors) applyColors.disabled = true;
+        if (applyColorsStatus) applyColorsStatus.textContent = "Preferences reset.";
         if (animations) {
             animations.textContent = "On";
             animations.setAttribute("aria-pressed", "true");

@@ -379,6 +379,25 @@ function makeDetails(service) {
         service.lastFailureAt ? `Last issue ${readableTime(service.lastFailureAt)}` : null
     ].filter(Boolean);
     if (facts.length) content.append(textElement("p", facts.join(" · ")));
+    if (service.id === "rl-presence" && service.scheduledJobs) {
+        for (const [job, label] of [["mmr", "Hourly MMR refresh"], ["shop", "Hourly Shop refresh"]]) {
+            const state = service.scheduledJobs[job];
+            if (!state?.lastInvocationAt) {
+                content.append(textElement("p", `${label}: no run has been recorded yet.`));
+                continue;
+            }
+            const summary = state.lastSummary || {};
+            const outcome = state.lastFailureAt && (!state.lastSuccessAt || state.lastFailureAt >= state.lastSuccessAt)
+                ? "failed"
+                : "completed";
+            const detail = job === "shop"
+                ? summary.changed === true ? "snapshot changed" : summary.changed === false ? "snapshot unchanged" : "result unavailable"
+                : Number.isFinite(summary.attempted)
+                    ? `${summary.attempted} components attempted${Number.isFinite(summary.mmrChanged) ? ` · ${summary.mmrChanged} MMR changed` : ""}${Number.isFinite(summary.mmrUnchanged) ? ` · ${summary.mmrUnchanged} unchanged` : ""}`
+                    : "result unavailable";
+            content.append(textElement("p", `${label}: ${readableTime(state.lastInvocationAt)} · ${outcome} · ${detail}`));
+        }
+    }
     if (service.id === "mmr-api") {
         const componentLabels = {
             worker: "Worker", configuration: "Configuration", eosAuthorization: "EOS Authorization",

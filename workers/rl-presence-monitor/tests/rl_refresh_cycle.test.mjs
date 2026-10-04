@@ -52,7 +52,7 @@ test("history and Discord do not invoke provider APIs and are checkpointed unsup
         return Response.json({ success: true });
     };
     const result = await refreshCandidate(baseEnv, { ...candidate, match_history_due: true, discord_due: true });
-    assert.deepEqual(result, { attempted: 2, succeeded: 0, failed: 2 });
+    assert.deepEqual(result, { attempted: 2, succeeded: 0, failed: 2, mmrChanged: 0, mmrUnchanged: 0 });
     assert.deepEqual(writes.map(item => item.rpc), ["record_rl_player_refresh_result", "record_rl_player_refresh_result"]);
     assert.deepEqual(writes.map(item => item.body.p_error_code), [
         "RL_MATCH_HISTORY_AUTHENTICATED_PLAYER_ONLY", "DISCORD_GATEWAY_RUNTIME_UNAVAILABLE"

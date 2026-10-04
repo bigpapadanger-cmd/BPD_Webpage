@@ -117,6 +117,10 @@ _structure_details/rocketleague-shop-audit.md
     Read-only source audit and proposed separate authenticated shop-sync design;
     no service, storage contract, API, or carousel implemented.
 
+_structure_details/rocketleague-follow-up-backlog.md
+    Ordered Search Players/public profile work and the deferred Match History
+    session audit/implementation gate.
+
 LOCAL/UNTRACKED ROOT FILES
 
 .env

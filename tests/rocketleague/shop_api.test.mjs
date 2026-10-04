@@ -3,6 +3,7 @@ import test, { afterEach } from "node:test";
 
 import { onRequestGet } from "../../functions/api/rocketleague/shop.js";
 import { getCurrentRocketLeagueShop } from "../../functions/services/supabase/rocketleague/current_shop.js";
+import { isSnapshotStale } from "../../public/Tabs/RocketLeague/Features/JS/shop.js";
 
 const originalFetch = globalThis.fetch;
 afterEach(() => { globalThis.fetch = originalFetch; });
@@ -80,5 +81,30 @@ test("Shop browser module reads the DomainData cache endpoint only", async () =>
     const { readFile } = await import("node:fs/promises");
     const source = await readFile(new URL("../../public/Tabs/RocketLeague/Features/JS/shop.js", import.meta.url), "utf8");
     assert.match(source, /fetch\("\/api\/rocketleague\/shop"/);
+    assert.match(source, /export async function initializePage\(\)/);
+    assert.doesNotMatch(source, /^loadShop\(\);/m);
     assert.doesNotMatch(source, /MMR_API_URL|SUPABASE_AUTH|\/get-shop-data|Shops\/Get/);
+});
+
+test("Shop freshness becomes stale after one missed hourly refresh or an expired section", () => {
+    const now = Date.parse("2026-10-03T18:00:00Z");
+    const base = {
+        capturedAt: "2026-10-03T17:00:00Z",
+        shops: [{ id: 7, ends_at: "2026-10-03T19:00:00Z" }],
+        catalogues: [{ shop_id: 7, items: [{ id: 9 }] }]
+    };
+    assert.equal(isSnapshotStale(base, now), false);
+    assert.equal(isSnapshotStale({ ...base, capturedAt: "2026-10-03T15:59:59Z" }, now), true);
+    assert.equal(isSnapshotStale({ ...base, shops: [{ id: 7, ends_at: "2026-10-03T17:59:59Z" }] }, now), true);
+    assert.equal(isSnapshotStale({ ...base, capturedAt: null }, now), true);
+});
+
+test("Shop page exposes section and item start/end timing with an explicit stale label", async () => {
+    const { readFile } = await import("node:fs/promises");
+    const source = await readFile(new URL("../../public/Tabs/RocketLeague/Features/JS/shop.js", import.meta.url), "utf8");
+    const html = await readFile(new URL("../../public/Tabs/RocketLeague/Features/HTML/shop.html", import.meta.url), "utf8");
+    assert.match(source, /Saved shop rotation may be out of date/);
+    assert.match(source, /timingLabel\(shop\?\.starts_at, shop\?\.ends_at\)/);
+    assert.match(source, /Available \$\{start\} – \$\{end\}/);
+    assert.match(html, /data-shop-section-timing/);
 });

@@ -1037,3 +1037,8 @@ AUTHORIZATION VISIBILITY
     border-color: var(--site-accent);
     background-color: var(--site-accent-soft);
 }
+
+.site-sidebar .nav-item:hover,
+.site-sidebar .nav-item:focus-visible {
+    color: var(--bpd-hover-text-color, #ffffff);
+}

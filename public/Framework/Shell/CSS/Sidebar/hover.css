@@ -16,7 +16,7 @@ SIDEBAR HOVER TOOLTIP
         rgba(9, 13, 21, 0.98),
         rgba(14, 22, 35, 0.96)
     );
-    color: #f2f4f8;
+    color: var(--bpd-hover-text-color, #f2f4f8);
     font-size: 12px;
     font-weight: 700;
     letter-spacing: 0.4px;
@@ -66,6 +66,7 @@ TOOLTIP TEXT
 #sidebarHoverText {
     position: relative;
     display: inline-block;
+    color: inherit;
     text-shadow:
         0 0 5px rgba(242, 244, 248, 0.35),
         0 0 10px rgba(0, 0, 0, 0.25);

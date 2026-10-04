@@ -16,13 +16,17 @@
             </select>
         </label>
         <label class="user-settings__row user-settings__color-row" for="backgroundColorSetting">
-            <span><strong>Background Color</strong><small>Changes the shared page background; Rocket League cards and branded accents stay the same. Colors that reduce text contrast are not applied.</small><output id="backgroundColorPreview" class="user-settings__color-preview" for="backgroundColorSetting"><span aria-hidden="true"></span><span>Current: #0d0f13</span></output><small id="backgroundColorStatus" role="status" aria-live="polite"></small></span>
-            <input id="backgroundColorSetting" type="color" value="#0d0f13" aria-describedby="backgroundColorPreview">
+            <span><strong>Background Color</strong><small>Changes the shared page background; Rocket League cards and branded accents stay the same. Colors that reduce text contrast are not applied.</small><output id="backgroundColorPreview" class="user-settings__color-preview" for="backgroundColorSetting"><span aria-hidden="true"></span><span>Current: #0d0f13</span></output><output id="backgroundColorPreviewPending" class="user-settings__color-preview user-settings__color-preview--pending" for="backgroundColorSetting" hidden><span aria-hidden="true"></span><span></span></output><small id="backgroundColorStatus" role="status" aria-live="polite"></small></span>
+            <input id="backgroundColorSetting" type="color" value="#0d0f13" aria-describedby="backgroundColorPreview backgroundColorPreviewPending backgroundColorStatus">
         </label>
         <label class="user-settings__row user-settings__color-row" for="hoverTextColorSetting">
-            <span><strong>Hover Text Color</strong><small>Changes generic site navigation hover text. Rocket League branding and warning/error colors are protected.</small><output id="hoverTextColorPreview" class="user-settings__color-preview" for="hoverTextColorSetting"><span aria-hidden="true"></span><span>Current: #ffffff</span></output><small id="hoverTextColorStatus" role="status" aria-live="polite"></small></span>
-            <input id="hoverTextColorSetting" type="color" value="#ffffff" aria-describedby="hoverTextColorPreview">
+            <span><strong>Hover Text Color</strong><small>Changes generic site navigation hover text. Rocket League branding and warning/error colors are protected.</small><output id="hoverTextColorPreview" class="user-settings__color-preview" for="hoverTextColorSetting"><span aria-hidden="true"></span><span>Current: #ffffff</span></output><output id="hoverTextColorPreviewPending" class="user-settings__color-preview user-settings__color-preview--pending" for="hoverTextColorSetting" hidden><span aria-hidden="true"></span><span></span></output><small id="hoverTextColorStatus" role="status" aria-live="polite"></small></span>
+            <input id="hoverTextColorSetting" type="color" value="#ffffff" aria-describedby="hoverTextColorPreview hoverTextColorPreviewPending hoverTextColorStatus">
         </label>
+        <div class="user-settings__color-actions">
+            <button id="applyColors" type="button" disabled>Apply Colors</button>
+            <p id="applyColorsStatus" role="status" aria-live="polite">Color changes are not applied until you confirm.</p>
+        </div>
         <div class="user-settings__row">
             <span><strong>Animations</strong><small>Enable or reduce interface animations.</small></span>
             <button id="animationSetting" type="button" aria-pressed="true">On</button>

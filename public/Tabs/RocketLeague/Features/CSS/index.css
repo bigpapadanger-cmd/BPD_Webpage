@@ -24,6 +24,7 @@
 .rl-shop-panel__heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
 .rl-shop-panel__heading h3 { margin: 0; color: #fff; font-size: 1.25rem; }
 .rl-shop-panel__heading span { color: #aebdd2; font-size: .9rem; }
+.rl-shop-section-timing { margin: -8px 0 16px !important; color: #9eacc0 !important; font-size: .88rem; }
 .rl-shop-carousel-controls { display: flex; justify-content: flex-end; gap: 10px; margin-bottom: 16px; }
 .rl-shop-carousel-controls button { color: #eaf4ff; font: inherit; cursor: pointer; }
 .rl-shop-carousel-controls button:disabled { opacity: .5; cursor: default; }

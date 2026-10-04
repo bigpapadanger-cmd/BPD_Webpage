@@ -101,6 +101,29 @@ test("private profile getter maps nested settings.find_profile_enabled and marks
     });
 });
 
+test("private profile getter falls back to the existing authenticated profile RPC for a missing Find Players boolean", async () => {
+    const requested = [];
+    await withFetch(async url => {
+        requested.push(new URL(String(url)).pathname);
+        if (requested.length === 1) return response({
+            account_id: "f6332c75-771a-46bc-ae09-ef5d886a4c35",
+            rl_player_id: "eb08189f-d425-48a3-a6aa-e23d0ef478d2",
+            settings: { show_online_status: true }
+        });
+        return response({ find_profile_enabled: false });
+    }, async () => {
+        const profile = await getRocketLeagueProfileByAccountId(ENV, "f6332c75-771a-46bc-ae09-ef5d886a4c35", { includeLegacyFindProfileFallback: true });
+        assert.deepEqual(requested, [
+            "/rpc/get_rocketleague_profile_v2",
+            "/rpc/get_rocketleague_profile"
+        ]);
+        assert.equal(profile.settings.findProfileEnabled, false);
+        assert.equal(profile.findProfileEnabled, false);
+        assert.equal(profile.settingsAvailability.findProfileEnabled, true);
+        assert.equal(profile.settings.showOnlineStatus, true);
+    });
+});
+
 test("private profile getter maps persisted provider name and career totals regardless of public privacy flags", async () => {
     await withFetch(async () => response({
         account_id: "f6332c75-771a-46bc-ae09-ef5d886a4c35",

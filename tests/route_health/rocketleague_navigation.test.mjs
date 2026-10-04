@@ -100,7 +100,7 @@ test("Shop reads cached public data and Match History does not invent matches", 
 test("Rocket League home keeps snapshot language and the public home describes current tools", () => {
     const home = readFileSync(resolve(publicRoot, "Tabs/RocketLeague/Index/HTML/index.html"), "utf8");
     const mainMenu = readFileSync(resolve(publicRoot, "Framework/Shell/HTML/Body/body.html"), "utf8");
-    assert.match(home, /Last 15 captures/);
+    assert.match(home, /Last 90 captures/);
     assert.match(home, /do not represent individual matches/);
     assert.match(home, /normal page visit reads saved data and does not trigger a provider refresh/i);
     assert.match(mainMenu, /linked-player ranks, saved MMR changes/i);

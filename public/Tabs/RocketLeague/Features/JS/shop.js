@@ -1,6 +1,7 @@
 "use strict";
 
-const root = document.querySelector("[data-rl-shop]");
+let root = null;
+const SHOP_STALE_AFTER_MS = 2 * 60 * 60 * 1000;
 
 function element(tag, className, text) {
     const node = document.createElement(tag);
@@ -26,6 +27,31 @@ function dateLabel(value) {
         : null;
 }
 
+export function isSnapshotStale(snapshot, now = Date.now()) {
+    const capturedAt = Date.parse(snapshot?.capturedAt || "");
+    if (!Number.isFinite(capturedAt) || capturedAt > now + 5 * 60 * 1000 || now - capturedAt > SHOP_STALE_AFTER_MS) {
+        return true;
+    }
+
+    const shops = Array.isArray(snapshot?.shops) ? snapshot.shops : [];
+    const catalogues = Array.isArray(snapshot?.catalogues) ? snapshot.catalogues : [];
+    const shopsById = new Map(shops.map(shop => [String(shop.id), shop]));
+    const displayedSections = catalogues.filter(entry => Array.isArray(entry.items) && entry.items.length);
+    return displayedSections.length > 0 && displayedSections.every(entry => {
+        const endsAt = Date.parse(shopsById.get(String(entry.shop_id))?.ends_at || "");
+        return Number.isFinite(endsAt) && endsAt <= now;
+    });
+}
+
+function timingLabel(startsAt, endsAt) {
+    const start = dateLabel(startsAt);
+    const end = dateLabel(endsAt);
+    if (start && end) return `Available ${start} – ${end}`;
+    if (start) return `Available from ${start}`;
+    if (end) return `Available until ${end}`;
+    return null;
+}
+
 function itemCard(item) {
     const card = element("article", "rl-shop-item");
     const imageUrl = safeImage(item.image_url);
@@ -46,8 +72,11 @@ function itemCard(item) {
     if (price) card.append(element("p", "rl-shop-item__price", `${price.amount.toLocaleString()} · Currency ${price.currency_id}`));
     else card.append(element("p", "rl-shop-item__price", "Price unavailable"));
 
-    const timing = dateLabel(item.ends_at);
-    if (timing) card.append(element("p", "rl-shop-item__timing", `Listed until ${timing}`));
+    const timing = timingLabel(
+        item.starts_at || item.costs.find(cost => cost.starts_at)?.starts_at,
+        item.ends_at || item.costs.find(cost => cost.ends_at)?.ends_at
+    );
+    if (timing) card.append(element("p", "rl-shop-item__timing", timing));
     return card;
 }
 
@@ -61,6 +90,7 @@ function initializeCarousel(snapshot) {
     const next = root.querySelector("[data-shop-next]");
     const position = root.querySelector("[data-shop-position]");
     const sectionTitle = root.querySelector("[data-shop-section-title]");
+    const sectionTiming = root.querySelector("[data-shop-section-timing]");
     const items = root.querySelector("[data-shop-items]");
 
     if (!snapshot.available || !sections.length) {
@@ -72,7 +102,8 @@ function initializeCarousel(snapshot) {
     }
 
     const captured = dateLabel(snapshot.capturedAt);
-    status.textContent = "Saved shop rotation";
+    const stale = isSnapshotStale(snapshot);
+    status.textContent = stale ? "Saved shop rotation may be out of date" : "Current saved shop rotation";
     root.querySelector("[data-shop-capture]").textContent = captured ? `Data captured ${captured}` : "Showing the latest saved shop data.";
     panel.hidden = false;
     let index = 0;
@@ -80,6 +111,7 @@ function initializeCarousel(snapshot) {
         const entry = sections[index];
         const shop = entry.shop;
         sectionTitle.textContent = shop?.title || shop?.name || shop?.type || "Shop rotation";
+        sectionTiming.textContent = timingLabel(shop?.starts_at, shop?.ends_at) || "Shop dates unavailable";
         position.textContent = `${index + 1} of ${sections.length}`;
         items.replaceChildren(...entry.catalogue.items.map(itemCard));
         previous.disabled = sections.length < 2;
@@ -107,4 +139,8 @@ async function loadShop() {
     }
 }
 
-loadShop();
+export async function initializePage() {
+    root = document.querySelector("[data-rl-shop]");
+    if (!root) return;
+    await loadShop();
+}

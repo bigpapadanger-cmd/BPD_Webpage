@@ -2,6 +2,7 @@ import test, { afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import worker, { handleFetch, handleScheduled } from "../src/index.js";
+import { persistCapability } from "../src/rl_refresh_cycle.js";
 import { WORKER_ROUTE_INVENTORY } from "../../../functions/services/admin/generatedApiRouteInventory.js";
 
 const TRIGGER_KEY = "test-only-trigger-key-with-32-characters-minimum";
@@ -42,6 +43,23 @@ const rpcPayload = {
     status: { to_do: 3, in_progress: 2, completed: 4, shelved: 1, archived: 0, deleted: 2 },
     responsibility: { owner: 2, database: 3, security: 4, ui: 5 }
 };
+
+test("MMR persistence reports the confirmed changed-only RPC result without adding provider calls", async () => {
+    const requests = [];
+    globalThis.fetch = async (url, init) => {
+        requests.push({ url: new URL(String(url)), body: JSON.parse(init.body) });
+        return Response.json({ saved: false, snapshot: { onesMmr: 900 } });
+    };
+    const result = await persistCapability(env(), {
+        account_id: "account-1", epic_account_id: "epic-1"
+    }, "mmr", { skills: { status: "success", data: { playlists: [
+        { id: 10, mmr: 900, tier: 14 }, { id: 11, mmr: 1000, tier: 16 }, { id: 13, mmr: 1100, tier: 17 }
+    ] } } });
+    assert.equal(result.changed, false);
+    assert.equal(requests.length, 1);
+    assert.equal(requests[0].url.pathname, "/rest/v1/rpc/save_rl_player_mmr_snapshot_v2");
+    assert.equal(requests[0].body.p_source, "mmr-api-v2");
+});
 
 test("Taskboard schedule is noon UTC in code and Wrangler config", async () => {
     const source = await readFile(new URL("../src/index.js", import.meta.url), "utf8");
@@ -196,6 +214,22 @@ test("hourly Rocket League schedule pages due candidates using the confirmed RPC
         p_refresh_key: "shop", p_success: true, p_changed: false, p_error_code: null
     });
     assert.equal(kv.get("rl:scheduled-refresh:cursor"), "player-1");
+    assert.ok(JSON.parse(kv.get("admin:service-status:rl-mmr")).lastInvocationAt);
+    assert.equal(JSON.parse(kv.get("admin:service-status:rl-shop")).lastSummary.changed, false);
+});
+
+test("protected Worker health exposes last MMR and Shop schedule attempts", async () => {
+    const kv = new Map([
+        ["admin:service-status:rl-mmr", JSON.stringify({ lastInvocationAt: "2026-10-03T15:00:00Z", lastSummary: { success: true, attempted: 3 } })],
+        ["admin:service-status:rl-shop", JSON.stringify({ lastInvocationAt: "2026-10-03T15:00:01Z", lastSummary: { success: true, changed: false } })]
+    ]);
+    const response = await handleFetch(new Request("https://status.invalid/admin/health", { headers: { Authorization: `Bearer ${TRIGGER_KEY}` } }), {
+        ...env(), SERVICE_STATUS: { async get(key) { const value = kv.get(key); return value ? JSON.parse(value) : null; } }
+    });
+    const result = await response.json();
+    assert.equal(response.status, 200);
+    assert.equal(result.scheduledJobs.mmr.lastSummary.attempted, 3);
+    assert.equal(result.scheduledJobs.shop.lastSummary.changed, false);
 });
 
 test("protected manual Shop refresh uses the same cached snapshot pipeline", async () => {

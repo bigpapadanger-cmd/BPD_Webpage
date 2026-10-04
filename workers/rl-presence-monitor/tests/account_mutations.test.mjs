@@ -9,9 +9,9 @@ function fixture({ providers = ["epic"], active = true, ageConsent = true } = {}
     const records = new Map();
     const calls = [];
     const iso = time => new Date(time).toISOString();
-    records.set("session:test-session", { UserId: "account-1", Role: "user", Active: true,
+    records.set("session:test-session", { UserId: "account-1", Role: "user", Active: active,
         CreatedAt: NOW - DAY, LastSeenAt: NOW, AbsoluteExpiresAt: NOW + DAY,
-        Providers: { epic: { AccountId: "old-cached-subject", Linked: true } } });
+        Providers: Object.fromEntries(providers.map(provider => [provider, { AccountId: "old-cached-subject", Linked: true }])) });
     records.set("account_login_status:account-1", { accountId: "account-1", lastLoginAt: iso(NOW - DAY), providerReauthAfter: null });
     for (const provider of providers) records.set(`provider_auth_id:account-1:${provider}`, {
         accountId: "account-1", provider, connectedAt: iso(NOW - DAY), expiresAt: iso(NOW + 30 * DAY)
@@ -37,7 +37,8 @@ function fixture({ providers = ["epic"], active = true, ageConsent = true } = {}
 }
 
 
-function setup(options = {}, response = { accountId: "account-1", displayName: "New Player" }) {
+function setup(options = {}, response = { accountId: "account-1", displayName: "New Player",
+    displayNameChangedAt: "2026-09-19T12:00:00.000Z", displayNameChangeAvailableAt: "2026-10-19T12:00:00.000Z" }) {
     const f = fixture(options), authFetch = globalThis.fetch, mutations = [];
     globalThis.fetch = async (url, init) => {
         if (/\/(update_account_display_name|deactivate_account|delete_account)$/.test(String(url))) {
@@ -55,10 +56,13 @@ function request(operation = "profile", body = { displayName: "New Player" }, he
         body: JSON.stringify(body) });
 }
 test("profile mutation uses canonical ownership, API schema, and excludes raw account records", async () => {
-    const f = setup({}, { accountId: "account-1", displayName: "New Player", account: { private: true } });
+    const f = setup({}, { accountId: "account-1", displayName: "New Player",
+        displayNameChangedAt: "2026-09-19T12:00:00.000Z", displayNameChangeAvailableAt: "2026-10-19T12:00:00.000Z",
+        account: { private: true } });
     const response = await handleAccountMutation(request(), f.env, "profile");
     assert.equal(response.status, 200);
-    assert.deepEqual(await response.json(), { success: true, accountId: "account-1", displayName: "New Player" });
+    assert.deepEqual(await response.json(), { success: true, displayName: "New Player",
+        displayNameChangedAt: "2026-09-19T12:00:00.000Z", displayNameChangeAvailableAt: "2026-10-19T12:00:00.000Z" });
     assert.deepEqual(f.mutations[0].body, { p_account_id: "account-1", p_display_name: "New Player" });
     assert.equal(f.mutations[0].url, "https://db.invalid/rest/v1/rpc/update_account_display_name");
     assert.equal(f.mutations[0].headers["Content-Profile"], "api");
@@ -76,13 +80,14 @@ test("invalid input, browser ownership, cross-site requests, and missing confirm
     assert.equal(f.mutations.length, 0);
 });
 test("signed-out, inactive, and stale accounts cannot mutate; any current supported provider can", async () => {
-    for (const scenario of ["signed-out", "inactive", "stale", "google", "discord"]) {
-        const f = setup({ active: scenario !== "inactive", providers: [scenario === "google" || scenario === "discord" ? scenario : "epic"] });
+    for (const scenario of ["signed-out", "inactive", "stale", "google", "discord", "steam"]) {
+        const f = setup({ active: scenario !== "inactive", providers: [scenario === "google" || scenario === "discord" || scenario === "steam" ? scenario : "epic"] });
         if (scenario === "signed-out") f.records.delete("session:test-session");
         if (scenario === "stale") f.records.delete("provider_auth_id:account-1:epic");
         const response = await handleAccountMutation(request(), f.env, "profile");
         assert.equal(response.status, scenario === "signed-out" ? 401 : ["inactive", "stale"].includes(scenario) ? 403 : 200, scenario);
-        assert.equal(f.mutations.length, ["google", "discord"].includes(scenario) ? 1 : 0);
+        assert.equal(f.mutations.length, ["google", "discord", "steam"].includes(scenario) ? 1 : 0);
+        if (scenario === "stale") assert.equal((await response.json()).code, "PROVIDER_REAUTHORIZATION_REQUIRED");
     }
 });
 test("confirmed removal clears the session only after RPC success without touching provider links", async () => {

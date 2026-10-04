@@ -20,7 +20,7 @@ afterEach(() => { Date.now = originalNow; globalThis.fetch = originalFetch; });
 
 test("registration API refuses missing consent, stale Epic, and inactive accounts before saving", async () => {
     for (const scenario of ["missing-consent", "stale", "inactive"]) {
-        const { env, records, calls } = fixture({ active: scenario !== "inactive" });
+        const { env, records, calls } = fixture({ active: scenario !== "inactive", ageConsent: scenario !== "missing-consent" });
         if (scenario === "stale") records.delete("provider_auth_id:account-1:epic");
         const response = await handleRocketLeagueProfile(new Request("https://bpd.invalid/api/auth/rocketleague/profile", {
             method: "POST", headers: { cookie: "bpd_session=test-session", "content-type": "application/json" },
@@ -37,9 +37,9 @@ function fixture({ providers = ["epic"], active = true, ageConsent = true } = {}
     const records = new Map();
     const calls = [];
     const iso = time => new Date(time).toISOString();
-    records.set("session:test-session", { UserId: "account-1", Role: "user", Active: true,
+    records.set("session:test-session", { UserId: "account-1", Role: "user", Active: active,
         CreatedAt: NOW - DAY, LastSeenAt: NOW, AbsoluteExpiresAt: NOW + DAY,
-        Providers: { epic: { AccountId: "old-cached-subject", Linked: true } } });
+        Providers: providers.includes("epic") ? { epic: { AccountId: "old-cached-subject", Linked: true } } : {} });
     records.set("account_login_status:account-1", { accountId: "account-1", lastLoginAt: iso(NOW - DAY), providerReauthAfter: null });
     for (const provider of providers) records.set(`provider_auth_id:account-1:${provider}`, {
         accountId: "account-1", provider, connectedAt: iso(NOW - DAY), expiresAt: iso(NOW + 30 * DAY)
@@ -55,7 +55,7 @@ function fixture({ providers = ["epic"], active = true, ageConsent = true } = {}
         if (url.endsWith("get_account_session_identity")) return Response.json([{ id: "account-1", role: "user", active }]);
         if (url.endsWith("verify_account_provider_identity")) return Response.json(providers.includes(body.p_provider)
             ? [{ account_id: "account-1", provider: body.p_provider, provider_subject: `${body.p_provider}-subject`, active: true }] : []);
-        if (url.endsWith("get_rocketleague_profile")) return Response.json({ account_id: "account-1", rl_player_id: "player-1",
+        if (url.endsWith("get_rocketleague_profile_v2")) return Response.json({ account_id: "account-1", rl_player_id: "player-1",
             active, registration_status: "complete", profile_complete: true, rocket_league_access: true,
             age_consent: ageConsent, policy_consent: true });
         if (url.endsWith("touch_account_last_seen")) return Response.json({ updated: true });
@@ -108,9 +108,10 @@ test("Google authorizes BPD profile but does not substitute for Epic", async () 
     await assert.rejects(authorizeRocketLeagueRequest(request, env), { code: "PROVIDER_REQUIRED" });
 });
 
-test("Steam alone cannot authorize BPD profile; recovery remains available", async () => {
+test("Steam-only account can access BPD account features but cannot access Rocket League; recovery remains available", async () => {
     const { env, request } = fixture({ providers: ["steam"] });
-    await assert.rejects(authorizeRequest(request, env, { account: true }), { code: "PROFILE_PROVIDER_REAUTHORIZATION_REQUIRED" });
+    assert.equal((await authorizeRequest(request, env, { account: true })).accountId, "account-1");
+    await assert.rejects(authorizeRocketLeagueRequest(request, env), { code: "PROVIDER_REQUIRED" });
     assert.equal((await authorizeRequest(request, env, { account: true, recovery: true })).accountId, "account-1");
 });
 
@@ -188,7 +189,10 @@ test("Epic reauthorization rejects another subject without relinking", async () 
         headers: { cookie: "bpd_session=test-session; bpd_epic_state=state; bpd_oauth_mode=reauthorize; bpd_oauth_account=account-1" }
     }), env);
     assert.equal(response.status, 302);
-    assert.equal(response.headers.get("location"), "/Account?error=PROVIDER_REAUTHORIZATION_MISMATCH");
+    const location = new URL(response.headers.get("location"), "https://bpd.invalid");
+    assert.equal(location.pathname, "/Account");
+    assert.equal(location.searchParams.get("error"), "PROVIDER_REAUTHORIZATION_MISMATCH");
+    assert.match(location.searchParams.get("debugId") || "", /^[0-9a-f-]{36}$/iu);
     assert.deepEqual([...records], before);
     assert.ok(!calls.some(url => /link_epic_identity|resolve_epic_identity/.test(url)));
 });

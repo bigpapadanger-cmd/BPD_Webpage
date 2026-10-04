@@ -48,6 +48,28 @@ import {
 const activeJobs = new Set();
 const PRESENCE_STATUS_KEY = "admin:service-status:rl-presence";
 
+async function recordScheduledJob(env, job, summary, startedAt, failed = false) {
+    if (!env?.SERVICE_STATUS || !["mmr", "shop"].includes(job)) return;
+    const key = `admin:service-status:rl-${job}`;
+    let prior = {};
+    try { prior = await env.SERVICE_STATUS.get(key, "json") || {}; } catch { /* Best effort. */ }
+    const now = new Date().toISOString();
+    const succeeded = !failed && summary?.success !== false;
+    const selected = job === "shop"
+        ? ["success", "changed", "saved", "errorCode"]
+        : ["success", "candidateCount", "attempted", "succeeded", "failed", "mmrChanged", "mmrUnchanged", "nextCursorStored"];
+    const lastSummary = Object.fromEntries(selected.filter(field => summary?.[field] !== undefined).map(field => [field, summary[field]]));
+    try {
+        await env.SERVICE_STATUS.put(key, JSON.stringify({
+            lastInvocationAt: now,
+            lastSuccessAt: succeeded ? now : prior.lastSuccessAt || null,
+            lastFailureAt: succeeded ? prior.lastFailureAt || null : now,
+            lastDurationMs: Date.now() - startedAt,
+            lastSummary
+        }), { expirationTtl: 2592000 });
+    } catch { /* Telemetry must not change job behavior. */ }
+}
+
 async function recordPresenceRun(env, summary, startedAt, failed = false) {
     if (!env?.SERVICE_STATUS) return;
     let prior = {};
@@ -148,7 +170,7 @@ function summarizeJobResult(job, result) {
     }
     if (job === "mmr") {
         return Object.fromEntries(
-            ["success", "candidateCount", "attempted", "succeeded", "failed", "cursorReset", "nextCursorStored"]
+            ["success", "candidateCount", "attempted", "succeeded", "failed", "mmrChanged", "mmrUnchanged", "cursorReset", "nextCursorStored"]
                 .filter(key => result?.[key] !== undefined)
                 .map(key => [key, result[key]])
         );
@@ -187,6 +209,7 @@ async function executeJob(job, env) {
         const result = await run();
         const summary = summarizeJobResult(job, result);
         if (job === "presence") await recordPresenceRun(env, summary, startedAt);
+        await recordScheduledJob(env, job, summary, startedAt);
         console.info("BPD BACKGROUND WORKER: Job completed.", {
             job,
             durationMs: Date.now() - startedAt,
@@ -196,6 +219,7 @@ async function executeJob(job, env) {
     }
     catch (error) {
         if (job === "presence") await recordPresenceRun(env, { success: false, failed: 1 }, startedAt, true);
+        await recordScheduledJob(env, job, { success: false, errorCode: error?.code || "BACKGROUND_JOB_FAILED" }, startedAt, true);
         console.error("BPD BACKGROUND WORKER: Job failed.", {
             job,
             durationMs: Date.now() - startedAt,
@@ -246,9 +270,14 @@ async function handleFetch(
         if (!isWakeAuthorized(request, env)) return Response.json({ success: false, code: "UNAUTHORIZED" }, { status: 401, headers: { "Cache-Control": "no-store" } });
         let state = null;
         try { state = await env?.SERVICE_STATUS?.get(PRESENCE_STATUS_KEY, "json") || null; } catch { /* Safe unknown fallback. */ }
+        const scheduledJobs = {};
+        for (const job of ["mmr", "shop"]) {
+            try { scheduledJobs[job] = await env?.SERVICE_STATUS?.get(`admin:service-status:rl-${job}`, "json") || null; }
+            catch { scheduledJobs[job] = null; }
+        }
         const lastSuccessAt = state?.lastSuccessAt || null;
         const lastFailureAt = state?.lastFailureAt || null;
-        return Response.json({ success: true, service: "bpd-rl-presence-monitor", status: !state ? "unknown" : lastFailureAt && (!lastSuccessAt || lastFailureAt >= lastSuccessAt) ? "degraded" : "healthy", checkedAt: new Date().toISOString(), lastInvocationAt: state?.lastInvocationAt || null, lastSuccessAt, lastFailureAt, lastDurationMs: Number.isFinite(state?.lastDurationMs) ? state.lastDurationMs : null, lastSummary: state?.lastSummary || null, configuration: { supabaseUrlPresent: Boolean(String(env?.SUPABASE_URL || "").trim()), supabaseCredentialPresent: Boolean(String(env?.SUPABASE_SERVICE_ROLE_KEY || env?.SUPABASE_AUTH || "").trim()), mmrApiUrlPresent: Boolean(String(env?.MMR_API_URL || "").trim()) } }, { headers: { "Cache-Control": "no-store" } });
+        return Response.json({ success: true, service: "bpd-rl-presence-monitor", status: !state ? "unknown" : lastFailureAt && (!lastSuccessAt || lastFailureAt >= lastSuccessAt) ? "degraded" : "healthy", checkedAt: new Date().toISOString(), lastInvocationAt: state?.lastInvocationAt || null, lastSuccessAt, lastFailureAt, lastDurationMs: Number.isFinite(state?.lastDurationMs) ? state.lastDurationMs : null, lastSummary: state?.lastSummary || null, scheduledJobs, configuration: { supabaseUrlPresent: Boolean(String(env?.SUPABASE_URL || "").trim()), supabaseCredentialPresent: Boolean(String(env?.SUPABASE_SERVICE_ROLE_KEY || env?.SUPABASE_AUTH || "").trim()), mmrApiUrlPresent: Boolean(String(env?.MMR_API_URL || "").trim()) } }, { headers: { "Cache-Control": "no-store" } });
     }
 
     if (

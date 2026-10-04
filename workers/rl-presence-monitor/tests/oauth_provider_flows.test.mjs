@@ -76,7 +76,10 @@ for (const provider of ["google", "discord"]) {
         const { env, records, calls, request } = setup(provider, { mode: "reauthorize", mismatch: true });
         const before = structuredClone([...records]);
         const response = await handleOAuthCallback(request, env);
-        assert.equal(response.headers.get("location"), "/Account?error=PROVIDER_REAUTHORIZATION_MISMATCH");
+        const location = new URL(response.headers.get("location"), request.url);
+        assert.equal(location.pathname, "/Account");
+        assert.equal(location.searchParams.get("error"), "PROVIDER_REAUTHORIZATION_MISMATCH");
+        assert.match(location.searchParams.get("debugId") || "", /^[0-9a-f-]{36}$/iu);
         assert.deepEqual([...records], before);
         assert.ok(!calls.some(call => /\/link_|\/resolve_/.test(call.url)));
     });

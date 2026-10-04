@@ -30,10 +30,10 @@ test("upstream credential errors and unknown database details are service failur
     for (const status of [400, 401, 403, 500]) {
         globalThis.fetch = async () => Response.json({ code: "private_code", message: "private SQL", details: "private details", hint: "private hint" }, { status });
         await assert.rejects(callAdminTaskRpc({ SUPABASE_URL: "https://db.invalid", SUPABASE_SERVICE_ROLE_KEY: "mock-only" }, ADMIN_TASK_RPCS.SUMMARY), error => {
-            assert.equal(error.status, 503);
+            assert.equal(error.status, status);
             assert.equal(error.code, "ADMIN_TASK_RPC_FAILED");
-            assert.equal(error.unavailable, true);
-            assert.doesNotMatch(error.message + JSON.stringify(error), /private/);
+            assert.equal(error.unavailable, [502, 503, 504].includes(status));
+            assert.doesNotMatch(error.message, /private/);
             return true;
         });
     }

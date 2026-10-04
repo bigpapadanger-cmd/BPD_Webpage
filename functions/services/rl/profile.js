@@ -1722,7 +1722,8 @@ async function handleProfileGet(
         databaseProfile =
             await getRocketLeagueProfileByAccountId(
                 env,
-                accountId
+                accountId,
+                { includeLegacyFindProfileFallback: requestUrl.searchParams.get("includeLegacyFindProfile") === "true" }
             );
 
         if (

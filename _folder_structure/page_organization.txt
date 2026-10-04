@@ -118,7 +118,7 @@ Main/global routes
     /Error                    Global/404.
 
 Rocket League routes
-    /RocketLeague             Tabs/RocketLeague/Index; signed-in view uses persisted ranks, career totals, snapshot MMR changes, and up to 15 captures; public content explains current tools.
+    /RocketLeague             Tabs/RocketLeague/Index; signed-in view uses persisted ranks, career totals, snapshot MMR changes, and up to 90 captures; public content explains current tools.
     /RocketLeague/Profile     Tabs/RocketLeague/Registration; onboarding/setup route, redirects established accounts to MyProfile.
     /RocketLeague/MyProfile   Private settings editor; individual unconfirmed controls are named/locked and the full-settings save remains disabled until all fields are confirmed.
     /RocketLeague/FindPlayers Public opt-in search through Pages API; styled responsive cards, three compact ranks, neutral unknown presence.

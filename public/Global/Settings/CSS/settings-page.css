@@ -54,6 +54,10 @@
     font-size: 0.875rem;
 }
 
+.user-settings__row .user-settings__color-preview[hidden] {
+    display: none;
+}
+
 .user-settings__color-preview > span:first-child {
     width: 1.25rem;
     height: 1.25rem;
@@ -83,6 +87,33 @@
     color: inherit;
     font: inherit;
 }
+
+#themeSetting {
+    color: #f2f4f8;
+    background-color: #111827;
+}
+
+#themeSetting option {
+    color: #111827;
+    background-color: #ffffff;
+}
+
+#themeSetting option:checked,
+#themeSetting option:hover,
+#themeSetting option:focus {
+    color: #ffffff;
+    background-color: #1d4ed8;
+}
+
+.user-settings__color-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: .75rem;
+    padding-top: .25rem;
+}
+
+.user-settings__color-actions p { margin: 0; }
 
 .user-settings__name-field {
     display: grid;

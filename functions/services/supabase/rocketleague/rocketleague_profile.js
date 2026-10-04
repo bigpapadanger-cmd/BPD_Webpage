@@ -114,6 +114,32 @@ function normalizeTimestamp(value) {
     return Number.isFinite(Date.parse(timestamp)) ? timestamp : null;
 }
 
+async function getLegacyFindProfileValue(baseUrl, apiKey, accountId) {
+    try {
+        const response = await fetch(`${baseUrl}rpc/get_rocketleague_profile`, {
+            method: "POST",
+            headers: {
+                apikey: apiKey,
+                Authorization: `Bearer ${apiKey}`,
+                "Content-Type": "application/json",
+                "Content-Profile": "api",
+                "Accept-Profile": "api",
+                Accept: "application/json"
+            },
+            body: JSON.stringify({ p_account_id: accountId })
+        });
+        if (!response.ok) return null;
+        const body = await response.json();
+        const value = body?.settings?.find_profile_enabled
+            ?? body?.settings?.findProfileEnabled
+            ?? body?.find_profile_enabled
+            ?? body?.findProfileEnabled;
+        return typeof value === "boolean" ? value : null;
+    } catch {
+        return null;
+    }
+}
+
 /* =========================================================
 OBJECT DATA CHECK
 ========================================================= */
@@ -134,7 +160,8 @@ MAIN PROFILE LOOKUP
 
 export async function getRocketLeagueProfileByAccountId(
     env,
-    accountId
+    accountId,
+    { includeLegacyFindProfileFallback = false } = {}
 ) {
     const normalizedAccountId =
         normalizeString(
@@ -429,11 +456,17 @@ export async function getRocketLeagueProfileByAccountId(
         capturedAt: normalizeTimestamp(providerData.captured_at),
         updatedAt: normalizeTimestamp(providerData.updated_at)
     };
-    const settings = normalizeProfileSettings(responseData);
+    let settings = normalizeProfileSettings(responseData);
+    if (includeLegacyFindProfileFallback && typeof settings.findProfileEnabled !== "boolean") {
+        const findProfileEnabled = await getLegacyFindProfileValue(baseUrl, apiKey, normalizedAccountId);
+        if (typeof findProfileEnabled === "boolean") {
+            settings = normalizeProfileSettings({ ...responseData, find_profile_enabled: findProfileEnabled });
+        }
+    }
     if (Object.hasOwn(responseData, "notifications_v2")) {
         settings.notificationsV2 = normalizeNotificationsV2(responseData.notifications_v2);
     }
-    const settingsAvailability = getProfileSettingsAvailability(responseData);
+    const settingsAvailability = getProfileSettingsAvailability({ ...responseData, find_profile_enabled: typeof settings.findProfileEnabled === "boolean" ? settings.findProfileEnabled : responseData.find_profile_enabled });
 
     /* =====================================================
     NORMALIZED PROFILE

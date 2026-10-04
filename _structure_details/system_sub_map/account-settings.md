@@ -42,6 +42,20 @@
 - This client timer is display-only. It never authorizes a change; Supabase
   enforces the cooldown even if a client clock is manipulated.
 
+## Browser appearance preferences
+
+- Theme, animation, sidebar, background color, and hover text color are stored
+  in this browser only; the existing `bpdTheme`, `bpdAnimations`, and
+  `bpdSidebar` keys remain unchanged.
+- The shared shell reapplies preferences on direct loads and SPA navigation.
+  Background and hover colors are staged as pending values and are persisted and
+  activated together only after the user selects **Apply Colors**.
+- The custom background affects shared neutral page surfaces. The custom hover
+  color affects generic navigation/menu text only; Rocket League branding and
+  semantic warning/error/success colors remain protected.
+- Theme options use explicit contrasting foreground/background colors. Reset
+  restores the browser-local preference defaults.
+
 ## Main files
 
 - `functions/services/auth/account/get_session.js`
