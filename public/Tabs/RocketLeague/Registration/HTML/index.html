@@ -568,12 +568,12 @@ Security:
                     ></span>
 
                     <span>
-                        Allow my profile to appear in Find Players
+                        Allow my Rocket League profile to appear in Find Players
                     </span>
                 </label>
 
                 <small>
-                    Off by default. This does not control leaderboard visibility.
+                    Optional and off by default. This controls public player discovery only; it does not affect access to Rocket League features.
                 </small>
                 <small id="findProfileAvailabilityNotice" hidden></small>
             </div>
@@ -660,156 +660,17 @@ Security:
             </legend>
 
             <p class="section-description">
-                Choose whether you want match notifications and
-                how those notifications should be delivered.
+                Enable any combination of delivery channels. Each channel can keep up to three reminder times, from 15 minutes to 7 days 23 hours before a match. Leaving every channel off is optional and does not prevent registration.
             </p>
 
-            <!-- =============================================
-            NOTIFICATION ENABLED
-            ============================================== -->
+            <fieldset id="registrationNotificationsV2Fieldset" class="registration-notification-channels">
+                <legend class="sr-only">Independent notification channels</legend>
+                <div id="registrationNotificationChannels"></div>
+            </fieldset>
+            <p id="registrationNotificationsAvailabilityNotice" class="inline-warning" role="status" hidden>Your saved notification settings could not be confirmed. They are locked to prevent accidental changes.</p>
+            <p id="registrationReminderDuplicateWarning" class="inline-warning" role="status" hidden>Some reminder times are duplicates. Duplicate reminders are allowed.</p>
 
-            <div class="notification-setting">
-                <span class="field-label">
-                    Match notifications
-
-                    <span
-                        class="required-mark"
-                        aria-hidden="true"
-                    >
-                        *
-                    </span>
-                </span>
-
-                <div
-                    class="choice-row notification-choice-row"
-                    role="radiogroup"
-                    aria-label="Match notifications"
-                >
-                    <label class="choice-card">
-                        <input
-                            name="notificationsEnabled"
-                            type="radio"
-                            value="true"
-                            checked
-                            required
-                        >
-
-                        <span>
-                            Opt in
-                        </span>
-                    </label>
-
-                    <label class="choice-card warning-choice">
-                        <input
-                            name="notificationsEnabled"
-                            type="radio"
-                            value="false"
-                        >
-
-                        <span>
-                            Opt out
-                        </span>
-                    </label>
-                </div>
-            </div>
-
-            <div
-                id="notificationOptOutWarning"
-                class="inline-warning"
-                role="status"
-                hidden
-            >
-                <strong>Notifications are off</strong>
-                <span>You may miss scheduled reminders and other alerts while notifications are disabled. This does not prevent profile completion.</span>
-            </div>
-
-            <!-- =============================================
-            DELIVERY METHOD
-            ============================================== -->
-
-            <div
-                id="notificationDeliveryOptions"
-                class="notification-delivery-options"
-            >
-                <span class="field-label">
-                    Notification method
-
-                    <span
-                        class="required-mark"
-                        aria-hidden="true"
-                    >
-                        *
-                    </span>
-                </span>
-
-                <p class="section-description">
-                    Choose how you want to receive Rocket League
-                    match notifications.
-                </p>
-
-                <div
-                    class="choice-row notification-method-row"
-                    role="radiogroup"
-                    aria-label="Notification method"
-                >
-                    <label
-                        class="choice-card"
-                        data-notification-method="email"
-                    >
-                        <input
-                            id="notificationMethodEmail"
-                            name="notificationMethod"
-                            type="radio"
-                            value="email"
-                            required
-                        >
-
-                        <span>
-                            Email
-                        </span>
-                    </label>
-
-                    <label
-                        class="choice-card"
-                        data-notification-method="phone"
-                    >
-                        <input
-                            id="notificationMethodPhone"
-                            name="notificationMethod"
-                            type="radio"
-                            value="phone"
-                        >
-
-                        <span>
-                            Phone
-                        </span>
-                    </label>
-
-                    <label
-                        id="discordNotificationChoice"
-                        class="choice-card"
-                        data-notification-method="discord"
-                        data-discord-eligible="false"
-                    >
-                        <input
-                            id="discordNotificationMethod"
-                            name="notificationMethod"
-                            type="radio"
-                            value="discord"
-                            aria-describedby="discordNotificationStatus"
-                            disabled
-                        >
-
-                        <span>
-                            Discord
-                        </span>
-                    </label>
-                </div>
-            </div>
-
-            <!-- =============================================
-            DISCORD STATUS
-            ============================================== -->
+            <!-- Discord eligibility is displayed independently from delivery choices. -->
 
             <div
                 id="discordNotificationStatus"
@@ -891,87 +752,11 @@ Security:
 
                 <span>
                     Your linked Discord account shares a server
-                    with BPD MatchBot. Discord may be selected as
-                    your notification method.
+                    with BPD MatchBot. Discord reminders can be
+                    enabled alongside email or text reminders.
                 </span>
             </div>
 
-            <!-- =============================================
-            REMINDER TIMING
-            ============================================== -->
-
-            <div
-                id="reminderOptions"
-                class="reminder-options"
-            >
-                <span class="field-label">
-                    Reminder preference
-
-                    <span
-                        class="required-mark"
-                        aria-hidden="true"
-                    >
-                        *
-                    </span>
-                </span>
-
-                <div
-                    class="choice-row reminder-mode-row"
-                    role="radiogroup"
-                    aria-label="Reminder timing"
-                >
-                    <label class="choice-card">
-                        <input
-                            name="reminderMode"
-                            type="radio"
-                            value="24-hours"
-                            checked
-                            required
-                        >
-
-                        <span>
-                            24 hours before
-                        </span>
-                    </label>
-
-                    <label class="choice-card">
-                        <input
-                            name="reminderMode"
-                            type="radio"
-                            value="1-hour"
-                        >
-
-                        <span>
-                            1 hour before
-                        </span>
-                    </label>
-
-                    <label class="choice-card">
-                        <input
-                            name="reminderMode"
-                            type="radio"
-                            value="both"
-                        >
-
-                        <span>
-                            Both
-                        </span>
-                    </label>
-                </div>
-
-                <div class="reminder-note">
-                    <strong>
-                        Scheduling note
-                    </strong>
-
-                    <span>
-                        Automatic reminders normally run the day
-                        before a scheduled match. For Monday matches,
-                        the reminder may run earlier to account for
-                        weekend scheduling.
-                    </span>
-                </div>
-            </div>
         </fieldset>
 
         <!-- =================================================

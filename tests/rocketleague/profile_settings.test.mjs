@@ -3,7 +3,13 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import { getProfileSettingsAvailability, mapProfileSettingsToRpcArgs, mapProfileSettingsToV2RpcArgs, normalizeNotificationsV2, normalizeProfileSettings, PROFILE_SETTING_FIELDS } from "../../functions/services/rl/profile_settings.js";
-import { buildSettingsPayload, getConfirmedSettings, getSettingsConfirmationState, isSettingConfirmed } from "../../public/Tabs/RocketLeague/MyProfile/JS/settings_view.js";
+import { buildSettingsPayload, getConfirmedSettings, getDuplicateReminderChannels, getSettingsConfirmationState, isSettingConfirmed, reminderMinutesFromParts, validateNotificationsV2 } from "../../public/Tabs/RocketLeague/MyProfile/JS/settings_view.js";
+
+const EMPTY_NOTIFICATIONS_V2 = Object.freeze({
+    email: { enabled: false, reminders: [] },
+    sms: { enabled: false, reminders: [] },
+    discord: { enabled: false, reminders: [] }
+});
 
 test("central settings mapping preserves false, empty, null, and availability values", () => {
     const settings = normalizeProfileSettings({
@@ -94,7 +100,8 @@ test("My Profile edits only confirmed values and preserves explicit nulls", () =
     const fields = Object.keys(PROFILE_SETTING_FIELDS);
     const settings = Object.fromEntries(fields.map(key => [key,
         PROFILE_SETTING_FIELDS[key].type === "boolean" ? false
-            : PROFILE_SETTING_FIELDS[key].type === "array" ? [] : ""
+            : PROFILE_SETTING_FIELDS[key].type === "array" ? []
+                : PROFILE_SETTING_FIELDS[key].type === "object" ? structuredClone(EMPTY_NOTIFICATIONS_V2) : ""
     ]));
     settings.phone = null;
     const profile = {
@@ -108,13 +115,13 @@ test("My Profile edits only confirmed values and preserves explicit nulls", () =
         ...settings,
         phone: "",
         email: "",
-        notificationsEnabled: false,
         availability: []
     });
     assert.equal(payload.phone, null);
     assert.equal(payload.email, "");
     assert.equal(payload.showOnlineStatus, false);
-    assert.equal(payload.notificationsEnabled, false);
+    assert.deepEqual(payload.notificationsV2, EMPTY_NOTIFICATIONS_V2);
+    assert.equal(Object.hasOwn(payload, "notificationsEnabled"), false);
     assert.equal(Object.hasOwn(payload, "stats"), false);
     assert.equal(Object.hasOwn(payload, "provider"), false);
 });
@@ -129,9 +136,7 @@ test("My Profile updates Find Players independently while preserving the saved b
         availability: [],
         email: null,
         phone: null,
-        notificationsEnabled: false,
-        notificationMethod: null,
-        reminderMode: null
+        notificationsV2: structuredClone(EMPTY_NOTIFICATIONS_V2)
     };
     const profile = {
         ageConsent: true,
@@ -149,9 +154,7 @@ test("My Profile updates Find Players independently while preserving the saved b
         availability: [],
         email: "",
         phone: "",
-        notificationsEnabled: false,
-        notificationMethod: "",
-        reminderMode: ""
+        notificationsV2: structuredClone(EMPTY_NOTIFICATIONS_V2)
     });
     assert.equal(payload.findProfileEnabled, false);
     assert.equal(payload.showOnlineStatus, true);
@@ -165,20 +168,34 @@ test("My Profile updates Find Players independently while preserving the saved b
         availability: [],
         email: "",
         phone: "",
-        notificationsEnabled: false,
-        notificationMethod: "",
-        reminderMode: ""
+        notificationsV2: structuredClone(EMPTY_NOTIFICATIONS_V2)
     });
     assert.equal(enabledPayload.findProfileEnabled, true);
     assert.equal(enabledPayload.showOnlineStatus, false);
+});
+
+test("My Profile Find Players control stays native, fail-closed, keyboard-visible, and animation-aware", async () => {
+    const html = await readFile(new URL("../../public/Tabs/RocketLeague/MyProfile/HTML/index.html", import.meta.url), "utf8");
+    const page = await readFile(new URL("../../public/Tabs/RocketLeague/MyProfile/JS/index.js", import.meta.url), "utf8");
+    const css = await readFile(new URL("../../public/Tabs/RocketLeague/MyProfile/CSS/index.css", import.meta.url), "utf8");
+
+    assert.match(html, /<input id="findProfileEnabled" type="checkbox">/);
+    assert.match(html, /Allow my Rocket League profile to appear in Find Players/);
+    assert.match(page, /findProfileEnabled: \["findProfileEnabled"\]/);
+    assert.match(page, /control\.indeterminate = !confirmed \|\| profile\.settings\[key\] === null/);
+    assert.match(page, /findProfileEnabled: document\.getElementById\("findProfileEnabled"\)\.checked/);
+    assert.match(css, /\.my-profile-discovery-toggle:has\(input:checked\)/);
+    assert.match(css, /\.my-profile-discovery-toggle:has\(input:focus-visible\)/);
+    assert.match(css, /body\[data-animations="off"\] \.my-profile-discovery-toggle \{ transition: none; \}/);
+    assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.my-profile-discovery-toggle \{ transition: none; \}/);
 });
 
 test("My Profile fails closed when a setting or consent source is not confirmed", () => {
     const complete = {
         ageConsent: true,
         policyConsent: true,
-        settings: { primaryPlatform: null, autoDetectRegion: false, showOnlineStatus: false, findProfileEnabled: false, notificationsEnabled: false,
-            preferredMode: null, otherMode: null, availability: [], email: null, phone: null, notificationMethod: null, reminderMode: null },
+        settings: { primaryPlatform: null, autoDetectRegion: false, showOnlineStatus: false, findProfileEnabled: false,
+            preferredMode: null, otherMode: null, availability: [], email: null, phone: null, notificationsV2: structuredClone(EMPTY_NOTIFICATIONS_V2) },
         settingsAvailability: Object.fromEntries([...Object.keys(PROFILE_SETTING_FIELDS), "ageConsent", "policyConsent"].map(key => [key, true]))
     };
     assert.ok(getConfirmedSettings(complete));
@@ -188,8 +205,8 @@ test("My Profile fails closed when a setting or consent source is not confirmed"
 
 test("a missing optional setting identifies only its own control while preserving the full-save safety gate", () => {
     const fields = Object.keys(PROFILE_SETTING_FIELDS);
-    const settings = { primaryPlatform: null, autoDetectRegion: false, showOnlineStatus: false, findProfileEnabled: false, notificationsEnabled: false,
-        preferredMode: null, otherMode: null, availability: [], email: null, phone: null, notificationMethod: null, reminderMode: null };
+    const settings = { primaryPlatform: null, autoDetectRegion: false, showOnlineStatus: false, findProfileEnabled: false,
+        preferredMode: null, otherMode: null, availability: [], email: null, phone: null, notificationsV2: structuredClone(EMPTY_NOTIFICATIONS_V2) };
     const profile = {
         ageConsent: true,
         policyConsent: true,
@@ -207,8 +224,8 @@ test("a missing optional setting identifies only its own control while preservin
 });
 
 test("an unconfirmed read-only location field does not lock editable settings", () => {
-    const settings = { primaryPlatform: null, autoDetectRegion: false, showOnlineStatus: false, findProfileEnabled: false, notificationsEnabled: false,
-        preferredMode: null, otherMode: null, availability: [], email: null, phone: null, notificationMethod: null, reminderMode: null };
+    const settings = { primaryPlatform: null, autoDetectRegion: false, showOnlineStatus: false, findProfileEnabled: false,
+        preferredMode: null, otherMode: null, availability: [], email: null, phone: null, notificationsV2: structuredClone(EMPTY_NOTIFICATIONS_V2) };
     const availability = Object.fromEntries([...Object.keys(PROFILE_SETTING_FIELDS), "ageConsent", "policyConsent"].map(key => [key, true]));
     availability.region = false;
     const profile = { ageConsent: true, policyConsent: true, settings, settingsAvailability: availability };
@@ -228,9 +245,7 @@ test("RPC projection is explicit and excludes read-only provider, stats, and unk
         email: "",
         phone: null,
         availability: [],
-        notificationsEnabled: false,
-        notificationMethod: null,
-        reminderMode: null,
+        notificationsV2: structuredClone(EMPTY_NOTIFICATIONS_V2),
         provider: { displayUsername: "read-only" },
         stats: { wins: 999 },
         injected: "never-save"
@@ -271,6 +286,26 @@ test("V2 settings preserve explicit channel choices, disabled reminder values, a
     assert.deepEqual(mapped.p_notifications, notificationsV2);
 });
 
+test("My Profile notification V2 validates reminder boundaries, simultaneous channels, contacts, and duplicate warnings", () => {
+    assert.deepEqual(reminderMinutesFromParts("", "", ""), { empty: true, minutes: null });
+    assert.deepEqual(reminderMinutesFromParts("0", "0", "15"), { empty: false, minutes: 15 });
+    assert.deepEqual(reminderMinutesFromParts("7", "23", "0"), { empty: false, minutes: 11460 });
+    assert.match(reminderMinutesFromParts("0", "0", "14").error, /between 15 minutes/);
+    assert.match(reminderMinutesFromParts("7", "23", "1").error, /between 15 minutes/);
+    assert.match(reminderMinutesFromParts("1", "", "15").error, /Complete the days/);
+
+    const allEnabled = {
+        email: { enabled: true, reminders: [15, 60, 60] },
+        sms: { enabled: true, reminders: [60] },
+        discord: { enabled: true, reminders: [] }
+    };
+    assert.equal(validateNotificationsV2(allEnabled, "player@example.com", "+15555550123"), null);
+    assert.match(validateNotificationsV2(allEnabled, "", "+15555550123"), /Add an email address/);
+    assert.match(validateNotificationsV2({ ...allEnabled, email: { enabled: false, reminders: [] }, sms: { enabled: true, reminders: [] } }, "", ""), /Add a phone number/);
+    assert.deepEqual(getDuplicateReminderChannels(allEnabled), ["email"]);
+    assert.equal(validateNotificationsV2({ ...allEnabled, email: { enabled: true, reminders: [15, 30, 45, 60] } }, "player@example.com", "+15555550123"), "Check the notification channel settings and reminder times.");
+});
+
 test("setup redirects completed players to the standalone My Profile route", async () => {
     const source = await readFile(new URL("../../public/Tabs/RocketLeague/Registration/JS/index.js", import.meta.url), "utf8");
     const myProfile = await readFile(new URL("../../public/Tabs/RocketLeague/MyProfile/JS/index.js", import.meta.url), "utf8");
@@ -294,12 +329,54 @@ test("setup redirects completed players to the standalone My Profile route", asy
     assert.doesNotMatch(payloadBuilder, /provider|careerStats|stats|ranked/i);
 });
 
+test("registration Find Players privacy is explicit opt-in and does not control Rocket League access", async () => {
+    const html = await readFile(new URL("../../public/Tabs/RocketLeague/Registration/HTML/index.html", import.meta.url), "utf8");
+    const page = await readFile(new URL("../../public/Tabs/RocketLeague/Registration/JS/index.js", import.meta.url), "utf8");
+    const css = await readFile(new URL("../../public/Tabs/RocketLeague/Registration/CSS/index.css", import.meta.url), "utf8");
+    const shellCss = await readFile(new URL("../../public/Framework/Shell/CSS/General/shell.css", import.meta.url), "utf8");
+    const input = html.match(/<input\s+id="findProfileEnabled"[\s\S]*?>/i)?.[0];
+
+    assert.ok(input, "registration should include the existing Find Players checkbox");
+    assert.match(input, /type="checkbox"/);
+    assert.doesNotMatch(input, /\bchecked\b/i, "new registrations must default to opt-out");
+    assert.match(html, /Allow my Rocket League profile to appear in Find Players/);
+    assert.match(html, /Optional and off by default[\s\S]*?does not affect access to Rocket League features/);
+    assert.match(page, /findProfileEnabled:\s*data\.get\([\s\S]{0,120}"findProfileEnabled"[\s\S]{0,60}===\s*"on"/);
+    assert.match(page, /const findProfileConfirmed = profile\.settingsAvailability\?\.findProfileEnabled === true/);
+    assert.match(page, /findProfile\.checked = findProfileConfirmed \? settings\.findProfileEnabled : false/);
+    assert.match(css, /\.toggle-control[\s\S]{0,260}transition:/);
+    assert.match(css, /prefers-reduced-motion:\s*reduce[\s\S]{0,100}transition:\s*none/);
+    assert.match(shellCss, /body\.animations-off[\s\S]{0,220}transition-duration:\s*0\.01ms/);
+});
+
+test("registration uses the shared V2 notification channels without the legacy single-channel contract", async () => {
+    const html = await readFile(new URL("../../public/Tabs/RocketLeague/Registration/HTML/index.html", import.meta.url), "utf8");
+    const page = await readFile(new URL("../../public/Tabs/RocketLeague/Registration/JS/index.js", import.meta.url), "utf8");
+    const helper = await readFile(new URL("../../public/Tabs/RocketLeague/shared/notificationsV2.js", import.meta.url), "utf8");
+
+    assert.match(page, /from "\.\.\/\.\.\/shared\/notificationsV2\.js"/);
+    assert.match(html, /registrationNotificationsV2Fieldset/);
+    assert.match(html, /registrationNotificationChannels/);
+    assert.match(page, /for \(const channel of NOTIFICATION_CHANNELS\)/);
+    assert.match(page, /settings\.notificationsV2/);
+    assert.match(page, /profile\.settingsAvailability\?\.notificationsV2 === true/);
+    assert.match(page, /notificationsV2: notificationResult\.settings/);
+    assert.match(page, /discordNotificationState\.eligible/);
+    assert.match(helper, /maxPerChannel: 3/);
+    assert.match(helper, /minMinutes: 15/);
+    assert.match(helper, /maxMinutes: 11460/);
+    assert.match(helper, /getDuplicateReminderChannels/);
+    assert.doesNotMatch(html, /name="notificationsEnabled"|name="notificationMethod"|name="reminderMode"/);
+    assert.doesNotMatch(page, /getNotificationsEnabled|getNotificationMethod|discordNotificationMethod/);
+    assert.match(page, /registrationNotificationsConfirmed && !notificationResult\.error[\s\S]{0,120}\? \{ notificationsV2: notificationResult\.settings \}/);
+});
+
 test("My Profile uses the post-registration PATCH contract and does not resubmit setup consent", async () => {
     const view = await readFile(new URL("../../public/Tabs/RocketLeague/MyProfile/JS/settings_view.js", import.meta.url), "utf8");
     const page = await readFile(new URL("../../public/Tabs/RocketLeague/MyProfile/JS/index.js", import.meta.url), "utf8");
     const service = await readFile(new URL("../../functions/services/rl/profile.js", import.meta.url), "utf8");
     const route = await readFile(new URL("../../functions/api/auth/rocketleague/profile.js", import.meta.url), "utf8");
-    assert.match(page, /requestProfile\("PATCH", settingsPayload\(\)\)/);
+    assert.match(page, /requestProfile\("PATCH", payload\)/);
     assert.doesNotMatch(view.slice(view.indexOf("export function buildSettingsPayload")), /ageConsent:|policyConsent:/);
     assert.match(service, /request\.method === "PATCH"/);
     assert.match(service, /settings\.ageConsent = current\.ageConsent === true/);

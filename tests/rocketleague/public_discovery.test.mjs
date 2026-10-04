@@ -458,11 +458,12 @@ test("private My Profile settings preserve persisted values and fail closed for 
     assert.match(source, /getSettingsConfirmationState\(profile\)/);
     assert.match(source, /isSettingConfirmed\(profile, key\)/);
     assert.match(source, /const availability = DAYS\.flatMap/);
-    assert.match(settingsView, /notificationMethod: notificationsEnabled \?/);
+    assert.match(settingsView, /notificationsV2: values\.notificationsV2/);
+    assert.match(source, /renderNotificationsV2\(settings, profile\)/);
     assert.match(source, /autoDetectRegion: document\.getElementById\("autoDetectRegion"\)\.checked/);
     assert.match(source, /form\.hidden = false/);
     assert.match(source, /Could not confirm:/);
-    for (const id of ["preferredMode", "myProfileAvailability", "profileEmail", "profilePhone", "notificationMethod", "reminderMode"]) {
+    for (const id of ["preferredMode", "myProfileAvailability", "profileEmail", "profilePhone", "notificationsV2Fieldset", "notificationsV2Channels"]) {
         assert.match(html, new RegExp(`id="${id}"`));
     }
     assert.match(source, /method,\s*credentials: "same-origin"/);

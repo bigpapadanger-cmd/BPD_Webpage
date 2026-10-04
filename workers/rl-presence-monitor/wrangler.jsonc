@@ -26,6 +26,13 @@
         }
     ],
 
+    "services": [
+        {
+            "binding": "PROVIDER_RUNTIME",
+            "service": "bpd-provider-runtime"
+        }
+    ],
+
     "triggers": {
         "crons": [
             "*/15 * * * *",

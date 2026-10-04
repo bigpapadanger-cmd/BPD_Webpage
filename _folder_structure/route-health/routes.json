@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-04T05:29:14.869Z",
+  "generatedAt": "2026-10-04T18:28:49.749Z",
   "policy": {
     "humanPagePaths": "case-insensitive lookup; canonical TitleCase path",
     "apiAndAssetPaths": "exact-case; never normalized by the human-page router",
@@ -2000,7 +2000,8 @@
       ],
       "handler": "functions/api/auth/rocketleague/discord-notifications.js",
       "methods": [
-        "GET"
+        "GET",
+        "POST"
       ],
       "authRequired": "handler-defined",
       "healthStatus": "valid",
@@ -2016,6 +2017,7 @@
       ],
       "handler": "functions/api/auth/rocketleague/profile.js",
       "methods": [
+        "DELETE",
         "GET",
         "PATCH",
         "POST"

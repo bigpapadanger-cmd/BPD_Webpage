@@ -10,6 +10,8 @@ File:
 Public Route:
     GET  /api/auth/rocketleague/profile
     POST /api/auth/rocketleague/profile
+    PATCH /api/auth/rocketleague/profile
+    DELETE /api/auth/rocketleague/profile
 
 Service:
     functions/services/rl/profile.js
@@ -36,6 +38,7 @@ Important:
       requested with:
           ?detectLocation=true
     - POST handles registration/profile saving.
+    - DELETE removes only the current account's Rocket League profile and Epic link.
     - This route does not independently determine Rocket
       League access.
 ========================================================= */
@@ -43,6 +46,9 @@ Important:
 import {
     handleRocketLeagueProfile
 } from "../../../services/rl/profile.js";
+import {
+    handleRocketLeagueProfileDelete
+} from "../../../services/rl/delete_profile.js";
 
 /* =========================================================
 REQUEST HANDLER
@@ -204,4 +210,8 @@ export async function onRequestPost(
 
 export async function onRequestPatch(context) {
     return handleRequest(context);
+}
+
+export async function onRequestDelete(context) {
+    return handleRocketLeagueProfileDelete(context.request, context.env);
 }

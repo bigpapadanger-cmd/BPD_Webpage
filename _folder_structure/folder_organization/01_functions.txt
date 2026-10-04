@@ -68,7 +68,7 @@ functions/
     |   |   +-- discord_matchbot/
     |   |   |   +-- channels.js, client.js, eligibility.js, events.js
     |   |   |   +-- guilds.js, interactions.js, members.js, messages.js
-    |   |   |   +-- permissions.js
+    |   |   |   +-- permissions.js, runtime_contract.js
     |   |   +-- epic/callback.js, login.js
     |   |   +-- google/login.js
     |   |   +-- steam/callback.js, login.js

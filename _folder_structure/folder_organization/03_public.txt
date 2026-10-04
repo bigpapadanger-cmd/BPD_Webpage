@@ -104,9 +104,9 @@ public/Tabs/
 |   |   +-- JS/index.js, auth.js, connect_epic.js, profile.js, ranks.js,
 |   |           submenu.js, mmr_dashboard.js; saved MMR progression/history UI
 |   +-- Registration/    CSS/index.css, HTML/index.html, JS/index.js, timezone.js; setup/onboarding only
-|   +-- MyProfile/       CSS/index.css, HTML/index.html, JS/index.js, settings_view.js; private field-aware settings verification
+|   +-- MyProfile/       CSS/index.css, HTML/index.html, JS/index.js, settings_view.js; private settings plus acknowledged three-second Rocket League profile deletion
 |   +-- PublicProfile/   Public-safe profile by public_profile_id; shell fragment, styles via master_rl.css
-|   +-- shared/          Profile visibility/presence (normalized online/offline only) and timestamp presentation helpers.
+|   +-- shared/          notificationsV2.js (shared channel/reminder validation), profile visibility/presence (normalized online/offline only), and timestamp presentation helpers.
 |   +-- MatchResults/, PrivateMatches/, WeeklyMatches/ Legacy full-page sources; routes use shell fragments below
 |   +-- FindPlayers/     Public opt-in search; CSS/index.css, HTML/index.html, JS/index.js, view.js; responsive cards
 |   +-- Features/

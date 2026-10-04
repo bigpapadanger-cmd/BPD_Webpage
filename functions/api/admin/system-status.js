@@ -35,14 +35,15 @@ export async function onRequestPost({ request, env }) {
     const service = typeof parsed.data?.service === "string" ? parsed.data.service.trim() : "";
     const action = typeof parsed.data?.action === "string" ? parsed.data.action.trim() : "";
     const startedAt = Date.now();
+    const requestId = crypto.randomUUID();
     try {
         const result = service === "mmr-api" && action === "validate-build"
             ? await updateMmrBuildConfiguration(env, parsed.data)
             : await performSystemStatusAction(env, service, action, parsed.data);
-        console.info("ADMIN SYSTEM ACTION", { service, action, accountId: authorization.accountId, requestedAt: new Date(startedAt).toISOString(), completedAt: new Date().toISOString(), result: "success", durationMs: Date.now() - startedAt });
+        console.info("ADMIN SYSTEM ACTION", { service, action, requestId, requestedAt: new Date(startedAt).toISOString(), completedAt: new Date().toISOString(), result: "success", durationMs: Date.now() - startedAt });
         return json(result);
     } catch (error) {
-        console.warn("ADMIN SYSTEM ACTION", { service, action, accountId: authorization.accountId, requestedAt: new Date(startedAt).toISOString(), completedAt: new Date().toISOString(), result: error?.code || "failed", durationMs: Date.now() - startedAt });
+        console.warn("ADMIN SYSTEM ACTION", { service, action, requestId, requestedAt: new Date(startedAt).toISOString(), completedAt: new Date().toISOString(), result: error?.code || "failed", durationMs: Date.now() - startedAt });
         const status = [400, 401, 403, 409, 422, 429, 502, 503, 504].includes(Number(error?.status)) ? Number(error.status) : 503;
         return json({ success: false, code: error?.code || "SYSTEM_ACTION_FAILED", message: error?.safeMessage || "The requested MMR operation could not be completed.", providerCode: error?.providerCode || null, retryAfterSeconds: error?.retryAfterSeconds || null, rootCause: error?.rootCause || null, action: error?.action || null }, status, error?.retryAfterSeconds ? { "Retry-After": String(error.retryAfterSeconds) } : {});
     }

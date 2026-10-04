@@ -1136,18 +1136,33 @@ function validateRegistrationPayload(
 DISCORD NOTIFICATION VERIFICATION
 ========================================================= */
 
+function hasSavedDiscordNotificationsEnabled(profile) {
+    const settings = profile?.settings && typeof profile.settings === "object"
+        ? profile.settings
+        : profile;
+    const notifications = settings?.notificationsV2 || settings?.notifications_v2;
+    if (typeof notifications?.discord?.enabled === "boolean") return notifications.discord.enabled;
+    return settings?.notificationsEnabled === true && settings?.notificationMethod === "discord";
+}
+
+export function canEnableDiscordNotifications(requestedEnabled, previouslyEnabled, eligibility) {
+    return requestedEnabled !== true || previouslyEnabled === true || eligibility?.eligible === true;
+}
+
 async function verifyDiscordNotificationAccess(
     request,
     env,
-    registration
+    accountId,
+    registration,
+    previouslyEnabled = false
 ) {
     const discordNotificationsEnabled = registration.notificationsV2
         ? registration.notificationsV2.discord?.enabled === true
         : registration.notificationsEnabled === true && registration.notificationMethod === "discord";
     if (!discordNotificationsEnabled) {
         return {
-            valid:
-                true
+            valid: true,
+            eligible: false
         };
     }
 
@@ -1178,8 +1193,9 @@ async function verifyDiscordNotificationAccess(
                 "PROVIDER_REQUIRED"
         ) {
             return {
-                valid:
-                    false,
+                valid: canEnableDiscordNotifications(true, previouslyEnabled, null),
+                eligible: false,
+                status: "not_linked",
 
                 code:
                     "DISCORD_ACCOUNT_REQUIRED",
@@ -1194,8 +1210,9 @@ async function verifyDiscordNotificationAccess(
             && (error.status >= 500 || error.code === "AUTHORIZATION_UNAVAILABLE")
         ) {
             return {
-                valid: true,
+                valid: canEnableDiscordNotifications(true, previouslyEnabled, null),
                 status: "unavailable",
+                eligible: false,
                 reason: error.code || "DISCORD_AUTHORIZATION_UNAVAILABLE"
             };
         }
@@ -1206,15 +1223,18 @@ async function verifyDiscordNotificationAccess(
             )
         ) {
             return {
-                valid:
-                    false,
+                valid: canEnableDiscordNotifications(true, previouslyEnabled, null),
+                eligible: false,
+                status: error.status >= 500 ? "unavailable" : "not_linked",
 
                 code:
                     error.code
                     || "DISCORD_AUTHORIZATION_FAILED",
 
                 message:
-                    "Discord notification authorization could not be verified."
+                    previouslyEnabled === true
+                        ? "Your saved Discord reminder preference was preserved, but eligibility could not be verified."
+                        : "Discord notification authorization could not be verified."
             };
         }
 
@@ -1232,8 +1252,9 @@ async function verifyDiscordNotificationAccess(
         !discordUserId
     ) {
         return {
-            valid:
-                false,
+            valid: canEnableDiscordNotifications(true, previouslyEnabled, null),
+            eligible: false,
+            status: "not_linked",
 
             code:
                 "DISCORD_IDENTITY_MISSING",
@@ -1246,14 +1267,15 @@ async function verifyDiscordNotificationAccess(
     const eligibility =
         await getDiscordMatchBotEligibility(
             env,
-            discordUserId
+            accountId
         );
 
     if (eligibility?.status === "unavailable" || eligibility?.status === "partial") {
         return {
-            valid: true,
+            valid: canEnableDiscordNotifications(true, previouslyEnabled, eligibility),
             status: eligibility.status,
             reason: eligibility.reason,
+            eligible: false,
             eligibility
         };
     }
@@ -1263,21 +1285,27 @@ async function verifyDiscordNotificationAccess(
         true
     ) {
         return {
-            valid:
-                false,
+            valid: canEnableDiscordNotifications(true, previouslyEnabled, eligibility),
+            eligible: false,
+            status: eligibility?.status || "unavailable",
 
             code:
                 eligibility?.reason
                 || "MATCHBOT_REQUIRED",
 
             message:
-                "Your Discord account must share a server with BPD MatchBot before Discord notifications can be enabled."
+                previouslyEnabled === true
+                    ? "Your saved Discord reminder preference was preserved, but Discord notifications are not currently eligible."
+                    : "Your Discord account must share a server with BPD MatchBot before Discord notifications can be enabled.",
+            eligibility
         };
     }
 
     return {
         valid:
             true,
+        eligible: true,
+        eligibility,
 
         discordUserId,
 
@@ -2227,13 +2255,36 @@ async function handleProfilePost(
     ===================================================== */
 
     let discordNotificationAccess;
+    let previouslyEnabled = false;
+
+    if (registration.notificationsV2?.discord?.enabled === true) {
+        try {
+            const currentProfile = await getRocketLeagueProfileByAccountId(env, accountId);
+            previouslyEnabled = hasSavedDiscordNotificationsEnabled(currentProfile);
+        } catch (error) {
+            console.error("ROCKET LEAGUE PROFILE: Existing Discord preference could not be confirmed.", {
+                code: error?.code || null,
+                status: error?.status || null
+            });
+            return json({
+                success: false,
+                authenticated: true,
+                registrationAccepted: false,
+                profileSaved: false,
+                code: "PROFILE_SETTINGS_UNAVAILABLE",
+                message: "Your saved notification settings could not be verified. Try again before enabling Discord reminders."
+            }, 503);
+        }
+    }
 
     try {
         discordNotificationAccess =
             await verifyDiscordNotificationAccess(
                 request,
                 env,
-                registration
+                accountId,
+                registration,
+                previouslyEnabled
             );
     }
     catch (
@@ -2289,10 +2340,7 @@ async function handleProfilePost(
         );
     }
 
-    if (
-        discordNotificationAccess.valid !==
-        true
-    ) {
+    if (discordNotificationAccess.valid !== true) {
         return json(
             {
                 success:
@@ -2326,7 +2374,7 @@ async function handleProfilePost(
                         .message
                     || "Discord notifications are not currently available."
             },
-            400
+            discordNotificationAccess.status === "unavailable" ? 503 : 400
         );
     }
 
@@ -2890,9 +2938,10 @@ async function handleProfilePatch(request, env, sessionContext, accountId) {
     const validationError = validateRegistrationPayload(settings);
     if (validationError) return json({ success: false, code: "INVALID_PROFILE_SETTINGS", message: validationError }, 400);
 
-    const discordAccess = await verifyDiscordNotificationAccess(request, env, settings);
+    const previouslyEnabled = hasSavedDiscordNotificationsEnabled(current);
+    const discordAccess = await verifyDiscordNotificationAccess(request, env, accountId, settings, previouslyEnabled);
     if (discordAccess.valid !== true) {
-        return json({ success: false, code: discordAccess.code || "DISCORD_NOTIFICATION_NOT_AVAILABLE", message: discordAccess.message || "Discord notifications are not currently available." }, 400);
+        return json({ success: false, code: discordAccess.code || "DISCORD_NOTIFICATION_NOT_AVAILABLE", message: discordAccess.message || "Discord notifications are not currently available." }, discordAccess.status === "unavailable" ? 503 : 400);
     }
 
     try {

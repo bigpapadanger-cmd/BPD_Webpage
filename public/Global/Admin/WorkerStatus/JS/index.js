@@ -371,6 +371,7 @@ function makeDetails(service) {
     content.className = "worker-status-detail-content";
     const message = service.message || service.detail;
     if (message) content.append(textElement("p", message));
+    if (service.id === "provider-runtime" && service.errorCode) content.append(textElement("p", `Health check: ${service.errorCode}`));
     const facts = [
         service.checkedAt ? `Checked ${readableTime(service.checkedAt)}` : null,
         Number.isFinite(service.responseTimeMs) ? `${service.responseTimeMs} ms response` : null,
@@ -578,7 +579,10 @@ async function loadStatus() {
             indicator.setAttribute("aria-label", status);
             const identity = document.createElement("div");
             identity.className = "worker-status-identity";
-            identity.append(textElement("strong", service.name, "worker-status-name"), textElement("span", status, `worker-status-label worker-status-${status}`));
+            const statusLabel = service.id === "provider-runtime"
+                ? ({ healthy: "Online", degraded: "Degraded", down: "Offline" })[status] || "Offline"
+                : status;
+            identity.append(textElement("strong", service.name, "worker-status-name"), textElement("span", statusLabel, `worker-status-label worker-status-${status}`));
             primary.append(indicator, identity);
             const controls = getMmrControlModel(service, canDeployMmr);
             if (controls.actions.length) {

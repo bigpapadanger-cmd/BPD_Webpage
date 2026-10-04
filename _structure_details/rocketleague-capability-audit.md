@@ -1,6 +1,6 @@
 # Rocket League Provider Capability Audit
 
-Snapshot: 2026-10-03. This is a source-contract/code audit, not a live PsyNet
+Snapshot: 2026-10-04. This is a source-contract/code audit, not a live PsyNet
 measurement. No live Worker calls or Supabase changes were made.
 
 ## Support classifications
@@ -29,11 +29,37 @@ measurement. No live Worker calls or Supabase changes were made.
 | `Clubs/GetStats v1` | LOCAL-PLAYER-ONLY | Empty request is scoped to the authenticated player's club context. | Not an arbitrary target's club-stat lookup. |
 | `Clubs/UpdateClub v2` | LOCAL-PLAYER-ONLY, MUTATION | Club update operation uses authenticated context. | No mutation surface should be exposed. |
 | Item Shop | READ-ONLY CACHED DISPLAY ACTIVE | Protected MMR Worker `GET /get-shop-data` requests `GetStandardShops` then `GetShopCatalogue`; it has no player ID parameter and returns normalized public-safe sections/catalogues. DomainData hashes and saves the payload hourly. Public `/api/rocketleague/shop` reads confirmed `api.get_rl_current_shop()` server-side; `/RocketLeague/Shop` renders a keyboard-navigable cached section carousel. | No wallet, ownership, purchase, or mutation fields are exposed; page loads do not call the provider. See [`rocketleague-shop-audit.md`](rocketleague-shop-audit.md). |
+| Discord notification eligibility | SUPPORTED, REST-ONLY | Private `bpd-provider-runtime` uses the bot token to obtain a complete paginated (and explicitly sharded when configured) guild inventory, then checks the canonical linked Discord user against that inventory with bounded concurrency. DomainData owns account/identity resolution, Supabase sync, hourly scheduling, 60-minute freshness, on-demand Check Again, and failure preservation. | No Gateway is used. Complete inventory is required before global reconciliation; member 404 means nonmembership, while inaccessible guilds and provider failures remain unavailable. No provider IDs are returned to the browser. Large-bot shard mode must be explicitly configured before deployment. |
 | WebSocket push / lifecycle events | UNKNOWN | Worker Durable Object correlates outbound RPC request IDs to responses; no provider event subscription or party/match event dispatcher was found. | PsyPing keepalive is not a presence event stream. No push-only capability is established. |
 
 The upstream contracts are documented in [`dank/rlapi REQUESTS.md`](https://github.com/dank/rlapi/blob/master/REQUESTS.md) and its Go request implementations for [players](https://github.com/dank/rlapi/blob/master/players.go), [skills](https://github.com/dank/rlapi/blob/master/skills.go), [stats](https://github.com/dank/rlapi/blob/master/stats.go), [matches](https://github.com/dank/rlapi/blob/master/matches.go), [party](https://github.com/dank/rlapi/blob/master/party.go), [matchmaking](https://github.com/dank/rlapi/blob/master/matchmaking.go), [clubs](https://github.com/dank/rlapi/blob/master/clubs.go), [playlists](https://github.com/dank/rlapi/blob/master/playlists.go), and [game-server methods](https://github.com/dank/rlapi/blob/master/misc.go). The MMR Worker code inspected was `worker/index.ts`, `worker/services/provider-data.ts`, and `worker/rl/socket.ts` in the separate `mmr-api-v2` checkout.
 
 ## Presence and activity conclusions
+
+## Discord eligibility and privacy
+
+- Discord validation uses the existing MatchBot REST token only inside provider
+  execution; `bpd-provider-runtime` has no Supabase, BPD account lookup, schedule,
+  public route, or persistence. DomainData calls it via Pages/monitor Service
+  Bindings and resolves the canonical active Discord identity server-side.
+- Complete bot-guild inventory is required before `api.sync_discord_bot_guilds`
+  can replace the current registry. Per-account replacement is written only
+  after every current guild membership check succeeds. An empty, successful
+  membership result is authoritative ineligible; any provider/inventory error
+  preserves previous state.
+- Authenticated Settings/Registration reads use persisted state while its
+  `checkedAt` is under 60 minutes; stale/unknown state validates on demand and
+  Check Again forces a fresh check. The existing hourly refresh reconciles a
+  complete bot-guild inventory even when no account is due, then batches due
+  accounts and records each Discord checkpoint independently. Each account is
+  checked in sequential batches of up to 400 guild IDs; the runtime checks at
+  most three memberships concurrently. Provider
+  `Retry-After` and bounded temporary failure cooldowns prevent retry storms.
+- Browser-safe output includes eligibility, shared count, freshness, and warning
+  suppression state only. Guild/user/account/player IDs and raw provider data
+  remain server-side. The runtime requires explicit `DISCORD_LARGE_BOT_SHARDING`
+  configuration; deployment remains blocked until the current bot mode is
+  verified and caller/token secrets are configured.
 
 - The legacy Worker `GET /get-profile?playerId=...` uses `Players/GetProfile v1` with the requested target ID and returns the provider's coarse `PresenceState` string. This is a provider-reported state, but its vocabulary is not normalized into actionable states such as menu, party, queue, training, private match, tournament, or in-game.
 - The MMR Worker exposes normalized presence through `/get-player-data?capabilities=presence`, returning `online`, `offline`, or `unknown` with provider `checked_at`. DomainData's 15-minute monitor consumes this capability and persists only successful online/offline results through the existing presence RPC.

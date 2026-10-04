@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { persistCapability, refreshCandidate } from "../src/rl_refresh_cycle.js";
+import { persistCapability, refreshCandidate, runRocketLeagueRefreshCycle } from "../src/rl_refresh_cycle.js";
 
 const candidate = { account_id: "account-1", player_id: "player-1", epic_account_id: "epic-1" };
 const baseEnv = { SUPABASE_URL: "https://supabase.invalid/rest/v1", SUPABASE_SERVICE_ROLE_KEY: "test-secret" };
@@ -45,7 +45,7 @@ test("career stats require all six nonnegative aggregate values before persisten
     assert.equal(writes, 0);
 });
 
-test("history and Discord do not invoke provider APIs and are checkpointed unsupported", async () => {
+test("history remains unsupported and Discord inventory failure is independently checkpointed", async () => {
     const writes = [];
     globalThis.fetch = async (url, init) => {
         writes.push({ rpc: new URL(url).pathname.split("/").at(-1), body: JSON.parse(init.body) });
@@ -55,8 +55,128 @@ test("history and Discord do not invoke provider APIs and are checkpointed unsup
     assert.deepEqual(result, { attempted: 2, succeeded: 0, failed: 2, mmrChanged: 0, mmrUnchanged: 0 });
     assert.deepEqual(writes.map(item => item.rpc), ["record_rl_player_refresh_result", "record_rl_player_refresh_result"]);
     assert.deepEqual(writes.map(item => item.body.p_error_code), [
-        "RL_MATCH_HISTORY_AUTHENTICATED_PLAYER_ONLY", "DISCORD_GATEWAY_RUNTIME_UNAVAILABLE"
+        "RL_MATCH_HISTORY_AUTHENTICATED_PLAYER_ONLY", "DISCORD_INVENTORY_UNAVAILABLE"
     ]);
+});
+
+test("hourly Discord refresh syncs complete guild inventory before account membership and checkpoints separately", async () => {
+    const calls = [];
+    const guildId = "900000000000000003";
+    const discordId = "900000000000000004";
+    const runtime = { async fetch(request) {
+        const url = new URL(request.url);
+        calls.push(`worker:${url.pathname}`);
+        if (url.pathname.endsWith("guild-inventory")) return Response.json({ success: true, complete: true, guilds: [{ id: guildId, name: "BPD" }], count: 1, capturedAt: new Date().toISOString() });
+        return Response.json({ success: true, status: "available", eligible: true, mutualGuildCount: 1, sharedGuildIds: [guildId], countComplete: true, checkedAt: new Date().toISOString() });
+    } };
+    const kvData = new Map();
+    const env = {
+        ...baseEnv,
+        SUPABASE_AUTH: "test-secret",
+        PROVIDER_RUNTIME_CALLER_SECRET: "r".repeat(64),
+        PROVIDER_RUNTIME: runtime,
+        SERVICE_STATUS: {
+            async get(key, type) { const value = kvData.get(key); return type === "json" && typeof value === "string" ? JSON.parse(value) : value ?? null; },
+            async put(key, value) { kvData.set(key, value); },
+            async delete(key) { kvData.delete(key); }
+        }
+    };
+    globalThis.fetch = async (url, init) => {
+        const rpc = new URL(url).pathname.split("/").at(-1);
+        const body = init.body ? JSON.parse(init.body) : {};
+        calls.push(`rpc:${rpc}`);
+        if (rpc === "get_rl_refresh_candidates") return Response.json([{ ...candidate, discord_due: true, mmr_due: false, provider_due: false, club_due: false, career_stats_due: false, match_history_due: false }]);
+        if (rpc === "verify_account_provider_identity") return Response.json([{ account_id: candidate.account_id, provider: "discord", provider_subject: discordId, active: true }]);
+        if (rpc === "sync_discord_bot_guilds") return Response.json({ success: true, checkedAt: body.p_checked_at, upserted: 1, deactivated: 0 });
+        if (rpc === "sync_account_discord_guilds") return Response.json({ success: true, checkedAt: body.p_checked_at, eligible: true, sharedGuildCount: 1, playerId: null });
+        if (rpc === "get_rl_discord_notification_state") return Response.json({ profileExists: false, discordNotificationsEnabled: false, eligible: true, sharedGuildCount: 1, warningRequired: false });
+        if (rpc === "record_rl_player_refresh_result") return Response.json({ success: true });
+        throw new Error(`unexpected RPC ${rpc}`);
+    };
+    const result = await runRocketLeagueRefreshCycle(env);
+    assert.equal(result.attempted, 1);
+    assert.equal(result.succeeded, 1);
+    assert.equal(result.failed, 0);
+    assert.equal(result.discordInventoryAvailable, true);
+    assert.ok(calls.indexOf("rpc:sync_discord_bot_guilds") < calls.indexOf("worker:/internal/discord/check-membership"));
+    assert.ok(calls.indexOf("rpc:sync_account_discord_guilds") < calls.indexOf("rpc:record_rl_player_refresh_result"));
+    assert.equal(calls.includes("rpc:save_rl_player_mmr_snapshot_v2"), false);
+});
+
+test("scheduled Discord timeout checkpoints one account and continues with remaining accounts", async t => {
+    t.mock.timers.enable({ apis: ["setTimeout"] });
+    const firstDiscordId = "900000000000000011";
+    const secondDiscordId = "900000000000000012";
+    const guildId = "900000000000000013";
+    const rows = [
+        { ...candidate, account_id: "account-1", player_id: "player-1", discord_due: true, mmr_due: false, provider_due: false, club_due: false, career_stats_due: false, match_history_due: false },
+        { ...candidate, account_id: "account-2", player_id: "player-2", discord_due: true, mmr_due: false, provider_due: false, club_due: false, career_stats_due: false, match_history_due: false }
+    ];
+    const checkpoints = [];
+    const accountWrites = [];
+    const observed = [];
+    const kvData = new Map();
+    let started;
+    const requestStarted = new Promise(resolve => { started = resolve; });
+    const env = {
+        ...baseEnv,
+        SUPABASE_AUTH: "test-secret",
+        PROVIDER_RUNTIME_CALLER_SECRET: "r".repeat(64),
+        SERVICE_STATUS: {
+            async get(key, type) { const value = kvData.get(key); return type === "json" && typeof value === "string" ? JSON.parse(value) : value ?? null; },
+            async put(key, value) { kvData.set(key, value); },
+            async delete(key) { kvData.delete(key); }
+        },
+        PROVIDER_RUNTIME: { async fetch(request) {
+            const url = new URL(request.url);
+            observed.push(`worker:${url.pathname}`);
+            if (url.pathname.endsWith("guild-inventory")) return Response.json({ success: true, complete: true, guilds: [{ id: guildId, name: "BPD" }], count: 1, capturedAt: new Date().toISOString() });
+            const body = await request.json();
+            observed.push(`member:${body.discordUserId}`);
+            if (body.discordUserId === firstDiscordId) {
+                started();
+                return new Promise((_, reject) => request.signal.addEventListener("abort", () => { const error = new Error(); error.name = "AbortError"; reject(error); }, { once: true }));
+            }
+            return Response.json({ success: true, status: "available", eligible: true, mutualGuildCount: 1, sharedGuildIds: [guildId], countComplete: true, checkedAt: new Date().toISOString() });
+        } }
+    };
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async (url, init = {}) => {
+        const rpc = new URL(url).pathname.split("/").at(-1);
+        observed.push(`rpc:${rpc}`);
+        const body = init.body ? JSON.parse(init.body) : {};
+        if (rpc === "get_rl_refresh_candidates") return Response.json(rows);
+        if (rpc === "verify_account_provider_identity") {
+            const id = body.p_account_id === "account-1" ? firstDiscordId : secondDiscordId;
+            return Response.json([{ account_id: body.p_account_id, provider: "discord", provider_subject: id, active: true }]);
+        }
+        if (rpc === "sync_discord_bot_guilds") return Response.json({ success: true, checkedAt: body.p_checked_at, upserted: 1, deactivated: 0 });
+        if (rpc === "sync_account_discord_guilds") {
+            accountWrites.push(body.p_account_id);
+            return Response.json({ success: true, checkedAt: body.p_checked_at, eligible: true, sharedGuildCount: 1 });
+        }
+        if (rpc === "get_rl_discord_notification_state") return Response.json({ profileExists: false, eligible: true, sharedGuildCount: 1, checkedAt: new Date().toISOString() });
+        if (rpc === "record_rl_player_refresh_result") { checkpoints.push(body); return Response.json({ success: true }); }
+        throw new Error(`unexpected RPC ${rpc}`);
+    };
+    try {
+        const pending = runRocketLeagueRefreshCycle(env, { reconcileDiscordInventory: true });
+        const startState = await Promise.race([requestStarted.then(() => "started"), pending.then(() => "completed", error => `error:${error?.code || error?.message}`), new Promise(resolve => setImmediate(() => resolve("idle")))]);
+        assert.equal(startState, "started", `refresh did not reach the first account's provider request: ${observed.join(",")}; checkpoints=${JSON.stringify(checkpoints.map(item => [item.p_account_id, item.p_component, item.p_error_code]))}`);
+        t.mock.timers.tick(30000);
+        const result = await pending;
+        assert.equal(result.attempted, 2);
+        assert.equal(result.succeeded, 1);
+        assert.equal(result.failed, 1);
+        assert.deepEqual(accountWrites, ["account-2"]);
+        assert.deepEqual(checkpoints.map(item => [item.p_account_id, item.p_success, item.p_error_code]), [
+            ["account-1", false, "PROVIDER_RUNTIME_TIMEOUT"],
+            ["account-2", true, null]
+        ]);
+    } finally {
+        globalThis.fetch = originalFetch;
+        t.mock.timers.reset();
+    }
 });
 
 test("due capabilities share one authorized Worker request and persist/checkpoint independently", async () => {

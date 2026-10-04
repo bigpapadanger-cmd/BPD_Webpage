@@ -123,10 +123,10 @@ test("Worker custom domain is shared-secret gated and Pages uses its fixed servi
     assert.equal(workerConfig.vars.OCR_PUBLIC_HOSTNAME, "ocr-transport.bpd-gaming-network.com");
     assert.equal(workerConfig.triggers?.crons, undefined);
     assert.equal(workerConfig.queues, undefined);
-    assert.deepEqual(pagesConfig.services, [{
-        binding: "OCR_GOOGLE_TRANSPORT",
-        service: "bpd-ocr-cloud-run-proxy"
-    }]);
+    assert.deepEqual(pagesConfig.services, [
+        { binding: "PROVIDER_RUNTIME", service: "bpd-provider-runtime" },
+        { binding: "OCR_GOOGLE_TRANSPORT", service: "bpd-ocr-cloud-run-proxy" }
+    ]);
 });
 
 test("rejects missing and incorrect shared secrets before any Google or Cloud Run request", async () => {

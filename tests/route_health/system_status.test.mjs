@@ -12,7 +12,7 @@ const INTERNAL_HOSTNAME_FOR_TEST = "ocr-google-transport.internal";
 
 function createEnv() {
     const values = new Map();
-    const calls = { presence: 0, transport: 0, mmr: 0 };
+    const calls = { presence: 0, transport: 0, mmr: 0, providerRuntime: 0 };
     return {
         calls,
         expire() { for (const item of values.values()) item.expiresAt = 0; },
@@ -25,6 +25,13 @@ function createEnv() {
             MMR_API_KEY: "lookup-key",
             MMR_ADMIN_API_KEY: "admin-key",
             OCR_GOOGLE_TRANSPORT_SECRET: "s".repeat(48),
+            PROVIDER_RUNTIME_CALLER_SECRET: "p".repeat(64),
+            PROVIDER_RUNTIME: {
+                async fetch() {
+                    calls.providerRuntime += 1;
+                    return Response.json({ success: true, service: "bpd-provider-runtime", status: "ok", timestamp: new Date().toISOString() });
+                }
+            },
             RL_STATS_CACHE: {
                 async get(key) { const value = values.get(key); return value && value.expiresAt > Date.now() ? JSON.parse(value.body) : null; },
                 async put(key, body, options) { assert.equal(options.expirationTtl, 45); values.set(key, { body, expiresAt: Date.now() + options.expirationTtl * 1000 }); },
@@ -98,6 +105,121 @@ test("system health cache includes protected MMR readiness without starting MMR 
         assert.ok(["miss", "hit"].includes(concurrent.cache));
         assert.equal(calls.mmr, 1);
         assert.equal(JSON.stringify(first).includes("lookup-key"), false);
+    } finally { restore(); }
+});
+
+test("provider runtime health uses the private Service Binding and exposes only its safe contract", async () => {
+    const { env, calls } = createEnv();
+    let observed;
+    env.PROVIDER_RUNTIME.fetch = async request => {
+        calls.providerRuntime += 1;
+        observed = { url: new URL(request.url), method: request.method, authorization: request.headers.get("Authorization") };
+        return Response.json({ success: true, service: "bpd-provider-runtime", status: "ok", timestamp: new Date().toISOString() });
+    };
+    const restore = installHealthFetch(calls);
+    try {
+        const status = await getSystemStatus(env, { force: true });
+        const runtime = status.services.find(item => item.id === "provider-runtime");
+        assert.equal(runtime.name, "bpd-provider-runtime");
+        assert.equal(runtime.status, "healthy");
+        assert.equal(runtime.message, "Provider runtime is online.");
+        assert.ok(Number.isFinite(runtime.responseTimeMs));
+        assert.ok(Number.isFinite(Date.parse(runtime.checkedAt)));
+        assert.deepEqual({ hostname: observed.url.hostname, pathname: observed.url.pathname, method: observed.method }, {
+            hostname: "bpd-provider-runtime.internal", pathname: "/internal/health", method: "GET"
+        });
+        assert.equal(observed.authorization, `Bearer ${env.PROVIDER_RUNTIME_CALLER_SECRET}`);
+        assert.equal(calls.providerRuntime, 1);
+        assert.equal(JSON.stringify(runtime).includes(env.PROVIDER_RUNTIME_CALLER_SECRET), false);
+    } finally { restore(); }
+});
+
+test("provider runtime degraded health is reported without invoking a provider", async () => {
+    const { env, calls } = createEnv();
+    env.PROVIDER_RUNTIME.fetch = async () => {
+        calls.providerRuntime += 1;
+        return Response.json({ success: true, service: "bpd-provider-runtime", status: "degraded", timestamp: new Date().toISOString() });
+    };
+    const restore = installHealthFetch(calls);
+    try {
+        const runtime = (await getSystemStatus(env, { force: true })).services.find(item => item.id === "provider-runtime");
+        assert.equal(runtime.status, "degraded");
+        assert.equal(runtime.message, "Provider runtime is reachable but reports degraded health.");
+        assert.equal(calls.providerRuntime, 1);
+    } finally { restore(); }
+});
+
+test("provider runtime service recheck uses its fixed Service Binding health path", async () => {
+    const { env, values, calls } = createEnv();
+    env.RL_STATS_CACHE.put = async (key, body, options) => {
+        values.set(key, { body, expiresAt: Date.now() + options.expirationTtl * 1000 });
+    };
+    const result = await performSystemStatusAction(env, "provider-runtime", "recheck");
+    assert.equal(result.success, true);
+    assert.equal(result.result.status, "healthy");
+    assert.equal(calls.providerRuntime, 1);
+    assert.equal(JSON.stringify(result).includes(env.PROVIDER_RUNTIME_CALLER_SECRET), false);
+});
+
+test("provider runtime health rejects weak or whitespace-modified caller configuration", async () => {
+    const { env } = createEnv();
+    let calls = 0;
+    env.PROVIDER_RUNTIME.fetch = async () => { calls += 1; return Response.json({}); };
+    for (const secret of ["x".repeat(63), "x".repeat(257), `${"x".repeat(64)} `, ` ${"x".repeat(64)}`]) {
+        env.PROVIDER_RUNTIME_CALLER_SECRET = secret;
+        const result = (await getSystemStatus(env, { force: true })).services.find(item => item.id === "provider-runtime");
+        assert.equal(result.status, "down");
+        assert.equal(result.errorCode, "PROVIDER_RUNTIME_UNAVAILABLE");
+    }
+    assert.equal(calls, 0);
+});
+
+test("provider runtime health timeout remains active through response body parsing", async t => {
+    t.mock.timers.enable({ apis: ["setTimeout"] });
+    const { env } = createEnv();
+    let started;
+    const responseStarted = new Promise(resolve => { started = resolve; });
+    env.PROVIDER_RUNTIME.fetch = async () => {
+        started();
+        return new Response(new ReadableStream({ start(controller) { controller.enqueue(new TextEncoder().encode("{")); } }));
+    };
+    try {
+        const pending = getSystemStatus(env, { force: true });
+        await responseStarted;
+        await new Promise(resolve => setImmediate(resolve));
+        t.mock.timers.tick(2000);
+        const status = (await pending).services.find(item => item.id === "provider-runtime");
+        assert.equal(status.status, "down");
+        assert.equal(status.errorCode, "PROVIDER_RUNTIME_TIMEOUT");
+    } finally { t.mock.timers.reset(); }
+});
+
+test("provider runtime timeout and malformed health responses fail offline with sanitized codes", async () => {
+    const { env, calls } = createEnv();
+    const restore = installHealthFetch(calls);
+    try {
+        env.PROVIDER_RUNTIME.fetch = request => new Promise((resolve, reject) => {
+            request.signal.addEventListener("abort", () => {
+                const error = new Error("internal timeout details");
+                error.name = "AbortError";
+                reject(error);
+            }, { once: true });
+        });
+        const timedOut = (await getSystemStatus(env, { force: true })).services.find(item => item.id === "provider-runtime");
+        assert.equal(timedOut.status, "down");
+        assert.equal(timedOut.errorCode, "PROVIDER_RUNTIME_TIMEOUT");
+        assert.equal(timedOut.message, "Provider runtime health check timed out.");
+        assert.equal(JSON.stringify(timedOut).includes("internal timeout details"), false);
+
+        env.PROVIDER_RUNTIME.fetch = async () => Response.json({
+            success: true, service: "bpd-provider-runtime", status: "ok", timestamp: "not-a-time",
+            discordUserId: "123456789012345678", botToken: "must-not-pass", supabaseUrl: "must-not-pass"
+        });
+        const malformed = (await getSystemStatus(env, { force: true })).services.find(item => item.id === "provider-runtime");
+        assert.equal(malformed.status, "down");
+        assert.equal(malformed.errorCode, "PROVIDER_RUNTIME_HEALTH_INVALID");
+        assert.equal(JSON.stringify(malformed).includes("123456789012345678"), false);
+        assert.equal(JSON.stringify(malformed).includes("must-not-pass"), false);
     } finally { restore(); }
 });
 
@@ -180,6 +302,20 @@ test("Admin role receives system-status and MMR deploy permissions", () => {
     assert.ok(permissions.includes(ADMIN_PERMISSIONS.MMR_DEPLOY));
     const canDeployMmr = permissions.includes(ADMIN_PERMISSIONS.MMR_DEPLOY);
     assert.equal(getMmrControlModel({ id: "mmr-api", supportsBuildUpdate: false }, canDeployMmr).showDeploy, true);
+});
+
+test("provider runtime is called only server-side and has no browser/public route", async () => {
+    const source = await readFile(new URL("../../public/Global/Admin/WorkerStatus/JS/index.js", import.meta.url), "utf8");
+    const config = JSON.parse(await readFile(new URL("../../workers/bpd-provider-runtime/wrangler.jsonc", import.meta.url), "utf8"));
+    assert.match(source, /fetch\("\/api\/admin\/system-status"/);
+    assert.doesNotMatch(source, /bpd-provider-runtime\.internal|PROVIDER_RUNTIME_CALLER_SECRET|PROVIDER_RUNTIME/);
+    assert.equal(config.workers_dev, false);
+    assert.equal(config.preview_urls, false);
+    assert.equal("routes" in config, false);
+    assert.match(source, /healthy: "Online", degraded: "Degraded", down: "Offline"/);
+    assert.match(source, /Health check: \$\{service\.errorCode\}/);
+    assert.match(source, /service\.checkedAt \? `Checked/);
+    assert.match(source, /Number\.isFinite\(service\.responseTimeMs\)/);
 });
 
 test("missing MMR server authorization omits reconnect/version/build capabilities", async () => {
@@ -301,6 +437,13 @@ test("MMR version action is unavailable to unauthenticated system-status callers
     } finally { globalThis.fetch = originalFetch; }
 });
 
+test("admin action logs use request correlation without account IDs", async () => {
+    const source = await readFile(new URL("../../functions/api/admin/system-status.js", import.meta.url), "utf8");
+    assert.doesNotMatch(source, /accountId:\s*authorization\.accountId/u);
+    assert.match(source, /requestId, requestedAt/u);
+    assert.doesNotMatch(source, /actorRef|createAdminActorReference/u);
+});
+
 test("unsupported system actions fail before any outbound request", async () => {
     let calls = 0;
     const originalFetch = globalThis.fetch;
@@ -358,15 +501,20 @@ test("Cloud Run recheck uses fixed transport diagnostic route and no caller URL"
 
 test("system status route enforces admin permission before checking services", async () => {
     let externalCalls = 0;
+    let providerBindingCalls = 0;
     const originalFetch = globalThis.fetch;
     globalThis.fetch = async () => { externalCalls += 1; throw new Error("should not call health services"); };
     try {
-        const response = await onRequestGet({ request: new Request("https://site.example.test/api/admin/system-status"), env: {} });
+        const response = await onRequestGet({ request: new Request("https://site.example.test/api/admin/system-status"), env: {
+            PROVIDER_RUNTIME_CALLER_SECRET: "p".repeat(64),
+            PROVIDER_RUNTIME: { async fetch() { providerBindingCalls += 1; throw new Error("must not be called before admin authorization"); } }
+        } });
         assert.ok([401, 403, 503].includes(response.status));
         const payload = await response.json();
         assert.equal(payload.success, false);
         assert.equal("services" in payload, false);
         assert.equal(externalCalls, 0);
+        assert.equal(providerBindingCalls, 0);
     } finally { globalThis.fetch = originalFetch; }
 });
 

@@ -57,7 +57,7 @@ async function recordScheduledJob(env, job, summary, startedAt, failed = false) 
     const succeeded = !failed && summary?.success !== false;
     const selected = job === "shop"
         ? ["success", "changed", "saved", "errorCode"]
-        : ["success", "candidateCount", "attempted", "succeeded", "failed", "mmrChanged", "mmrUnchanged", "nextCursorStored"];
+        : ["success", "candidateCount", "attempted", "succeeded", "failed", "mmrChanged", "mmrUnchanged", "discordInventoryAvailable", "discordInventoryError", "nextCursorStored"];
     const lastSummary = Object.fromEntries(selected.filter(field => summary?.[field] !== undefined).map(field => [field, summary[field]]));
     try {
         await env.SERVICE_STATUS.put(key, JSON.stringify({
@@ -144,12 +144,12 @@ function isWakeAuthorized(
         `Bearer ${expected}`;
 }
 
-function getJobRunner(job, env) {
+function getJobRunner(job, env, { forceDiscordInventory = false, reconcileDiscordInventory = false } = {}) {
     if (job === "presence") {
         return () => runPresenceCycle(env, { force: true });
     }
     if (job === "mmr") {
-        return () => runRocketLeagueRefreshCycle(env);
+        return () => runRocketLeagueRefreshCycle(env, { forceDiscordInventory, reconcileDiscordInventory });
     }
     if (job === "shop") {
         return () => runRocketLeagueShopRefresh(env);
@@ -170,7 +170,7 @@ function summarizeJobResult(job, result) {
     }
     if (job === "mmr") {
         return Object.fromEntries(
-            ["success", "candidateCount", "attempted", "succeeded", "failed", "mmrChanged", "mmrUnchanged", "cursorReset", "nextCursorStored"]
+            ["success", "candidateCount", "attempted", "succeeded", "failed", "mmrChanged", "mmrUnchanged", "discordInventoryAvailable", "discordInventoryError", "cursorReset", "nextCursorStored"]
                 .filter(key => result?.[key] !== undefined)
                 .map(key => [key, result[key]])
         );
@@ -191,8 +191,8 @@ function summarizeJobResult(job, result) {
     return { success: false };
 }
 
-async function executeJob(job, env) {
-    const run = getJobRunner(job, env);
+async function executeJob(job, env, options = {}) {
+    const run = getJobRunner(job, env, options);
     if (!run) {
         throw new Error("UNKNOWN_BACKGROUND_JOB");
     }
@@ -233,9 +233,9 @@ async function executeJob(job, env) {
     }
 }
 
-function runInBackground(job, env, ctx) {
+function runInBackground(job, env, ctx, options = {}) {
     ctx.waitUntil(
-        executeJob(job, env).catch(() => undefined)
+        executeJob(job, env, options).catch(() => undefined)
     );
 }
 
@@ -395,7 +395,7 @@ async function handleScheduled(
         controller.cron ===
         ROCKET_LEAGUE_REFRESH_CRON
     ) {
-        runInBackground("mmr", env, ctx);
+        runInBackground("mmr", env, ctx, { forceDiscordInventory: true, reconcileDiscordInventory: true });
         runInBackground("shop", env, ctx);
 
         return;

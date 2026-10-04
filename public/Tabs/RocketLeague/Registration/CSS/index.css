@@ -476,6 +476,98 @@
         translateX(19px);
 }
 
+.registration-notification-channels {
+    min-width: 0;
+    margin: 18px 0 0;
+    padding: 0;
+    border: 0;
+}
+
+#registrationNotificationChannels {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+    gap: 12px;
+}
+
+.registration-notification-card {
+    min-width: 0;
+    padding: 15px;
+    border: 1px solid var(--rl-border);
+    border-radius: 14px;
+    background: linear-gradient(145deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.018));
+}
+
+.registration-notification-toggle {
+    min-height: 44px;
+}
+
+.registration-notification-toggle > span:last-child {
+    display: grid;
+    gap: 3px;
+}
+
+.registration-notification-toggle small {
+    color: var(--rl-muted);
+    font-size: 0.78rem;
+    line-height: 1.4;
+}
+
+.registration-notification-channels:disabled .registration-notification-card {
+    opacity: 0.7;
+}
+
+.registration-reminders {
+    display: grid;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.registration-reminder-row {
+    display: flex;
+    align-items: end;
+    gap: 8px;
+}
+
+.registration-reminder-fields {
+    display: grid;
+    flex: 1 1 auto;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 7px;
+}
+
+.registration-reminder-field {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+    color: var(--rl-muted);
+    font-size: 0.75rem;
+}
+
+.registration-reminder-field input {
+    width: 100%;
+    min-width: 0;
+}
+
+.registration-reminder-remove,
+.registration-reminder-add {
+    min-height: 38px;
+    white-space: nowrap;
+}
+
+.registration-reminder-remove {
+    padding-inline: 10px;
+}
+
+.registration-reminder-add {
+    width: 100%;
+    margin-top: 9px;
+}
+
+#registrationReminderDuplicateWarning,
+#registrationNotificationsAvailabilityNotice {
+    margin-top: 12px;
+}
+
 .other-mode-field {
     margin-top: 15px;
 }
@@ -543,13 +635,8 @@
     text-align: center;
 }
 
-.notification-setting {
-    margin-top: 3px;
-}
-
 .inline-warning,
 .registration-warning,
-.reminder-note,
 .post-registration-note {
     display: flex;
     flex-direction: column;
@@ -576,134 +663,6 @@
 
 .inline-warning span {
     color: #ffd2d7;
-    line-height: 1.5;
-}
-
-.reminder-options {
-    margin-top: 18px;
-    padding-top: 16px;
-    border-top:
-        1px solid
-        var(--rl-border);
-    transition:
-        opacity 0.18s ease;
-}
-
-.reminder-options.notifications-disabled {
-    opacity: 0.4;
-    pointer-events: none;
-}
-
-.reminder-window-heading {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-    margin-top: 20px;
-}
-
-.reminder-window-heading strong {
-    color: #ffffff;
-}
-
-.reminder-window-heading span {
-    color: var(--rl-muted);
-    font-size: 0.82rem;
-    line-height: 1.5;
-}
-
-.specific-reminder-times {
-    margin-top: 16px;
-}
-
-.reminder-slot-grid {
-    display: grid;
-    grid-template-columns:
-        repeat(
-            auto-fit,
-            minmax(88px, 1fr)
-        );
-    gap: 7px;
-}
-
-.reminder-slot-grid-24h {
-    grid-template-columns:
-        repeat(
-            6,
-            minmax(0, 1fr)
-        );
-    margin-top: 13px;
-}
-
-.reminder-slot {
-    position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 37px;
-    padding: 6px 8px;
-    border: 1px solid var(--rl-border);
-    border-radius: 8px;
-    background: var(--rl-field);
-    color: #cbd1df;
-    font-size: 0.78rem;
-    font-weight: 700;
-    cursor: pointer;
-    user-select: none;
-    text-align: center;
-    transition:
-        border-color 0.18s ease,
-        background 0.18s ease,
-        box-shadow 0.18s ease,
-        color 0.18s ease;
-}
-
-.reminder-slot:hover {
-    border-color:
-        rgba(179, 165, 255, 0.52);
-}
-
-.reminder-slot input {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    opacity: 0;
-}
-
-.reminder-slot:has(input:focus-visible) {
-    border-color: var(--rl-accent-light);
-    box-shadow:
-        0 0 0 2px
-        rgba(124, 92, 255, 0.2);
-}
-
-.reminder-slot:has(input:checked) {
-    border-color: var(--rl-accent-light);
-    background:
-        rgba(124, 92, 255, 0.24);
-    color: #ffffff;
-    box-shadow:
-        0 0 12px
-        rgba(124, 92, 255, 0.15);
-}
-
-.reminder-note {
-    margin-top: 17px;
-    border:
-        1px solid
-        rgba(245, 158, 11, 0.34);
-    background:
-        rgba(245, 158, 11, 0.07);
-    box-shadow:
-        inset 3px 0 0
-        rgba(245, 158, 11, 0.7);
-}
-
-.reminder-note strong {
-    color: var(--rl-warning);
-}
-
-.reminder-note span {
-    color: #d8dce8;
     line-height: 1.5;
 }
 
@@ -869,18 +828,6 @@
 }
 
 @media (
-    max-width: 800px
-) {
-    .reminder-slot-grid-24h {
-        grid-template-columns:
-            repeat(
-                4,
-                minmax(0, 1fr)
-            );
-    }
-}
-
-@media (
     max-width: 700px
 ) {
     .rl-registration {
@@ -928,14 +875,6 @@
             calc(50% - 7px);
     }
 
-    .reminder-slot-grid-24h {
-        grid-template-columns:
-            repeat(
-                3,
-                minmax(0, 1fr)
-            );
-    }
-
     .availability-row {
         grid-template-columns: 1fr;
     }
@@ -958,13 +897,6 @@
             100%;
     }
 
-    .reminder-slot-grid-24h {
-        grid-template-columns:
-            repeat(
-                2,
-                minmax(0, 1fr)
-            );
-    }
 }
 
 @media (

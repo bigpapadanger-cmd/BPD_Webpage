@@ -69,6 +69,10 @@
 
     "services": [
         {
+            "binding": "PROVIDER_RUNTIME",
+            "service": "bpd-provider-runtime"
+        },
+        {
             "binding": "OCR_GOOGLE_TRANSPORT",
             "service": "bpd-ocr-cloud-run-proxy"
         }

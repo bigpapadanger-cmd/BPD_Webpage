@@ -63,6 +63,15 @@ import {
 } from "../../../../scripts/apiConnection.js";
 
 import {
+    getDuplicateReminderChannels,
+    isNotificationsV2,
+    NOTIFICATION_CHANNELS,
+    REMINDER_LIMITS,
+    reminderMinutesFromParts,
+    validateNotificationsV2
+} from "../../shared/notificationsV2.js";
+
+import {
     getAuthState,
     hasActiveAccount,
     hasLinkedProvider,
@@ -155,6 +164,7 @@ let discordNotificationState = {
     reason:
         null
 };
+let registrationNotificationsConfirmed = true;
 
 
 /* =========================================================
@@ -1360,152 +1370,160 @@ async function handleRegionDetectionChange() {
 NOTIFICATION STATE
 ========================================================= */
 
-function getNotificationsEnabled() {
-    return (
-        document.querySelector(
-            'input[name="notificationsEnabled"]:checked'
-        )?.value !==
-        "false"
-    );
+const NOTIFICATION_LABELS = Object.freeze({ email: "Email", sms: "Text / SMS", discord: "Discord" });
+
+function notificationEnabled(channel) {
+    return document.querySelector(`[data-notification-enabled="${channel}"]`)?.checked === true;
 }
 
-function getNotificationMethod() {
-    return normalizeString(
-        document.querySelector(
-            'input[name="notificationMethod"]:checked'
-        )?.value
+function reminderParts(totalMinutes) {
+    return { days: Math.floor(totalMinutes / 1440), hours: Math.floor(totalMinutes % 1440 / 60), minutes: totalMinutes % 60 };
+}
+
+function createRegistrationReminderInput(channel, index, unit, max, value) {
+    const label = document.createElement("label");
+    label.className = "registration-reminder-field";
+    const caption = document.createElement("span");
+    caption.textContent = unit;
+    const input = document.createElement("input");
+    input.type = "number";
+    input.min = "0";
+    input.max = String(max);
+    input.step = "1";
+    input.value = value === null ? "" : String(value);
+    input.placeholder = "0";
+    input.dataset.reminderUnit = unit;
+    input.setAttribute("aria-label", `${NOTIFICATION_LABELS[channel]} reminder ${index} ${unit}`);
+    label.append(caption, input);
+    return label;
+}
+
+function appendRegistrationReminder(channel, container, totalMinutes = null) {
+    if (container.children.length >= REMINDER_LIMITS.maxPerChannel) return;
+    const number = container.children.length + 1;
+    const parts = totalMinutes === null ? { days: null, hours: null, minutes: null } : reminderParts(totalMinutes);
+    const row = document.createElement("div");
+    row.className = "registration-reminder-row";
+    row.dataset.reminderRow = "true";
+    const fields = document.createElement("div");
+    fields.className = "registration-reminder-fields";
+    fields.append(
+        createRegistrationReminderInput(channel, number, "days", 7, parts.days),
+        createRegistrationReminderInput(channel, number, "hours", 23, parts.hours),
+        createRegistrationReminderInput(channel, number, "minutes", 59, parts.minutes)
     );
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "secondary-button registration-reminder-remove";
+    remove.textContent = "Remove";
+    remove.setAttribute("aria-label", `Remove ${NOTIFICATION_LABELS[channel]} reminder ${number}`);
+    remove.addEventListener("click", () => {
+        row.remove();
+        [...container.children].forEach((item, itemIndex) => {
+            const nextNumber = itemIndex + 1;
+            item.querySelectorAll("input").forEach(input => input.setAttribute("aria-label", `${NOTIFICATION_LABELS[channel]} reminder ${nextNumber} ${input.dataset.reminderUnit}`));
+            item.querySelector("button").setAttribute("aria-label", `Remove ${NOTIFICATION_LABELS[channel]} reminder ${nextNumber}`);
+        });
+        container.parentElement.querySelector(".registration-reminder-add").disabled = container.children.length >= REMINDER_LIMITS.maxPerChannel;
+        updateRegistrationReminderWarning();
+    });
+    fields.addEventListener("input", updateRegistrationReminderWarning);
+    row.append(fields, remove);
+    container.append(row);
+}
+
+function renderRegistrationNotifications(notifications, profileExists = false, confirmed = true) {
+    const fieldset = document.getElementById("registrationNotificationsV2Fieldset");
+    const root = document.getElementById("registrationNotificationChannels");
+    const valid = isNotificationsV2(notifications);
+    registrationNotificationsConfirmed = !profileExists || (confirmed && valid);
+    fieldset.disabled = profileExists && !registrationNotificationsConfirmed;
+    const notice = document.getElementById("registrationNotificationsAvailabilityNotice");
+    notice.hidden = !profileExists || registrationNotificationsConfirmed;
+    root.replaceChildren();
+    const values = valid ? notifications : { email: { enabled: false, reminders: [] }, sms: { enabled: false, reminders: [] }, discord: { enabled: false, reminders: [] } };
+
+    for (const channel of NOTIFICATION_CHANNELS) {
+        const card = document.createElement("section");
+        card.className = "registration-notification-card";
+        const label = document.createElement("label");
+        label.className = "toggle-row registration-notification-toggle";
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.dataset.notificationEnabled = channel;
+        checkbox.checked = values[channel].enabled === true;
+        checkbox.indeterminate = profileExists && !registrationNotificationsConfirmed;
+        checkbox.setAttribute("aria-label", `Enable ${NOTIFICATION_LABELS[channel]} reminders`);
+        if (channel === "discord") checkbox.setAttribute("aria-describedby", "discordNotificationStatus");
+        const switchVisual = document.createElement("span");
+        switchVisual.className = "toggle-control";
+        switchVisual.setAttribute("aria-hidden", "true");
+        const title = document.createElement("span");
+        const strong = document.createElement("strong");
+        strong.textContent = `Enable ${NOTIFICATION_LABELS[channel]} reminders`;
+        const description = document.createElement("small");
+        description.textContent = channel === "discord"
+            ? "Requires current server-side Discord eligibility."
+            : "Reminder times remain saved while this channel is off.";
+        title.append(strong, description);
+        label.append(checkbox, switchVisual, title);
+        const reminders = document.createElement("div");
+        reminders.className = "registration-reminders";
+        reminders.dataset.reminderChannel = channel;
+        for (const minutes of values[channel].reminders.slice(0, REMINDER_LIMITS.maxPerChannel)) appendRegistrationReminder(channel, reminders, minutes);
+        const add = document.createElement("button");
+        add.type = "button";
+        add.className = "secondary-button registration-reminder-add";
+        add.textContent = "Add reminder time";
+        add.disabled = reminders.children.length >= REMINDER_LIMITS.maxPerChannel;
+        add.addEventListener("click", () => {
+            appendRegistrationReminder(channel, reminders, 15);
+            add.disabled = reminders.children.length >= REMINDER_LIMITS.maxPerChannel;
+            updateRegistrationReminderWarning();
+        });
+        card.append(label, reminders, add);
+        root.append(card);
+    }
+    updateRegistrationReminderWarning();
+    updateNotificationState();
+}
+
+function readRegistrationNotifications() {
+    const settings = {};
+    for (const channel of NOTIFICATION_CHANNELS) {
+        const reminders = [];
+        for (const row of document.querySelectorAll(`[data-reminder-channel="${channel}"] [data-reminder-row]`)) {
+            const parts = Object.fromEntries([...row.querySelectorAll("input[data-reminder-unit]")].map(input => [input.dataset.reminderUnit, input.value]));
+            const parsed = reminderMinutesFromParts(parts.days, parts.hours, parts.minutes);
+            if (parsed.error) return { settings: null, error: parsed.error };
+            if (!parsed.empty) reminders.push(parsed.minutes);
+        }
+        settings[channel] = { enabled: notificationEnabled(channel), reminders };
+    }
+    return { settings, error: null };
+}
+
+function updateRegistrationReminderWarning() {
+    const warning = document.getElementById("registrationReminderDuplicateWarning");
+    if (!warning) return;
+    const result = readRegistrationNotifications();
+    warning.hidden = Boolean(result.error) || !getDuplicateReminderChannels(result.settings).length;
 }
 
 function updateNotificationFieldRequirements() {
-    const enabled =
-        getNotificationsEnabled();
-
-    const method =
-        getNotificationMethod();
-
-    const email =
-        document.getElementById(
-            "email"
-        );
-
-    const phone =
-        document.getElementById(
-            "phone"
-        );
-
-    if (
-        email
-    ) {
-        email.required =
-            enabled
-            && method ===
-                "email";
-    }
-
-    if (
-        phone
-    ) {
-        phone.required =
-            enabled
-            && method ===
-                "phone";
-    }
+    const email = document.getElementById("email");
+    const phone = document.getElementById("phone");
+    if (email) email.required = notificationEnabled("email");
+    if (phone) phone.required = notificationEnabled("sms");
 }
 
 function updateNotificationState() {
-    const enabled =
-        getNotificationsEnabled();
-
-    const warning =
-        document.getElementById(
-            "notificationOptOutWarning"
-        );
-
-    const deliveryOptions =
-        document.getElementById(
-            "notificationDeliveryOptions"
-        );
-
-    const reminderOptions =
-        document.getElementById(
-            "reminderOptions"
-        );
-
-    if (
-        warning
-    ) {
-        warning.hidden =
-            enabled;
+    const discordInput = document.querySelector('[data-notification-enabled="discord"]');
+    if (discordInput && !document.getElementById("registrationNotificationsV2Fieldset").disabled) {
+        discordInput.disabled = !discordNotificationState.eligible && !discordInput.checked;
     }
-
-    if (
-        deliveryOptions
-    ) {
-        deliveryOptions.classList.toggle(
-            "notifications-disabled",
-            !enabled
-        );
-
-        deliveryOptions
-            .querySelectorAll(
-                'input[name="notificationMethod"]'
-            )
-            .forEach(
-                input => {
-                    if (
-                        input.value ===
-                        "discord"
-                    ) {
-                        input.disabled =
-                            !enabled
-                            || !discordNotificationState
-                                .eligible;
-                    }
-                    else {
-                        input.disabled =
-                            !enabled;
-                    }
-
-                    input.required =
-                        enabled;
-                }
-            );
-    }
-
-    if (
-        reminderOptions
-    ) {
-        reminderOptions.classList.toggle(
-            "notifications-disabled",
-            !enabled
-        );
-
-        reminderOptions
-            .querySelectorAll(
-                "input"
-            )
-            .forEach(
-                input => {
-                    input.disabled =
-                        !enabled;
-
-                    input.required =
-                        enabled
-                        && input.name ===
-                            "reminderMode";
-                }
-            );
-    }
-
     updateNotificationFieldRequirements();
     updateDirectContactWarning();
-}
-
-function handleNotificationChoiceChange(
-    _event
-) {
-    updateNotificationState();
 }
 
 /* =========================================================
@@ -1513,15 +1531,7 @@ DISCORD NOTIFICATION UI
 ========================================================= */
 
 function resetDiscordNotificationUi() {
-    const discordInput =
-        document.getElementById(
-            "discordNotificationMethod"
-        );
-
-    const choice =
-        document.getElementById(
-            "discordNotificationChoice"
-        );
+    const discordInput = document.querySelector('[data-notification-enabled="discord"]');
 
     const status =
         document.getElementById(
@@ -1553,13 +1563,6 @@ function resetDiscordNotificationUi() {
     ) {
         discordInput.disabled =
             true;
-    }
-
-    if (
-        choice
-    ) {
-        choice.dataset.discordEligible =
-            "false";
     }
 
     if (
@@ -1602,15 +1605,7 @@ function applyDiscordNotificationState() {
     const state =
         discordNotificationState;
 
-    const discordInput =
-        document.getElementById(
-            "discordNotificationMethod"
-        );
-
-    const choice =
-        document.getElementById(
-            "discordNotificationChoice"
-        );
+    const discordInput = document.querySelector('[data-notification-enabled="discord"]');
 
     const status =
         document.getElementById(
@@ -1637,22 +1632,12 @@ function applyDiscordNotificationState() {
             "installDiscordMatchBotButton"
         );
 
-    if (
-        choice
-    ) {
-        choice.dataset.discordEligible =
-            String(
-                state.eligible
-            );
-    }
-
     const selectedDiscord = discordInput?.checked === true;
     if (
         discordInput
     ) {
         discordInput.disabled =
-            !getNotificationsEnabled()
-            || (!state.eligible && !selectedDiscord);
+            !state.eligible && !selectedDiscord;
     }
 
     if (
@@ -1669,8 +1654,7 @@ function applyDiscordNotificationState() {
         botRequired.hidden =
             !state.checked
             || !state.discordLinked
-            || !getNotificationsEnabled()
-            || getNotificationMethod() !== "discord"
+            || !notificationEnabled("discord")
             || state.status !== "available"
             || state.matchBotAvailable;
     }
@@ -1689,8 +1673,7 @@ function applyDiscordNotificationState() {
             !(
                 state.checked
                 && state.discordLinked
-                && getNotificationsEnabled()
-                && getNotificationMethod() === "discord"
+                && notificationEnabled("discord")
                 && state.status === "available"
                 && state.reason === "MATCHBOT_REQUIRED"
                 && !state.matchBotAvailable
@@ -1741,7 +1724,7 @@ function applyDiscordNotificationState() {
     updateNotificationState();
 }
 
-async function checkDiscordNotificationEligibility() {
+async function checkDiscordNotificationEligibility(force = false) {
     resetDiscordNotificationUi();
 
     try {
@@ -1750,7 +1733,9 @@ async function checkDiscordNotificationEligibility() {
                 DISCORD_NOTIFICATION_STATUS_URL,
                 {
                     method:
-                        "GET",
+                        force ? "POST" : "GET",
+
+                    ...(force ? { body: "{}" } : {}),
 
                     credentials:
                         "same-origin",
@@ -1759,6 +1744,7 @@ async function checkDiscordNotificationEligibility() {
                         "no-store",
 
                     headers: {
+                        ...(force ? { "Content-Type": "application/json" } : {}),
                         "Accept":
                             "application/json"
                     }
@@ -1971,19 +1957,7 @@ function normalizeProfile(
             typeof setting("findProfileEnabled", "find_profile_enabled") === "boolean"
                 ? setting("findProfileEnabled", "find_profile_enabled")
                 : null,
-
-        notificationsEnabled:
-            typeof setting("notificationsEnabled") === "boolean" ? setting("notificationsEnabled") : null,
-
-        notificationMethod:
-            normalizeString(
-                setting("notificationMethod")
-            ),
-
-        reminderMode:
-            normalizeString(
-                setting("reminderMode")
-            ),
+        notificationsV2: normalizeObject(setting("notificationsV2", "notifications_v2")),
 
         ageConsent:
             profile.ageConsent ===
@@ -2101,21 +2075,10 @@ function populateProfileForm(
         findProfileNotice.textContent = "Your saved Find Players preference could not be confirmed. It is locked and won’t be changed while you complete setup.";
     }
 
-    if (typeof settings.notificationsEnabled === "boolean") setRadioValue("notificationsEnabled", settings.notificationsEnabled ? "true" : "false");
-
-
-    if (
-        settings.notificationMethod
-    ) {
-        setRadioValue(
-            "notificationMethod",
-            settings.notificationMethod
-        );
-    }
-
-    setRadioValue(
-        "reminderMode",
-        settings.reminderMode
+    renderRegistrationNotifications(
+        settings.notificationsV2,
+        profile.profileExists === true,
+        profile.settingsAvailability?.notificationsV2 === true
     );
 
     populateAvailability(
@@ -2421,22 +2384,9 @@ function saveRegistrationDraft(
             )
                 ? payload.availability
                 : [],
-
-        notificationsEnabled:
-            payload?.notificationsEnabled ===
-            true,
-
-        notificationMethod:
-            normalizeString(
-                payload?.notificationMethod
-            )
-            || null,
-
-        reminderMode:
-            normalizeString(
-                payload?.reminderMode
-            )
-            || null
+        ...(registrationNotificationsConfirmed && isNotificationsV2(payload?.notificationsV2)
+            ? { notificationsV2: JSON.parse(JSON.stringify(payload.notificationsV2)) }
+            : {})
     };
 
     try {
@@ -2528,26 +2478,7 @@ function populateDraft(
         draft.findProfileEnabled
     );
 
-    setRadioValue(
-        "notificationsEnabled",
-        draft.notificationsEnabled
-            ? "true"
-            : "false"
-    );
-
-    if (
-        draft.notificationMethod
-    ) {
-        setRadioValue(
-            "notificationMethod",
-            draft.notificationMethod
-        );
-    }
-
-    setRadioValue(
-        "reminderMode",
-        draft.reminderMode
-    );
+    renderRegistrationNotifications(draft.notificationsV2, false, true);
 
     populateAvailability(
         draft.availability
@@ -2570,11 +2501,10 @@ function buildRegistrationPayload(
             form
         );
 
-    const notificationsEnabled =
-        getNotificationsEnabled();
-
     const autoDetectRegion =
         getAutoDetectRegionEnabled();
+
+    const notificationResult = readRegistrationNotifications();
 
     return {
         primaryPlatform: normalizeString(data.get("primaryPlatform")),
@@ -2651,17 +2581,9 @@ function buildRegistrationPayload(
         availability:
             getAvailability(),
 
-        notificationsEnabled,
-
-        notificationMethod:
-            notificationsEnabled
-                ? getNotificationMethod()
-                : null,
-
-        reminderMode:
-            notificationsEnabled
-                ? normalizeString(data.get("reminderMode"))
-                : null
+        ...(registrationNotificationsConfirmed && !notificationResult.error
+            ? { notificationsV2: notificationResult.settings }
+            : {})
     };
 }
 
@@ -2670,7 +2592,8 @@ VALIDATION
 ========================================================= */
 
 function validateRegistrationPayload(
-    payload
+    payload,
+    form
 ) {
     if (
         payload.ageConsent !==
@@ -2755,46 +2678,16 @@ function validateRegistrationPayload(
         );
     }
 
-    if (
-        payload.notificationsEnabled
-    ) {
-        if (
-            !payload.notificationMethod
-        ) {
-            return (
-                "Choose a notification method or opt out of match notifications."
-            );
+    if (payload.notificationsV2) {
+        const notificationError = validateNotificationsV2(payload.notificationsV2, payload.email, payload.phone);
+        if (notificationError) return notificationError;
+        if (payload.notificationsV2.email.enabled && !document.getElementById("email").checkValidity()) {
+            return "Enter a valid email address to enable email reminders.";
         }
-
-        if (
-            payload.notificationMethod ===
-                "email"
-            && !payload.email
-        ) {
-            return (
-                "Enter an email address to use email notifications, choose another notification method, or opt out."
-            );
-        }
-
-        if (
-            payload.notificationMethod ===
-                "phone"
-            && !payload.phone
-        ) {
-            return (
-                "Enter a phone number to use phone notifications, choose another notification method, or opt out."
-            );
-        }
-
-        if (
-            payload.notificationMethod ===
-                "discord"
-            && !discordNotificationState
-                .eligible
-        ) {
-            return (
-                "Discord notifications are not available until your linked Discord account shares a server with BPD MatchBot."
-            );
+        if (payload.notificationsV2.discord.enabled
+            && form?.dataset.discordPreviouslyEnabled !== "true"
+            && !discordNotificationState.eligible) {
+            return "Discord notifications are not available until your linked Discord account shares a server with BPD MatchBot.";
         }
     }
 
@@ -2833,30 +2726,22 @@ async function submitRegistration(
     updateDirectContactWarning();
     updateNotificationState();
 
-    if (
-        !form.reportValidity()
-    ) {
+    const notificationInputs = readRegistrationNotifications();
+    if (registrationNotificationsConfirmed && notificationInputs.error) {
+        showMessage(notificationInputs.error, "error");
         return;
     }
 
-    const payload =
-        buildRegistrationPayload(
-            form
-        );
-
-    const validationError =
-        validateRegistrationPayload(
-            payload
-        );
+    const payload = buildRegistrationPayload(form);
+    const validationError = validateRegistrationPayload(payload, form);
+    if (validationError) {
+        showMessage(validationError, "error");
+        return;
+    }
 
     if (
-        validationError
+        !form.reportValidity()
     ) {
-        showMessage(
-            validationError,
-            "error"
-        );
-
         return;
     }
 
@@ -3134,43 +3019,15 @@ export async function initializePage() {
     NOTIFICATIONS
     ===================================================== */
 
-    document
-        .querySelectorAll(
-            'input[name="notificationsEnabled"]'
-        )
-        .forEach(
-            input => {
-                input.addEventListener(
-                    "change",
-                    handleNotificationChoiceChange
-                );
-            }
-        );
-
-    document
-        .querySelectorAll(
-            'input[name="notificationMethod"]'
-        )
-        .forEach(
-            input => {
-                input.addEventListener(
-                    "change",
-                    () => {
-                        updateNotificationState();
-
-                        if (
-                            input.value ===
-                                "discord"
-                            && input.checked
-                            && !discordNotificationState
-                                .eligible
-                        ) {
-                            applyDiscordNotificationState();
-                        }
-                    }
-                );
-            }
-        );
+    const notificationRoot = document.getElementById("registrationNotificationChannels");
+    notificationRoot?.addEventListener("change", event => {
+        if (event.target.matches("[data-notification-enabled]")) {
+            updateRegistrationReminderWarning();
+            updateNotificationState();
+            applyDiscordNotificationState();
+        }
+    });
+    notificationRoot?.addEventListener("input", updateRegistrationReminderWarning);
 
     /* =====================================================
     MATCHBOT
@@ -3191,7 +3048,7 @@ export async function initializePage() {
         )
         ?.addEventListener(
             "click",
-            checkDiscordNotificationEligibility
+            () => checkDiscordNotificationEligibility(true)
         );
 
     form.addEventListener("input", () => { form.dataset.draftDirty = "true"; });
@@ -3227,6 +3084,9 @@ export async function initializePage() {
     form.dataset.profileExists = profileResult.profileExists === true || profileResult.profile?.profileExists === true ? "true" : "false";
     form.dataset.findProfileEnabledConfirmed = profileResult.profile?.settingsAvailability?.findProfileEnabled === true
         && typeof profileResult.profile?.settings?.findProfileEnabled === "boolean" ? "true" : "false";
+    const savedNotificationsV2 = profileResult.profile?.settings?.notificationsV2;
+    form.dataset.discordPreviouslyEnabled = profileResult.profile?.settingsAvailability?.notificationsV2 === true
+        && savedNotificationsV2?.discord?.enabled === true ? "true" : "false";
 
     const profileComplete = profileResult.profileComplete === true
         || profileResult.profile?.profileComplete === true;
@@ -3284,6 +3144,11 @@ function restoreRegistrationDraft(profileResult) {
         checkbox.checked = confirmed && settings.findProfileEnabled === true;
         checkbox.indeterminate = !confirmed;
         checkbox.disabled = !confirmed;
+        renderRegistrationNotifications(
+            settings.notificationsV2,
+            true,
+            profile.settingsAvailability?.notificationsV2 === true
+        );
     }
     showMessage("Your locally saved registration draft has been restored. Please review it and confirm the required consent fields.", "info");
     return true;

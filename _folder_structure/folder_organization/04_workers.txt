@@ -1,21 +1,29 @@
 WORKERS/: INDEPENDENT CLOUDFLARE WORKERS
-Snapshot: 2026-10-03
+Snapshot: 2026-10-04
 
 ROLE
 
-workers/ contains four separately configured Worker deployments. They do not use
+workers/ contains five separately configured Worker deployments. They do not use
 the root Pages wrangler.jsonc at deployment time; each child owns its entrypoint,
 bindings, routes, triggers, and observability settings.
 
-Discord MatchBot runtime status: none of these Workers owns a persistent Discord
-Gateway session or guild registry. MatchBot REST services and signed interaction
-routes currently live under functions/; they are request-driven and do not
-receive Gateway READY/GUILD_CREATE/GUILD_DELETE lifecycle events. A future
-Gateway runtime is only a proposal in _structure_details/system-map.md.
+Discord MatchBot runtime status: bpd-provider-runtime is a stateless, private
+REST validator with no Gateway session, guild registry persistence, or schedule.
+Pages and the hourly refresh Worker call it through Service Bindings; DomainData
+owns canonical identity resolution, Supabase inventory/state RPCs, freshness,
+batching, forced rechecks, and safe UI responses. Existing MatchBot REST services
+and signed interaction routes also remain under functions/; they are request-
+driven and do not receive Gateway READY/GUILD_CREATE/GUILD_DELETE lifecycle
+events.
 
 HIERARCHY
 
 workers/
++-- bpd-provider-runtime/
+|   +-- wrangler.jsonc       Private Worker; workers_dev and preview URLs disabled.
+|   +-- README.md             Internal Discord API contract, secret/config requirements, and integration blocker.
+|   +-- src/index.js          Stateless Discord guild inventory/member validator; no Supabase, schedule, or Durable Object.
+|   +-- tests/discord.test.mjs Inventory completeness, sharding, validation, provider errors, and privacy tests.
 +-- google-mtls-diagnostic/
 |   +-- wrangler.jsonc
 |   +-- README.md          Temporary, protected, manually invoked WIF/mTLS probes.
@@ -40,7 +48,7 @@ workers/
 |   +-- src/
 |   |   +-- index.js             /health, protected /admin/health, authorized /wake, cron dispatcher, presence heartbeat.
 |   |   +-- presence_cycle.js    Supabase-eligible candidates, normalized presence fetch/save cycle.
-|   |   +-- rl_refresh_cycle.js  Due-aware paged MMR/profile/stats/club refresh orchestration.
+|   |   +-- rl_refresh_cycle.js  Due-aware paged MMR/profile/stats/club/Discord refresh orchestration.
 |   |   +-- rl_shop_refresh.js   Hourly global Shop snapshot fetch/hash/save/checkpoint.
 |   |   +-- scheduled_mmr.js     Legacy weekly MMR refresh implementation (retained, no longer scheduled).
 |   |   +-- taskboard_summary.js Taskboard aggregate load and Discord delivery.
@@ -120,12 +128,14 @@ Runtime relationships
         -> requests only due MMR/profile/club/career_stats capabilities through
            /get-player-data, persists successful values, and checkpoints each
            component independently
+        -> obtains/reconciles one complete bot-guild inventory each hour, even
+           when no Discord account is due; only confirmed
+           membership sets are synced, then each Discord component is checkpointed
         -> rl_shop_refresh.js calls the protected MMR /get-shop-data endpoint
            once; the MMR Worker makes two PsyNet shop reads
         -> hashes the normalized response and calls api.save_rl_shop_snapshot
            plus api.record_rl_global_refresh_result (key shop)
-        -> history remains unsupported for arbitrary scheduled player IDs;
-           Discord refresh remains unavailable without a Gateway runtime
+        -> history remains unsupported for arbitrary scheduled player IDs
     daily cron
         -> taskboard_summary.js
         -> loads Supabase Taskboard aggregates and sends Discord summary output
@@ -135,7 +145,7 @@ GOOGLE mTLS DIAGNOSTIC WORKER
 Configuration
     Worker name       bpd-google-mtls-diagnostic
     Entry             src/index.js
-    Runtime URL       workers.dev; every route requires a dedicated bearer secret
+    Runtime URL       no public route; Pages and rl-presence-monitor use Service Bindings
     mTLS binding      OCR_GCP_MTLS from the configured Cloudflare mTLS certificate
     Triggers          none; no cron, queue, or automatic retries
     Rates             calls occur only for an explicit authorized request:

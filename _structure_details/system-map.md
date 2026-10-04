@@ -1,6 +1,6 @@
 # DomainData System Map
 
-Snapshot: 2026-10-02
+Snapshot: 2026-10-04
 
 ## Runtime overview
 
@@ -19,8 +19,8 @@ validated server-side before account resolution and BPD session finalization.
 Epic has a separate direct OAuth callback and server-only credential exchange.
 OAuth/session cookies are Secure, HttpOnly, host-only, `Path=/`, and
 `SameSite=Lax`; browser storage and popups are not part of the auth contract.
-Discord account linking is independent of the currently unavailable MatchBot
-mutual-guild check. See [authentication and mobile compatibility](auth-mobile-compatibility.md)
+Discord account linking is independent of the REST-based MatchBot mutual-guild
+eligibility check. See [authentication and mobile compatibility](auth-mobile-compatibility.md)
 for the detailed flow map, provider-console checks, and physical-device matrix.
 
 The shared Rocket League sidebar is implemented in
@@ -68,8 +68,17 @@ wake the presence monitor or call the MMR/provider Worker. No direct Supabase
 table access was added. The public Rocket League hub remains visible for
 incomplete profiles and presents a setup notice/CTA; protected features retain
 their own access requirements. Notifications may be disabled without blocking
-profile completion, with an informational warning shown in both setup and My
-Profile.
+profile completion. Registration and My Profile use the same V2 notification
+settings model: email, SMS, and Discord can be enabled independently, each with
+up to three reminder offsets (15 minutes through 7 days 23 hours). Both editors
+share validation and duplicate-time warning helpers. Discord eligibility remains
+server-verified through `/api/auth/rocketleague/discord-notifications`. My
+Profile and Registration disable new Discord opt-in when that check is not
+eligible. Server saves also reject a newly enabled Discord preference unless
+eligibility is confirmed. If a previously enabled preference loses eligibility,
+its saved reminder values are preserved while the UI marks Discord unavailable;
+the repository has no Discord notification-delivery dispatcher, so no delivery
+is claimed by this state.
 
 The signed-in `/RocketLeague` home displays current saved ranks, career totals,
 per-playlist capture-to-capture changes, and a graph of up to the latest 15 MMR
@@ -105,90 +114,58 @@ Results, Weekly Matches, My Matches, and Private Matches have shell-integrated
 status pages rather than reusing the Rocket League landing page or displaying
 fabricated records.
 
-Discord MatchBot eligibility currently returns a scoped `unavailable` result
-from `functions/services/auth/providers/discord_matchbot/eligibility.js` for
-linked Discord accounts. Static `DISCORD_GUILD_ID(S)` configuration is no
-longer read by that service. The candidate `/users/@me/guilds` route requires a
-user OAuth token with the `guilds` scope; it is not an authoritative bot guild
-inventory and must not be called with `DISCORD_MATCHBOT_TOKEN`. DomainData has
-request-driven MatchBot REST services and signed interaction handlers, but no
-persistent Discord Gateway runtime, lifecycle-event receiver, reconnect owner,
-or authoritative guild-registry writer. Profile reads and settings remain
-usable while this optional check is unavailable. Registration initialization
-isolates the check from profile loading, and the invalid `Set.filter()` call
-was fixed by filtering the array before constructing the set.
+Discord MatchBot eligibility is a REST-only provider check. DomainData resolves
+the authenticated BPD account and canonical linked Discord identity, applies
+freshness/cache/backoff rules, and owns on-demand checks, hourly reconciliation,
+Supabase persistence, and browser-safe status. The private
+`bpd-provider-runtime` Worker owns only stateless Discord bot-guild inventory
+and membership validation, plus its internal health response. DomainData calls
+it through a Service Binding with internal caller authentication; it has no
+public route, Supabase credentials, scheduling, account lookup, or persistence.
+The Worker requests a complete validated paginated guild inventory, explicitly
+enumerates shards when the configured large-bot mode requires it, then checks
+the canonical linked user's membership. Missing/invalid shard configuration,
+incomplete inventory, timeouts, rate limits, and provider errors fail closed.
+Only a complete successful result is persisted; provider failure preserves the
+last known eligibility. Member-endpoint 404 means nonmembership, while a guild
+or bot-access 404 is unavailable. Fresh cached state avoids provider calls;
+stale/unknown state is checked on demand, Check Again forces a refresh, and the
+scheduled reconciler refreshes eligible accounts independently of page views.
+No Gateway or persistent Discord session is used. The formerly proposed
+Gateway-owned guild registry, ingestion endpoint, and Cloud Run worker-pool
+design are obsolete and are not part of the current architecture.
 
-#### Confirmed gap and proposed future boundary (not implemented)
+#### Central notification system (approved direction; not implemented)
 
-The known BPD repositories have no owner for Gateway `READY`, `GUILD_CREATE`,
-`GUILD_DELETE`, reconnect/session state, or startup guild reconciliation. Do not
-simulate these events in Pages Functions. The current integration intentionally
-does not claim mutual-guild eligibility until a persistent runtime is approved
-and exists.
+The repository does not yet contain a general website notification inbox or
+durable cross-channel delivery system. Existing Rocket League reminder
+preferences, Discord eligibility checks, Taskboard messages, and Discord
+interactions remain separate features; none is the general notification
+delivery path.
 
-Recommended future owner: a standalone `bpd-matchbot-gateway` container project,
-deployed as a single-instance Google Cloud Run worker pool in the existing
-Google Cloud environment. This workload is continuous background work, needs
-no public HTTP endpoint, and can initiate the Discord Gateway WebSocket
-outbound. Configure exactly one active instance initially; reconnects and
-replayed lifecycle events must be handled idempotently. Cloud Run worker pools
-are intended for continuous background processes and have no load-balanced
-HTTP endpoint; instances must be kept above zero and are restarted periodically,
-so Gateway reconnect plus full startup reconciliation are mandatory. See [Cloud Run worker
-pools](https://docs.cloud.google.com/run/docs/deploy-worker-pools) and [Cloud
-Run resource types](https://docs.cloud.google.com/run/docs/overview/what-is-cloud-run).
+The website notification record is intended to be the durable source of truth;
+Discord DM is an optional secondary channel. DomainData remains responsible for
+Admin authorization, audience resolution, recipient snapshots, inbox
+creation/read state, and delivery orchestration. Admin role targeting uses the
+existing Admin/Moderator/League Staff permission groups, not the distinct
+`identity.account_roles` responsibility roles. Discord DM consent must be an
+independent opt-in and must not reuse Rocket League reminder consent. The first
+user surface is a shared notification panel/inbox; a full history page can be
+added later if needed.
 
-Proposed responsibilities and data boundary:
-
-- Gateway container: own the Discord Gateway session; request only the guild
-  lifecycle intent; after a fully ready session, reconcile its complete current
-  guild set, then emit lifecycle events. Keep the bot token in Google Secret
-  Manager. Never write user membership data or hold a copy of Supabase's
-  service-role credential.
-- Durable source of truth: a future Supabase registry table, for example
-  `core.discord_matchbot_guild_registry`, with `guild_id` as the key and only
-  operational fields (`active`, temporary-unavailable state, `joined_at`,
-  `left_at`, `last_seen_at`, `updated_at`, reconciliation/event identifiers).
-  Do not store bot credentials or unnecessary guild/member data. This requires
-  a separately reviewed Supabase migration; none is part of the current work.
-- Write contract: the Gateway calls a new narrowly scoped DomainData Pages
-  ingestion endpoint over HTTPS. Sign method, path, timestamp, event ID, and
-  raw body with a dedicated rotated HMAC secret held in Google Secret Manager
-  and as a Cloudflare Pages secret. Enforce a short clock-skew window,
-  idempotent event IDs, strict Discord snowflake validation, payload limits,
-  and rate limits. Pages validates the signature and writes only through
-  service-side Supabase RPCs under the existing server credential. The Gateway
-  receives no registry read access and no database credential. These endpoint,
-  secret, RPC, and table contracts are proposed only; no binding or secret has
-  been added.
-- Event semantics: `GUILD_CREATE` upserts active; `GUILD_DELETE` with
-  `unavailable=true` marks temporarily unavailable without recording a
-  permanent leave; other deletes mark inactive and set `left_at`. A startup
-  reconcile is accepted only after Gateway READY and complete guild-cache
-  hydration, then atomically marks the supplied set active and stale entries
-  inactive. Serialize reconciliation and event writes by event/reconcile ID.
-- Read contract: the existing authenticated DomainData eligibility service
-  reads only active guild IDs server-side, intersects them with the linked
-  user's current membership using the existing bot member lookup, and returns
-  safe status/count metadata only. A confirmed zero after a complete check may
-  raise the existing eligibility-loss warning; partial REST failures remain
-  unavailable, never “removed.” One surviving mutual guild keeps eligibility.
-- Storage/bindings: the proposed design uses the existing Pages-side
-  `SUPABASE_AUTH` server credential and adds a dedicated Supabase table/RPC
-  contract plus a Cloudflare secret; it needs no new KV binding and does not
-  reuse `AUTH_SESSIONS` or `RL_STATS_CACHE` for guild state. The Cloud Run
-  worker pool has no inbound binding/route. No Guild Members intent or full
-  member mirror is proposed.
-- Rate/scale guard: current membership checks cost up to one Discord REST lookup
-  per active bot guild to compute an exact count. Keep bounded concurrency and
-  shared short-lived caching; if the guild count exceeds a configured safe
-  scan budget, return `partial/unavailable` rather than false ineligibility.
-  A reverse membership index is a later design only if measured traffic or
-  Discord rate limits require it.
-
-The repository inventory in `_folder_structure/folder_organization/04_workers.txt`
-records that no Discord Gateway Worker currently exists. This proposal does
-not establish that an external `bpd-matchbot-gateway` repository already exists.
+Proposed flow: authorize the Admin action; resolve and snapshot recipients;
+commit the website notification and per-recipient inbox records; then enqueue
+optional Discord DM deliveries. A separate `bpd-notification-delivery` Worker
+or queue consumer may receive bounded delivery jobs, send DMs, and return
+normalized outcomes with bounded retry/backoff. It must not resolve accounts or
+roles, choose audiences, authorize Admins, own inbox persistence decisions, or
+share Rocket League provider-session state. Discord DMs stay outside
+`bpd-provider-runtime`, whose current boundary remains provider validation and
+narrow checks. Discord delivery failures must not erase or block the website
+inbox notification. Exact storage, queue, callback, and deployment contracts
+remain future design work. The authoritative production Supabase migration
+workflow is not identified in this repository and must be established before
+schema work; no migration location or database contract is assumed here.
 
 Normal page reads do not call the provider. A single hourly cron on the existing
 Rocket League background Worker asks the live
@@ -201,8 +178,8 @@ checkpointed independently with `api.record_rl_player_refresh_result`. Incomplet
 career stats are never persisted. The Supabase due flags control per-capability
 cadence, so the hourly schedule does not imply an hourly request per player.
 History remains unsupported for linked users because the Worker only has its
-shared service-account PsyNet session; Discord refresh remains unavailable until
-a persistent Gateway/runtime provides authoritative state. The same hourly
+shared service-account PsyNet session. Discord eligibility refresh is performed
+through the separate REST-only `bpd-provider-runtime` path described above. The same hourly
 trigger starts an independent global Shop job: it calls the protected
 `/get-shop-data` endpoint, hashes the normalized catalogue, saves it through
 `api.save_rl_shop_snapshot`, and records the global `shop` refresh result. The

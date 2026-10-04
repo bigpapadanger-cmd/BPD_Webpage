@@ -30,6 +30,8 @@
 .my-profile-section-heading { display: flex; align-items: end; justify-content: space-between; gap: 14px; }
 .my-profile-section h2 { margin: 0; color: #fff; font-size: 1.35rem; }
 .my-profile-note { margin: 10px 0 0; }
+#myProfileDiscordNotificationStatus[data-state="unavailable"] { color: #f1ca86; }
+#myProfileDiscordNotificationStatus[data-state="ready"] { color: #86e4ba; }
 .my-profile-settings { display: grid; gap: 14px; margin-top: 18px; }
 .my-profile-settings-group { display: grid; gap: 12px; min-width: 0; margin: 0; padding: 16px; border: 1px solid rgba(181, 206, 242, .16); border-radius: 13px; background: rgba(5, 11, 19, .25); }
 .my-profile-settings-group legend { padding: 0 8px; color: #dfeaff; font-weight: 800; }
@@ -46,12 +48,42 @@
 .my-profile-toggle input { width: 18px; height: 18px; margin-top: 2px; }
 .my-profile-toggle strong, .my-profile-toggle small { display: block; }
 .my-profile-toggle small { margin-top: 4px; color: #aebbd0; line-height: 1.5; }
+.my-profile-notifications { display: grid; gap: 12px; min-width: 0; margin: 0; padding: 16px; border: 1px solid rgba(181, 206, 242, .16); border-radius: 13px; background: rgba(5, 11, 19, .25); }
+.my-profile-notifications legend { padding: 0 8px; color: #dfeaff; font-weight: 800; }
+.my-profile-notification-channels { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.my-profile-notification-channel { display: grid; align-content: start; gap: 10px; min-width: 0; padding: 12px; border: 1px solid rgba(181, 206, 242, .14); border-radius: 11px; background: rgba(5, 11, 19, .3); }
+.my-profile-reminders { display: grid; gap: 9px; }
+.my-profile-reminder-row { display: grid; gap: 8px; min-width: 0; padding: 9px; border: 1px solid rgba(181, 206, 242, .12); border-radius: 9px; }
+.my-profile-reminder-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.my-profile-reminder-field { display: grid; gap: 4px; min-width: 0; color: #aebbd0; font-size: .72rem; }
+.my-profile-reminder-field input { width: 100%; min-width: 0; min-height: 36px; padding: 6px; border: 1px solid rgba(181, 206, 242, .25); border-radius: 7px; background: #101b2a; color: #f4f7ff; font: inherit; }
+.my-profile-reminder-field input:focus-visible, .my-profile-reminder-add:focus-visible, .my-profile-reminder-remove:focus-visible { outline: 3px solid rgba(121, 184, 255, .6); outline-offset: 2px; }
+.my-profile-reminder-add, .my-profile-reminder-remove { min-height: 36px; padding: 6px 10px; border: 1px solid rgba(121, 184, 255, .45); border-radius: 8px; background: rgba(31, 92, 153, .22); color: #e4efff; font: inherit; font-weight: 700; cursor: pointer; }
+.my-profile-reminder-remove { justify-self: end; min-height: 30px; font-size: .78rem; }
+.my-profile-reminder-add:disabled, .my-profile-notifications:disabled button { opacity: .55; cursor: not-allowed; }
+.my-profile-discovery-toggle { transition: border-color .18s ease, background-color .18s ease, box-shadow .18s ease; }
+.my-profile-discovery-toggle:has(input:checked) { border-color: rgba(87, 166, 255, .62); background: rgba(31, 92, 153, .2); }
+.my-profile-discovery-toggle:has(input:focus-visible) { outline: 3px solid rgba(121, 184, 255, .6); outline-offset: 2px; }
+.my-profile-discovery-toggle:has(input:indeterminate) { border-style: dashed; cursor: not-allowed; }
 .my-profile-settings button { justify-self: start; min-height: 44px; padding: 0 20px; border: 1px solid #5ea9f9; border-radius: 10px; background: linear-gradient(135deg, #3378c6, #20518e); color: white; font: inherit; font-weight: 800; cursor: pointer; }
 .my-profile-settings button:disabled { opacity: .65; cursor: not-allowed; }
+.my-profile-danger-zone { border-color: rgba(255, 105, 105, .42); }
+.my-profile-danger-warning { color: #ffd4d4; line-height: 1.65; }
+.my-profile-delete-acknowledgment { margin-top: 16px; }
+.my-profile-delete-button { margin-top: 12px; min-height: 44px; padding: 0 20px; border: 1px solid #e56767; border-radius: 10px; background: linear-gradient(135deg, #a8303a, #70202a); color: #fff; font: inherit; font-weight: 800; cursor: pointer; touch-action: none; }
+.my-profile-delete-button:disabled { opacity: .55; cursor: not-allowed; }
+#deleteRlProfileStatus[data-state="error"] { color: #ffb9b9; }
+
+body[data-animations="off"] .my-profile-discovery-toggle { transition: none; }
+
+@media (prefers-reduced-motion: reduce) {
+    .my-profile-discovery-toggle { transition: none; }
+}
 
 @media (max-width: 680px) {
     .my-profile-location { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .my-profile-settings-fields { grid-template-columns: 1fr; }
+    .my-profile-notification-channels { grid-template-columns: 1fr; }
     .my-profile-availability-row { grid-template-columns: minmax(75px, .6fr) repeat(2, minmax(0, 1fr)); gap: 6px; }
 }
 

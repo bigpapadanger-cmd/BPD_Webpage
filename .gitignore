@@ -31,6 +31,7 @@ V12/
 *.backup
 
 **/AGENTS
+AGENTS
 
 # Local Taskboard SQL support
 /functions/services/supabase/admin/tasks/sql/

@@ -75,6 +75,7 @@ test("all Worker call schedules are bounded and diagnostic Worker is manual-only
     const diagnosticConfig = JSON.parse(await readFile(new URL("../../google-mtls-diagnostic/wrangler.jsonc", import.meta.url), "utf8"));
 
     assert.deepEqual(rlConfig.triggers.crons, ["*/15 * * * *", "0 * * * *", "0 12 * * *"]);
+    assert.deepEqual(rlConfig.services, [{ binding: "PROVIDER_RUNTIME", service: "bpd-provider-runtime" }]);
     assert.deepEqual(ocrConfig.triggers.crons, ["*/30 * * * *"]);
     assert.deepEqual(ocrConfig.queues.consumers.map(({ max_batch_size, max_retries, max_concurrency }) => ({ max_batch_size, max_retries, max_concurrency })), [
         { max_batch_size: 1, max_retries: 2, max_concurrency: 2 }
@@ -181,12 +182,19 @@ test("hourly Rocket League schedule pages due candidates using the confirmed RPC
             mmr_due: false, provider_due: false, match_history_due: true,
             club_due: false, career_stats_due: false, discord_due: false
         }]);
+        if (rpc === "sync_discord_bot_guilds") return Response.json({ success: true, checkedAt: body.p_checked_at, upserted: 0, deactivated: 0 });
         if (rpc === "save_rl_shop_snapshot") return Response.json({ saved: false, snapshot_id: 1 });
         if (rpc === "record_rl_player_refresh_result" || rpc === "record_rl_global_refresh_result") return Response.json({ success: true });
         throw new Error(`Unexpected request to ${rpc}`);
     };
     const scheduledEnv = {
         ...env(),
+        SUPABASE_AUTH: "test-service-role-secret",
+        PROVIDER_RUNTIME_CALLER_SECRET: "r".repeat(64),
+        PROVIDER_RUNTIME: { async fetch(request) {
+            assert.equal(new URL(request.url).pathname, "/internal/discord/guild-inventory");
+            return Response.json({ success: true, complete: true, count: 0, guilds: [], capturedAt: new Date().toISOString() });
+        } },
         MMR_API_URL: "https://mmr.example.test",
         MMR_API_KEY: "mmr-test-secret",
         SERVICE_STATUS: {
@@ -202,6 +210,7 @@ test("hourly Rocket League schedule pages due candidates using the confirmed RPC
     const callsByRpc = new Map();
     for (const call of calls) callsByRpc.set(call.rpc, [...(callsByRpc.get(call.rpc) || []), call]);
     assert.equal(callsByRpc.get("get_rl_refresh_candidates").length, 1);
+    assert.equal(callsByRpc.get("sync_discord_bot_guilds").length, 1);
     assert.deepEqual(callsByRpc.get("get_rl_refresh_candidates")[0].body, { p_after_player_id: null, p_limit: 20 });
     assert.equal(callsByRpc.get("get-shop-data").length, 1);
     assert.equal(callsByRpc.get("save_rl_shop_snapshot").length, 1);

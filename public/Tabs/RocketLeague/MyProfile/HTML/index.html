@@ -29,7 +29,7 @@
             <fieldset class="my-profile-settings-group">
                 <legend>Visibility and location</legend>
                 <label class="my-profile-toggle"><input id="showOnlineStatus" type="checkbox"><span><strong>Share online status</strong><small>When disabled, public profiles show “Presence not shared.”</small></span></label>
-                <label class="my-profile-toggle"><input id="findProfileEnabled" type="checkbox"><span><strong>Appear in Find Players</strong><small>Allow other players to discover your opted-in public profile.</small></span></label>
+                <label class="my-profile-toggle my-profile-discovery-toggle"><input id="findProfileEnabled" type="checkbox"><span><strong>Allow my Rocket League profile to appear in Find Players</strong><small>When enabled, your completed profile can appear in public player discovery. This is separate from sharing online status.</small></span></label>
                 <label class="my-profile-toggle"><input id="autoDetectRegion" type="checkbox"><span><strong>Detect approximate region and time zone</strong><small>Turning this off clears saved location details. When on, the server uses request metadata.</small></span></label>
             </fieldset>
 
@@ -46,15 +46,28 @@
                     <label class="my-profile-field" for="profileEmail"><span>Email</span><input id="profileEmail" type="email" maxlength="254" autocomplete="email"></label>
                     <label class="my-profile-field" for="profilePhone"><span>Phone</span><input id="profilePhone" type="tel" maxlength="24" autocomplete="tel"></label>
                 </div>
-                <label class="my-profile-toggle"><input id="notificationsEnabled" type="checkbox"><span><strong>Match notifications</strong><small>Choose where and when to receive match reminders.</small></span></label>
-                <p id="notificationsOptOutNote" class="my-profile-note" role="status" hidden>You may miss scheduled reminders and other alerts while notifications are disabled. This does not prevent profile completion.</p>
-                <div id="notificationFields" class="my-profile-settings-fields">
-                    <label class="my-profile-field" for="notificationMethod"><span>Delivery method</span><select id="notificationMethod"><option value="">Choose a method</option><option value="email">Email</option><option value="phone">Phone</option><option value="discord">Discord (existing preference)</option></select></label>
-                    <label class="my-profile-field" for="reminderMode"><span>Reminder timing</span><select id="reminderMode"><option value="">Choose timing</option><option value="24-hours">24 hours before</option><option value="1-hour">1 hour before</option><option value="both">Both</option></select></label>
-                </div>
-                <p id="discordSettingsNote" class="my-profile-note" hidden>Discord delivery remains subject to the server-side MatchBot availability check.</p>
+                <fieldset id="notificationsV2Fieldset" class="my-profile-notifications">
+                    <legend>Notification channels</legend>
+                    <p class="my-profile-note">Enable any combination of channels. Each can keep up to three reminder times, from 15 minutes to 7 days 23 hours before a match.</p>
+                    <div id="notificationsV2Channels" class="my-profile-notification-channels"></div>
+                    <p id="myProfileDiscordNotificationStatus" class="my-profile-note" role="status" aria-live="polite">Checking Discord notification availability…</p>
+                    <button id="myProfileDiscordCheckAgain" type="button">Check Again</button>
+                    <p id="notificationsV2Notice" class="my-profile-note my-profile-verification" role="status" hidden></p>
+                    <p id="notificationsV2DuplicateWarning" class="my-profile-note" role="status" hidden>Some reminders use the same time. Duplicate reminder times are allowed.</p>
+                </fieldset>
             </fieldset>
             <button id="myProfileSave" type="submit">Update Profile</button>
         </form>
+    </section>
+
+    <section class="my-profile-section my-profile-danger-zone" aria-labelledby="deleteRlProfileTitle">
+        <div class="my-profile-section-heading">
+            <div><p class="my-profile-eyebrow">ACCOUNT ACTION</p><h2 id="deleteRlProfileTitle">Delete Rocket League profile</h2></div>
+        </div>
+        <p class="my-profile-danger-warning">This permanently removes your Rocket League profile and unlinks its Epic identity. Your main BPD account and current sign-in remain. If Epic is your only sign-in method, connect another provider or a replacement Epic account before signing out. Deletion may remove Rocket League competition participation and notification/alert records; some shared audit records may remain without your player association. You can connect an Epic account again when setting up Rocket League.</p>
+        <label class="my-profile-toggle my-profile-delete-acknowledgment"><input id="deleteRlProfileAcknowledgment" type="checkbox"><span><strong>I understand this Rocket League data deletion cannot be undone.</strong><small>This does not delete your main BPD account.</small></span></label>
+        <button id="deleteRlProfileHold" class="my-profile-delete-button" type="button" disabled aria-describedby="deleteRlProfileInstructions">Press and hold to delete</button>
+        <p id="deleteRlProfileInstructions" class="my-profile-note">Keep the button pressed for 3 seconds. Releasing early cancels the action.</p>
+        <p id="deleteRlProfileStatus" class="my-profile-status" role="status" aria-live="polite"></p>
     </section>
 </main>

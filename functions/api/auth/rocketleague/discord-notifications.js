@@ -74,6 +74,12 @@ function jsonResponse(
     );
 }
 
+function isCrossSiteRequest(request) {
+    const origin = normalizeString(request.headers.get("Origin"));
+    return request.headers.get("Sec-Fetch-Site") === "cross-site"
+        || (origin !== "" && origin !== new URL(request.url).origin);
+}
+
 /* =========================================================
 INSTALL URL
 ========================================================= */
@@ -147,14 +153,16 @@ function discordNotLinkedResponse(
 GET
 ========================================================= */
 
-export async function onRequestGet(
-    context
-) {
+async function handleEligibilityRequest(context, force) {
     const {
         request,
         env
     } =
         context;
+
+    if (isCrossSiteRequest(request)) {
+        return jsonResponse({ success: false, code: "CROSS_SITE_REQUEST_REJECTED", message: "This request must come from the BPD website." }, 403);
+    }
 
     try {
         /* =====================================================
@@ -233,7 +241,8 @@ export async function onRequestGet(
         const eligibility =
             await getDiscordMatchBotEligibility(
                 env,
-                discordUserId
+                authorization.accountId,
+                { force }
             );
 
         const eligible =
@@ -255,7 +264,10 @@ export async function onRequestGet(
 
                 matchBotAvailable,
 
-                eligible,
+                eligible:
+                    typeof eligibility?.eligible === "boolean"
+                    ? eligibility.eligible
+                    : null,
 
                 status:
                     normalizeString(eligibility?.status)
@@ -271,6 +283,21 @@ export async function onRequestGet(
 
                 checkedAt:
                     normalizeString(eligibility?.checkedAt)
+                    || null,
+
+                stale:
+                    eligibility?.stale === true,
+
+                retryAfterSeconds:
+                    Number.isSafeInteger(eligibility?.retryAfterSeconds)
+                    ? eligibility.retryAfterSeconds
+                    : null,
+
+                warningRequired:
+                    eligibility?.warningRequired === true,
+
+                snoozedUntil:
+                    normalizeString(eligibility?.snoozedUntil)
                     || null,
 
                 eligibilityLost:
@@ -299,27 +326,6 @@ export async function onRequestGet(
     catch (
         error
     ) {
-        console.error(
-            "ROCKET LEAGUE DISCORD NOTIFICATIONS: Eligibility check failed.",
-            {
-                name:
-                    error?.name
-                    || "Error",
-
-                code:
-                    error?.code
-                    || null,
-
-                status:
-                    error?.status
-                    || null,
-
-                message:
-                    error?.message
-                    || "Unknown error"
-            }
-        );
-
         /* =====================================================
         AUTHORIZATION FAILURE
         ===================================================== */
@@ -371,7 +377,7 @@ export async function onRequestGet(
 
                 matchBotAvailable: false,
 
-                eligible: false,
+                eligible: null,
 
                 status: "unavailable",
 
@@ -379,17 +385,19 @@ export async function onRequestGet(
 
                 countComplete: false,
 
-                checkedAt: new Date().toISOString(),
+                checkedAt: null,
+
+                stale: true,
+
+                warningRequired: false,
+
+                snoozedUntil: null,
 
                 eligibilityLost: false,
 
-                code:
-                    error?.code
-                    || "DISCORD_NOTIFICATION_CHECK_FAILED",
+                code: "DISCORD_NOTIFICATION_CHECK_FAILED",
 
-                reason:
-                    error?.code
-                    || "DISCORD_NOTIFICATION_CHECK_FAILED",
+                reason: "DISCORD_NOTIFICATION_CHECK_FAILED",
 
                 message:
                     "Discord notification availability could not be checked.",
@@ -399,4 +407,31 @@ export async function onRequestGet(
             }
         );
     }
+}
+
+export async function onRequestGet(context) {
+    return handleEligibilityRequest(context, false);
+}
+
+export async function onRequestPost(context) {
+    const { request } = context;
+    if (normalizeString(request.headers.get("Origin")) !== new URL(request.url).origin || isCrossSiteRequest(request)) {
+        return jsonResponse({ success: false, code: "CROSS_SITE_REQUEST_REJECTED", message: "This request must come from the BPD website." }, 403);
+    }
+    const declaredLength = Number(request.headers.get("Content-Length"));
+    if (Number.isFinite(declaredLength) && declaredLength > 128) {
+        return jsonResponse({ success: false, code: "REQUEST_SCHEMA_INVALID", message: "The refresh request is invalid." }, 400);
+    }
+    let body;
+    try {
+        const raw = await request.text();
+        if (raw.length > 128) throw new Error("body");
+        body = JSON.parse(raw);
+    } catch {
+        return jsonResponse({ success: false, code: "REQUEST_SCHEMA_INVALID", message: "The refresh request is invalid." }, 400);
+    }
+    if (!body || typeof body !== "object" || Array.isArray(body) || Object.keys(body).length !== 0) {
+        return jsonResponse({ success: false, code: "REQUEST_SCHEMA_INVALID", message: "The refresh request is invalid." }, 400);
+    }
+    return handleEligibilityRequest(context, true);
 }

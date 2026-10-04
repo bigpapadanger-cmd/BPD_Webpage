@@ -1,8 +1,12 @@
 "use strict";
 
+import { getDuplicateReminderChannels, isNotificationsV2, NOTIFICATION_CHANNELS, REMINDER_LIMITS, reminderMinutesFromParts, validateNotificationsV2 } from "../../shared/notificationsV2.js";
+
+export { getDuplicateReminderChannels, isNotificationsV2, NOTIFICATION_CHANNELS, REMINDER_LIMITS, reminderMinutesFromParts, validateNotificationsV2 };
+
 const EDITABLE_FIELDS = [
     "primaryPlatform", "autoDetectRegion", "showOnlineStatus", "findProfileEnabled", "preferredMode", "otherMode",
-    "availability", "email", "phone", "notificationsEnabled", "notificationMethod", "reminderMode"
+    "availability", "email", "phone", "notificationsV2"
 ];
 
 function isNullableString(value) {
@@ -20,22 +24,21 @@ const SETTING_LABELS = Object.freeze({
     autoDetectRegion: "region detection",
     showOnlineStatus: "online status sharing",
     findProfileEnabled: "Find Players visibility",
+    notificationsV2: "notification channel settings",
     preferredMode: "preferred mode",
     otherMode: "other mode details",
     availability: "weekly availability",
     email: "email",
-    phone: "phone",
-    notificationsEnabled: "match notifications",
-    notificationMethod: "delivery method",
-    reminderMode: "reminder timing"
+    phone: "phone"
 });
 
 function hasValidSettingValue(settings, key) {
     const value = settings?.[key];
-    if (["autoDetectRegion", "showOnlineStatus", "findProfileEnabled", "notificationsEnabled"].includes(key)) {
+    if (["autoDetectRegion", "showOnlineStatus", "findProfileEnabled"].includes(key)) {
         return typeof value === "boolean";
     }
     if (key === "availability") return Array.isArray(value);
+    if (key === "notificationsV2") return isNotificationsV2(value);
     return isNullableString(value);
 }
 
@@ -73,7 +76,6 @@ function preserveNull(original, value) {
 
 export function buildSettingsPayload(profile, values) {
     const original = profile.settings;
-    const notificationsEnabled = values.notificationsEnabled === true;
     return {
         primaryPlatform: preserveNull(original.primaryPlatform, values.primaryPlatform),
         autoDetectRegion: values.autoDetectRegion === true,
@@ -84,8 +86,6 @@ export function buildSettingsPayload(profile, values) {
         preferredMode: preserveNull(original.preferredMode, values.preferredMode),
         otherMode: preserveNull(original.otherMode, values.otherMode),
         availability: values.availability,
-        notificationsEnabled,
-        notificationMethod: notificationsEnabled ? preserveNull(original.notificationMethod, values.notificationMethod) : null,
-        reminderMode: notificationsEnabled ? preserveNull(original.reminderMode, values.reminderMode) : null
+        notificationsV2: values.notificationsV2
     };
 }

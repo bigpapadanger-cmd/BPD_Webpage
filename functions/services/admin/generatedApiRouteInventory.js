@@ -1994,7 +1994,8 @@ export const API_ROUTE_INVENTORY = Object.freeze([
     ],
     "handler": "functions/api/auth/rocketleague/discord-notifications.js",
     "methods": [
-      "GET"
+      "GET",
+      "POST"
     ],
     "authRequired": "handler-defined",
     "healthStatus": "valid",
@@ -2010,6 +2011,7 @@ export const API_ROUTE_INVENTORY = Object.freeze([
     ],
     "handler": "functions/api/auth/rocketleague/profile.js",
     "methods": [
+      "DELETE",
       "GET",
       "PATCH",
       "POST"

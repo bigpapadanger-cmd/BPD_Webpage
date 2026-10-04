@@ -1,4 +1,5 @@
 import { verifyBackgroundEpicAccount } from "../../../functions/services/rl/authorization.js";
+import { refreshDiscordAccountEligibility, refreshDiscordBotGuildInventory } from "../../../functions/services/auth/providers/discord_matchbot/eligibility.js";
 
 const PAGE_SIZE = 20;
 const CURSOR_KEY = "rl:scheduled-refresh:cursor";
@@ -184,7 +185,7 @@ function requestedCapabilities(candidate) {
     return capabilities;
 }
 
-export async function refreshCandidate(env, candidate) {
+export async function refreshCandidate(env, candidate, { discordInventory = null } = {}) {
     const due = COMPONENTS.filter(component => ({
         mmr: candidate.mmr_due,
         provider: candidate.provider_due,
@@ -213,7 +214,13 @@ export async function refreshCandidate(env, candidate) {
         let errorCode = sharedFailure;
         let success = false;
         if (component === "match_history") errorCode = "RL_MATCH_HISTORY_AUTHENTICATED_PLAYER_ONLY";
-        else if (component === "discord") errorCode = "DISCORD_GATEWAY_RUNTIME_UNAVAILABLE";
+        else if (component === "discord") {
+            try {
+                if (!discordInventory?.complete) throw failure("DISCORD_INVENTORY_UNAVAILABLE");
+                await refreshDiscordAccountEligibility(env, candidate.account_id, { inventory: discordInventory });
+                success = true;
+            } catch (error) { errorCode = error?.code || "DISCORD_PROVIDER_UNAVAILABLE"; }
+        }
         else if (!errorCode) {
             try {
                 const persisted = await persistCapability(env, candidate, component, capabilities);
@@ -233,9 +240,15 @@ export async function refreshCandidate(env, candidate) {
     return { attempted: due.length, succeeded, failed, mmrChanged, mmrUnchanged };
 }
 
-export async function runRocketLeagueRefreshCycle(env) {
+export async function runRocketLeagueRefreshCycle(env, { forceDiscordInventory = false, reconcileDiscordInventory = false } = {}) {
     const kv = env?.SERVICE_STATUS;
     if (!kv || typeof kv.get !== "function" || typeof kv.put !== "function") throw failure("REFRESH_CURSOR_STORAGE_UNAVAILABLE");
+    let discordInventory = null;
+    let discordInventoryError = null;
+    if (reconcileDiscordInventory) {
+        try { discordInventory = await refreshDiscordBotGuildInventory(env, { force: forceDiscordInventory }); }
+        catch (error) { discordInventoryError = error?.code || "DISCORD_INVENTORY_UNAVAILABLE"; }
+    }
     const afterPlayerId = text(await kv.get(CURSOR_KEY));
     const rows = await callRpc(env, "get_rl_refresh_candidates", {
         p_after_player_id: afterPlayerId || null,
@@ -244,7 +257,12 @@ export async function runRocketLeagueRefreshCycle(env) {
     if (!Array.isArray(rows)) throw failure("REFRESH_CANDIDATES_INVALID");
     if (!rows.length) {
         await kv.delete?.(CURSOR_KEY);
-        return { success: true, candidateCount: 0, attempted: 0, succeeded: 0, failed: 0, mmrChanged: 0, mmrUnchanged: 0, cursorReset: true };
+        return { success: !discordInventoryError, candidateCount: 0, attempted: 0, succeeded: 0, failed: 0, mmrChanged: 0, mmrUnchanged: 0, discordInventoryAvailable: reconcileDiscordInventory ? discordInventory !== null : null, discordInventoryError, cursorReset: true };
+    }
+    const hasDiscordDue = rows.some(candidate => candidate?.discord_due === true);
+    if (hasDiscordDue && !discordInventory && !reconcileDiscordInventory) {
+        try { discordInventory = await refreshDiscordBotGuildInventory(env, { force: forceDiscordInventory }); }
+        catch (error) { discordInventoryError = error?.code || "DISCORD_INVENTORY_UNAVAILABLE"; }
     }
     let attempted = 0;
     let succeeded = 0;
@@ -257,7 +275,7 @@ export async function runRocketLeagueRefreshCycle(env) {
             continue;
         }
         try {
-            const result = await refreshCandidate(env, candidate);
+            const result = await refreshCandidate(env, candidate, { discordInventory });
             attempted += result.attempted;
             succeeded += result.succeeded;
             failed += result.failed;
@@ -266,5 +284,5 @@ export async function runRocketLeagueRefreshCycle(env) {
         } catch { failed += 1; }
     }
     await kv.put(CURSOR_KEY, text(rows.at(-1)?.player_id), { expirationTtl: 7 * 24 * 60 * 60 });
-    return { success: failed === 0, candidateCount: rows.length, attempted, succeeded, failed, mmrChanged, mmrUnchanged, nextCursorStored: true };
+    return { success: failed === 0 && !discordInventoryError, candidateCount: rows.length, attempted, succeeded, failed, mmrChanged, mmrUnchanged, discordInventoryAvailable: reconcileDiscordInventory || hasDiscordDue ? discordInventory !== null : null, discordInventoryError, nextCursorStored: true };
 }

@@ -1,5 +1,7 @@
 "use strict";
 
+import { isValidProviderRuntimeCallerSecret, withAbortTimeout } from "../auth/providers/discord_matchbot/runtime_contract.js";
+
 const CACHE_KEY = "admin:system-status:v2";
 const CACHE_TTL_SECONDS = 45;
 const CHECK_TIMEOUT_MS = 2000;
@@ -8,10 +10,10 @@ const CLOUD_RUN_ACTION_TIMEOUT_MS = 30000;
 const INTERNAL_HOSTNAME = "ocr-google-transport.internal";
 let inFlightCheck = null;
 const actionLocks = new Set();
-const ACTION_COOLDOWNS = { "mmr-api:reconnect-psynet": 30, "mmr-api:refresh-eos": 15, "mmr-api:repair-session": 15, "cloud-run-ocr:recheck": 60, "rl-presence:run-now": 60 };
+const ACTION_COOLDOWNS = { "mmr-api:reconnect-psynet": 30, "mmr-api:refresh-eos": 15, "mmr-api:repair-session": 15, "cloud-run-ocr:recheck": 60, "rl-presence:run-now": 60, "provider-runtime:recheck": 15 };
 const ACTIONS = {
     pages: ["recheck"], "rl-presence": ["recheck", "run-now"], "ocr-transport": ["recheck"],
-    "ocr-queue": ["recheck"], "cloud-run-ocr": ["recheck"], supabase: ["recheck"],
+    "ocr-queue": ["recheck"], "cloud-run-ocr": ["recheck"], "provider-runtime": ["recheck"], supabase: ["recheck"],
     "mmr-api": ["recheck", "refresh-eos", "reauthorize-account", "poll-authorization", "reconnect-psynet", "repair-session", "functional-test"]
 };
 const SERVICE_STATUS_PREFIX = "admin:service-status:";
@@ -86,6 +88,53 @@ async function checkOcrTransport(env) {
         return statusEntry("ocr-transport", "OCR transport Worker", missing || recentFailure ? "Degraded" : "Healthy", missing ? `Worker reachable; configuration check incomplete (${missing} missing item${missing === 1 ? "" : "s"}).` : recentFailure ? `Worker reachable; last OCR request failed during ${operational.lastFailureStage || "an unknown stage"}.` : "Liveness/configuration only; routine check did not contact Google.", { ...operational, lastSuccessfulAt: operational.lastSuccessAt || null, responseTimeMs: Date.now() - started, dependencies: cloudRun ? [{ id: "cloud-run-ocr", status: cloudRun.status || "unknown", checkedAt: cloudRun.checkedAt || null }] : [] });
     } catch (error) {
         return statusEntry("ocr-transport", "OCR transport Worker", error?.name === "AbortError" ? "Down" : "Unknown", error?.name === "AbortError" ? "Health check timed out." : "Health check failed.");
+    }
+}
+
+async function checkProviderRuntime(env) {
+    const binding = env?.PROVIDER_RUNTIME;
+    const secret = env?.PROVIDER_RUNTIME_CALLER_SECRET;
+    const unavailable = (message, errorCode, responseTimeMs = null) => statusEntry(
+        "provider-runtime", "bpd-provider-runtime", "down", message,
+        { errorCode, responseTimeMs }
+    );
+    if (typeof binding?.fetch !== "function" || !isValidProviderRuntimeCallerSecret(secret)) {
+        return unavailable("Provider runtime health check is unavailable.", "PROVIDER_RUNTIME_UNAVAILABLE");
+    }
+    const started = Date.now();
+    let response = null;
+    try {
+        return await withAbortTimeout(async signal => {
+            response = await binding.fetch(new Request("https://bpd-provider-runtime.internal/internal/health", {
+                method: "GET", headers: { Authorization: `Bearer ${secret}`, Accept: "application/json" }, signal
+            }));
+            const responseTimeMs = Date.now() - started;
+            if (!response.ok) return unavailable("Provider runtime health check is unavailable.", "PROVIDER_RUNTIME_UNAVAILABLE", responseTimeMs);
+
+            let payload;
+            try { payload = await readSmallJson(response, 1024); }
+            catch (error) {
+                if (signal.aborted) throw error;
+                return unavailable("Provider runtime returned an invalid health response.", "PROVIDER_RUNTIME_HEALTH_INVALID", responseTimeMs);
+            }
+            const allowedKeys = ["success", "service", "status", "timestamp"];
+            const validKeys = payload && typeof payload === "object" && !Array.isArray(payload)
+                && Object.keys(payload).length === allowedKeys.length
+                && Object.keys(payload).every(key => allowedKeys.includes(key));
+            const validTimestamp = typeof payload?.timestamp === "string" && Number.isFinite(Date.parse(payload.timestamp));
+            if (!validKeys || payload.success !== true || payload.service !== "bpd-provider-runtime"
+                || !["ok", "degraded"].includes(payload.status) || !validTimestamp) {
+                return unavailable("Provider runtime returned an unrecognized health response.", "PROVIDER_RUNTIME_HEALTH_INVALID", responseTimeMs);
+            }
+            const degraded = payload.status === "degraded";
+            return statusEntry("provider-runtime", "bpd-provider-runtime", degraded ? "degraded" : "healthy",
+                degraded ? "Provider runtime is reachable but reports degraded health." : "Provider runtime is online.",
+                { responseTimeMs });
+        }, CHECK_TIMEOUT_MS, () => response?.body?.cancel());
+    } catch (error) {
+        const timeout = error?.code === "PROVIDER_RUNTIME_TIMEOUT" || error?.name === "AbortError";
+        return unavailable(timeout ? "Provider runtime health check timed out." : "Provider runtime health check is unavailable.",
+            timeout ? "PROVIDER_RUNTIME_TIMEOUT" : "PROVIDER_RUNTIME_UNAVAILABLE", Date.now() - started);
     }
 }
 
@@ -191,7 +240,7 @@ async function checkMmrApi(env) {
 }
 
 async function runChecks(env) {
-    const [presence, transport, queue, cloudRun, supabase, mmr] = await Promise.all([checkPresenceMonitor(env), checkOcrTransport(env), checkQueueConsumer(env), checkCloudRun(env), checkSupabase(env), checkMmrApi(env)]);
+    const [presence, transport, queue, cloudRun, supabase, mmr, providerRuntime] = await Promise.all([checkPresenceMonitor(env), checkOcrTransport(env), checkQueueConsumer(env), checkCloudRun(env), checkSupabase(env), checkMmrApi(env), checkProviderRuntime(env)]);
     return {
         success: true,
         generatedAt: new Date().toISOString(),
@@ -203,6 +252,7 @@ async function runChecks(env) {
             queue,
             cloudRun,
             mmr,
+            providerRuntime,
             supabase
         ]
     };
@@ -256,6 +306,7 @@ export async function performSystemStatusAction(env, service, action, input = {}
             result = await checkPresenceMonitor(env);
         } else if (service === "ocr-transport") result = await checkOcrTransport(env);
         else if (service === "ocr-queue") result = await checkQueueConsumer(env);
+        else if (service === "provider-runtime") result = await checkProviderRuntime(env);
         else if (service === "supabase") result = await recheckSupabase(env);
         else if (service === "cloud-run-ocr") result = await recheckCloudRun(env);
         await storeActionResult(env, result);
