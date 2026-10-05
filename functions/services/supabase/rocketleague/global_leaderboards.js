@@ -27,13 +27,25 @@ function string(value, max = 120) { return typeof value === "string" ? value.tri
 function number(value) { const result = Number(value); return Number.isSafeInteger(result) && result >= 0 ? result : null; }
 function timestamp(value) { return typeof value === "string" && Number.isFinite(Date.parse(value)) ? value : null; }
 
+function logRpcFailure(name, code, upstreamStatus = null) {
+    console.warn("RL LEADERBOARD: Supabase RPC failed.", {
+        rpc: name,
+        code,
+        upstreamStatus: Number.isInteger(upstreamStatus) ? upstreamStatus : null
+    });
+}
+
 async function callRpc(env, name, parameters) {
     if (!ALLOWED_RPCS.has(name)) throw new RocketLeagueLeaderboardError("RL_LEADERBOARD_UNAVAILABLE", 500);
     const root = typeof env?.SUPABASE_URL === "string" ? env.SUPABASE_URL.trim().replace(/\/+$/, "").replace(/\/rest\/v1$/i, "") : "";
     const key = typeof env?.SUPABASE_AUTH === "string" ? env.SUPABASE_AUTH.trim() : "";
     try {
         if (!key || new URL(root).protocol !== "https:") throw new Error("config");
-    } catch { throw new RocketLeagueLeaderboardError(); }
+    } catch {
+        logRpcFailure(name, "RL_LEADERBOARD_CONFIG_UNAVAILABLE");
+        throw new RocketLeagueLeaderboardError();
+    }
+    let upstreamStatus = null;
     try {
         return await withUpstreamDeadline(async signal => {
             const response = await fetchBoundedResponse(`${root}/rest/v1/rpc/${name}`, {
@@ -45,6 +57,7 @@ async function callRpc(env, name, parameters) {
                 body: JSON.stringify(parameters),
                 signal
             }, 1024 * 1024);
+            upstreamStatus = response.status;
             if (!response.ok) {
                 if (name === "save_rl_global_leaderboard_preference") {
                     let providerCode = null;
@@ -61,8 +74,11 @@ async function callRpc(env, name, parameters) {
             try { return await response.json(); } catch { throw new RocketLeagueLeaderboardError("RL_LEADERBOARD_RESPONSE_INVALID", 502); }
         }, 10000);
     } catch (error) {
-        if (error instanceof RocketLeagueLeaderboardError) throw error;
-        throw new RocketLeagueLeaderboardError(error?.code === "UPSTREAM_TIMEOUT" ? "RL_LEADERBOARD_TIMEOUT" : "RL_LEADERBOARD_UNAVAILABLE", error?.code === "UPSTREAM_TIMEOUT" ? 504 : 503);
+        const normalized = error instanceof RocketLeagueLeaderboardError
+            ? error
+            : new RocketLeagueLeaderboardError(error?.code === "UPSTREAM_TIMEOUT" ? "RL_LEADERBOARD_TIMEOUT" : "RL_LEADERBOARD_UNAVAILABLE", error?.code === "UPSTREAM_TIMEOUT" ? 504 : 503);
+        logRpcFailure(name, normalized.code, upstreamStatus);
+        throw normalized;
     }
 }
 

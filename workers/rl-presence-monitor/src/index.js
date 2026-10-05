@@ -19,7 +19,8 @@ Schedules:
           Rocket League presence monitoring.
 
     - Every hour:
-          Due-aware per-player Rocket League refresh and global Shop snapshot.
+          Due-aware per-player Rocket League refresh, global Shop snapshot, and
+          Admin health checks for Supabase, MMR API, provider-runtime, and MatchBot.
 
     - Daily at noon UTC:
           Admin Taskboard aggregate summary and global ranked Leaderboard snapshots.
@@ -41,6 +42,7 @@ import {
     runRocketLeagueShopRefresh
 } from "./rl_shop_refresh.js";
 import { refreshGlobalRocketLeagueLeaderboards } from "./rl_global_leaderboards.js";
+import { runScheduledAdminHealthChecks } from "../../../functions/services/admin/system_status.js";
 
 import {
     runTaskboardSummary
@@ -50,15 +52,17 @@ const activeJobs = new Set();
 const PRESENCE_STATUS_KEY = "admin:service-status:rl-presence";
 
 async function recordScheduledJob(env, job, summary, startedAt, failed = false) {
-    if (!env?.SERVICE_STATUS || !["mmr", "shop", "leaderboards"].includes(job)) return;
+    if (!env?.SERVICE_STATUS || !["mmr", "shop", "leaderboards", "health"].includes(job)) return;
     const key = `admin:service-status:rl-${job}`;
     let prior = {};
     try { prior = await env.SERVICE_STATUS.get(key, "json") || {}; } catch { /* Best effort. */ }
     const now = new Date().toISOString();
     const succeeded = !failed && summary?.success !== false;
-    const selected = job === "shop"
-        ? ["success", "changed", "saved", "errorCode"]
-        : job === "leaderboards" ? ["success", "playlistCount", "succeeded", "failed", "errorCode"]
+    const selected = job === "health"
+        ? ["success", "checked", "healthy", "degraded", "down", "unknown"]
+        : job === "shop"
+            ? ["success", "changed", "saved", "errorCode"]
+            : job === "leaderboards" ? ["success", "playlistCount", "succeeded", "failed", "errorCode"]
             : ["success", "candidateCount", "attempted", "succeeded", "failed", "mmrChanged", "mmrUnchanged", "discordInventoryAvailable", "discordInventoryError", "nextCursorStored"];
     const lastSummary = Object.fromEntries(selected.filter(field => summary?.[field] !== undefined).map(field => [field, summary[field]]));
     try {
@@ -160,6 +164,7 @@ function getJobRunner(job, env, { forceDiscordInventory = false, reconcileDiscor
     if (job === "taskboard") {
         return () => runTaskboardSummary(env);
     }
+    if (job === "health") return () => runScheduledAdminHealthChecks(env);
     return null;
 }
 
@@ -195,6 +200,14 @@ function summarizeJobResult(job, result) {
             ...(result?.summary ? { summary: result.summary } : {})
         };
     }
+    if (job === "health") return {
+        success: result?.success === true,
+        checked: Number(result?.checked) || 0,
+        healthy: Number(result?.healthy) || 0,
+        degraded: Number(result?.degraded) || 0,
+        down: Number(result?.down) || 0,
+        unknown: Number(result?.unknown) || 0
+    };
     return { success: false };
 }
 
@@ -278,7 +291,7 @@ async function handleFetch(
         let state = null;
         try { state = await env?.SERVICE_STATUS?.get(PRESENCE_STATUS_KEY, "json") || null; } catch { /* Safe unknown fallback. */ }
         const scheduledJobs = {};
-        for (const job of ["mmr", "shop", "leaderboards"]) {
+        for (const job of ["mmr", "shop", "leaderboards", "health"]) {
             try { scheduledJobs[job] = await env?.SERVICE_STATUS?.get(`admin:service-status:rl-${job}`, "json") || null; }
             catch { scheduledJobs[job] = null; }
         }
@@ -404,6 +417,7 @@ async function handleScheduled(
     ) {
         runInBackground("mmr", env, ctx, { forceDiscordInventory: true, reconcileDiscordInventory: true });
         runInBackground("shop", env, ctx);
+        runInBackground("health", env, ctx);
 
         return;
     }

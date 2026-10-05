@@ -47,6 +47,10 @@ import {
     hasAdminAccess,
     getAdminResponsibilityRoles
 } from "/Framework/Auth/auth.js";
+import {
+    beginVerificationNotice,
+    clearVerificationNotice
+} from "/scripts/verificationNotice.js";
 
 /* =========================================================
 ENDPOINTS
@@ -261,6 +265,10 @@ function hideAdminStates() {
     } =
         getAdminElements();
 
+    clearVerificationNotice(
+        document.getElementById("adminVerificationStatus")
+    );
+
     if (
         adminContent
     ) {
@@ -303,6 +311,13 @@ function showLoading() {
     ) {
         adminLoading.hidden =
             false;
+        beginVerificationNotice(
+            document.getElementById("adminVerificationStatus"),
+            {
+                checkingText: "Verifying administrator access...",
+                fallbackText: "Admin access"
+            }
+        );
     }
 }
 

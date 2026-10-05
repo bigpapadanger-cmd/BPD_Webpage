@@ -1,6 +1,7 @@
 "use strict";
 
 import { getAuthState, hasAdminPermission } from "/Framework/Auth/auth.js";
+import { beginVerificationNotice, finishVerificationNotice } from "/scripts/verificationNotice.js";
 import { getMmrControlModel } from "./mmr_controls.js";
 import { ROCKET_LEAGUE_CAPABILITIES, ROCKET_LEAGUE_CAPABILITY_CATEGORIES } from "./rocket_league_capabilities.js";
 
@@ -122,8 +123,10 @@ async function runAction(service, action, button) {
     actionInFlight = true;
     button.disabled = true;
     const originalText = button.textContent;
-    button.textContent = action === "recheck" ? "Rechecking…" : action === "refresh-shop" ? "Refreshing shop…" : "Repairing…";
+    const checkingText = action === "recheck" ? "Rechecking…" : action === "refresh-shop" ? "Refreshing shop…" : "Repairing…";
+    beginVerificationNotice(button, { checkingText, fallbackText: originalText });
     const message = document.getElementById("workerStatusMessage");
+    if (action === "recheck") beginVerificationNotice(message, { checkingText: `Checking ${service}…`, fallbackText: "System status" });
     if (service === "mmr-api" && action !== "recheck") startOperationPolling();
     try {
         const response = await fetch("/api/admin/system-status", {
@@ -133,15 +136,15 @@ async function runAction(service, action, button) {
         });
         const payload = await response.json();
         if (!response.ok || payload.success !== true) throw Object.assign(new Error(), { payload });
-        message.textContent = action === "recheck" ? `${service} status rechecked.` : `${ACTION_LABELS[action] || "MMR operation"} completed${payload.result?.resultCode ? `: ${payload.result.resultCode}` : "."}`;
+        finishVerificationNotice(message, action === "recheck" ? `${service} status rechecked.` : `${ACTION_LABELS[action] || "MMR operation"} completed${payload.result?.resultCode ? `: ${payload.result.resultCode}` : "."}`);
         await loadStatus();
     } catch (error) {
-        message.textContent = safeActionFailure(error, `${originalText} failed`);
+        finishVerificationNotice(message, safeActionFailure(error, `${originalText} failed`));
     } finally {
         actionInFlight = false;
         stopOperationPolling();
         button.disabled = false;
-        button.textContent = originalText;
+        finishVerificationNotice(button, originalText);
     }
 }
 
@@ -516,6 +519,10 @@ function diagnosticRow({ title, status, label, details = [] }) {
 async function loadRouteDiagnostics() {
     const status = document.getElementById("routeDiagnosticsStatus");
     const content = document.getElementById("routeDiagnosticsContent");
+    beginVerificationNotice(status, {
+        checkingText: "Loading route diagnostics…",
+        fallbackText: "Route diagnostics"
+    });
     try {
         const response = await fetch("/api/admin/page-settings/route-health", { credentials: "same-origin", cache: "no-store", headers: { Accept: "application/json" } });
         const payload = await response.json();
@@ -553,10 +560,10 @@ async function loadRouteDiagnostics() {
         document.getElementById("connectionDiagnosticsCount").textContent = `(${(payload.connections || []).length})`;
         document.getElementById("findingDiagnosticsCount").textContent = `(${(payload.knownFindings || []).length})`;
         document.getElementById("routeDiagnosticsGenerated").textContent = `Inventory updated ${readableTime(payload.generatedAt)}`;
-        status.textContent = "";
+        finishVerificationNotice(status, "");
         content.hidden = false;
     } catch {
-        status.textContent = "Route diagnostics are unavailable.";
+        finishVerificationNotice(status, "Route diagnostics are unavailable.");
     }
 }
 
@@ -566,25 +573,45 @@ async function loadStatus() {
         const response = await fetch("/api/admin/system-status", { credentials: "same-origin", cache: "no-store", headers: { Accept: "application/json" } });
         const payload = await response.json();
         if (!response.ok || payload.success !== true || !Array.isArray(payload.services)) throw new Error("Status unavailable");
-        const list = document.getElementById("workerStatusServices");
-        list.replaceChildren();
+        const groups = document.getElementById("workerStatusGroups");
+        const previousGroups = new Map([...groups.querySelectorAll(".worker-status-group")].map(group => [group.dataset.status, { open: group.open, count: Number(group.dataset.count) || 0 }]));
+        const statusNames = { healthy: "Online", degraded: "Degraded", down: "Down", unknown: "Unknown" };
+        const groupedServices = new Map(Object.keys(statusNames).map(status => [status, []]));
         for (const service of payload.services) {
+            const canonicalStatus = Object.hasOwn(statusNames, service.canonicalStatus) ? service.canonicalStatus : "unknown";
+            groupedServices.get(canonicalStatus).push({ ...service, canonicalStatus });
+        }
+        const fragment = document.createDocumentFragment();
+        for (const [status, services] of groupedServices) {
+            const previous = previousGroups.get(status);
+            const group = document.createElement("details");
+            group.className = `worker-status-group worker-status-${status}`;
+            group.dataset.status = status;
+            group.dataset.count = String(services.length);
+            const autoExpanded = ["degraded", "down"].includes(status) && services.length > 0;
+            group.open = previous
+                ? (autoExpanded && previous.count === 0 ? true : previous.open)
+                : autoExpanded;
+            const summary = document.createElement("summary");
+            summary.className = "worker-status-group-summary";
+            summary.append(textElement("span", statusNames[status], "worker-status-group-name"), textElement("span", `(${services.length})`, "worker-status-group-count"));
+            const list = document.createElement("ul");
+            list.className = "worker-status-services";
+            list.setAttribute("aria-label", `${statusNames[status]} services`);
+            for (const service of services) {
             const item = document.createElement("li");
             item.className = "worker-status-row";
             item.id = `worker-status-service-${service.id}`;
-            const status = String(service.status || "unknown").toLowerCase();
+            const rowStatus = service.canonicalStatus;
             const primary = document.createElement("div");
             primary.className = "worker-status-primary";
-            const indicator = textElement("span", statusIcon(status), `worker-status-indicator worker-status-${status}`);
+            const indicator = textElement("span", statusIcon(rowStatus), `worker-status-indicator worker-status-${rowStatus}`);
             indicator.setAttribute("role", "img");
-            indicator.setAttribute("aria-label", status);
+            indicator.setAttribute("aria-label", statusNames[rowStatus]);
             const identity = document.createElement("div");
             identity.className = "worker-status-identity";
             const botService = service.id === "discord-matchbot" || service.id === "discord-authz-bot";
-            const statusLabel = service.id === "provider-runtime" || botService
-                ? ({ healthy: "Online", degraded: "Degraded", down: "Offline", unknown: "Not checked" })[status] || "Offline"
-                : status;
-            identity.append(textElement("strong", service.name, "worker-status-name"), textElement("span", statusLabel, `worker-status-label worker-status-${status}`));
+            identity.append(textElement("strong", service.name, "worker-status-name"), textElement("span", statusNames[rowStatus], `worker-status-label worker-status-${rowStatus}`));
             primary.append(indicator, identity);
             const controls = getMmrControlModel(service, canDeployMmr);
             if (controls.actions.length) {
@@ -603,10 +630,14 @@ async function loadStatus() {
             }
             item.append(primary, makeDetails(service));
             list.append(item);
+            }
+            group.append(summary, list);
+            fragment.append(group);
         }
+        groups.replaceChildren(fragment);
         renderRocketLeagueCapabilities(payload.services);
         document.getElementById("workerStatusGenerated").textContent = `Updated ${readableTime(payload.generatedAt)}`;
-        document.getElementById("workerStatusMessage").textContent = "";
+        finishVerificationNotice(document.getElementById("workerStatusMessage"), "");
     })().finally(() => { requestInFlight = null; });
     return requestInFlight;
 }
@@ -615,9 +646,13 @@ export async function initializePage() {
     const message = document.getElementById("workerStatusMessage");
     const refresh = document.getElementById("workerStatusRefresh");
     if (!message || !refresh) return;
+    beginVerificationNotice(message, {
+        checkingText: "Checking your access…",
+        fallbackText: "System status"
+    });
     try {
         const auth = await getAuthState({ force: true });
-        if (!hasAdminPermission(REQUIRED_PERMISSION, auth)) { message.textContent = "You do not have permission to view worker status."; return; }
+        if (!hasAdminPermission(REQUIRED_PERMISSION, auth)) { finishVerificationNotice(message, "You do not have permission to view worker status."); return; }
         canDeployMmr = hasAdminPermission(DEPLOY_PERMISSION, auth);
         canForceRocketLeagueRefresh = hasAdminPermission(RL_FORCE_REFRESH_PERMISSION, auth);
         const forceRefreshPanel = document.getElementById("rocketLeagueForceRefresh");
@@ -625,10 +660,10 @@ export async function initializePage() {
         if (canForceRocketLeagueRefresh) document.getElementById("rlForceRefreshForm")?.addEventListener("submit", forceRocketLeagueRefresh);
         refresh.disabled = false;
         refresh.addEventListener("click", () => {
-            message.textContent = "Refreshing status…";
-            Promise.all([loadStatus(), loadRouteDiagnostics()]).catch(() => { message.textContent = "Status is unavailable. Please retry later."; });
+            beginVerificationNotice(message, { checkingText: "Refreshing status…", fallbackText: "System status" });
+            Promise.all([loadStatus(), loadRouteDiagnostics()]).catch(() => finishVerificationNotice(message, "Status is unavailable. Please retry later."));
         });
         await Promise.all([loadStatus(), loadRouteDiagnostics()]);
         await loadDeploymentStatus();
-    } catch { message.textContent = "Status is unavailable. Please retry later."; }
+    } catch { finishVerificationNotice(message, "Status is unavailable. Please retry later."); }
 }

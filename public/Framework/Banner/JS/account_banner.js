@@ -55,6 +55,11 @@ import {
     invalidateAuthState
 } from "../../Auth/auth.js";
 
+import {
+    beginVerificationNotice,
+    clearVerificationNotice
+} from "/scripts/verificationNotice.js";
+
 /* =========================================================
 CONSTANTS
 ========================================================= */
@@ -354,6 +359,11 @@ function createButton(
 function setBannerState(
     state
 ) {
+    const status =
+        getBannerElements().status;
+
+    clearVerificationNotice(status);
+
     const root =
         getBannerRoot();
 
@@ -768,6 +778,11 @@ function renderLoading() {
     setBannerState(
         "loading"
     );
+
+    beginVerificationNotice(status, {
+        checkingText: "Loading account...",
+        fallbackText: "Account status"
+    });
 }
 
 /* =========================================================
@@ -1352,4 +1367,9 @@ function renderWaitingForConnection() {
     setBannerState(
         "loading"
     );
+
+    beginVerificationNotice(status, {
+        checkingText: "Checking account...",
+        fallbackText: "Account status"
+    });
 }

@@ -52,6 +52,14 @@
     font-size: .9rem;
 }
 
+.worker-status-help {
+    max-width: 78ch;
+    margin: 0 0 20px;
+    color: #b7c6d9;
+    font-size: .88rem;
+    line-height: 1.55;
+}
+
 #workerStatusMessage:empty {
     display: none;
 }
@@ -92,6 +100,41 @@
     font-size: .78rem;
 }
 
+.worker-status-groups {
+    display: grid;
+    gap: 10px;
+}
+
+.worker-status-group {
+    min-width: 0;
+    padding: 0 14px;
+    border: 1px solid rgba(148, 163, 184, .16);
+    border-radius: 13px;
+    background: rgba(255, 255, 255, .025);
+}
+
+.worker-status-group-summary {
+    min-height: 52px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #e8f1fc;
+    font-weight: 750;
+    cursor: pointer;
+    list-style: none;
+}
+
+.worker-status-group-summary::-webkit-details-marker { display: none; }
+.worker-status-group-summary::after { content: "+"; margin-left: auto; color: #91a2b8; font-size: 1.2rem; }
+.worker-status-group[open] > .worker-status-group-summary::after { content: "−"; }
+.worker-status-group-summary:focus-visible { outline: 2px solid #62d0ff; outline-offset: 2px; border-radius: 7px; }
+.worker-status-group-name { color: inherit; }
+.worker-status-group-count { min-width: 26px; padding: 3px 8px; border: 1px solid currentColor; border-radius: 999px; color: #b5c2d3; font-size: .72rem; text-align: center; }
+.worker-status-group.worker-status-healthy > .worker-status-group-summary { color: #75e3a1; }
+.worker-status-group.worker-status-degraded > .worker-status-group-summary { color: #ffd27a; }
+.worker-status-group.worker-status-down > .worker-status-group-summary { color: #ff8f9a; }
+.worker-status-group.worker-status-unknown > .worker-status-group-summary { color: #b5c2d3; }
+
 .worker-status-services {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
@@ -99,6 +142,7 @@
     padding: 0;
     margin: 0;
     list-style: none;
+    padding-bottom: 13px;
 }
 
 .rocket-capability-section { margin-top: 25px; padding-top: 22px; border-top: 1px solid rgba(148, 163, 184, .17); }

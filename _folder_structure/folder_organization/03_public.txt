@@ -140,6 +140,7 @@ public/scripts/
 +-- cacheHandler.js           Client cache/version handling.
 +-- generate-cache-ids.js     Build-time cache ID generation.
 +-- repopulate_sitemap.js     Sitemap maintenance utility.
++-- verificationNotice.js    Shared 3-second transient verification/loading copy helper.
 
 ASSETS
 

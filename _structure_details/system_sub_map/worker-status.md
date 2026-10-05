@@ -40,11 +40,16 @@ same account in that isolate, not as a global lock.
 | OCR Transport | Secret-gated Service Binding `/health`; no Google calls | Same bounded config/liveness request | `SERVICE_STATUS`; OCR request writes throttled per isolate to 30 seconds |
 | OCR Queue Consumer | Queue-only heartbeat; no HTTP liveness route | Reads heartbeat only | `SERVICE_STATUS`; once after each queue invocation |
 | Cloud Run OCR | Cached result from last explicit recheck | Secret-gated fixed transport route → cached WIF credential → authenticated `/api/ocr/health`; 30-second outer/6-second health request bound | `SERVICE_STATUS`; no OCR inference |
-| Supabase | Last explicit result; no routine network call | `HEAD /rest/v1/` with server-side API key, 2-second timeout | `RL_STATS_CACHE` |
+| Supabase | Last scheduled or explicit result; no page-load network call | Existing read-only `api.get_rl_featured_player()` RPC with server-side service-role authorization and bounded response validation | `RL_STATS_CACHE` |
 | MMR API/PsyNet | Protected `/health/ready` | 45-second aggregate cache plus explicit Recheck or Check Rocket League Version | Safe config/build state, auth stage, recent-failure, backoff, reconnect, latency, and aggregate traffic state |
 
 Worker `SERVICE_STATUS` bindings reuse the existing `RL_STATS_CACHE` KV
-namespace; no new namespace or cloud resource is introduced. Presence run
+namespace; no new namespace or cloud resource is introduced. The hourly
+Rocket League cron runs the same Supabase, MMR readiness, provider-runtime, and
+MatchBot checkers used by Admin Recheck, then persists their normalized results
+under the service keys read by the Admin page. Operational results older than
+two hours are presented as Unknown/stale while retaining their prior state for
+diagnostics. Presence run
 summaries contain counts/status only, no player/account identifiers. OCR queue
 heartbeats contain invocation counts, timestamps, bounded duration, and a
 stable generic error code; no job IDs or image data.
@@ -58,7 +63,7 @@ stable generic error code; no job IDs or image data.
 | OCR Transport | Yes | No | No |
 | OCR Queue Consumer | Yes: read heartbeat | No | No |
 | Cloud Run OCR | Yes: explicit readiness-only probe | No | No |
-| Supabase | Yes: bounded API availability check | No | No |
+| Supabase | Yes: bounded read-only readiness RPC | No | No |
 | MMR API/PsyNet | Recheck | Explicit reconnect; Check Rocket League Version through the same protected Pages allowlist | No |
 
 MMR Details also contains two manual operations: Update Build Configuration
@@ -96,16 +101,21 @@ the `shop` global refresh result. The public Shop page reads the cached DomainDa
 endpoint only; it does not call the provider. Old or expired snapshots are
 labeled potentially out of date.
 
-The main view uses compact status-icon rows; per-service metadata is collapsed
-under Details. Route, connection, and known-finding diagnostics share the same
-page in collapsed groups. The sidebar and Admin home provide one System Status
+The main view groups services into Online, Degraded, Down, and Unknown
+accordions using the backend's canonical status classification; Down and
+Degraded groups open automatically when populated, while the other groups
+start collapsed. Each service retains its existing status row, actions, and
+Details. Route, connection, and known-finding diagnostics share the same page
+in collapsed groups. The sidebar and Admin home provide one System Status
 entry; `/Admin/PageSettings` remains only as a bookmark-compatible alias.
 
 ## Status semantics and limits
 
 Statuses are `healthy`, `degraded`, `down`, or `unknown`. An idle queue is not
 Down; a queue with no heartbeat is Unknown. Cloud Run is Unknown until an
-operator explicitly rechecks it. Supabase is Unknown until an operator
-explicitly rechecks it. Pages Recheck proves the current authorized route only,
+operator explicitly rechecks it. Supabase is checked hourly and by explicit
+Recheck through the existing read-only Featured Player RPC. Previously checked
+operational state becomes Unknown/stale after two hours rather than remaining
+green indefinitely. Pages Recheck proves the current authorized route only,
 not a separate recursive network probe. KV writes are best-effort; if telemetry
 storage is unavailable, the relevant last-known state may be Unknown/stale.

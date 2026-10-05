@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-import { getSystemStatus, performSystemStatusAction, updateMmrBuildConfiguration } from "../../functions/services/admin/system_status.js";
+import { getSystemStatus, performSystemStatusAction, runScheduledAdminHealthChecks, updateMmrBuildConfiguration } from "../../functions/services/admin/system_status.js";
 import { getPermissionsForDiscordRoles, ADMIN_PERMISSIONS } from "../../functions/services/admin/permissions.js";
 import { onRequestGet, onRequestPost } from "../../functions/api/admin/system-status.js";
 import { getMmrControlModel } from "../../public/Global/Admin/WorkerStatus/JS/mmr_controls.js";
@@ -16,6 +16,7 @@ function createEnv() {
     return {
         calls,
         expire() { for (const item of values.values()) item.expiresAt = 0; },
+        seedStatus(id, status, checkedAt) { values.set(`admin:service-status:${id}`, { body: JSON.stringify({ id, name: id, status, checkedAt, lastSuccessfulAt: checkedAt }), expiresAt: Date.now() + 60_000 }); },
         env: {
             RL_PRESENCE_MONITOR_URL: "https://status.example.test",
             PRESENCE_TRIGGER_KEY: "p".repeat(48),
@@ -34,7 +35,7 @@ function createEnv() {
             },
             RL_STATS_CACHE: {
                 async get(key) { const value = values.get(key); return value && value.expiresAt > Date.now() ? JSON.parse(value.body) : null; },
-                async put(key, body, options) { assert.equal(options.expirationTtl, 45); values.set(key, { body, expiresAt: Date.now() + options.expirationTtl * 1000 }); },
+                async put(key, body, options) { values.set(key, { body, expiresAt: Date.now() + options.expirationTtl * 1000 }); },
                 async delete(key) { values.delete(key); }
             },
             OCR_GOOGLE_TRANSPORT: {
@@ -169,7 +170,7 @@ test("provider runtime health rejects weak or whitespace-modified caller configu
         env.PROVIDER_RUNTIME_CALLER_SECRET = secret;
         const result = (await getSystemStatus(env, { force: true })).services.find(item => item.id === "provider-runtime");
         assert.equal(result.status, "down");
-        assert.equal(result.errorCode, "PROVIDER_RUNTIME_UNAVAILABLE");
+        assert.equal(result.errorCode, "PROVIDER_RUNTIME_CALLER_SECRET_UNCONFIGURED");
     }
     assert.equal(calls, 0);
 });
@@ -221,6 +222,19 @@ test("provider runtime timeout and malformed health responses fail offline with 
         assert.equal(JSON.stringify(malformed).includes("123456789012345678"), false);
         assert.equal(JSON.stringify(malformed).includes("must-not-pass"), false);
     } finally { restore(); }
+});
+
+test("provider runtime Admin health classifies rejected caller auth and missing endpoint safely", async () => {
+    const { env } = createEnv();
+    env.PROVIDER_RUNTIME.fetch = async () => new Response("private response body", { status: 401 });
+    const unauthorized = (await getSystemStatus(env, { force: true })).services.find(item => item.id === "provider-runtime");
+    assert.equal(unauthorized.errorCode, "PROVIDER_RUNTIME_CALLER_REJECTED");
+    assert.equal(JSON.stringify(unauthorized).includes("private response body"), false);
+
+    env.PROVIDER_RUNTIME.fetch = async () => new Response("private response body", { status: 404 });
+    const missingRoute = (await getSystemStatus(env, { force: true })).services.find(item => item.id === "provider-runtime");
+    assert.equal(missingRoute.errorCode, "PROVIDER_RUNTIME_HEALTH_ENDPOINT_MISSING");
+    assert.equal(JSON.stringify(missingRoute).includes("private response body"), false);
 });
 
 test("Worker Status UI is event-driven and exposes current MMR operations", async () => {
@@ -311,8 +325,9 @@ test("provider runtime is called only server-side and has no browser/public rout
     assert.doesNotMatch(source, /bpd-provider-runtime\.internal|PROVIDER_RUNTIME_CALLER_SECRET|PROVIDER_RUNTIME/);
     assert.equal(config.workers_dev, false);
     assert.equal(config.preview_urls, false);
+    assert.deepEqual(config.placement, { mode: "smart" });
     assert.equal("routes" in config, false);
-    assert.match(source, /healthy: "Online", degraded: "Degraded", down: "Offline"/);
+    assert.match(source, /healthy: "Online", degraded: "Degraded", down: "Down", unknown: "Unknown"/);
     assert.match(source, /Health check: \$\{service\.errorCode\}/);
     assert.match(source, /service\.checkedAt \? `Checked/);
     assert.match(source, /Number\.isFinite\(service\.responseTimeMs\)/);
@@ -366,18 +381,19 @@ test("current healthy MMR state is not degraded by historical VersionMismatch", 
     } finally { globalThis.fetch = originalFetch; }
 });
 
-test("MMR Recheck calls only the protected recheck endpoint", async () => {
+test("MMR Recheck uses the same cheap readiness checker as the hourly health runner", async () => {
     const { env } = createEnv();
     const paths = [];
     const originalFetch = globalThis.fetch;
     globalThis.fetch = async (input, init) => {
         const url = new URL(input); paths.push(url.pathname);
-        assert.equal(init.headers.Authorization, "Bearer admin-key");
+        assert.equal(init.headers.Authorization, "Bearer lookup-key");
         return Response.json({ status: "healthy", rootCause: null, availableActions: ["recheck"], components: { worker: { status: "healthy" }, configuration: { status: "healthy" }, eosAuthorization: { status: "healthy" }, psynetAuthentication: { status: "healthy" }, psynetSocket: { status: "healthy" }, buildConfiguration: { status: "healthy" }, mmrService: { status: "healthy" } }, config: { requiredConfigPresent: true }, build: {}, psynet: {}, recovery: {}, traffic: {} });
     };
     try {
-        await performSystemStatusAction(env, "mmr-api", "recheck");
-        assert.deepEqual(paths, ["/admin/recheck"]);
+        const result = await performSystemStatusAction(env, "mmr-api", "recheck");
+        assert.deepEqual(paths, ["/health/ready"]);
+        assert.equal(result.result.status, "healthy");
     } finally { globalThis.fetch = originalFetch; }
 });
 
@@ -454,16 +470,18 @@ test("unsupported system actions fail before any outbound request", async () => 
     } finally { globalThis.fetch = originalFetch; }
 });
 
-test("explicit Supabase recheck uses only bounded Data API HEAD and returns no data", async () => {
+test("explicit Supabase recheck calls the bounded read-only featured RPC and returns no data", async () => {
     const { env } = createEnv();
     const originalFetch = globalThis.fetch;
     let calls = 0;
     globalThis.fetch = async (url, init) => {
         calls += 1;
-        assert.equal(new URL(url).pathname, "/rest/v1/");
-        assert.equal(init.method, "HEAD");
+        assert.equal(new URL(url).pathname, "/rest/v1/rpc/get_rl_featured_player");
+        assert.equal(init.method, "POST");
         assert.equal(init.headers.apikey, "supabase-test-key");
-        return new Response(null, { status: 200 });
+        assert.equal(init.headers["Accept-Profile"], "api");
+        assert.deepEqual(JSON.parse(init.body), {});
+        return Response.json({ featuredDate: "2026-10-05", validUntil: "2026-10-06T00:00:00Z", player: null });
     };
     try {
         const result = await performSystemStatusAction(env, "supabase", "recheck");
@@ -472,6 +490,78 @@ test("explicit Supabase recheck uses only bounded Data API HEAD and returns no d
         assert.equal(JSON.stringify(result).includes("supabase-test-key"), false);
         assert.equal(JSON.stringify(result).includes("profile"), false);
     } finally { globalThis.fetch = originalFetch; }
+});
+
+test("stale persisted health becomes Unknown while preserving the last operational status", async () => {
+    const { env, calls, seedStatus } = createEnv();
+    const staleAt = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
+    seedStatus("supabase", "healthy", staleAt);
+    seedStatus("discord-matchbot", "healthy", staleAt);
+    const restore = installHealthFetch(calls);
+    try {
+        const status = await getSystemStatus(env, { force: true });
+        for (const id of ["supabase", "discord-matchbot"]) {
+            const service = status.services.find(item => item.id === id);
+            assert.equal(service.status, "unknown");
+            assert.equal(service.canonicalStatus, "unknown");
+            assert.equal(service.stale, true);
+            assert.equal(service.lastKnownStatus, "healthy");
+            assert.equal(service.checkedAt, staleAt);
+        }
+    } finally { restore(); }
+});
+
+test("hourly health runner stores the same bounded service checks in shared status KV", async () => {
+    const { env, values } = createEnv();
+    env.PROVIDER_RUNTIME.fetch = async request => {
+        const path = new URL(request.url).pathname;
+        if (path === "/internal/health") return Response.json({ success: true, service: "bpd-provider-runtime", status: "ok", timestamp: new Date().toISOString() });
+        if (path === "/internal/discord/bot-health") return Response.json({ success: true, botAuthenticated: true, checkedAt: new Date().toISOString() });
+        throw new Error("Unexpected provider-runtime health path");
+    };
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async input => {
+        const url = new URL(input);
+        if (url.hostname === "supabase.example.test") return Response.json({ featuredDate: "2026-10-05", validUntil: "2026-10-06T00:00:00Z", player: null });
+        if (url.hostname === "mmr.example.test") return Response.json({ status: "healthy", components: {} });
+        throw new Error("Unexpected health request");
+    };
+    try {
+        const result = await runScheduledAdminHealthChecks(env);
+        assert.deepEqual([result.checked, result.healthy, result.degraded, result.down, result.unknown], [4, 4, 0, 0, 0]);
+        for (const id of ["supabase", "mmr-api", "provider-runtime", "discord-matchbot"]) {
+            const stored = JSON.parse(values.get(`admin:service-status:${id}`).body);
+            assert.equal(stored.status, "healthy");
+            assert.equal(stored.canonicalStatus, "healthy");
+            assert.ok(stored.checkedAt);
+        }
+    } finally { globalThis.fetch = originalFetch; }
+});
+
+test("Admin service rows group exclusively by backend canonical health", async () => {
+    const source = await readFile(new URL("../../public/Global/Admin/WorkerStatus/JS/index.js", import.meta.url), "utf8");
+    const html = await readFile(new URL("../../public/Global/Admin/WorkerStatus/HTML/index.html", import.meta.url), "utf8");
+    assert.match(html, /id="workerStatusGroups"/);
+    assert.match(source, /service\.canonicalStatus/);
+    assert.match(source, /statusNames = \{ healthy: "Online", degraded: "Degraded", down: "Down", unknown: "Unknown" \}/);
+    assert.match(source, /\["degraded", "down"\]\.includes\(status\) && services\.length > 0/);
+    assert.match(source, /previous\.count === 0 \? true : previous\.open/);
+    assert.match(source, /`\(\$\{services\.length\}\)`/);
+    assert.doesNotMatch(source, /String\(service\.status \|\| "unknown"\)\.toLowerCase\(\)/);
+});
+
+test("all Worker compatibility dates match the current local date", async () => {
+    const configs = [
+        "../../workers/rl-presence-monitor/wrangler.jsonc",
+        "../../workers/ocr-job-consumer/wrangler.jsonc",
+        "../../workers/ocr-cloud-run-proxy/wrangler.jsonc",
+        "../../workers/google-mtls-diagnostic/wrangler.jsonc",
+        "../../workers/bpd-provider-runtime/wrangler.jsonc"
+    ];
+    for (const path of configs) {
+        const config = JSON.parse(await readFile(new URL(path, import.meta.url), "utf8"));
+        assert.equal(config.compatibility_date, "2026-10-05", path);
+    }
 });
 
 test("service action allowlist rejects arbitrary service/action combinations", async () => {

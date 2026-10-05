@@ -176,11 +176,13 @@ test("hourly Rocket League schedule pages due candidates and refreshes Shop, not
                 calls.push({ rpc: "get-shop-data", body: null });
                 return Response.json({ success: true, shops: [{ id: 7 }], catalogues: [{ shop_id: 7, items: [] }] });
             }
+            if (parsed.pathname === "/health/ready") return Response.json({ status: "healthy", components: {} });
             throw new Error("Unexpected MMR Worker endpoint");
         }
         const rpc = parsed.pathname.split("/").at(-1);
         const body = init.body ? JSON.parse(init.body) : null;
         calls.push({ rpc, body });
+        if (rpc === "get_rl_featured_player") return Response.json({ featuredDate: "2026-10-05", validUntil: "2026-10-06T00:00:00Z", player: null });
         if (rpc === "get_rl_refresh_candidates") return Response.json([{
             account_id: "account-1", player_id: "player-1", epic_account_id: "epic-1",
             mmr_due: false, provider_due: false, match_history_due: true,
@@ -196,8 +198,11 @@ test("hourly Rocket League schedule pages due candidates and refreshes Shop, not
         SUPABASE_AUTH: "test-service-role-secret",
         PROVIDER_RUNTIME_CALLER_SECRET: "r".repeat(64),
         PROVIDER_RUNTIME: { async fetch(request) {
-            assert.equal(new URL(request.url).pathname, "/internal/discord/guild-inventory");
-            return Response.json({ success: true, complete: true, count: 0, guilds: [], capturedAt: new Date().toISOString() });
+            const path = new URL(request.url).pathname;
+            if (path === "/internal/discord/guild-inventory") return Response.json({ success: true, complete: true, count: 0, guilds: [], capturedAt: new Date().toISOString() });
+            if (path === "/internal/health") return Response.json({ success: true, service: "bpd-provider-runtime", status: "ok", timestamp: new Date().toISOString() });
+            if (path === "/internal/discord/bot-health") return Response.json({ success: true, botAuthenticated: true, checkedAt: new Date().toISOString() });
+            throw new Error(`Unexpected provider-runtime path: ${path}`);
         } },
         MMR_API_URL: "https://mmr.example.test",
         MMR_API_KEY: "mmr-test-secret",
@@ -231,6 +236,10 @@ test("hourly Rocket League schedule pages due candidates and refreshes Shop, not
     assert.equal(kv.get("rl:scheduled-refresh:cursor"), "player-1");
     assert.ok(JSON.parse(kv.get("admin:service-status:rl-mmr")).lastInvocationAt);
     assert.equal(JSON.parse(kv.get("admin:service-status:rl-shop")).lastSummary.changed, false);
+    assert.equal(JSON.parse(kv.get("admin:service-status:rl-health")).lastSummary.checked, 4);
+    for (const id of ["supabase", "mmr-api", "provider-runtime", "discord-matchbot"]) {
+        assert.ok(JSON.parse(kv.get(`admin:service-status:${id}`)).checkedAt, `${id} health check stored`);
+    }
 });
 
 test("daily noon UTC schedule refreshes each leaderboard playlist once", async () => {

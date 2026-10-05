@@ -527,6 +527,8 @@ test("public Find Players and Player views use the same rank-color mapping", asy
     const search = await readFile(new URL("../../public/Tabs/RocketLeague/FindPlayers/JS/view.js", import.meta.url), "utf8");
     const profile = await readFile(new URL("../../public/Tabs/RocketLeague/PublicProfile/JS/index.js", import.meta.url), "utf8");
     assert.match(renderer, /getRocketLeagueRankClass/);
+    assert.match(renderer, /element\.classList\.add\(\s*getRocketLeagueRankClass\(\s*resolved\.rank/s);
+    assert.doesNotMatch(renderer, /\bgetRankClass\s*\(/);
     assert.match(search, /getRocketLeagueRankClass\(tier\)/);
     assert.match(profile, /getRocketLeagueRankClass\(tier\)/);
 });

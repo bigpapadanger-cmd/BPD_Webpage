@@ -77,6 +77,11 @@ import {
     getRocketLeagueAccessPresentation
 } from "./access_presentation.js";
 
+import {
+    beginVerificationNotice,
+    clearVerificationNotice
+} from "/scripts/verificationNotice.js";
+
 /* =========================================================
 ROUTES
 ========================================================= */
@@ -215,8 +220,10 @@ export function setRocketLeagueAccessButtonValidating() {
     if (
         buttonText
     ) {
-        buttonText.textContent =
-            "Validating...";
+        beginVerificationNotice(buttonText, {
+            checkingText: "Validating...",
+            fallbackText: "Rocket League access"
+        });
     }
 }
 
@@ -262,6 +269,7 @@ function setRocketLeagueAccessButtonUnavailable(
     if (
         buttonText
     ) {
+        clearVerificationNotice(buttonText);
         buttonText.textContent =
             message;
     }
@@ -287,6 +295,8 @@ function applyRocketLeagueAccessButtonState(
         getRocketLeagueAccessButtonText(
             button
         );
+
+    clearVerificationNotice(buttonText);
 
     const authenticated =
         rocketLeagueSession

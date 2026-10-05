@@ -140,6 +140,17 @@ test("MatchBot internal check rejects unauthorized, wrong method and caller-supp
     });
 });
 
+test("MatchBot Admin check identifies private runtime caller-auth rejection without leaking its body", async () => {
+    const env = fixture();
+    env.PROVIDER_RUNTIME.fetch = async () => new Response(JSON.stringify({ success: false, code: "CALLER_UNAUTHORIZED", token: "must-not-pass" }), { status: 401 });
+    await withFetch(() => { throw new Error("unexpected public Discord request"); }, async () => {
+        const result = await performSystemStatusAction(env, "discord-matchbot", "recheck");
+        assert.equal(result.result.errorCode, "PROVIDER_RUNTIME_CALLER_REJECTED");
+        noSecrets(result);
+        assert.equal(JSON.stringify(result).includes("must-not-pass"), false);
+    });
+});
+
 test("Admin status and connection actions fail closed without authorization configuration", async () => {
     const url = "https://site.test/api/admin/system-status";
     await withFetch(() => { throw new Error("unauthorized provider call"); }, async () => {
@@ -155,8 +166,11 @@ test("Admin status and connection actions fail closed without authorization conf
         }
     });
     const source = await readFile("public/Global/Admin/WorkerStatus/JS/index.js", "utf8");
+    const html = await readFile("public/Global/Admin/WorkerStatus/HTML/index.html", "utf8");
     assert.match(source, /Check connection/);
     assert.doesNotMatch(source, /DISCORD_.*BOT_TOKEN|discord\.com\/api/);
+    assert.match(html, /Use Recheck on bpd-provider-runtime/);
+    assert.match(html, /Check Again in Rocket League My Profile/);
 });
 
 test("MatchBot rate limit stays sanitized and prevents an immediate second check", async () => {

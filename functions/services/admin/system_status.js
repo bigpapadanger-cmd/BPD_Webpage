@@ -2,9 +2,11 @@
 
 import { isValidProviderRuntimeCallerSecret, withAbortTimeout } from "../auth/providers/discord_matchbot/runtime_contract.js";
 import { withUpstreamDeadline, fetchBoundedResponse } from "../http/upstream.js";
+import { getFeaturedRocketLeaguePlayer } from "../supabase/rocketleague/discovery.js";
 
 const CACHE_KEY = "admin:system-status:v3";
 const CACHE_TTL_SECONDS = 45;
+const HEALTH_STALE_AFTER_MS = 2 * 60 * 60 * 1000;
 const CHECK_TIMEOUT_MS = 2000;
 const ACTION_TIMEOUT_MS = 15000;
 const CLOUD_RUN_ACTION_TIMEOUT_MS = 30000;
@@ -22,15 +24,36 @@ const ACTIONS = {
 };
 const SERVICE_STATUS_PREFIX = "admin:service-status:";
 
-function statusEntry(id, name, status, detail, extra = {}) {
-    return { id, name, status: String(status).toLowerCase(), checkedAt: new Date().toISOString(), responseTimeMs: null, lastSuccessfulAt: null, lastFailureAt: null, message: detail, detail, dependencies: [], actions: ACTIONS[id] || [], ...extra };
+function canonicalStatus(value) {
+    const status = String(value || "").toLowerCase();
+    if (["healthy", "online"].includes(status)) return "healthy";
+    if (["degraded", "repairing"].includes(status)) return "degraded";
+    if (["down", "offline", "unhealthy"].includes(status)) return "down";
+    return "unknown";
 }
 
+function statusEntry(id, name, status, detail, extra = {}) {
+    const normalizedStatus = String(status).toLowerCase();
+    return { id, name, status: normalizedStatus, canonicalStatus: canonicalStatus(normalizedStatus), stale: false, checkedAt: new Date().toISOString(), responseTimeMs: null, lastSuccessfulAt: null, lastFailureAt: null, message: detail, detail, dependencies: [], actions: ACTIONS[id] || [], ...extra };
+}
+
+function statusKv(env) { return env?.RL_STATS_CACHE || env?.SERVICE_STATUS || null; }
+
 async function readStatus(env, id) {
-    try { return await env?.RL_STATS_CACHE?.get(`${SERVICE_STATUS_PREFIX}${id}`, "json"); } catch { return null; }
+    try {
+        const saved = await statusKv(env)?.get(`${SERVICE_STATUS_PREFIX}${id}`, "json");
+        if (!saved || typeof saved !== "object") return null;
+        const checkedAt = saved.checkedAt || saved.lastInvocationAt || saved.lastSuccessfulAt || saved.lastFailureAt;
+        const checkedAtMs = Date.parse(checkedAt || "");
+        const stale = !Number.isFinite(checkedAtMs) || checkedAtMs > Date.now() || Date.now() - checkedAtMs > HEALTH_STALE_AFTER_MS;
+        if (!stale) return { ...saved, canonicalStatus: canonicalStatus(saved.status), stale: false };
+        const lastKnownStatus = saved.lastKnownStatus || saved.status || "unknown";
+        return { ...saved, status: "unknown", canonicalStatus: "unknown", stale: true, lastKnownStatus,
+            message: "Health result is stale.", detail: `Last health result is stale; the last recorded status was ${lastKnownStatus}.` };
+    } catch { return null; }
 }
 async function writeStatus(env, id, value) {
-    try { await env?.RL_STATS_CACHE?.put(`${SERVICE_STATUS_PREFIX}${id}`, JSON.stringify(value), { expirationTtl: 60 * 60 * 24 * 30 }); } catch { /* Best effort; status remains available for this response. */ }
+    try { await statusKv(env)?.put(`${SERVICE_STATUS_PREFIX}${id}`, JSON.stringify(value), { expirationTtl: 60 * 60 * 24 * 30 }); } catch { /* Best effort; status remains available for this response. */ }
 }
 function applyOperationalState(entry, state) {
     if (!state || typeof state !== "object") return entry;
@@ -102,9 +125,8 @@ async function checkProviderRuntime(env) {
         "provider-runtime", "bpd-provider-runtime", "down", message,
         { errorCode, responseTimeMs }
     );
-    if (typeof binding?.fetch !== "function" || !isValidProviderRuntimeCallerSecret(secret)) {
-        return unavailable("Provider runtime health check is unavailable.", "PROVIDER_RUNTIME_UNAVAILABLE");
-    }
+    if (typeof binding?.fetch !== "function") return unavailable("Provider runtime Service Binding is unavailable.", "PROVIDER_RUNTIME_BINDING_MISSING");
+    if (!isValidProviderRuntimeCallerSecret(secret)) return unavailable("Provider runtime caller authentication is not configured.", "PROVIDER_RUNTIME_CALLER_SECRET_UNCONFIGURED");
     const started = Date.now();
     let response = null;
     try {
@@ -113,7 +135,15 @@ async function checkProviderRuntime(env) {
                 method: "GET", headers: { Authorization: `Bearer ${secret}`, Accept: "application/json" }, signal
             }));
             const responseTimeMs = Date.now() - started;
-            if (!response.ok) return unavailable("Provider runtime health check is unavailable.", "PROVIDER_RUNTIME_UNAVAILABLE", responseTimeMs);
+            if (!response.ok) {
+                if (response.status === 401 || response.status === 403) {
+                    return unavailable("Provider runtime rejected caller authentication.", "PROVIDER_RUNTIME_CALLER_REJECTED", responseTimeMs);
+                }
+                if (response.status === 404) {
+                    return unavailable("Provider runtime health endpoint was not found.", "PROVIDER_RUNTIME_HEALTH_ENDPOINT_MISSING", responseTimeMs);
+                }
+                return unavailable("Provider runtime health check returned an unsuccessful response.", "PROVIDER_RUNTIME_HTTP_ERROR", responseTimeMs);
+            }
 
             let payload;
             try { payload = await readSmallJson(response, 1024); }
@@ -148,15 +178,16 @@ async function readBotStatus(env, id) {
     if (!saved) return entry;
     // Whitelist stored fields rather than forwarding a provider payload/cache blob.
     return { ...entry, status: ["healthy", "degraded", "down", "unknown"].includes(saved.status) ? saved.status : "unknown",
+        canonicalStatus: canonicalStatus(saved.status), stale: saved.stale === true, lastKnownStatus: saved.lastKnownStatus || null,
         checkedAt: safeTimestamp(saved.checkedAt), responseTimeMs: Number.isFinite(saved.responseTimeMs) ? saved.responseTimeMs : null,
         lastSuccessfulAt: safeTimestamp(saved.lastSuccessfulAt), lastFailureAt: safeTimestamp(saved.lastFailureAt),
-        message: saved.status === "healthy" ? "Last read-only Discord bot connection check succeeded." : "Last Discord bot connection check was unavailable.",
-        detail: saved.status === "healthy" ? "Last read-only Discord bot connection check succeeded." : "Last Discord bot connection check was unavailable.",
+        message: saved.stale ? "Discord bot connection result is stale." : saved.status === "healthy" ? "Last read-only Discord bot connection check succeeded." : "Last Discord bot connection check was unavailable.",
+        detail: saved.stale ? saved.detail : saved.status === "healthy" ? "Last read-only Discord bot connection check succeeded." : "Last Discord bot connection check was unavailable.",
         errorCode: BOT_CODES.has(saved.errorCode) ? saved.errorCode : null,
         retryAfterSeconds: Number.isSafeInteger(saved.retryAfterSeconds) ? saved.retryAfterSeconds : null };
 }
 
-const BOT_CODES = new Set(["DISCORD_BOT_UNAVAILABLE", "DISCORD_BOT_TIMEOUT", "DISCORD_BOT_RESPONSE_INVALID", "DISCORD_BOT_RATE_LIMITED", "DISCORD_BOT_UNAUTHORIZED", "DISCORD_BOT_GUILD_UNAVAILABLE"]);
+const BOT_CODES = new Set(["DISCORD_BOT_UNAVAILABLE", "DISCORD_BOT_TIMEOUT", "DISCORD_BOT_RESPONSE_INVALID", "DISCORD_BOT_RATE_LIMITED", "DISCORD_BOT_UNAUTHORIZED", "DISCORD_BOT_GUILD_UNAVAILABLE", "PROVIDER_RUNTIME_BINDING_MISSING", "PROVIDER_RUNTIME_CALLER_SECRET_UNCONFIGURED", "PROVIDER_RUNTIME_CALLER_REJECTED", "PROVIDER_RUNTIME_HEALTH_ENDPOINT_MISSING"]);
 
 async function recheckDiscordBot(env, id) {
     const started = Date.now();
@@ -165,12 +196,17 @@ async function recheckDiscordBot(env, id) {
     try {
         return await withUpstreamDeadline(async signal => {
             if (id === "discord-matchbot") {
-                if (typeof env?.PROVIDER_RUNTIME?.fetch !== "function" || !isValidProviderRuntimeCallerSecret(env.PROVIDER_RUNTIME_CALLER_SECRET)) return failed("DISCORD_BOT_UNAVAILABLE");
+                if (typeof env?.PROVIDER_RUNTIME?.fetch !== "function") return failed("PROVIDER_RUNTIME_BINDING_MISSING");
+                if (!isValidProviderRuntimeCallerSecret(env.PROVIDER_RUNTIME_CALLER_SECRET)) return failed("PROVIDER_RUNTIME_CALLER_SECRET_UNCONFIGURED");
                 const response = await fetchBoundedResponse("https://bpd-provider-runtime.internal/internal/discord/bot-health", {
                     method: "GET", signal, headers: { Authorization: `Bearer ${env.PROVIDER_RUNTIME_CALLER_SECRET}`, Accept: "application/json" }, redirect: "manual"
                 }, 1024, (url, init) => env.PROVIDER_RUNTIME.fetch(new Request(url, init)));
                 const payload = await response.json();
-                if (!response.ok || payload?.success !== true) return failed(payload?.code, safeBotRetry(payload?.retryAfterSeconds));
+                if (!response.ok || payload?.success !== true) {
+                    if (response.status === 401 || response.status === 403 || payload?.code === "CALLER_UNAUTHORIZED") return failed("PROVIDER_RUNTIME_CALLER_REJECTED");
+                    if (response.status === 404) return failed("PROVIDER_RUNTIME_HEALTH_ENDPOINT_MISSING");
+                    return failed(payload?.code, safeBotRetry(payload?.retryAfterSeconds));
+                }
                 const keys = ["success", "botAuthenticated", "checkedAt"];
                 if (Object.keys(payload).length !== keys.length || keys.some(key => !Object.hasOwn(payload, key))
                     || payload.botAuthenticated !== true || !safeTimestamp(payload.checkedAt)) return failed("DISCORD_BOT_RESPONSE_INVALID");
@@ -213,6 +249,7 @@ function safeBotRetry(value) {
 async function checkQueueConsumer(env) {
     const state = await readStatus(env, "ocr-queue");
     if (!state) return statusEntry("ocr-queue", "OCR queue consumer", "Unknown", "No queue invocation has reported status yet; an idle queue is not considered down.");
+    if (state.stale) return statusEntry("ocr-queue", "OCR queue consumer", "Unknown", state.detail, state);
     const failedAfterSuccess = state.lastFailureAt && (!state.lastSuccessAt || state.lastFailureAt >= state.lastSuccessAt);
     return statusEntry("ocr-queue", "OCR queue consumer", failedAfterSuccess ? "Degraded" : "Healthy", failedAfterSuccess ? "Latest queue invocation recorded a retryable or permanent failure." : "Last queue invocation completed without a recorded failure.", { ...state, lastSuccessfulAt: state.lastSuccessAt || null, lastInvocationAt: state.lastInvocationAt || null });
 }
@@ -226,7 +263,7 @@ async function checkCloudRun(env) {
 async function checkSupabase(env) {
     const state = await readStatus(env, "supabase");
     if (!state) return statusEntry("supabase", "Supabase", "Unknown", "No explicit availability check has been run.");
-    return statusEntry("supabase", "Supabase", state.status || "unknown", state.message || "Last explicit API availability check.", state);
+    return statusEntry("supabase", "Supabase", state.status || "unknown", state.detail || state.message || "Last database readiness check.", state);
 }
 
 const MMR_ADVERTISED_ACTIONS = new Set(["recheck", "refresh-eos", "reauthorize-account", "reconnect-psynet", "validate-build", "repair-session"]);
@@ -335,13 +372,13 @@ async function runChecks(env) {
 export async function getSystemStatus(env, { force = false } = {}) {
     if (!force) {
         try {
-            const cached = await env?.RL_STATS_CACHE?.get(CACHE_KEY, "json");
+            const cached = await statusKv(env)?.get(CACHE_KEY, "json");
             if (cached?.success === true && Array.isArray(cached.services)) return { ...cached, cache: "hit" };
         } catch { /* Continue with a bounded live sweep. */ }
     }
     if (!inFlightCheck) {
         inFlightCheck = runChecks(env).then(async payload => {
-            try { await env?.RL_STATS_CACHE?.put(CACHE_KEY, JSON.stringify(payload), { expirationTtl: CACHE_TTL_SECONDS }); } catch { /* Best effort. */ }
+            try { await statusKv(env)?.put(CACHE_KEY, JSON.stringify(payload), { expirationTtl: CACHE_TTL_SECONDS }); } catch { /* Best effort. */ }
             return payload;
         }).finally(() => { inFlightCheck = null; });
     }
@@ -465,19 +502,51 @@ async function storeActionResult(env, entry) {
         lastFailureAt: entry.status === "down" || entry.status === "degraded" ? checkedAt : entry.lastFailureAt || previous?.lastFailureAt || null
     };
     await writeStatus(env, entry.id, statusPayload);
-    try { await env?.RL_STATS_CACHE?.delete(CACHE_KEY); } catch { /* Best effort. */ }
+    try { await statusKv(env)?.delete(CACHE_KEY); } catch { /* Best effort. */ }
 }
 
 async function recheckSupabase(env) {
-    const configuredUrl = String(env?.SUPABASE_URL || "").trim(); const apiKey = String(env?.SUPABASE_AUTH || "").trim();
-    if (!configuredUrl || !apiKey) return statusEntry("supabase", "Supabase", "unknown", "Supabase availability check is not configured.");
+    const configuredUrl = String(env?.SUPABASE_URL || "").trim();
+    const apiKey = String(env?.SUPABASE_SERVICE_ROLE_KEY || env?.SUPABASE_AUTH || "").trim();
+    if (!configuredUrl || !apiKey) return statusEntry("supabase", "Supabase", "down", "Supabase readiness check is not configured.", { errorCode: "SUPABASE_CONFIGURATION_UNAVAILABLE" });
     const started = Date.now();
     try {
-        const root = new URL(configuredUrl); const path = root.pathname.replace(/\/rest\/v1\/?$/, "/rest/v1/");
-        const response = await timedFetch(signal => fetch(new URL(path, root.origin), { method: "HEAD", redirect: "manual", signal, headers: { apikey: apiKey, Accept: "application/json" } }));
-        const status = response.ok ? "healthy" : response.status >= 500 ? "down" : "degraded";
-        return statusEntry("supabase", "Supabase", status, response.ok ? "Supabase Data API is reachable." : `Supabase Data API returned HTTP ${response.status}.`, { responseTimeMs: Date.now() - started });
-    } catch (error) { return statusEntry("supabase", "Supabase", error?.name === "AbortError" ? "down" : "unknown", error?.name === "AbortError" ? "Supabase check timed out." : "Supabase availability check failed.", { responseTimeMs: Date.now() - started }); }
+        const result = await getFeaturedRocketLeaguePlayer({ ...env, SUPABASE_AUTH: apiKey });
+        if (!result || !/^\d{4}-\d{2}-\d{2}$/.test(result.featuredDate)
+            || !Number.isFinite(Date.parse(result.validUntil))
+            || !(result.player === null || (typeof result.player === "object" && !Array.isArray(result.player)))) {
+            return statusEntry("supabase", "Supabase", "down", "Supabase returned an unrecognized readiness response.", {
+                responseTimeMs: Date.now() - started,
+                errorCode: "SUPABASE_READINESS_RESPONSE_INVALID"
+            });
+        }
+        return statusEntry("supabase", "Supabase", "healthy", "Read-only database RPC and response contract succeeded.", { responseTimeMs: Date.now() - started });
+    } catch (error) {
+        const timedOut = error?.status === 504 || error?.code === "UPSTREAM_TIMEOUT";
+        const status = timedOut || Number(error?.status) >= 500 || [401, 403].includes(Number(error?.status)) ? "down" : "degraded";
+        return statusEntry("supabase", "Supabase", status, timedOut ? "Supabase readiness check timed out." : "Supabase readiness RPC failed.", {
+            responseTimeMs: Date.now() - started,
+            errorCode: timedOut ? "SUPABASE_TIMEOUT" : "SUPABASE_READINESS_CHECK_FAILED"
+        });
+    }
+}
+
+export async function runScheduledAdminHealthChecks(env) {
+    const results = await Promise.all([
+        recheckSupabase(env),
+        checkMmrApi(env),
+        checkProviderRuntime(env),
+        recheckDiscordBot(env, "discord-matchbot")
+    ]);
+    await Promise.all(results.map(result => storeActionResult(env, result)));
+    return {
+        success: true,
+        checked: results.length,
+        healthy: results.filter(result => canonicalStatus(result.status) === "healthy").length,
+        degraded: results.filter(result => canonicalStatus(result.status) === "degraded").length,
+        down: results.filter(result => canonicalStatus(result.status) === "down").length,
+        unknown: results.filter(result => canonicalStatus(result.status) === "unknown").length
+    };
 }
 
 async function recheckCloudRun(env) {
@@ -527,15 +596,20 @@ async function callMmr(env, path, keyName, { method = "POST", body, timeout = AC
 }
 
 async function runMmrAdminAction(env, service, action) {
+    if (action === "recheck") {
+        const result = await checkMmrApi(env);
+        await storeActionResult(env, result);
+        return { success: true, service, action, result };
+    }
     const paths = {
-        recheck: "/admin/recheck", "refresh-eos": "/admin/refresh", "reauthorize-account": "/admin/bootstrap",
+        "refresh-eos": "/admin/refresh", "reauthorize-account": "/admin/bootstrap",
         "poll-authorization": "/admin/poll", "reconnect-psynet": "/admin/reconnect", "repair-session": "/admin/repair-session"
     };
     const payload = await callMmr(env, paths[action], "MMR_ADMIN_API_KEY");
     await invalidateMmrStatus(env);
     if (action === "reauthorize-account") return { success: true, service, action, result: { status: "authorization_pending", url: safeText(payload?.url, 512), interval: Math.max(5, Number(payload?.interval) || 10) } };
     if (action === "poll-authorization") return { success: true, service, action, result: { status: payload?.status === "authorized" ? "authorized" : "authorization_pending", retryAfter: Math.max(5, Number(payload?.retryAfter) || 10) } };
-    const readiness = action === "recheck" ? normalizeMmrHealth(payload, null, true) : await checkMmrApi(env);
+    const readiness = await checkMmrApi(env);
     await storeActionResult(env, readiness);
     return { success: true, service, action, result: {
         success: payload?.success !== false, resultCode: safeCode(payload?.resultCode || payload?.code, null),

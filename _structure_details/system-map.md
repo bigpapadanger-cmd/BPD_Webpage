@@ -350,10 +350,17 @@ transport contract, boundaries, and operator sequence.
   `/api/admin/system-status` for service health and
   `/api/admin/page-settings/route-health` for the read-only page inventory.
   The Pages aggregator caches the normalized
-  seven-service response for 45 seconds and deduplicates concurrent checks.
+  service response for 45 seconds and deduplicates concurrent checks.
   Routine refreshes make bounded RL, OCR transport, and MMR checks; Cloud Run
-  and Supabase use last-known state, while the OCR queue is read from a
-  per-invocation heartbeat. Service-specific actions use an explicit allowlist;
+  uses last-known state, while Supabase runs its existing read-only Featured
+  Player RPC during the hourly health sweep and explicit Recheck. The hourly
+  Rocket League monitor cron also runs the same Supabase, MMR readiness,
+  provider-runtime, and MatchBot checkers, persisting normalized state to the
+  existing shared status KV. Backend canonical statuses drive Online,
+  Degraded, Down, and Unknown accordion groups; operational results older than
+  two hours become Unknown/stale without being reclassified as Down. The OCR
+  queue is read from a per-invocation heartbeat. Service-specific actions use
+  an explicit allowlist;
   only RL presence has `Run Now`, while MMR/PsyNet has `Reconnect` and
   `Check Rocket League Version`. The MMR details remain secret-free and include
   build state, safe build metadata, validation/check timestamps, auth/failure
@@ -371,7 +378,8 @@ transport contract, boundaries, and operator sequence.
   `RL_STATS_CACHE` namespace through their `SERVICE_STATUS` bindings. Queue
   status writes once per queue invocation. Cloud Run readiness is an explicit
   secret-gated transport action; routine page refresh never mints credentials
-  or calls Cloud Run. Supabase is checked only when an admin requests Recheck.
+  or calls Cloud Run. Supabase health uses the existing read-only
+  `api.get_rl_featured_player()` RPC; no schema changes are required.
 - See [Worker Status sub-map](system_sub_map/worker-status.md) and
   [request-frequency inventory](request-frequency-inventory.md) for contracts,
   action limits, and dependency semantics.

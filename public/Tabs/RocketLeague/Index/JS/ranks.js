@@ -478,7 +478,7 @@ function renderRankCard(
     }
 
     element.classList.add(
-        getRankClass(
+        getRocketLeagueRankClass(
             resolved.rank
         )
     );

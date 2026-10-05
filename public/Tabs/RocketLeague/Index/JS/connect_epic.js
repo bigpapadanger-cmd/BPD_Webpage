@@ -1,5 +1,9 @@
 "use strict";
 
+import {
+    beginVerificationNotice
+} from "/scripts/verificationNotice.js";
+
 /* =========================================================
 BPD GAMING NETWORK
 ROCKET LEAGUE AUTH BUTTONS
@@ -281,8 +285,15 @@ export function setMainRocketLeagueActionValidating() {
     button.dataset.action =
         "validating";
 
-    button.textContent =
-        "Validating...";
+    const buttonText =
+        button.querySelector("span:last-child");
+
+    if (buttonText) {
+        beginVerificationNotice(buttonText, {
+            checkingText: "Validating...",
+            fallbackText: "Rocket League access"
+        });
+    }
 }
 
 export function releaseMainRocketLeagueAction() {
@@ -308,7 +319,8 @@ export function releaseMainRocketLeagueAction() {
      * This function only releases the button.
      */
     button.disabled =
-        false;
+        button.dataset.action === "validating"
+        || button.dataset.action === "unavailable";
 }
 
 /* =========================================================

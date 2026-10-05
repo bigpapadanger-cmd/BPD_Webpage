@@ -7,8 +7,9 @@
         <p id="workerStatusMessage" role="status" aria-live="polite">Checking your access…</p>
         <button id="workerStatusRefresh" type="button" disabled>Refresh status</button>
     </div>
+    <p class="worker-status-help">Use Recheck on bpd-provider-runtime, then Check connection on each Discord bot. MatchBot checks its bot credential through the private runtime; the role-authorization bot checks its credential and configured guild access. These checks send no messages and do not change membership. To test a linked user’s eligibility, use Check Again in Rocket League My Profile.</p>
     <p id="workerStatusGenerated"></p>
-    <ul id="workerStatusServices" class="worker-status-services" aria-label="Service health"></ul>
+    <div id="workerStatusGroups" class="worker-status-groups" aria-label="Service health"></div>
     <section class="rocket-capability-section" aria-labelledby="rocketCapabilityTitle">
         <header>
             <p class="admin-eyebrow">Current and planned integrations</p>

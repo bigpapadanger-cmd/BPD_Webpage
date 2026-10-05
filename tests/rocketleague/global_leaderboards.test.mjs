@@ -81,6 +81,27 @@ test("leaderboard service restricts playlists, page sizes, and response identity
     }), error => error.code === "RL_LEADERBOARD_RESPONSE_INVALID");
 });
 
+test("leaderboard RPC diagnostics identify the failed boundary without logging private error details", async () => {
+    const warnings = [];
+    const originalWarn = console.warn;
+    console.warn = (...args) => warnings.push(args);
+    globalThis.fetch = async () => Response.json({ message: "private database detail", hint: "secret body" }, { status: 503 });
+    try {
+        await assert.rejects(() => getGlobalRocketLeagueLeaderboard({
+            SUPABASE_URL: "https://supabase.example", SUPABASE_AUTH: "private-service-key"
+        }, { playlistId: 10 }), error => error.code === "RL_LEADERBOARD_UNAVAILABLE");
+    } finally {
+        console.warn = originalWarn;
+    }
+    assert.equal(warnings.length, 1);
+    assert.deepEqual(warnings[0][1], {
+        rpc: "get_rl_global_leaderboard",
+        code: "RL_LEADERBOARD_UNAVAILABLE",
+        upstreamStatus: 503
+    });
+    assert.doesNotMatch(JSON.stringify(warnings), /private database detail|secret body|private-service-key/);
+});
+
 test("public route validates filters and never accepts caller-supplied player identity", async () => {
     const calls = [];
     globalThis.fetch = async (url, init) => {
