@@ -1,5 +1,7 @@
 "use strict";
 
+import { getRocketLeagueRankClass } from "../../shared/profilePresentation.js";
+
 /* =========================================================
 BPD GAMING NETWORK
 ROCKET LEAGUE RANK RENDERER
@@ -328,98 +330,6 @@ function getGeneralRank(
 /* =========================================================
 RANK THEME
 ========================================================= */
-
-function getRankClass(
-    rankName
-) {
-    const normalized =
-        normalizeString(
-            rankName
-        )
-            .toLowerCase();
-
-    if (
-        !normalized
-        || normalized.includes(
-            "unranked"
-        )
-    ) {
-        return "rank-unranked";
-    }
-
-    if (
-        normalized.includes(
-            "supersonic legend"
-        )
-        || normalized ===
-            "ssl"
-    ) {
-        return "rank-supersonic-legend";
-    }
-
-    if (
-        normalized.includes(
-            "grand champion"
-        )
-        || normalized.startsWith(
-            "gc "
-        )
-        || normalized ===
-            "gc"
-    ) {
-        return "rank-grand-champion";
-    }
-
-    if (
-        normalized.includes(
-            "champion"
-        )
-    ) {
-        return "rank-champion";
-    }
-
-    if (
-        normalized.includes(
-            "diamond"
-        )
-    ) {
-        return "rank-diamond";
-    }
-
-    if (
-        normalized.includes(
-            "platinum"
-        )
-    ) {
-        return "rank-platinum";
-    }
-
-    if (
-        normalized.includes(
-            "gold"
-        )
-    ) {
-        return "rank-gold";
-    }
-
-    if (
-        normalized.includes(
-            "silver"
-        )
-    ) {
-        return "rank-silver";
-    }
-
-    if (
-        normalized.includes(
-            "bronze"
-        )
-    ) {
-        return "rank-bronze";
-    }
-
-    return "rank-unranked";
-}
 
 /* =========================================================
 CLEAR RANK CLASSES

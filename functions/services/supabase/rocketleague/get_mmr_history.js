@@ -1,6 +1,6 @@
 "use strict";
 
-const MAX_MMR_HISTORY_CAPTURES = 90;
+const MAX_MMR_HISTORY_CAPTURES = 1000;
 const REQUEST_TIMEOUT_MS = 5000;
 
 function normalizeString(value) {
@@ -18,7 +18,7 @@ function normalizeTier(value) {
     return typeof value === "string" ? value.trim() : undefined;
 }
 
-export function normalizeMmrHistory(payload) {
+export function normalizeMmrHistory(payload, maxCaptures = 90) {
     if (!Array.isArray(payload)) {
         throw Object.assign(new Error("MMR history RPC returned an invalid response."), { code: "MMR_HISTORY_INVALID", status: 502 });
     }
@@ -43,11 +43,11 @@ export function normalizeMmrHistory(payload) {
 
     return snapshots
         .sort((a, b) => Date.parse(b.capturedAt) - Date.parse(a.capturedAt))
-        .slice(0, MAX_MMR_HISTORY_CAPTURES)
+        .slice(0, Math.min(MAX_MMR_HISTORY_CAPTURES, Number.isSafeInteger(maxCaptures) && maxCaptures > 0 ? maxCaptures : 90))
         .reverse();
 }
 
-export async function getRocketLeagueMmrHistory(env, accountId) {
+export async function getRocketLeagueMmrHistory(env, accountId, { maxCaptures = 90 } = {}) {
     const normalizedAccountId = normalizeString(accountId);
     const baseUrl = normalizeString(env?.SUPABASE_URL).replace(/\/+$/, "");
     const auth = normalizeString(env?.SUPABASE_AUTH);
@@ -82,7 +82,7 @@ export async function getRocketLeagueMmrHistory(env, accountId) {
         } catch {
             throw Object.assign(new Error("MMR history RPC returned invalid JSON."), { code: "MMR_HISTORY_INVALID", status: 502 });
         }
-        return normalizeMmrHistory(payload);
+        return normalizeMmrHistory(payload, maxCaptures);
     } catch (error) {
         if (error?.name === "AbortError") {
             throw Object.assign(new Error("MMR history RPC timed out."), { code: "MMR_HISTORY_TIMEOUT", status: 504 });
@@ -93,9 +93,9 @@ export async function getRocketLeagueMmrHistory(env, accountId) {
     }
 }
 
-export async function getRocketLeagueMmrHistorySafely(env, accountId) {
+export async function getRocketLeagueMmrHistorySafely(env, accountId, options = {}) {
     try {
-        return await getRocketLeagueMmrHistory(env, accountId);
+        return await getRocketLeagueMmrHistory(env, accountId, options);
     } catch (error) {
         console.error("ROCKET LEAGUE MMR HISTORY: Supabase read unavailable.", {
             code: error?.code || "MMR_HISTORY_FAILED",

@@ -541,6 +541,10 @@ export const PAGE_ROUTE_INVENTORY = Object.freeze([
       {
         "path": "/Framework/Shell/HTML/Footer/footer.html",
         "exists": true
+      },
+      {
+        "path": "/Tabs/RocketLeague/Features/JS/leaderboards.js",
+        "exists": true
       }
     ]
   },
@@ -2070,6 +2074,23 @@ export const API_ROUTE_INVENTORY = Object.freeze([
     "deepLinkSupported": false
   },
   {
+    "path": "/api/auth/rocketleague/global-leaderboard-preference",
+    "lookupKey": null,
+    "routeType": "api",
+    "casePolicy": "exact",
+    "sourceFiles": [
+      "functions/api/auth/rocketleague/global-leaderboard-preference.js"
+    ],
+    "handler": "functions/api/auth/rocketleague/global-leaderboard-preference.js",
+    "methods": [
+      "GET",
+      "PATCH"
+    ],
+    "authRequired": "handler-defined",
+    "healthStatus": "valid",
+    "deepLinkSupported": false
+  },
+  {
     "path": "/api/auth/rocketleague/profile",
     "lookupKey": null,
     "routeType": "api",
@@ -2417,6 +2438,22 @@ export const API_ROUTE_INVENTORY = Object.freeze([
     "handler": "functions/api/ocr/training.js",
     "methods": [
       "ALL"
+    ],
+    "authRequired": "handler-defined",
+    "healthStatus": "valid",
+    "deepLinkSupported": false
+  },
+  {
+    "path": "/api/rocketleague/leaderboards",
+    "lookupKey": null,
+    "routeType": "api",
+    "casePolicy": "exact",
+    "sourceFiles": [
+      "functions/api/rocketleague/leaderboards.js"
+    ],
+    "handler": "functions/api/rocketleague/leaderboards.js",
+    "methods": [
+      "GET"
     ],
     "authRequired": "handler-defined",
     "healthStatus": "valid",

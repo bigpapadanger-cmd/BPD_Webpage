@@ -44,6 +44,13 @@ export function isSnapshotStale(snapshot, now = Date.now()) {
     });
 }
 
+export function canShowLastSavedShop(snapshot, now = Date.now()) {
+    return snapshot?.available === false
+        && Number.isSafeInteger(snapshot.snapshotId) && snapshot.snapshotId > 0
+        && typeof snapshot.capturedAt === "string" && Number.isFinite(Date.parse(snapshot.capturedAt))
+        && shopPages(snapshot, now).length > 0;
+}
+
 function timingLabel(startsAt, endsAt) {
     const start = dateLabel(startsAt);
     const end = dateLabel(endsAt);
@@ -62,7 +69,6 @@ export function shopImage(value, alt, className) {
     image.loading = "lazy";
     image.referrerPolicy = "no-referrer";
     image.addEventListener("error", () => {
-        image.closest(".rl-shop-item")?.remove();
         image.remove();
     }, { once: true });
     return image;
@@ -70,15 +76,23 @@ export function shopImage(value, alt, className) {
 
 export function itemCard(item) {
     const card = element("article", "rl-shop-item");
+    if (typeof item?.title !== "string" || !item.title.trim()) return null;
     const image = shopImage(item.image_url, `${item.title} artwork`, "rl-shop-item__image");
-    if (!image || !item.title) return null;
-    card.append(image);
+    if (image) card.append(image);
     card.append(element("h3", "rl-shop-item__title", item.title));
     if (item.description) card.append(element("p", "rl-shop-item__description", item.description));
 
-    const price = item.costs.flatMap(cost => cost.prices).find(value => Number.isSafeInteger(value.amount));
+    const price = (Array.isArray(item.costs) ? item.costs : []).flatMap(cost => Array.isArray(cost.prices) ? cost.prices : [])
+        .find(value => Number.isSafeInteger(value.amount));
     if (price) card.append(element("p", "rl-shop-item__price", `${price.amount.toLocaleString()} · Currency ${price.currency_id}`));
     else card.append(element("p", "rl-shop-item__price", "Price unavailable"));
+
+    const variants = (Array.isArray(item.products) ? item.products : [])
+        .flatMap(product => Array.isArray(product.attributes) ? product.attributes : [])
+        .filter(attribute => /^(paint|painted|certification|certified|specialedition|special edition)$/i.test(attribute?.key || "")
+            && typeof attribute.value === "string" && attribute.value.trim())
+        .map(attribute => `${attribute.key}: ${attribute.value.trim()}`);
+    if (variants.length) card.append(element("p", "rl-shop-item__metadata", [...new Set(variants)].join(" · ")));
 
     const timing = timingLabel(
         item.starts_at || item.costs.find(cost => cost.starts_at)?.starts_at,
@@ -105,7 +119,7 @@ export function shopPages(snapshot, now = Date.now()) {
         const shop = shops.get(String(catalogue.shop_id));
         if (!shopCategoryName(shop) || !isActive(shop, now)) return [];
         const items = Array.isArray(catalogue.items) ? catalogue.items.filter(item =>
-            typeof item.title === "string" && item.title.trim() && safeImage(item.image_url) && isActive(item, now)) : [];
+            typeof item.title === "string" && item.title.trim() && isActive(item, now)) : [];
         const pages = [];
         for (let offset = 0; offset < items.length; offset += 3) {
             pages.push({ shop, shopId: String(catalogue.shop_id),
@@ -127,9 +141,10 @@ function initializeCarousel(snapshot) {
     const sectionTiming = root.querySelector("[data-shop-section-timing]");
     const items = root.querySelector("[data-shop-items]");
 
-    if (!snapshot.available || !pages.length) {
+    const lastSavedFallback = canShowLastSavedShop(snapshot);
+    if ((!snapshot.available && !lastSavedFallback) || !pages.length) {
         panel.hidden = true;
-        status.textContent = "No active shop artwork available";
+        status.textContent = "No active shop items available";
         root.querySelector("[data-shop-capture]").textContent = snapshot.capturedAt
             ? `Last saved snapshot: ${dateLabel(snapshot.capturedAt) || snapshot.capturedAt}`
             : "No saved shop snapshot is available yet.";
@@ -137,8 +152,10 @@ function initializeCarousel(snapshot) {
     }
 
     const captured = dateLabel(snapshot.capturedAt);
-    const stale = isSnapshotStale(snapshot);
-    status.textContent = stale ? "Saved shop rotation may be out of date" : "Current saved shop rotation";
+    const stale = isSnapshotStale(snapshot) || lastSavedFallback;
+    status.textContent = lastSavedFallback
+        ? "Showing the last saved shop rotation · refresh unavailable"
+        : stale ? "Saved shop rotation may be out of date" : "Current saved shop rotation";
     root.querySelector("[data-shop-capture]").textContent = captured ? `Data captured ${captured}` : "Showing the latest saved shop data.";
     panel.hidden = false;
     const pause = root.querySelector("[data-shop-pause]");

@@ -4,6 +4,7 @@ import {
     getPublicPresenceLabel,
     getPublicProfilePageUrl
 } from "../../shared/profileView.js";
+import { getRocketLeagueRankClass } from "../../shared/profilePresentation.js";
 
 const PLAYLISTS = [
     ["ones_tier", "ones_mmr", "1v1"],
@@ -56,9 +57,9 @@ export function createPlayerCard(documentRef, player, { featured = false } = {})
     ranks.setAttribute("aria-label", "Competitive playlist ranks");
     for (const [tierKey, mmrKey, label] of PLAYLISTS) {
         const rank = documentRef.createElement("div");
-        rank.className = "rl-player-rank";
-        rank.append(textElement(documentRef, "span", label, "rl-player-rank-label"));
         const tier = typeof player.mmr?.[tierKey] === "string" ? player.mmr[tierKey] : "Rank unavailable";
+        rank.className = `rl-player-rank ${getRocketLeagueRankClass(tier)}`;
+        rank.append(textElement(documentRef, "span", label, "rl-player-rank-label"));
         rank.append(textElement(documentRef, "strong", tier, "rl-player-rank-tier"));
         const mmr = player.mmr?.[mmrKey];
         rank.append(textElement(documentRef, "small", Number.isSafeInteger(mmr) && mmr >= 0 ? `${mmr.toLocaleString()} MMR` : "MMR unavailable", "rl-player-rank-mmr"));

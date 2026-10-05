@@ -3,6 +3,8 @@
 import { apiFetch } from "/scripts/apiConnection.js";
 import { getRocketLeaguePublicProfileUrl } from "/scripts/apiRoutes.js";
 import { getPublicPresenceLabel } from "../../shared/profileView.js";
+import { getRocketLeagueRankClass } from "../../shared/profilePresentation.js";
+import { renderMmrHistory } from "../../Index/JS/mmr_dashboard.js";
 
 function formatNumber(value) {
     return Number.isSafeInteger(value) && value >= 0 ? value.toLocaleString() : "—";
@@ -48,19 +50,23 @@ function renderProfile(profile) {
     setText("publicProfilePlatform", profile.rl_platform, "Platform not listed");
     setText("publicProfilePresence", getPublicPresenceLabel(profile));
 
-    const presenceAt = formatDate(profile.presence_checked_at);
-    const presenceAtElement = document.getElementById("publicPresenceCheckedAt");
-    if (presenceAtElement && profile.presence_shared === true && presenceAt) {
-        presenceAtElement.textContent = `Last checked ${presenceAt}`;
-        presenceAtElement.hidden = false;
-    }
-
     const ranks = document.getElementById("publicProfileRanks");
     ranks?.replaceChildren();
     if (ranks) {
-        addFact(ranks, "1v1", formatRank(profile.mmr?.ones_tier, profile.mmr?.ones_mmr));
-        addFact(ranks, "2v2", formatRank(profile.mmr?.twos_tier, profile.mmr?.twos_mmr));
-        addFact(ranks, "3v3", formatRank(profile.mmr?.threes_tier, profile.mmr?.threes_mmr));
+        for (const [label, tier, mmr] of [
+            ["1v1", profile.mmr?.ones_tier, profile.mmr?.ones_mmr],
+            ["2v2", profile.mmr?.twos_tier, profile.mmr?.twos_mmr],
+            ["3v3", profile.mmr?.threes_tier, profile.mmr?.threes_mmr]
+        ]) {
+            const fact = document.createElement("div");
+            fact.className = `rl-player-fact ${getRocketLeagueRankClass(tier)}`;
+            const heading = document.createElement("span");
+            heading.textContent = label;
+            const content = document.createElement("strong");
+            content.textContent = formatRank(tier, mmr);
+            fact.append(heading, content);
+            ranks.append(fact);
+        }
     }
 
     const rankAt = formatDate(profile.mmr?.captured_at);
@@ -69,6 +75,12 @@ function renderProfile(profile) {
         rankAtElement.textContent = `Last updated ${rankAt}`;
         rankAtElement.hidden = false;
     }
+    renderMmrHistory(profile.mmrHistory, document, {
+        graphId: "publicMmrHistoryGraph",
+        statusId: "publicMmrHistoryStatus",
+        days: 30,
+        averageByUtcDay: true
+    });
 
     const provider = document.getElementById("publicProfileProvider");
     provider?.replaceChildren();

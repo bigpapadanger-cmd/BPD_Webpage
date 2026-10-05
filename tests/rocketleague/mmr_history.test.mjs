@@ -51,6 +51,72 @@ test("MMR history preserves short histories and exactly 90 captures", () => {
     assert.equal(normalizeMmrHistory(Array.from({ length: 90 }, (_, index) => snapshot(index))).length, 90);
 });
 
+test("public chart limits to 30 days and averages multiple captures independently by UTC day and playlist", () => {
+    const rows = [
+        { capturedAt: "2026-10-04T09:00:00Z", ones: { mmr: 100, tier: "Gold" }, twos: { mmr: null, tier: null }, threes: { mmr: 800, tier: "Diamond" } },
+        { capturedAt: "2026-10-04T20:00:00Z", ones: { mmr: 102, tier: "Gold" }, twos: { mmr: 500, tier: "Silver" }, threes: { mmr: null, tier: null } },
+        { capturedAt: "2026-10-05T12:00:00Z", ones: { mmr: 110, tier: "Platinum" }, twos: { mmr: 510, tier: "Silver" }, threes: { mmr: 820, tier: "Diamond" } },
+        { capturedAt: "2026-09-01T12:00:00Z", ones: { mmr: 20, tier: "Bronze" }, twos: { mmr: 20, tier: "Bronze" }, threes: { mmr: 20, tier: "Bronze" } }
+    ];
+    const averaged = normalizeMmrHistoryForChart(rows, {
+        days: 30, averageByUtcDay: true, now: Date.parse("2026-10-06T00:00:00Z")
+    });
+    assert.equal(averaged.length, 2);
+    assert.equal(averaged[0].capturedAt, "2026-10-04T00:00:00.000Z");
+    assert.equal(averaged[0].ones.mmr, 101);
+    assert.equal(averaged[0].ones.captureCount, 2);
+    assert.equal(averaged[0].twos.mmr, 500);
+    assert.equal(averaged[0].threes.mmr, 800);
+    assert.equal(averaged[1].ones.mmr, 110);
+});
+
+test("30-day chart normalization retains more than the homepage 90-capture limit", () => {
+    const rows = Array.from({ length: 120 }, (_, index) => {
+        const day = Math.floor(index / 4);
+        const hour = (index % 4) * 6;
+        const date = new Date(Date.UTC(2026, 9, 1 + day, hour));
+        return { capturedAt: date.toISOString(),
+            ones: { mmr: 1000 + index, tier: "Champion" },
+            twos: { mmr: null, tier: null },
+            threes: { mmr: 2000 + index, tier: "Grand Champion" } };
+    });
+    const averaged = normalizeMmrHistoryForChart(rows, {
+        days: 30, averageByUtcDay: true, now: Date.parse("2026-10-31T00:00:00Z")
+    });
+    assert.equal(averaged.length, 30);
+    assert.equal(averaged[0].ones.captureCount, 4);
+    assert.equal(averaged[29].ones.captureCount, 4);
+});
+
+test("public profile server flow checks discoverability before private history lookup and returns no internal IDs", async () => {
+    const { getPublicRocketLeagueProfileWithMmrHistory } = await import("../../functions/services/supabase/rocketleague/discovery.js");
+    const calls = [];
+    const accountId = "f6332c75-771a-46bc-ae09-ef5d886a4c35";
+    const result = await withFetch(async (url, init) => {
+        const parsed = new URL(url);
+        calls.push({ url: parsed, init });
+        if (parsed.pathname.endsWith("get_public_rocketleague_profile")) {
+            return response({ public_profile_id: "38c395e6-cac4-4f27-86c0-f88f7304c618", display_name: "Public pilot", find_profile_enabled: true });
+        }
+        if (parsed.pathname === "/rest/v1/rl_players") {
+            assert.equal(init.headers["Accept-Profile"], "core");
+            assert.equal(parsed.searchParams.get("public_profile_id"), "eq.38c395e6-cac4-4f27-86c0-f88f7304c618");
+            return response([{ account_id: accountId }]);
+        }
+        if (parsed.pathname.endsWith("get_rl_player_mmr_history")) {
+            assert.deepEqual(JSON.parse(init.body), { p_account_id: accountId });
+            return response([snapshot(0)]);
+        }
+        throw new Error(`unexpected ${parsed.pathname}`);
+    }, () => getPublicRocketLeagueProfileWithMmrHistory({ SUPABASE_URL: "https://db.example.test", SUPABASE_AUTH: "server-only" }, "38c395e6-cac4-4f27-86c0-f88f7304c618"));
+    assert.equal(calls.length, 3);
+    assert.equal(result.display_name, "Public pilot");
+    assert.equal(result.mmrHistory.length, 1);
+    assert.equal("account_id" in result, false);
+    assert.equal("player_id" in result, false);
+    assert.doesNotMatch(JSON.stringify(result), new RegExp(accountId));
+});
+
 test("MMR history rejects malformed payloads and snapshots", () => {
     assert.throws(() => normalizeMmrHistory({ rows: [] }), error => error.code === "MMR_HISTORY_INVALID");
     assert.throws(() => normalizeMmrHistory([snapshot(1, { ones_mmr: -1 })]), error => error.code === "MMR_HISTORY_INVALID");

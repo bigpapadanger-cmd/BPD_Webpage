@@ -58,6 +58,17 @@
 .rl-player-rank-label { color: #9eadc3; font-size: .68rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
 .rl-player-rank-tier { display: block; min-width: 0; color: #f3f7ff; font-size: .76rem; line-height: 1.3; overflow-wrap: anywhere; }
 .rl-player-rank-mmr { color: #afbdd1; font-size: .7rem; font-variant-numeric: tabular-nums; }
+.rl-player-rank.rank-bronze,.rl-player-fact.rank-bronze { --rank-color: #c58b9b; }
+.rl-player-rank.rank-silver,.rl-player-fact.rank-silver { --rank-color: #c4cad8; }
+.rl-player-rank.rank-gold,.rl-player-fact.rank-gold { --rank-color: #f1d784; }
+.rl-player-rank.rank-platinum,.rl-player-fact.rank-platinum { --rank-color: #75d9e8; }
+.rl-player-rank.rank-diamond,.rl-player-fact.rank-diamond { --rank-color: #58b6ff; }
+.rl-player-rank.rank-champion,.rl-player-fact.rank-champion { --rank-color: #a998ff; }
+.rl-player-rank.rank-grand-champion,.rl-player-fact.rank-grand-champion { --rank-color: #ff8ebd; }
+.rl-player-rank.rank-supersonic-legend,.rl-player-fact.rank-supersonic-legend { --rank-color: #e8ecff; }
+.rl-player-rank.rank-unranked,.rl-player-rank.rank-unavailable,.rl-player-fact.rank-unranked { --rank-color: #7f8799; }
+.rl-player-rank[class*="rank-"] { border-color: var(--rank-color); }
+.rl-player-rank[class*="rank-"] .rl-player-rank-tier,.rl-player-fact[class*="rank-"] strong { color: var(--rank-color); }
 .rl-player-profile-link { align-self: flex-start; min-height: 40px; margin-top: auto; }
 .rl-search-state { grid-column: 1 / -1; margin: 0; padding: 22px 16px; border: 1px dashed var(--discovery-border); border-radius: 14px; color: #bac7da; text-align: center; }
 .rl-search-state-loading { border-style: solid; }

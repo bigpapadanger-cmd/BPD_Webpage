@@ -165,15 +165,18 @@ test("unknown scheduled trigger performs no work, and Worker has no queue handle
     assert.equal("queue" in worker, false);
 });
 
-test("hourly Rocket League schedule pages due candidates using the confirmed RPC contract", async () => {
+test("hourly Rocket League schedule pages due candidates and refreshes Shop, not daily leaderboards", async () => {
     const calls = [];
     const kv = new Map();
     const tasks = [];
     globalThis.fetch = async (url, init) => {
         const parsed = new URL(url);
         if (parsed.hostname === "mmr.example.test") {
-            calls.push({ rpc: "get-shop-data", body: null });
-            return Response.json({ success: true, shops: [{ id: 7 }], catalogues: [{ shop_id: 7, items: [] }] });
+            if (parsed.pathname === "/get-shop-data") {
+                calls.push({ rpc: "get-shop-data", body: null });
+                return Response.json({ success: true, shops: [{ id: 7 }], catalogues: [{ shop_id: 7, items: [] }] });
+            }
+            throw new Error("Unexpected MMR Worker endpoint");
         }
         const rpc = parsed.pathname.split("/").at(-1);
         const body = init.body ? JSON.parse(init.body) : null;
@@ -214,6 +217,8 @@ test("hourly Rocket League schedule pages due candidates using the confirmed RPC
     assert.equal(callsByRpc.get("sync_discord_bot_guilds").length, 1);
     assert.deepEqual(callsByRpc.get("get_rl_refresh_candidates")[0].body, { p_after_player_id: null, p_limit: 20 });
     assert.equal(callsByRpc.get("get-shop-data").length, 1);
+    assert.equal(callsByRpc.has("get-global-leaderboard"), false);
+    assert.equal(callsByRpc.has("begin_rl_global_leaderboard_snapshot"), false);
     assert.equal(callsByRpc.get("save_rl_shop_snapshot").length, 1);
     assert.match(callsByRpc.get("save_rl_shop_snapshot")[0].body.p_content_hash, /^[a-f0-9]{64}$/);
     assert.deepEqual(callsByRpc.get("record_rl_player_refresh_result")[0].body, {
@@ -226,6 +231,46 @@ test("hourly Rocket League schedule pages due candidates using the confirmed RPC
     assert.equal(kv.get("rl:scheduled-refresh:cursor"), "player-1");
     assert.ok(JSON.parse(kv.get("admin:service-status:rl-mmr")).lastInvocationAt);
     assert.equal(JSON.parse(kv.get("admin:service-status:rl-shop")).lastSummary.changed, false);
+});
+
+test("daily noon UTC schedule refreshes each leaderboard playlist once", async () => {
+    const calls = [];
+    const kv = new Map();
+    const tasks = [];
+    let snapshotNumber = 0;
+    globalThis.fetch = async (url, init) => {
+        const parsed = new URL(url);
+        if (parsed.hostname === "mmr.example.test") {
+            assert.equal(parsed.pathname, "/get-global-leaderboard");
+            const playlistId = Number(parsed.searchParams.get("playlistId"));
+            calls.push({ type: "provider", playlistId });
+            return Response.json({ success: true, playlistId, entries: [{ platform: "Epic", providerAccountId: "Epic|player|0", displayName: "Player", mmr: 1000, providerValue: null }] });
+        }
+        if (parsed.hostname === "discord.invalid") return new Response(null, { status: 204 });
+        const rpc = parsed.pathname.split("/").at(-1);
+        const body = init.body ? JSON.parse(init.body) : null;
+        calls.push({ type: "rpc", rpc, body });
+        if (rpc === "begin_rl_global_leaderboard_snapshot") return Response.json({ started: true, snapshotId: `00000000-0000-4000-8000-00000000000${++snapshotNumber}` });
+        if (rpc === "complete_rl_global_leaderboard_snapshot") return Response.json({ success: true, entryCount: body.p_source_entry_count });
+        if (rpc === "fail_rl_global_leaderboard_snapshot") return Response.json({ success: true });
+        if (rpc === "admin_taskboard_summary") return Response.json(rpcPayload);
+        throw new Error(`Unexpected request to ${rpc}`);
+    };
+    const scheduledEnv = {
+        ...env(),
+        SUPABASE_AUTH: "test-service-role-secret",
+        MMR_API_URL: "https://mmr.example.test",
+        MMR_API_KEY: "mmr-test-secret",
+        SERVICE_STATUS: { async get(key) { return kv.get(key) ?? null; }, async put(key, value) { kv.set(key, value); } }
+    };
+
+    await handleScheduled({ cron: "0 12 * * *" }, scheduledEnv, { waitUntil: task => tasks.push(task) });
+    await Promise.all(tasks);
+
+    assert.deepEqual(calls.filter(call => call.type === "provider").map(call => call.playlistId), [10, 11, 13]);
+    assert.equal(calls.filter(call => call.rpc === "complete_rl_global_leaderboard_snapshot").length, 3);
+    assert.equal(calls.filter(call => call.rpc === "admin_taskboard_summary").length, 1);
+    assert.equal(JSON.parse(kv.get("admin:service-status:rl-leaderboards")).lastSummary.succeeded, 3);
 });
 
 test("protected Worker health exposes last MMR and Shop schedule attempts", async () => {

@@ -3,7 +3,7 @@ import test, { afterEach } from "node:test";
 
 import { onRequestGet } from "../../functions/api/rocketleague/shop.js";
 import { getCurrentRocketLeagueShop } from "../../functions/services/supabase/rocketleague/current_shop.js";
-import { isSnapshotStale, shopPages, initializePage } from "../../public/Tabs/RocketLeague/Features/JS/shop.js";
+import { isSnapshotStale, shopPages, initializePage, itemCard } from "../../public/Tabs/RocketLeague/Features/JS/shop.js";
 
 const originalFetch = globalThis.fetch;
 afterEach(() => { globalThis.fetch = originalFetch; });
@@ -25,7 +25,7 @@ test("shop pages finish each active category in three-item groups without placeh
     assert.deepEqual(shopPages({ shops: [], catalogues: [] }), []);
 });
 
-test("shop excludes expired/future shops, technical names, missing artwork and inactive items", () => {
+test("shop excludes expired/future shops, technical names and inactive items, but keeps items without artwork", () => {
     const now = Date.parse("2026-10-05T12:00:00Z");
     const item = { title: "Real item", image_url: "https://images.test/item.png" };
     const shops = [{ id: 1, title: "Region:NA", name: "Featured" }, { id: 2, title: "Region:NA" },
@@ -36,7 +36,38 @@ test("shop excludes expired/future shops, technical names, missing artwork and i
         { ...item, ends_at: "2026-10-05T11:59:59Z" }] })) }, now);
     assert.equal(pages.length, 1);
     assert.equal(pages[0].shopId, "1");
-    assert.deepEqual(pages[0].items, [item]);
+    assert.deepEqual(pages[0].items, [item, { ...item, image_url: null }, { ...item, image_url: "javascript:bad" }]);
+});
+
+test("cached shop reader preserves all 33 observed sections within its bounded limit", async () => {
+    globalThis.fetch = async () => Response.json({
+        available: true, snapshotId: 1, contentHash: "a".repeat(64), providerSchemaVersion: 1,
+        capturedAt: "2026-10-05T12:00:00Z",
+        shops: Array.from({ length: 35 }, (_, id) => ({ id, name: `Section ${id}` })),
+        catalogues: Array.from({ length: 33 }, (_, id) => ({ shop_id: id, items: [] })), notifications: []
+    });
+    const snapshot = await getCurrentRocketLeagueShop(env);
+    assert.equal(snapshot.shops.length, 35);
+    assert.equal(snapshot.catalogues.length, 33);
+});
+
+test("item cards remain useful without artwork and show verified variant metadata", async () => {
+    const originalDocument = globalThis.document;
+    const createElement = tag => ({ tagName: tag, children: [], textContent: "", append(...items) { this.children.push(...items); }, addEventListener() {}, remove() {} });
+    globalThis.document = { createElement };
+    try {
+        const card = itemCard({
+            title: "Octane", image_url: null,
+            costs: [{ prices: [{ amount: 700, currency_id: 13 }] }],
+            products: [{ attributes: [{ key: "Paint", value: "Titanium White" }, { key: "Untrusted", value: "ignored" }] }]
+        });
+        const text = card.children.map(child => child.textContent).join(" ");
+        assert.equal(card.children.some(child => child.tagName === "img"), false);
+        assert.match(text, /Octane/);
+        assert.match(text, /700 · Currency 13/);
+        assert.match(text, /Paint: Titanium White/);
+        assert.doesNotMatch(text, /Untrusted/);
+    } finally { globalThis.document = originalDocument; }
 });
 
 test("carousel cycles cached three-item groups, pauses, honors preferences and cleans up on navigation", async () => {
@@ -164,6 +195,20 @@ test("Shop freshness becomes stale after one missed hourly refresh or an expired
     assert.equal(isSnapshotStale({ ...base, capturedAt: "2026-10-03T15:59:59Z" }, now), true);
     assert.equal(isSnapshotStale({ ...base, shops: [{ id: 7, ends_at: "2026-10-03T17:59:59Z" }] }, now), true);
     assert.equal(isSnapshotStale({ ...base, capturedAt: null }, now), true);
+});
+
+test("Shop can show an active last-saved snapshot when the latest refresh is unavailable", async () => {
+    const { canShowLastSavedShop } = await import("../../public/Tabs/RocketLeague/Features/JS/shop.js");
+    const snapshot = {
+        available: false,
+        snapshotId: 42,
+        capturedAt: "2026-10-05T09:00:00Z",
+        shops: [{ id: 7, title: "Featured", starts_at: "2026-10-05T00:00:00Z", ends_at: "2026-10-06T00:00:00Z" }],
+        catalogues: [{ shop_id: 7, items: [{ id: 9, title: "Octane", starts_at: "2026-10-05T00:00:00Z", ends_at: "2026-10-06T00:00:00Z" }] }]
+    };
+    assert.equal(canShowLastSavedShop(snapshot, Date.parse("2026-10-05T12:00:00Z")), true);
+    assert.equal(canShowLastSavedShop({ ...snapshot, snapshotId: null }, Date.parse("2026-10-05T12:00:00Z")), false);
+    assert.equal(canShowLastSavedShop({ ...snapshot, shops: [{ ...snapshot.shops[0], ends_at: "2026-10-05T10:00:00Z" }] }, Date.parse("2026-10-05T12:00:00Z")), false);
 });
 
 test("Shop page exposes section and item start/end timing with an explicit stale label", async () => {

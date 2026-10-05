@@ -110,12 +110,13 @@ its single card follows the authorized MMR history panel in the homepage markup.
 |   |           submenu.js, mmr_dashboard.js; saved MMR progression/history UI
 |   +-- Registration/    CSS/index.css, HTML/index.html, JS/index.js, timezone.js; setup/onboarding only
 |   +-- MyProfile/       CSS/index.css, HTML/index.html, JS/index.js, settings_view.js; private settings plus acknowledged three-second Rocket League profile deletion
-|   +-- PublicProfile/   Public-safe profile by public_profile_id; shell fragment, styles via master_rl.css
-|   +-- shared/          notificationsV2.js (shared channel/reminder validation), profile visibility/presence (normalized online/offline only), and timestamp presentation helpers.
+|   +-- PublicProfile/   Public-safe profile by public_profile_id; 30-day daily-average MMR graph; shared rank coloring; no presence-check timestamp display
+|   +-- shared/          notificationsV2.js (shared channel/reminder validation), profile visibility/presence (normalized online/offline only), timestamp and rank-color presentation helpers.
 |   +-- MatchResults/, PrivateMatches/, WeeklyMatches/ Legacy full-page sources; routes use shell fragments below
 |   +-- FindPlayers/     Public opt-in search and UTC daily featured player; CSS/index.css, HTML/index.html, JS/index.js, view.js; responsive cards
 |   +-- Features/
 |       +-- CSS/index.css; shared Rocket League destination/status card styling
+|       +-- JS/leaderboards.js; reads cached public snapshots and private current position
 |       +-- HTML/shop.html, match-history.html, leaderboards.html, match-results.html,
 |                  weekly-matches.html, my-matches.html, private-matches.html, find-custom-matches.html (Coming soon route)
 +-- Future/              Present empty placeholder directory.
@@ -164,7 +165,8 @@ ROUTE-TO-FOLDER MAP
 /RocketLeague/FindPlayers -> Public opt-in directory search and public profile links
 /RocketLeague/Shop -> Cached Supabase shop snapshot; item artwork/section logos with BPD fallback; no provider call on page views
 /RocketLeague/MatchHistory -> Auth-gated status page; arbitrary linked-player match history is unsupported
-/RocketLeague/Leaderboards, /MatchResults, /WeeklyMatches, /MyMatches, /PrivateMatches -> Shell-integrated status pages until verified data workflows exist
+/RocketLeague/Leaderboards -> public cached global ranked snapshots; hourly refresh; SQL migration prepared but not applied
+/RocketLeague/MatchResults, /WeeklyMatches, /MyMatches, /PrivateMatches -> Shell-integrated status pages until verified data workflows exist
     /RocketLeague*        -> Rocket League home/profile/discovery/feature pages plus public/ocr submission workflow
     /Minecraft*           -> Tabs/Minecraft
     /Ark*                 -> Tabs/Ark

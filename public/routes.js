@@ -419,7 +419,7 @@ export const ROUTES = {
             "/Framework/Shell/HTML/Footer/footer.html",
 
         module:
-            null,
+            "/Tabs/RocketLeague/Features/JS/leaderboards.js",
 
         sitemap:
             false

@@ -18,27 +18,48 @@ export async function callLeaderboardDiagnostic(env, fetcher = fetch) {
         if (!response.ok) throw failure(`LEADERBOARD_DEBUG_HTTP_${response.status}`);
         let data;
         try { data = await response.json(); } catch { throw failure("LEADERBOARD_DEBUG_RESPONSE_INVALID"); }
-        if (data?.success !== true || data.playlist !== 10 || !Number.isSafeInteger(data.totalEntries)
-            || data.totalEntries < 0 || data.totalEntries > 20000 || !Array.isArray(data.platforms) || data.platforms.length > 16) throw failure("LEADERBOARD_DEBUG_RESPONSE_INVALID");
-        const platforms = data.platforms.map(group => {
-            if (!/^[A-Za-z0-9_-]{1,32}$/.test(group?.platform || "") || !Number.isSafeInteger(group.entryCount)
-                || group.entryCount < 0 || !Array.isArray(group.samples) || group.samples.length > 5 || typeof group.mmrDescending !== "boolean") throw failure("LEADERBOARD_DEBUG_RESPONSE_INVALID");
-            return { platform: group.platform, entryCount: group.entryCount, mmrDescending: group.mmrDescending,
-                samples: group.samples.map(row => {
-                    if (typeof row?.name !== "string" || row.name.length > 200 || !Number.isFinite(row.mmr)
-                        || !(row.providerValue === null || Number.isSafeInteger(row.providerValue))) throw failure("LEADERBOARD_DEBUG_RESPONSE_INVALID");
-                    return { name: row.name, mmr: row.mmr, providerValue: row.providerValue };
-                }) };
-        });
-        if (platforms.reduce((sum, group) => sum + group.entryCount, 0) !== data.totalEntries) throw failure("LEADERBOARD_DEBUG_RESPONSE_INVALID");
-        return { playlist: 10, totalEntries: data.totalEntries, positionSemanticsVerified: false, platforms };
-    }, 40000);
+        const invalid = () => failure("LEADERBOARD_DEBUG_RESPONSE_INVALID");
+        const validatePlatformRows = (board, { stats = false } = {}) => {
+            if (typeof board?.leaderboardId !== "string" || !Number.isSafeInteger(board.totalEntries)
+                || board.totalEntries < 0 || board.totalEntries > 20000 || !Array.isArray(board.platforms) || board.platforms.length > 16) throw invalid();
+            const platforms = board.platforms.map(group => {
+                if (!/^[A-Za-z0-9_-]{1,32}$/.test(group?.platform || "") || !Number.isSafeInteger(group.entryCount)
+                    || group.entryCount < 0 || !Array.isArray(group.samples) || group.samples.length > 5) throw invalid();
+                if (stats ? typeof group.rankFieldPresent !== "boolean" || typeof group.rankAscending !== "boolean"
+                    : typeof group.mmrDescending !== "boolean") throw invalid();
+                return { platform: group.platform, entryCount: group.entryCount,
+                    ...(stats ? { rankFieldPresent: group.rankFieldPresent, rankAscending: group.rankAscending } : { mmrDescending: group.mmrDescending }),
+                    samples: group.samples.map(row => {
+                        if (typeof row?.name !== "string" || row.name.length > 200 || !Number.isFinite(row.value ?? row.mmr)
+                            || (stats ? !Number.isSafeInteger(row.providerRank) || row.providerRank < 0
+                                : !(row.providerValue === null || Number.isSafeInteger(row.providerValue)))) throw invalid();
+                        return stats ? { name: row.name, value: row.value, providerRank: row.providerRank }
+                            : { name: row.name, mmr: row.mmr, providerValue: row.providerValue };
+                    }) };
+            });
+            if (platforms.reduce((sum, group) => sum + group.entryCount, 0) !== board.totalEntries) throw invalid();
+            return { leaderboardId: board.leaderboardId, totalEntries: board.totalEntries, platforms };
+        };
+        if (data?.success !== true || !Array.isArray(data.skills) || data.skills.length !== 3
+            || ![10, 11, 13].every((playlist, index) => data.skills[index]?.playlist === playlist
+                && data.skills[index]?.positionSemanticsVerified === false
+                && data.skills[index]?.paginationParametersDocumented === false)
+            || typeof data.stats?.stat !== "string" || typeof data.stats?.userCheck?.valueForUserMatchesLeaderboard !== "boolean"
+            || !Array.isArray(data.requestShape?.skillLeaderboardPaginationFields) || data.requestShape.skillLeaderboardPaginationFields.length
+            || !Array.isArray(data.requestShape?.statsLeaderboardPaginationFields) || data.requestShape.statsLeaderboardPaginationFields.length) throw invalid();
+        const skills = data.skills.map(board => ({ playlist: board.playlist, ...validatePlatformRows(board) }));
+        const stats = { stat: data.stats.stat, ...validatePlatformRows(data.stats, { stats: true }), userCheck: data.stats.userCheck };
+        if (!data.skillValueCheck || typeof data.skillValueCheck.valueForUserMatchesLeaderboard !== "boolean"
+            || typeof data.skillValueCheck.rankForUsersValueMatchesLeaderboard !== "boolean") throw invalid();
+        return { skills, skillValueCheck: data.skillValueCheck, stats,
+            requestShape: { skillLeaderboardPaginationFields: [], statsLeaderboardPaginationFields: [], resultLimit: String(data.requestShape.resultLimit || "Unknown") } };
+    }, 75000);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
     const args = process.argv.slice(2);
     if (!args.length || args[0] === "--help") {
-        console.log("Manual contract diagnostic: node --env-file=.dev.vars scripts/debug-rl-leaderboard.mjs run\nOne protected Skills/GetSkillLeaderboard v1 read for playlist 10. No retries, writes or personal-ID input. Requires the separately approved Worker update. Do not run repeatedly.");
+        console.log("Manual contract diagnostic: node --env-file=.dev.vars scripts/debug-rl-leaderboard.mjs run\nRuns 3 protected Skills leaderboards (playlists 10/11/13), one Skill value/rank cross-check and one Wins stats leaderboard/value/rank check: at most 8 PsyNet calls, no retries, writes or personal-ID input. Requires deployment of the separately reviewed Worker update. Run once only.");
     } else if (args.length !== 1 || args[0] !== "run") {
         console.error("LEADERBOARD_DEBUG_ARGUMENTS_INVALID");
         process.exitCode = 1;

@@ -1,5 +1,6 @@
 "use strict";
 import { withUpstreamDeadline, fetchBoundedResponse } from "../../http/upstream.js";
+import { getRocketLeagueMmrHistorySafely } from "./get_mmr_history.js";
 
 const RPC_NAMES = Object.freeze({
     SEARCH: "search_rocketleague_players",
@@ -12,6 +13,7 @@ const ALLOWED_RPCS = new Set(Object.values(RPC_NAMES));
 const PUBLIC_PROFILE_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const REQUEST_TIMEOUT_MS = 8000;
 const PRESENCE_STALE_AFTER_MS = 30 * 60 * 1000;
+const ACCOUNT_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export class RocketLeagueDiscoveryError extends Error {
     constructor(code, status = 503) {
@@ -192,6 +194,51 @@ export async function getPublicRocketLeagueProfile(env, publicProfileId) {
     });
     const row = Array.isArray(result) ? result[0] : result;
     return row ? sanitizePublicProfile(row) : null;
+}
+
+async function getPublicProfileAccountId(env, publicProfileId) {
+    const root = typeof env?.SUPABASE_URL === "string" ? env.SUPABASE_URL.trim().replace(/\/+$/, "").replace(/\/rest\/v1$/i, "") : "";
+    const key = typeof env?.SUPABASE_AUTH === "string" ? env.SUPABASE_AUTH.trim() : "";
+    if (!root || !key) return null;
+    try {
+        if (new URL(root).protocol !== "https:") return null;
+        return await withUpstreamDeadline(async signal => {
+            const url = new URL(`${root}/rest/v1/rl_players`);
+            url.search = new URLSearchParams({
+                select: "account_id",
+                public_profile_id: `eq.${publicProfileId}`,
+                active: "eq.true",
+                limit: "2"
+            }).toString();
+            const response = await fetchBoundedResponse(url, {
+                method: "GET",
+                headers: {
+                    apikey: key,
+                    Authorization: `Bearer ${key}`,
+                    Accept: "application/json",
+                    "Accept-Profile": "core"
+                },
+                signal
+            }, 4096);
+            if (!response.ok) throw new Error("PUBLIC_PROFILE_OWNER_LOOKUP_FAILED");
+            const rows = await response.json();
+            if (!Array.isArray(rows) || rows.length !== 1 || !ACCOUNT_ID_PATTERN.test(rows[0]?.account_id || "")) return null;
+            return rows[0].account_id;
+        }, REQUEST_TIMEOUT_MS);
+    } catch {
+        console.error("Rocket League public MMR history owner lookup unavailable.", { code: "PUBLIC_HISTORY_OWNER_LOOKUP_FAILED" });
+        return null;
+    }
+}
+
+export async function getPublicRocketLeagueProfileWithMmrHistory(env, publicProfileId) {
+    const profile = await getPublicRocketLeagueProfile(env, publicProfileId);
+    if (!profile) return null;
+    const accountId = await getPublicProfileAccountId(env, profile.public_profile_id);
+    const history = accountId
+        ? await getRocketLeagueMmrHistorySafely(env, accountId, { maxCaptures: 1000 })
+        : null;
+    return { ...profile, mmrHistory: history };
 }
 
 export async function getFeaturedRocketLeaguePlayer(env) {

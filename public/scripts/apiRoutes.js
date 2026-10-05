@@ -150,6 +150,12 @@ export const ROCKET_LEAGUE_PROFILE_URL =
 export const ROCKET_LEAGUE_PLAYER_SEARCH_URL =
     "/api/rocketleague/players/search";
 
+export const ROCKET_LEAGUE_GLOBAL_LEADERBOARDS_URL =
+    "/api/rocketleague/leaderboards";
+
+export const ROCKET_LEAGUE_GLOBAL_LEADERBOARD_PREFERENCE_URL =
+    "/api/auth/rocketleague/global-leaderboard-preference";
+
 export function getRocketLeaguePublicProfileUrl(
     publicProfileId
 ) {

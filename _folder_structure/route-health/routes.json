@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-05T13:47:23.693Z",
+  "generatedAt": "2026-10-05T17:16:17.448Z",
   "policy": {
     "humanPagePaths": "case-insensitive lookup; canonical TitleCase path",
     "apiAndAssetPaths": "exact-case; never normalized by the human-page router",
@@ -546,6 +546,10 @@
         },
         {
           "path": "/Framework/Shell/HTML/Footer/footer.html",
+          "exists": true
+        },
+        {
+          "path": "/Tabs/RocketLeague/Features/JS/leaderboards.js",
           "exists": true
         }
       ]
@@ -2076,6 +2080,23 @@
       "deepLinkSupported": false
     },
     {
+      "path": "/api/auth/rocketleague/global-leaderboard-preference",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/auth/rocketleague/global-leaderboard-preference.js"
+      ],
+      "handler": "functions/api/auth/rocketleague/global-leaderboard-preference.js",
+      "methods": [
+        "GET",
+        "PATCH"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    },
+    {
       "path": "/api/auth/rocketleague/profile",
       "lookupKey": null,
       "routeType": "api",
@@ -2423,6 +2444,22 @@
       "handler": "functions/api/ocr/training.js",
       "methods": [
         "ALL"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/rocketleague/leaderboards",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/rocketleague/leaderboards.js"
+      ],
+      "handler": "functions/api/rocketleague/leaderboards.js",
+      "methods": [
+        "GET"
       ],
       "authRequired": "handler-defined",
       "healthStatus": "valid",

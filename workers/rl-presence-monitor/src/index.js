@@ -21,8 +21,8 @@ Schedules:
     - Every hour:
           Due-aware per-player Rocket League refresh and global Shop snapshot.
 
-    - Once per day:
-          Admin Taskboard aggregate summary.
+    - Daily at noon UTC:
+          Admin Taskboard aggregate summary and global ranked Leaderboard snapshots.
 
 Important:
     - /wake requires PRESENCE_TRIGGER_KEY.
@@ -40,6 +40,7 @@ import {
 import {
     runRocketLeagueShopRefresh
 } from "./rl_shop_refresh.js";
+import { refreshGlobalRocketLeagueLeaderboards } from "./rl_global_leaderboards.js";
 
 import {
     runTaskboardSummary
@@ -49,7 +50,7 @@ const activeJobs = new Set();
 const PRESENCE_STATUS_KEY = "admin:service-status:rl-presence";
 
 async function recordScheduledJob(env, job, summary, startedAt, failed = false) {
-    if (!env?.SERVICE_STATUS || !["mmr", "shop"].includes(job)) return;
+    if (!env?.SERVICE_STATUS || !["mmr", "shop", "leaderboards"].includes(job)) return;
     const key = `admin:service-status:rl-${job}`;
     let prior = {};
     try { prior = await env.SERVICE_STATUS.get(key, "json") || {}; } catch { /* Best effort. */ }
@@ -57,7 +58,8 @@ async function recordScheduledJob(env, job, summary, startedAt, failed = false) 
     const succeeded = !failed && summary?.success !== false;
     const selected = job === "shop"
         ? ["success", "changed", "saved", "errorCode"]
-        : ["success", "candidateCount", "attempted", "succeeded", "failed", "mmrChanged", "mmrUnchanged", "discordInventoryAvailable", "discordInventoryError", "nextCursorStored"];
+        : job === "leaderboards" ? ["success", "playlistCount", "succeeded", "failed", "errorCode"]
+            : ["success", "candidateCount", "attempted", "succeeded", "failed", "mmrChanged", "mmrUnchanged", "discordInventoryAvailable", "discordInventoryError", "nextCursorStored"];
     const lastSummary = Object.fromEntries(selected.filter(field => summary?.[field] !== undefined).map(field => [field, summary[field]]));
     try {
         await env.SERVICE_STATUS.put(key, JSON.stringify({
@@ -91,8 +93,8 @@ const ROCKET_LEAGUE_REFRESH_CRON =
     "0 * * * *";
 
 /*
-Set this to the single UTC time you want the Taskboard
-summary delivered each day.
+Set this to the single UTC time for the daily Taskboard
+summary and Global Leaderboard collection.
 
 Example:
     "0 12 * * *"
@@ -154,6 +156,7 @@ function getJobRunner(job, env, { forceDiscordInventory = false, reconcileDiscor
     if (job === "shop") {
         return () => runRocketLeagueShopRefresh(env);
     }
+    if (job === "leaderboards") return () => refreshGlobalRocketLeagueLeaderboards(env);
     if (job === "taskboard") {
         return () => runTaskboardSummary(env);
     }
@@ -181,6 +184,10 @@ function summarizeJobResult(job, result) {
                 .filter(key => result?.[key] !== undefined)
                 .map(key => [key, result[key]])
         );
+    }
+    if (job === "leaderboards") {
+        return { success: result?.success === true, playlistCount: result?.playlistCount || 0,
+            succeeded: result?.succeeded || 0, failed: result?.failed || 0 };
     }
     if (job === "taskboard") {
         return {
@@ -271,7 +278,7 @@ async function handleFetch(
         let state = null;
         try { state = await env?.SERVICE_STATUS?.get(PRESENCE_STATUS_KEY, "json") || null; } catch { /* Safe unknown fallback. */ }
         const scheduledJobs = {};
-        for (const job of ["mmr", "shop"]) {
+        for (const job of ["mmr", "shop", "leaderboards"]) {
             try { scheduledJobs[job] = await env?.SERVICE_STATUS?.get(`admin:service-status:rl-${job}`, "json") || null; }
             catch { scheduledJobs[job] = null; }
         }
@@ -342,7 +349,7 @@ async function handleFetch(
         }
 
         const job = body?.job;
-        if (!["presence", "mmr", "shop", "taskboard"].includes(job)) {
+        if (!["presence", "mmr", "shop", "leaderboards", "taskboard"].includes(job)) {
             return Response.json({ success: false, code: "INVALID_JOB" }, { status: 400 });
         }
         if (activeJobs.has(job)) {
@@ -406,6 +413,7 @@ async function handleScheduled(
         TASKBOARD_SUMMARY_CRON
     ) {
         runInBackground("taskboard", env, ctx);
+        runInBackground("leaderboards", env, ctx);
 
         return;
     }

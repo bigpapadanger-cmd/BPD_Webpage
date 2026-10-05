@@ -1,16 +1,47 @@
-<main class="rl-feature-page" aria-labelledby="rlLeaderboardsTitle">
-    <header class="rl-feature-heading">
-        <p class="rl-feature-eyebrow">ROCKET LEAGUE · COMMUNITY</p>
-        <h1 id="rlLeaderboardsTitle">Leaderboards</h1>
-        <p>Explore BPD competitive standings when a verified public leaderboard is available.</p>
+<main class="rl-leaderboards" data-rl-leaderboards aria-labelledby="rlLeaderboardsTitle">
+    <header class="rl-leaderboards__heading">
+        <p class="rl-feature-eyebrow">ROCKET LEAGUE · GLOBAL RANKED</p>
+        <h1 id="rlLeaderboardsTitle">Global Leaderboards</h1>
+        <p>Hourly snapshots for 1v1, 2v2, and 3v3. Positions are calculated by sorting each snapshot by MMR; they are not provider-confirmed competitive ranks. BPD member labels appear only when the player has separately opted in and their profile is public.</p>
     </header>
-    <section class="rl-feature-card" aria-labelledby="rlLeaderboardsStatusTitle">
-        <p class="rl-feature-status">Public standings are not currently available</p>
-        <h2 id="rlLeaderboardsStatusTitle">No leaderboard data is published here yet</h2>
-        <p>Player discovery and opted-in public profiles are available, but BPD does not currently publish a community leaderboard from those profiles. No rank or placement is estimated on this page.</p>
-        <nav class="rl-feature-links" aria-label="Rocket League pages">
-            <a class="rl-feature-link" href="/RocketLeague" data-router-link>Rocket League Home</a>
-            <a class="rl-feature-link" href="/RocketLeague/FindPlayers" data-router-link>Find Players</a>
+
+    <section class="rl-leaderboards__your-card" data-your-rank hidden aria-live="polite">
+        <div><p class="rl-leaderboards__eyebrow">YOUR LATEST POSITION</p><h2 data-your-title>Your rank</h2></div>
+        <strong data-your-value>—</strong>
+        <span data-your-meta></span>
+    </section>
+
+    <section class="rl-leaderboards__panel" aria-label="Global leaderboard">
+        <form class="rl-leaderboards__filters" data-filters>
+            <label><span>Ranked mode</span><select name="playlist">
+                <option value="10">Ranked Duel · 1v1</option>
+                <option value="11">Ranked Doubles · 2v2</option>
+                <option value="13">Ranked Standard · 3v3</option>
+            </select></label>
+            <label class="rl-leaderboards__search"><span>Search player name</span><input name="q" type="search" maxlength="80" minlength="2" placeholder="Enter at least 2 characters"></label>
+            <label><span>Rows per page</span><select name="pageSize"><option value="50">50</option><option value="100">100</option><option value="250" selected>250</option><option value="25">25</option></select></label>
+            <label><span>Rank from</span><input name="minRank" type="number" min="1" max="20000" inputmode="numeric" placeholder="Any"></label>
+            <label><span>Rank to</span><input name="maxRank" type="number" min="1" max="20000" inputmode="numeric" placeholder="Any"></label>
+            <label class="rl-leaderboards__members"><input name="membersOnly" type="checkbox"><span>BPD members only</span></label>
+            <button type="submit">Search</button>
+        </form>
+
+        <div class="rl-leaderboards__snapshot">
+            <p data-status role="status" aria-live="polite">Loading the latest saved leaderboard…</p>
+            <span data-snapshot></span>
+        </div>
+        <div class="rl-leaderboards__table-wrap">
+            <table>
+                <thead><tr><th scope="col">Rank</th><th scope="col">Player</th><th scope="col">Platform</th><th scope="col">MMR</th><th scope="col">BPD</th></tr></thead>
+                <tbody data-rows></tbody>
+            </table>
+        </div>
+        <p class="rl-leaderboards__empty" data-empty hidden></p>
+        <nav class="rl-leaderboards__pagination" aria-label="Leaderboard pages">
+            <button type="button" data-prev disabled>Previous</button>
+            <span data-page-label>Page 1</span>
+            <button type="button" data-next disabled>Next</button>
         </nav>
+        <p class="rl-leaderboards__footnote" data-depth></p>
     </section>
 </main>

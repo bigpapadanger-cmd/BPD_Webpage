@@ -81,7 +81,7 @@ the repository has no Discord notification-delivery dispatcher, so no delivery
 is claimed by this state.
 
 The signed-in `/RocketLeague` home displays current saved ranks, career totals,
-per-playlist capture-to-capture changes, and a graph of up to the latest 15 MMR
+per-playlist capture-to-capture changes, and a graph of up to the latest 90 MMR
 captures. The authenticated Pages profile service uses the server-only
 Supabase credential to call the service-role-only
 `api.get_rl_player_mmr_progression(uuid)` and history RPCs; the browser never
@@ -93,6 +93,13 @@ the previous capture time when available. A missing previous capture is shown
 as “No previous capture yet”; RPC/shape failures leave My Profile usable and
 show a temporary-unavailable message. Other private profile GETs do not request
 this RPC.
+
+The public `/RocketLeague/Player` page also renders a 30-day MMR graph, but only
+after the existing public-profile RPC confirms current Find Players visibility.
+DomainData then resolves the owner server-side from `core.rl_players` by public
+profile ID and calls the existing private history RPC; only normalized capture
+fields are returned. Multiple captures on one UTC date are averaged per
+playlist, missing values remain gaps, and account/player IDs stay server-side.
 
 Public `/RocketLeague/FindPlayers` uses the Rocket League master CSS caller and
 searches only opt-in public profiles. Result cards remain lightweight and show
@@ -109,10 +116,18 @@ the URL with `/RocketLeague/SubmitMatchResults`; it no longer renders the hub.
 match-by-match provider history is unsupported; the MMR Worker has one shared
 service-account session, while `Matches/GetMatchHistory` reads only that
 session's `localPlayerID`. It cannot supply a linked BPD user's private history,
-and MMR captures are never presented as matches. Leaderboards, public Match
-Results, Weekly Matches, My Matches, and Private Matches have shell-integrated
-status pages rather than reusing the Rocket League landing page or displaying
-fabricated records.
+and MMR captures are never presented as matches. Public Match Results, Weekly
+Matches, My Matches, and Private Matches have shell-integrated status pages
+rather than reusing the Rocket League landing page or displaying fabricated
+records. `/RocketLeague/Leaderboards` now has a public cached-data
+page/API, a separate default-off BPD-membership preference, and a prepared
+service-role Supabase snapshot contract. The hourly control-plane run requests
+the fixed 1v1/2v2/3v3 provider boards, stores per-playlist snapshots, and keeps
+the previous completed snapshot when a refresh fails. The migration is local
+and unapplied; until it is approved/applied, the page must show the safe
+unavailable/first-snapshot state. Displayed positions are calculated from the
+snapshot's MMR ordering, not provider-confirmed competitive rank; provider
+depth and cross-platform identity deduplication remain unverified.
 
 Discord MatchBot eligibility is a REST-only provider check. DomainData resolves
 the authenticated BPD account and canonical linked Discord identity, applies

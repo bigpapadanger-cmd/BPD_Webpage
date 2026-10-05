@@ -4,6 +4,7 @@ import { formatRocketLeagueTimestamp } from "../../shared/profilePresentation.js
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 const HISTORY_LIMIT = 90;
+const WINDOW_HISTORY_LIMIT = 1000;
 const SERIES = [
     { key: "ones", label: "1v1", color: "#b49aff" },
     { key: "twos", label: "2v2", color: "#68c5ff" },
@@ -70,7 +71,7 @@ export function renderMmrProgression(progression, documentRef = document) {
     }
 }
 
-export function normalizeMmrHistoryForChart(history) {
+export function normalizeMmrHistoryForChart(history, options = {}) {
     if (!Array.isArray(history)) return null;
     const snapshots = [];
     for (const row of history) {
@@ -85,10 +86,42 @@ export function normalizeMmrHistoryForChart(history) {
         }
         snapshots.push(snapshot);
     }
-    return snapshots
+    const limit = Number.isSafeInteger(options.days) && options.days > 0 ? WINDOW_HISTORY_LIMIT : HISTORY_LIMIT;
+    let ordered = snapshots
         .sort((a, b) => Date.parse(b.capturedAt) - Date.parse(a.capturedAt))
-        .slice(0, HISTORY_LIMIT)
+        .slice(0, limit)
         .reverse();
+    if (Number.isSafeInteger(options.days) && options.days > 0) {
+        const cutoff = (Number.isFinite(options.now) ? options.now : Date.now()) - options.days * 24 * 60 * 60 * 1000;
+        const now = Number.isFinite(options.now) ? options.now : Date.now();
+        ordered = ordered.filter(row => Date.parse(row.capturedAt) >= cutoff && Date.parse(row.capturedAt) <= now);
+    }
+    if (options.averageByUtcDay !== true) return ordered;
+
+    const days = new Map();
+    for (const row of ordered) {
+        const day = new Date(row.capturedAt).toISOString().slice(0, 10);
+        if (!days.has(day)) days.set(day, { captureCount: 0, values: { ones: [], twos: [], threes: [] }, tiers: { ones: null, twos: null, threes: null } });
+        const bucket = days.get(day);
+        bucket.captureCount += 1;
+        for (const series of SERIES) {
+            const value = row[series.key];
+            if (Number.isSafeInteger(value.mmr)) bucket.values[series.key].push(value.mmr);
+            if (value.tier) bucket.tiers[series.key] = value.tier;
+        }
+    }
+    return [...days.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([day, bucket]) => {
+        const average = { capturedAt: `${day}T00:00:00.000Z`, captureCount: bucket.captureCount };
+        for (const series of SERIES) {
+            const values = bucket.values[series.key];
+            average[series.key] = {
+                mmr: values.length ? Math.round(values.reduce((sum, value) => sum + value, 0) / values.length) : null,
+                tier: bucket.tiers[series.key],
+                captureCount: values.length
+            };
+        }
+        return average;
+    });
 }
 
 function svgElement(documentRef, tag, attributes = {}, label = "") {
@@ -98,28 +131,28 @@ function svgElement(documentRef, tag, attributes = {}, label = "") {
     return element;
 }
 
-function dateLabel(timestamp) {
-    return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(new Date(timestamp));
+function dateLabel(timestamp, utc = false) {
+    return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", ...(utc ? { timeZone: "UTC" } : {}) }).format(new Date(timestamp));
 }
 
 function dateTooltip(timestamp) {
     return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(timestamp));
 }
 
-export function renderMmrHistory(history, documentRef = document) {
-    const target = documentRef.getElementById("rocketLeagueMmrHistoryGraph");
-    const status = documentRef.getElementById("rocketLeagueMmrHistoryStatus");
+export function renderMmrHistory(history, documentRef = document, options = {}) {
+    const target = documentRef.getElementById(options.graphId || "rocketLeagueMmrHistoryGraph");
+    const status = documentRef.getElementById(options.statusId || "rocketLeagueMmrHistoryStatus");
     if (!target || !status) return;
     target.replaceChildren();
 
-    const snapshots = normalizeMmrHistoryForChart(history);
+    const snapshots = normalizeMmrHistoryForChart(history, options);
     if (snapshots === null) {
         status.textContent = "Saved MMR history is temporarily unavailable.";
         status.hidden = false;
         return;
     }
     if (!snapshots.length) {
-        status.textContent = "No saved MMR captures yet.";
+        status.textContent = options.days ? `No saved MMR captures from the last ${options.days} days.` : "No saved MMR captures yet.";
         status.hidden = false;
         return;
     }
@@ -130,7 +163,9 @@ export function renderMmrHistory(history, documentRef = document) {
         status.hidden = false;
         return;
     }
-    status.textContent = `${snapshots.length} saved capture${snapshots.length === 1 ? "" : "s"}; observations are not match results.`;
+    status.textContent = options.averageByUtcDay === true
+        ? `${snapshots.length} UTC daily average${snapshots.length === 1 ? "" : "s"} from saved captures; these are not match results.`
+        : `${snapshots.length} saved capture${snapshots.length === 1 ? "" : "s"}; observations are not match results.`;
     status.hidden = false;
 
     const width = 720;
@@ -156,7 +191,9 @@ export function renderMmrHistory(history, documentRef = document) {
     });
     svg.append(
         svgElement(documentRef, "title", { id: "rocketLeagueMmrHistorySvgTitle" }, "Rocket League MMR history"),
-        svgElement(documentRef, "desc", { id: "rocketLeagueMmrHistorySvgDescription" }, "Playlist MMR values across saved captures, positioned by capture time.")
+        svgElement(documentRef, "desc", { id: "rocketLeagueMmrHistorySvgDescription" }, options.averageByUtcDay === true
+            ? "Per-playlist average MMR for each UTC day in the selected period."
+            : "Playlist MMR values across saved captures, positioned by capture time.")
     );
 
     for (let tick = 0; tick <= 3; tick += 1) {
@@ -169,8 +206,8 @@ export function renderMmrHistory(history, documentRef = document) {
     }
 
     svg.append(
-        svgElement(documentRef, "text", { x: margin.left, y: height - 10, "text-anchor": "start", class: "rl-mmr-chart-axis-label" }, dateLabel(snapshots[0].capturedAt)),
-        svgElement(documentRef, "text", { x: width - margin.right, y: height - 10, "text-anchor": "end", class: "rl-mmr-chart-axis-label" }, dateLabel(snapshots.at(-1).capturedAt))
+        svgElement(documentRef, "text", { x: margin.left, y: height - 10, "text-anchor": "start", class: "rl-mmr-chart-axis-label" }, dateLabel(snapshots[0].capturedAt, options.averageByUtcDay === true)),
+        svgElement(documentRef, "text", { x: width - margin.right, y: height - 10, "text-anchor": "end", class: "rl-mmr-chart-axis-label" }, dateLabel(snapshots.at(-1).capturedAt, options.averageByUtcDay === true))
     );
 
     for (const series of SERIES) {
@@ -193,7 +230,9 @@ export function renderMmrHistory(history, documentRef = document) {
             }
             for (const point of points) {
                 const circle = svgElement(documentRef, "circle", { cx: point.x, cy: point.y, r: 4.5, class: "rl-mmr-chart-point", fill: series.color });
-                circle.append(svgElement(documentRef, "title", {}, `${series.label}: ${point.mmr.toLocaleString()} MMR · ${dateTooltip(point.snapshot.capturedAt)}`));
+                const pointDate = options.averageByUtcDay === true ? dateLabel(point.snapshot.capturedAt, true) : dateTooltip(point.snapshot.capturedAt);
+                const averageInfo = options.averageByUtcDay === true ? ` · average of ${point.snapshot[series.key].captureCount} values` : "";
+                circle.append(svgElement(documentRef, "title", {}, `${series.label}: ${point.mmr.toLocaleString()} MMR · ${pointDate}${averageInfo}`));
                 svg.append(circle);
             }
         }

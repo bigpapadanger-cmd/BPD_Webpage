@@ -1,7 +1,9 @@
 "use strict";
 
 const REQUEST_TIMEOUT_MS = 5000;
-const MAX_SECTIONS = 20;
+// Provider diagnostic confirmed 35 shops and 33 catalogues in one current
+// response. Keep bounded parsing while preserving that complete inventory.
+const MAX_SECTIONS = 40;
 const MAX_ITEMS_PER_SECTION = 80;
 const MAX_NOTIFICATIONS = 20;
 

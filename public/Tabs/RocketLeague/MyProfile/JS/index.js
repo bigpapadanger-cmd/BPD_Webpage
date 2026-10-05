@@ -1,7 +1,7 @@
 "use strict";
 
 import { apiFetch } from "/scripts/apiConnection.js";
-import { DISCORD_NOTIFICATION_STATUS_URL, ROCKET_LEAGUE_PROFILE_URL } from "/scripts/apiRoutes.js";
+import { DISCORD_NOTIFICATION_STATUS_URL, ROCKET_LEAGUE_GLOBAL_LEADERBOARD_PREFERENCE_URL, ROCKET_LEAGUE_PROFILE_URL } from "/scripts/apiRoutes.js";
 import { refreshAuthState } from "/Framework/Auth/auth.js";
 import { buildSettingsPayload, getDuplicateReminderChannels, getFindProfileVisibilityState, getSettingsConfirmationState, isSettingConfirmed, NOTIFICATION_CHANNELS, reminderMinutesFromParts, validateNotificationsV2 } from "./settings_view.js";
 
@@ -13,6 +13,7 @@ const DELETE_PROFILE_CONFIRMATION = "DELETE_ROCKETLEAGUE_PROFILE";
 const DELETE_HOLD_DURATION_MS = 3000;
 let deleteHoldTimer = null;
 let deleteInProgress = false;
+let savedGlobalLeaderboardVisible = null;
 
 function updateDiscordNotificationAvailability() {
     const input = document.querySelector('[data-channel-enabled="discord"]');
@@ -448,6 +449,59 @@ function lockSettings() {
     document.getElementById("myProfileSave").disabled = true;
 }
 
+async function loadGlobalLeaderboardPreference() {
+    const checkbox = document.getElementById("globalLeaderboardVisible");
+    const save = document.getElementById("globalLeaderboardPreferenceSave");
+    const status = document.getElementById("globalLeaderboardPreferenceStatus");
+    checkbox.disabled = true;
+    save.disabled = true;
+    status.textContent = "Checking saved preference…";
+    try {
+        const response = await apiFetch(ROCKET_LEAGUE_GLOBAL_LEADERBOARD_PREFERENCE_URL, { credentials: "same-origin", cache: "no-store", headers: { Accept: "application/json" } });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || result.success !== true || result.available !== true || typeof result.globalLeaderboardVisible !== "boolean") throw new Error("unavailable");
+        savedGlobalLeaderboardVisible = result.globalLeaderboardVisible;
+        checkbox.checked = savedGlobalLeaderboardVisible;
+        checkbox.disabled = false;
+        status.textContent = savedGlobalLeaderboardVisible ? "Your BPD membership display is enabled." : "This optional feature is off. Enable it and save to appear as a BPD member when your profile is public.";
+        save.disabled = true;
+    } catch {
+        savedGlobalLeaderboardVisible = null;
+        checkbox.checked = false;
+        checkbox.disabled = true;
+        save.disabled = true;
+        status.textContent = "The saved leaderboard preference could not be confirmed. It remains unchanged and locked for now.";
+    }
+}
+
+async function saveGlobalLeaderboardPreference() {
+    const checkbox = document.getElementById("globalLeaderboardVisible");
+    const save = document.getElementById("globalLeaderboardPreferenceSave");
+    const status = document.getElementById("globalLeaderboardPreferenceStatus");
+    if (savedGlobalLeaderboardVisible === null) return;
+    const desired = checkbox.checked;
+    checkbox.disabled = true;
+    save.disabled = true;
+    status.textContent = "Saving leaderboard preference…";
+    try {
+        const response = await apiFetch(ROCKET_LEAGUE_GLOBAL_LEADERBOARD_PREFERENCE_URL, {
+            method: "PATCH", credentials: "same-origin", cache: "no-store",
+            headers: { "Content-Type": "application/json", Accept: "application/json" },
+            body: JSON.stringify({ globalLeaderboardVisible: desired })
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || result.success !== true || result.globalLeaderboardVisible !== desired) throw new Error("save failed");
+        savedGlobalLeaderboardVisible = desired;
+        status.textContent = desired ? "Your BPD membership display is enabled." : "Your BPD membership display is off.";
+    } catch {
+        checkbox.checked = savedGlobalLeaderboardVisible;
+        status.textContent = "The preference could not be saved. Your previous setting has been restored.";
+    } finally {
+        checkbox.disabled = savedGlobalLeaderboardVisible === null;
+        save.disabled = savedGlobalLeaderboardVisible === null || checkbox.checked === savedGlobalLeaderboardVisible;
+    }
+}
+
 export async function initializePage() {
     const form = document.getElementById("myProfileSettingsForm");
     if (!form) return;
@@ -480,6 +534,12 @@ export async function initializePage() {
     });
     deleteButton.addEventListener("click", event => event.preventDefault());
     document.getElementById("myProfileDiscordCheckAgain")?.addEventListener("click", () => loadDiscordNotificationAvailability(true));
+    const leaderboardPreference = document.getElementById("globalLeaderboardVisible");
+    const saveLeaderboardPreference = document.getElementById("globalLeaderboardPreferenceSave");
+    leaderboardPreference?.addEventListener("change", () => {
+        saveLeaderboardPreference.disabled = savedGlobalLeaderboardVisible === null || leaderboardPreference.checked === savedGlobalLeaderboardVisible;
+    });
+    saveLeaderboardPreference?.addEventListener("click", () => saveGlobalLeaderboardPreference());
     form.addEventListener("submit", async event => {
         event.preventDefault();
         let payload;
@@ -520,6 +580,7 @@ export async function initializePage() {
             return;
         }
         const confirmed = renderProfile(result);
+        await loadGlobalLeaderboardPreference();
         if (confirmed) setStatus("Manage your Rocket League profile settings and privacy.");
     } catch {
         lockSettings();

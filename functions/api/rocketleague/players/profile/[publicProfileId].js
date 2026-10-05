@@ -2,7 +2,7 @@
 
 import {
     RocketLeagueDiscoveryError,
-    getPublicRocketLeagueProfile
+    getPublicRocketLeagueProfileWithMmrHistory
 } from "../../../../services/supabase/rocketleague/discovery.js";
 
 const PUBLIC_PROFILE_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -26,7 +26,7 @@ export async function onRequestGet(context) {
     }
 
     try {
-        const profile = await getPublicRocketLeagueProfile(context.env, publicProfileId);
+        const profile = await getPublicRocketLeagueProfileWithMmrHistory(context.env, publicProfileId);
         if (!profile) {
             return json({ success: false, error: "PROFILE_UNAVAILABLE" }, 404);
         }

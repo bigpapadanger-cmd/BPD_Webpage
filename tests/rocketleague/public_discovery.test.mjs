@@ -13,7 +13,7 @@ import { getRocketLeagueProfileByAccountId } from "../../functions/services/supa
 import { saveRocketLeagueProfile } from "../../functions/services/supabase/rocketleague/save_profile.js";
 import { getPublicPresenceLabel, getPublicProfilePageUrl } from "../../public/Tabs/RocketLeague/shared/profileView.js";
 import { createPlayerCard, renderPlayers, renderSearchState } from "../../public/Tabs/RocketLeague/FindPlayers/JS/view.js";
-import { formatRocketLeagueTimestamp } from "../../public/Tabs/RocketLeague/shared/profilePresentation.js";
+import { formatRocketLeagueTimestamp, getRocketLeagueRankClass } from "../../public/Tabs/RocketLeague/shared/profilePresentation.js";
 import { ROUTES } from "../../public/routes.js";
 
 const ENV = {
@@ -516,6 +516,19 @@ test("public profile UI exposes supported career fields and uses available MMR f
     assert.match(source, /profile\.mmr\?\.captured_at/);
     assert.doesNotMatch(source, /profile\.provider\?\.(?:level|xp|creator_code)/);
     assert.match(source, /Number\.isSafeInteger\(value\) && value >= 0/);
+    assert.doesNotMatch(source, /Last checked/);
+});
+
+test("public Find Players and Player views use the same rank-color mapping", async () => {
+    assert.equal(getRocketLeagueRankClass("Diamond III"), "rank-diamond");
+    assert.equal(getRocketLeagueRankClass("Grand Champion II"), "rank-grand-champion");
+    assert.equal(getRocketLeagueRankClass("Supersonic Legend"), "rank-supersonic-legend");
+    const renderer = await readFile(new URL("../../public/Tabs/RocketLeague/Index/JS/ranks.js", import.meta.url), "utf8");
+    const search = await readFile(new URL("../../public/Tabs/RocketLeague/FindPlayers/JS/view.js", import.meta.url), "utf8");
+    const profile = await readFile(new URL("../../public/Tabs/RocketLeague/PublicProfile/JS/index.js", import.meta.url), "utf8");
+    assert.match(renderer, /getRocketLeagueRankClass/);
+    assert.match(search, /getRocketLeagueRankClass\(tier\)/);
+    assert.match(profile, /getRocketLeagueRankClass\(tier\)/);
 });
 
 test("signed-in Rocket League card renders only present safe totals and keeps privacy settings independent", async () => {

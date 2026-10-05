@@ -60,6 +60,14 @@
         </form>
     </section>
 
+    <section class="my-profile-section rl-leaderboard-preference" aria-labelledby="myGlobalLeaderboardTitle">
+        <div class="my-profile-section-heading"><div><p class="my-profile-eyebrow">OPTIONAL PUBLIC FEATURE</p><h2 id="myGlobalLeaderboardTitle">Global Leaderboard</h2></div></div>
+        <p class="my-profile-note">This is separate from Find Players visibility. When enabled, your BPD membership can be labeled in global ranked leaderboards only while your profile is also public. Your own latest position remains private to you if you opt out.</p>
+        <label class="my-profile-toggle"><input id="globalLeaderboardVisible" type="checkbox" disabled><span><strong>Show my BPD membership on Global Leaderboards</strong><small>Off by default. This does not change your Rocket League profile, provider identity, or rank snapshot.</small></span></label>
+        <button id="globalLeaderboardPreferenceSave" type="button" disabled>Save leaderboard preference</button>
+        <p id="globalLeaderboardPreferenceStatus" class="my-profile-note" role="status" aria-live="polite">Checking saved preference…</p>
+    </section>
+
     <section class="my-profile-section my-profile-danger-zone" aria-labelledby="deleteRlProfileTitle">
         <div class="my-profile-section-heading">
             <div><p class="my-profile-eyebrow">ACCOUNT ACTION</p><h2 id="deleteRlProfileTitle">Delete Rocket League profile</h2></div>

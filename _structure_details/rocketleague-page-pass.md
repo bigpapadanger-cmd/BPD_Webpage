@@ -14,9 +14,10 @@ PsyNet responses; nulls there still require upstream-versus-normalizer investiga
 The Shop page groups the cached catalogues by provider shop ID and shows provider
 title/name/type plus a real logo in one active-category header. It never imports live rlshop.gg
 data or assumes product names/artwork beyond the normalized provider snapshot.
-Each group contains at most three named items with HTTPS artwork, preserving catalogue order.
-Expired/future shops/items, absent artwork and generic Region/unnamed categories are excluded.
-Missing/broken artwork is not replaced by BPD logos. Previous/Next
+Each group contains at most three named items, preserving catalogue order. Artwork is
+optional: missing or failed image URLs do not hide the item name, price, or allowlisted
+paint/variant attributes. Expired/future shops/items and generic Region/unnamed
+categories are excluded. Missing/broken artwork is not replaced by BPD logos. Previous/Next
 navigate locally; an eight-second timer finishes each category's groups and
 wraps across categories. Pause/Resume is explicit. Hover, keyboard focus, hidden
 tabs, reduced motion and disabled site animations suppress automatic advancement.
@@ -74,10 +75,23 @@ MMR Worker `worker/services/provider-data.ts`: normalizes to `image_url` and
 `api.get_rl_current_shop` returns persisted `catalogues[].items[].image_url`
 and `shops[].logo_url`. `current_shop.js` revalidates HTTPS URLs and strips
 ownership/purchase fields. `/api/rocketleague/shop` exposes that allowlist.
-`Features/JS/shop.js` renders item images and section logos with a one-shot
-error fallback to `/Assets/logo/gaming_network_logo_128px_no_border.png`.
+`Features/JS/shop.js` renders item images and section logos; failed images are
+removed while their item cards remain visible.
 No wallet/purchase calls, notification-image calls or page-triggered provider
 refreshes were introduced.
+
+The public Player profile retains the last MMR capture timestamp but no longer
+shows the internal presence-check timestamp. Public Find Players and Player rank
+badges use the shared Rocket League tier-to-color mapper. `master_rl.css` already
+imports both page stylesheets; page styles remain in their owning folders.
+
+After the existing public-profile RPC confirms the profile is currently
+discoverable, DomainData resolves its account server-side from `core.rl_players`
+by `public_profile_id`, then calls the existing private history RPC with the
+server-derived account ID. Only normalized MMR capture fields reach the browser;
+neither account nor player IDs do. The Player graph shows the last 30 days as UTC
+daily averages and keeps playlist gaps independent. The browser never calls
+Supabase or the provider.
 
 ## Verification boundary
 
