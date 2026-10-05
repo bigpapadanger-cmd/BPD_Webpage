@@ -1,7 +1,7 @@
 "use strict";
 
 import { getAuthState, hasAdminPermission } from "/Framework/Auth/auth.js";
-import { beginVerificationNotice, finishVerificationNotice } from "/scripts/verificationNotice.js";
+import { beginVerificationNotice, finishVerificationNotice, showVerificationOutcome } from "/scripts/verificationNotice.js";
 import { getMmrControlModel } from "./mmr_controls.js";
 import { ROCKET_LEAGUE_CAPABILITIES, ROCKET_LEAGUE_CAPABILITY_CATEGORIES } from "./rocket_league_capabilities.js";
 
@@ -21,7 +21,8 @@ let authorizationActive = false;
 
 const ACTION_LABELS = {
     recheck: "Recheck", "refresh-eos": "Refresh EOS", "reauthorize-account": "Reauthorize Account",
-    "reconnect-psynet": "Reconnect PsyNet", "repair-session": "Repair Session", "run-now": "Run", "refresh-shop": "Force Refresh Shop"
+    "reconnect-psynet": "Reconnect PsyNet", "repair-session": "Repair Session", "run-now": "Run", "refresh-shop": "Force Refresh Shop",
+    "test-rl-counters": "Test RL counters"
 };
 
 function textElement(tag, text, className) {
@@ -126,6 +127,7 @@ async function runAction(service, action, button) {
     const checkingText = action === "recheck" ? "Rechecking…" : action === "refresh-shop" ? "Refreshing shop…" : "Repairing…";
     beginVerificationNotice(button, { checkingText, fallbackText: originalText });
     const message = document.getElementById("workerStatusMessage");
+    button.setAttribute("aria-busy", "true");
     if (action === "recheck") beginVerificationNotice(message, { checkingText: `Checking ${service}…`, fallbackText: "System status" });
     if (service === "mmr-api" && action !== "recheck") startOperationPolling();
     try {
@@ -137,13 +139,39 @@ async function runAction(service, action, button) {
         const payload = await response.json();
         if (!response.ok || payload.success !== true) throw Object.assign(new Error(), { payload });
         finishVerificationNotice(message, action === "recheck" ? `${service} status rechecked.` : `${ACTION_LABELS[action] || "MMR operation"} completed${payload.result?.resultCode ? `: ${payload.result.resultCode}` : "."}`);
+        let outcomeMessage;
+        let outcomeState = "success";
+        if (action === "test-rl-counters") {
+            const result = payload.result || {};
+            const counters = result.counters || {};
+            const parts = [
+                Number.isSafeInteger(counters.registeredPlayers) ? `Registered players: ${counters.registeredPlayers}` : "Registered players: unavailable",
+                Number.isSafeInteger(counters.playersOnline) ? `Players online: ${counters.playersOnline}` : "Players online: unavailable"
+            ];
+            const unavailable = result.errorCode ? ` (${result.errorCode})` : "";
+            outcomeMessage = `${parts.join(" · ")}${unavailable}`;
+            outcomeState = result.available ? "success" : "error";
+        } else {
+            outcomeMessage = action === "recheck" ? `${service} check completed.` : `${ACTION_LABELS[action] || "Operation"} completed.`;
+        }
         await loadStatus();
+        const row = document.getElementById(`worker-status-service-${service}`);
+        const label = `${ACTION_LABELS[action] || action} for ${service}`;
+        const currentButton = [...(row?.querySelectorAll("button") || [])].find(candidate => candidate.getAttribute("aria-label") === label);
+        showVerificationOutcome(currentButton || button, outcomeMessage, { state: outcomeState });
     } catch (error) {
-        finishVerificationNotice(message, safeActionFailure(error, `${originalText} failed`));
+        const failure = safeActionFailure(error, `${originalText} failed`);
+        finishVerificationNotice(message, failure);
+        showVerificationOutcome(button, failure, { state: "error" });
     } finally {
         actionInFlight = false;
         stopOperationPolling();
         button.disabled = false;
+        button.removeAttribute("aria-busy");
+        document.querySelectorAll(".worker-status-card-actions button").forEach(current => {
+            current.disabled = authorizationActive;
+            current.removeAttribute("aria-busy");
+        });
         finishVerificationNotice(button, originalText);
     }
 }
@@ -621,7 +649,8 @@ async function loadStatus() {
                     const actionLabel = botService && action === "recheck" ? "Check connection" : ACTION_LABELS[action] || action;
                     const button = textElement("button", action === "run-now" ? "▶ Run" : `↻ ${actionLabel}`);
                     button.type = "button";
-                    button.disabled = authorizationActive;
+                    button.disabled = authorizationActive || actionInFlight;
+                    if (actionInFlight) button.setAttribute("aria-busy", "true");
                     button.setAttribute("aria-label", `${actionLabel} for ${service.name}`);
                     button.addEventListener("click", () => { void runAction(service.id, action, button); });
                     actions.append(button);

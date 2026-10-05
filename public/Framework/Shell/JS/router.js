@@ -2096,6 +2096,8 @@ async function loadShell() {
         true
     );
 
+    renderRouteLoadingShell();
+
     let route =
         resolveRoute(
             window.location.pathname
@@ -2411,6 +2413,23 @@ async function loadShell() {
             );
         }
     }
+}
+
+function renderRouteLoadingShell() {
+    const content = document.getElementById("siteContent");
+    if (!content) return;
+    const shell = document.createElement("section");
+    shell.className = "route-loading-shell";
+    shell.setAttribute("aria-busy", "true");
+    shell.setAttribute("aria-label", "Loading page");
+    const status = document.createElement("p");
+    status.setAttribute("role", "status");
+    status.textContent = "Loading page…";
+    const placeholder = document.createElement("div");
+    placeholder.className = "route-loading-placeholder";
+    placeholder.setAttribute("aria-hidden", "true");
+    shell.append(status, placeholder);
+    content.replaceChildren(shell);
 }
 
 /* =========================================================

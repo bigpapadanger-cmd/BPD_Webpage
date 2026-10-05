@@ -492,6 +492,62 @@ test("explicit Supabase recheck calls the bounded read-only featured RPC and ret
     } finally { globalThis.fetch = originalFetch; }
 });
 
+test("Admin RL counter test uses the server RPC and returns aggregate values only", async () => {
+    const { env } = createEnv();
+    const originalFetch = globalThis.fetch;
+    let calls = 0;
+    globalThis.fetch = async (url, init) => {
+        calls += 1;
+        assert.equal(new URL(url).pathname, "/rest/v1/rpc/get_rl_homepage_counters");
+        assert.equal(init.headers.Authorization, "Bearer supabase-test-key");
+        assert.deepEqual(JSON.parse(init.body), {});
+        return Response.json({ success: true, registeredPlayers: 17, playersOnline: 3, activeSeasons: null, upcomingEvents: null,
+            matchesPlayed: null, scoreboardsSubmitted: null, goalsRecorded: null, capturedAt: "2026-10-05T00:00:00Z", account_id: "must-not-return" });
+    };
+    try {
+        const result = await performSystemStatusAction(env, "supabase", "test-rl-counters");
+        assert.equal(result.result.available, true);
+        assert.equal(result.result.counters.registeredPlayers, 17);
+        assert.equal(result.result.counters.playersOnline, 3);
+        assert.equal(result.result.counters.activeSeasons, null);
+        assert.equal(result.result.fields.registeredPlayers, "available");
+        assert.equal(result.result.fields.activeSeasons, "unavailable");
+        assert.equal(calls, 1);
+        assert.doesNotMatch(JSON.stringify(result), /must-not-return|supabase-test-key|account_id/u);
+    } finally { globalThis.fetch = originalFetch; }
+});
+
+test("Admin RL counter test reports unavailable instead of fabricating zero", async () => {
+    const { env } = createEnv();
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async () => Response.json({ success: true, registered_players: 999, playersOnline: null });
+    try {
+        const result = await performSystemStatusAction(env, "supabase", "test-rl-counters");
+        assert.equal(result.result.available, false);
+        assert.equal(result.result.counters.registeredPlayers, null);
+        assert.equal(result.result.counters.playersOnline, null);
+        assert.equal(result.result.errorCode, "REGISTERED_PLAYER_COUNT_UNAVAILABLE");
+    } finally { globalThis.fetch = originalFetch; }
+});
+
+test("RL counter diagnostic remains Admin-authorized and rejects browser-supplied extra targets", async () => {
+    let outboundCalls = 0;
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async () => { outboundCalls += 1; throw new Error("unexpected outbound request"); };
+    try {
+        const request = new Request("https://site.example.test/api/admin/system-status", {
+            method: "POST", headers: { "Content-Type": "application/json", Origin: "https://site.example.test" },
+            body: JSON.stringify({ service: "supabase", action: "test-rl-counters", accountId: "browser-controlled" })
+        });
+        const response = await onRequestPost({ request, env: {} });
+        assert.ok([400, 401, 403, 503].includes(response.status));
+        assert.equal(outboundCalls, 0);
+        const api = await readFile(new URL("../../functions/api/admin/system-status.js", import.meta.url), "utf8");
+        assert.match(api, /await authorize\(request, env\)/);
+        assert.match(api, /\["refresh-shop", "test-rl-counters"\]\.includes\(action\)/);
+    } finally { globalThis.fetch = originalFetch; }
+});
+
 test("stale persisted health becomes Unknown while preserving the last operational status", async () => {
     const { env, calls, seedStatus } = createEnv();
     const staleAt = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
@@ -507,6 +563,7 @@ test("stale persisted health becomes Unknown while preserving the last operation
             assert.equal(service.stale, true);
             assert.equal(service.lastKnownStatus, "healthy");
             assert.equal(service.checkedAt, staleAt);
+            if (id === "supabase") assert.ok(service.actions.includes("test-rl-counters"));
         }
     } finally { restore(); }
 });

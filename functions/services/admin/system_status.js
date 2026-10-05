@@ -2,7 +2,7 @@
 
 import { isValidProviderRuntimeCallerSecret, withAbortTimeout } from "../auth/providers/discord_matchbot/runtime_contract.js";
 import { withUpstreamDeadline, fetchBoundedResponse } from "../http/upstream.js";
-import { getFeaturedRocketLeaguePlayer } from "../supabase/rocketleague/discovery.js";
+import { getFeaturedRocketLeaguePlayer, getRocketLeagueHomepageCounters } from "../supabase/rocketleague/discovery.js";
 
 const CACHE_KEY = "admin:system-status:v3";
 const CACHE_TTL_SECONDS = 45;
@@ -18,7 +18,7 @@ const BOT_NAMES = { "discord-matchbot": "Discord MatchBot", "discord-authz-bot":
 const ACTION_COOLDOWNS = { "mmr-api:reconnect-psynet": 30, "mmr-api:refresh-eos": 15, "mmr-api:repair-session": 15, "cloud-run-ocr:recheck": 60, "rl-presence:run-now": 60, "rl-presence:refresh-shop": 60, "provider-runtime:recheck": 15 };
 const ACTIONS = {
     pages: ["recheck"], "rl-presence": ["recheck", "run-now", "refresh-shop"], "ocr-transport": ["recheck"],
-    "ocr-queue": ["recheck"], "cloud-run-ocr": ["recheck"], "provider-runtime": ["recheck"], supabase: ["recheck"],
+    "ocr-queue": ["recheck"], "cloud-run-ocr": ["recheck"], "provider-runtime": ["recheck"], supabase: ["recheck", "test-rl-counters"],
     "discord-matchbot": ["recheck"], "discord-authz-bot": ["recheck"],
     "mmr-api": ["recheck", "refresh-eos", "reauthorize-account", "poll-authorization", "reconnect-psynet", "repair-session", "functional-test"]
 };
@@ -263,7 +263,7 @@ async function checkCloudRun(env) {
 async function checkSupabase(env) {
     const state = await readStatus(env, "supabase");
     if (!state) return statusEntry("supabase", "Supabase", "Unknown", "No explicit availability check has been run.");
-    return statusEntry("supabase", "Supabase", state.status || "unknown", state.detail || state.message || "Last database readiness check.", state);
+    return statusEntry("supabase", "Supabase", state.status || "unknown", state.detail || state.message || "Last database readiness check.", { ...state, actions: ACTIONS.supabase });
 }
 
 const MMR_ADVERTISED_ACTIONS = new Set(["recheck", "refresh-eos", "reauthorize-account", "reconnect-psynet", "validate-build", "repair-session"]);
@@ -409,6 +409,9 @@ export async function performSystemStatusAction(env, service, action, input = {}
     try {
         if (bot) botCooldowns.set(env, { ...botCooldowns.get(env), [service]: now + 60000 });
         if (cooldown) try { await env?.RL_STATS_CACHE?.put(cooldownKey, String(now), { expirationTtl: cooldown }); } catch { /* Local lock remains effective. */ }
+        if (service === "supabase" && action === "test-rl-counters") {
+            return { success: true, service, action, result: await testRocketLeagueCounters(env) };
+        }
         if (service === "mmr-api") {
             if (action === "functional-test") return await testMmrSkills(env, service, action, input);
             return await runMmrAdminAction(env, service, action);
@@ -528,6 +531,30 @@ async function recheckSupabase(env) {
             responseTimeMs: Date.now() - started,
             errorCode: timedOut ? "SUPABASE_TIMEOUT" : "SUPABASE_READINESS_CHECK_FAILED"
         });
+    }
+}
+
+async function testRocketLeagueCounters(env) {
+    const checkedAt = new Date().toISOString();
+    const key = String(env?.SUPABASE_SERVICE_ROLE_KEY || env?.SUPABASE_AUTH || "").trim();
+    if (!String(env?.SUPABASE_URL || "").trim() || !key) {
+        return { available: false, errorCode: "SUPABASE_CONFIGURATION_UNAVAILABLE", checkedAt };
+    }
+    try {
+        const counters = await getRocketLeagueHomepageCounters({ ...env, SUPABASE_AUTH: key });
+        const fields = Object.fromEntries(Object.entries(counters)
+            .filter(([name]) => name !== "capturedAt")
+            .map(([name, value]) => [name, Number.isSafeInteger(value) && value >= 0 ? "available" : "unavailable"]));
+        return {
+            available: fields.registeredPlayers === "available",
+            checkedAt: safeTimestamp(counters.capturedAt) || checkedAt,
+            counters: Object.fromEntries(Object.keys(fields).map(name => [name, counters[name]])),
+            fields,
+            errorCode: fields.registeredPlayers === "available" ? null : "REGISTERED_PLAYER_COUNT_UNAVAILABLE"
+        };
+    } catch (error) {
+        const timedOut = error?.status === 504 || error?.code === "UPSTREAM_TIMEOUT";
+        return { available: false, errorCode: timedOut ? "SUPABASE_TIMEOUT" : "NETWORK_STATISTICS_UNAVAILABLE", checkedAt };
     }
 }
 

@@ -27,10 +27,52 @@ ROUTE DISPLAY GATE
 
 
 body.page-loading .site-content {
-    opacity: 0;
+    opacity: 1;
 
     pointer-events: none;
 }
+
+.route-loading-shell {
+    display: grid;
+    align-content: start;
+    gap: 18px;
+    min-height: min(42vh, 360px);
+    padding: clamp(20px, 4vw, 48px);
+    color: var(--text-color, #f3f4f6);
+}
+
+.route-loading-shell p {
+    margin: 0;
+    color: var(--muted-text-color, #a1a8b8);
+}
+
+.route-loading-placeholder {
+    width: min(100%, 720px);
+    height: 180px;
+    border: 1px solid rgba(148, 163, 184, .18);
+    border-radius: 14px;
+    background: linear-gradient(110deg, rgba(148, 163, 184, .05) 8%, rgba(148, 163, 184, .12) 18%, rgba(148, 163, 184, .05) 33%);
+    background-size: 200% 100%;
+    animation: route-loading-shimmer 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .route-loading-placeholder { animation: none; }
+}
+
+@keyframes route-loading-shimmer {
+    to { background-position-x: -200%; }
+}
+
+.verification-action-result {
+    margin: 6px 0 0;
+    font-size: .9em;
+    line-height: 1.4;
+}
+
+.verification-action-result[data-state="success"] { color: #7ee0a5; }
+.verification-action-result[data-state="error"] { color: #ff9d9d; }
+.verification-action-result[data-state="info"] { color: var(--muted-text-color, #a1a8b8); }
 /* =========================================================
 GLOBAL BOX MODEL
 ========================================================= */

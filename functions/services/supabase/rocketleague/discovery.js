@@ -6,7 +6,7 @@ const RPC_NAMES = Object.freeze({
     SEARCH: "search_rocketleague_players",
     PUBLIC_PROFILE: "get_public_rocketleague_profile",
     FEATURED: "get_rl_featured_player",
-    NETWORK: "get_rocketleague_network_statistics"
+    NETWORK: "get_rl_homepage_counters"
 });
 
 const ALLOWED_RPCS = new Set(Object.values(RPC_NAMES));
@@ -256,16 +256,16 @@ export async function getFeaturedRocketLeaguePlayer(env) {
     };
 }
 
-export async function getRocketLeagueNetworkStatistics(env) {
+export async function getRocketLeagueHomepageCounters(env) {
     const result = await callDiscoveryRpc(env, RPC_NAMES.NETWORK, {});
-    if (!result || typeof result !== "object" || Array.isArray(result)) {
+    if (!result || typeof result !== "object" || Array.isArray(result) || result.success !== true) {
         throw new RocketLeagueDiscoveryError("ROCKET_LEAGUE_DISCOVERY_UNAVAILABLE", 502);
     }
     const output = {};
     for (const key of ["playersOnline", "registeredPlayers", "activeSeasons", "upcomingEvents", "matchesPlayed", "scoreboardsSubmitted", "goalsRecorded"]) {
         output[key] = Number.isSafeInteger(result[key]) && result[key] >= 0 ? result[key] : null;
     }
-    output.generatedAt = normalizeTimestamp(result.generatedAt);
+    output.capturedAt = normalizeTimestamp(result.capturedAt);
     return output;
 }
 

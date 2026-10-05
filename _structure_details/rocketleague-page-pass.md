@@ -35,10 +35,12 @@ response cap. Errors are sanitized; no raw provider data or credentials reach th
 
 ## Network statistics
 
-`GET /api/rocketleague/network-statistics` calls the confirmed
-`api.get_rocketleague_network_statistics()` with server-side Supabase access.
+`GET /api/rocketleague/network-statistics` calls the canonical
+`api.get_rl_homepage_counters()` with server-side Supabase access. The legacy
+`api.get_rocketleague_network_statistics()` is a database compatibility wrapper;
+application code calls only the canonical counters RPC.
 The response allowlist is playersOnline, registeredPlayers, activeSeasons,
-upcomingEvents, matchesPlayed, scoreboardsSubmitted, goalsRecorded, generatedAt.
+upcomingEvents, matchesPlayed, scoreboardsSubmitted, goalsRecorded, capturedAt.
 Only nonnegative safe integer values render as numbers; zero remains zero.
 Null, malformed values and failures render as an em dash. No client presence
 calculation is involved. Responses may cache for 60 seconds.

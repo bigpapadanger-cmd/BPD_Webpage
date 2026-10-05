@@ -1,5 +1,7 @@
 "use strict";
+
 export const OCR_SCRIPT_ID =
-    "20260904-1";
+    "V5UTUNZU3G";
+
 export const APP_ASSET_ID =
-    "20260904-1";
+    "U22F9NSMZE";

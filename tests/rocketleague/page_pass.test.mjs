@@ -28,18 +28,26 @@ const featured = player => ({ featuredDate: "2026-10-05", validUntil: "2026-10-0
 
 test("network statistics use the confirmed RPC with server credentials and a public allowlist", async () => {
     globalThis.fetch = async (url, init) => {
-        assert.equal(new URL(url).pathname, "/rest/v1/rpc/get_rocketleague_network_statistics");
+        assert.equal(new URL(url).pathname, "/rest/v1/rpc/get_rl_homepage_counters");
         assert.equal(init.headers["Content-Profile"], "api");
         assert.equal(init.headers.Authorization, "Bearer server-secret");
         assert.deepEqual(JSON.parse(init.body), {});
-        return Response.json({ playersOnline: 0, registeredPlayers: 12, activeSeasons: null, upcomingEvents: null,
-            matchesPlayed: 4, scoreboardsSubmitted: null, goalsRecorded: 9, generatedAt: "2026-10-05T00:00:00Z", account_id: "private" });
+        return Response.json({ success: true, playersOnline: 0, registeredPlayers: 12, activeSeasons: null, upcomingEvents: null,
+            matchesPlayed: 4, scoreboardsSubmitted: null, goalsRecorded: 9, capturedAt: "2026-10-05T00:00:00Z", account_id: "private" });
     };
     const result = await (await networkRoute({ request, env })).json();
     assert.equal(result.playersOnline, 0);
     assert.equal(result.registeredPlayers, 12);
     assert.equal(result.activeSeasons, null);
+    assert.equal(result.capturedAt, "2026-10-05T00:00:00Z");
     assert.equal(result.account_id, undefined);
+});
+
+test("network counter RPC failure contract is not rendered as valid counts", async () => {
+    globalThis.fetch = async () => Response.json({ success: false, playersOnline: 700, registeredPlayers: 900 });
+    const response = await networkRoute({ request, env });
+    assert.equal(response.status, 503);
+    assert.deepEqual(await response.json(), { success: false, error: "NETWORK_STATISTICS_UNAVAILABLE" });
 });
 
 test("network rendering preserves zero and distinguishes null or invalid numbers", () => {

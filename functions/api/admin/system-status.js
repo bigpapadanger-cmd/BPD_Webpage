@@ -38,7 +38,7 @@ export async function onRequestPost({ request, env }) {
         try { await authorize(request, env, ADMIN_PERMISSIONS.RL_FORCE_REFRESH); }
         catch (error) { return json({ success: false, error: error.code }, error.status); }
     }
-    if ((["discord-matchbot", "discord-authz-bot"].includes(service) || action === "refresh-shop")
+    if ((["discord-matchbot", "discord-authz-bot"].includes(service) || ["refresh-shop", "test-rl-counters"].includes(action))
         && Object.keys(parsed.data).some(key => !["service", "action"].includes(key))) return json({ success: false, error: "INVALID_INPUT" }, 400);
     const startedAt = Date.now();
     const requestId = crypto.randomUUID();

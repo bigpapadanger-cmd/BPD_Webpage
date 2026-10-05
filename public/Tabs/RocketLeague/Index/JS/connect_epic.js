@@ -184,6 +184,13 @@ function handleMainRocketLeagueAction(
         return;
     }
 
+    if (action === "retry-validation") {
+        const path = window.location.pathname + window.location.search;
+        if (window.BPDRouter?.navigate) void window.BPDRouter.navigate(path);
+        else window.location.reload();
+        return;
+    }
+
     void handleEpicLogin(
         event
     );
@@ -319,8 +326,7 @@ export function releaseMainRocketLeagueAction() {
      * This function only releases the button.
      */
     button.disabled =
-        button.dataset.action === "validating"
-        || button.dataset.action === "unavailable";
+        button.dataset.action === "validating";
 }
 
 /* =========================================================

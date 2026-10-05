@@ -42,7 +42,7 @@ CTA State Contract:
 
     unavailable
         Authentication/profile validation could not be
-        completed. The button remains disabled.
+        completed. The action provides a retry.
 
 Important:
     - Never expose create-profile until the profile request
@@ -76,6 +76,8 @@ import {
 import {
     getRocketLeagueAccessPresentation
 } from "./access_presentation.js";
+
+import { showVerificationOutcome } from "/scripts/verificationNotice.js";
 
 import {
     beginVerificationNotice,
@@ -250,10 +252,10 @@ function setRocketLeagueAccessButtonUnavailable(
         );
 
     button.disabled =
-        true;
+        false;
 
     button.dataset.action =
-        "unavailable";
+        "retry-validation";
 
     delete button.dataset.reauthorizeUrl;
 
@@ -271,8 +273,9 @@ function setRocketLeagueAccessButtonUnavailable(
     ) {
         clearVerificationNotice(buttonText);
         buttonText.textContent =
-            message;
+            "Retry access check";
     }
+    showVerificationOutcome(button, "Rocket League access could not be verified. Please retry in a moment.", { state: "error" });
 }
 
 /* =========================================================
@@ -1354,6 +1357,10 @@ export async function initializeRocketLeagueAuthView() {
                 rocketLeagueSession
             );
 
+            if (rocketLeagueSession.rocketLeagueAccess === true) {
+                showVerificationOutcome(getRocketLeagueAccessButton(), "Rocket League access verified.", { state: "success" });
+            }
+
             if (
                 rocketLeagueSession
                     .rocketLeagueAccess !==
@@ -1375,14 +1382,8 @@ export async function initializeRocketLeagueAuthView() {
                     name:
                         profileError?.name
                         || "Error",
-
-                    code:
-                        profileError?.code
-                        || null,
-
-                    message:
-                        profileError?.message
-                        || "Unknown error"
+                    hasCode:
+                        typeof profileError?.code === "string"
                 }
             );
 
@@ -1414,16 +1415,12 @@ export async function initializeRocketLeagueAuthView() {
                 }
             );
 
-            const unavailableMessage =
-                profileError?.message
-                || "Rocket League profile validation is temporarily unavailable.";
-
             setRocketLeagueAccessButtonUnavailable(
                 "Profile validation unavailable"
             );
 
             renderUnavailableRanks(
-                unavailableMessage
+                "Rocket League profile validation is temporarily unavailable. Please retry."
             );
 
             /*
@@ -1444,10 +1441,8 @@ export async function initializeRocketLeagueAuthView() {
                 name:
                     error?.name
                     || "Error",
-
-                message:
-                    error?.message
-                    || "Unknown error"
+                hasCode:
+                    typeof error?.code === "string"
             }
         );
 
