@@ -5,11 +5,33 @@ import test from "node:test";
 import { getProfileSettingsAvailability, getProfileUpdateSafetyError, mapProfileSettingsToRpcArgs, mapProfileSettingsToV2RpcArgs, normalizeNotificationsV2, normalizeProfileSettings, PROFILE_SETTING_FIELDS } from "../../functions/services/rl/profile_settings.js";
 import { buildSettingsPayload, getConfirmedSettings, getDuplicateReminderChannels, getFindProfileVisibilityState, getSettingsConfirmationState, isSettingConfirmed, reminderMinutesFromParts, validateNotificationsV2 } from "../../public/Tabs/RocketLeague/MyProfile/JS/settings_view.js";
 import { normalizeDatabaseProfile } from "../../functions/services/rl/profile.js";
+import { getRocketLeagueProfileByAccountId } from "../../functions/services/supabase/rocketleague/rocketleague_profile.js";
 
 const EMPTY_NOTIFICATIONS_V2 = Object.freeze({
     email: { enabled: false, reminders: [] },
     sms: { enabled: false, reminders: [] },
     discord: { enabled: false, reminders: [] }
+});
+
+test("confirmed fallback visibility survives a nested V2 null through the MyProfile read path", async () => {
+    const originalFetch = globalThis.fetch;
+    try {
+        for (const value of [true, false, null]) {
+            const calls = [];
+            globalThis.fetch = async url => {
+                calls.push(new URL(url).pathname);
+                return Response.json(url.endsWith("get_rocketleague_profile_v2")
+                    ? { rl_player_id: "player", settings: { findProfileEnabled: null, find_profile_enabled: null } }
+                    : { settings: { find_profile_enabled: value } });
+            };
+            const database = await getRocketLeagueProfileByAccountId({ SUPABASE_URL: "https://db.test/rest/v1/", SUPABASE_AUTH: "test-secret" }, "account", { includeLegacyFindProfileFallback: true });
+            const profile = normalizeDatabaseProfile(database, { userId: "account" }, {});
+            assert.equal(profile.settings.findProfileEnabled, value);
+            assert.equal(profile.settingsAvailability.findProfileEnabled, value !== null);
+            assert.deepEqual(getFindProfileVisibilityState(profile), { available: value !== null, checked: value === true });
+            assert.deepEqual(calls, ["/rest/v1/rpc/get_rocketleague_profile_v2", "/rest/v1/rpc/get_rocketleague_profile"]);
+        }
+    } finally { globalThis.fetch = originalFetch; }
 });
 
 test("server complete-settings save rejects missing authoritative or submitted fields", () => {

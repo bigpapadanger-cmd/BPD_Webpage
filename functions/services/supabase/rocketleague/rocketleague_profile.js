@@ -462,7 +462,8 @@ async function readRocketLeagueProfile(
     if (includeLegacyFindProfileFallback && typeof settings.findProfileEnabled !== "boolean") {
         const findProfileEnabled = await getLegacyFindProfileValue(baseUrl, apiKey, normalizedAccountId, signal);
         if (typeof findProfileEnabled === "boolean") {
-            settings = normalizeProfileSettings({ ...responseData, find_profile_enabled: findProfileEnabled });
+            // A V2 nested null must not shadow the confirmed legacy boolean.
+            settings = { ...settings, findProfileEnabled };
         }
     }
     if (Object.hasOwn(responseData, "notifications_v2")) {

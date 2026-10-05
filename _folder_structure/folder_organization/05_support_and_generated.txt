@@ -11,6 +11,12 @@ data, or generated output.
 NOTES/
 
 Notes/
++-- supabase/rocketleague/
+|   +-- rocketleague_featured_counters_inspection.sql   Read-only live contract inspection.
+|   +-- rocketleague_featured_counters_migration.sql    Prepared daily selection/counters; not applied.
+|   +-- rocketleague_featured_counters_verification.sql Read-only post-apply checks; not run.
+|   +-- rocketleague_featured_counters_rollback.sql     Narrow manual rollback; not run.
+|   +-- rocketleague_featured_counters_review.md        Live findings, shapes, grants and consumer plan.
 +-- _addSecretToCloudflare
 +-- _General_Notes
 +-- _RocketLeague

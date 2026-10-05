@@ -42,8 +42,10 @@ function normalizeObject(value) {
 
 function sanitizePublicProfile(value) {
     const row = normalizeObject(value);
-    // Public exposure is opt-in. Missing/legacy RPC fields fail closed too.
-    if (row.find_profile_enabled !== true) return null;
+    // Only the fixed service-role public RPCs call this sanitizer. Their live
+    // SQL excludes private/inactive profiles before projection and intentionally
+    // omits private preferences. Reject contradictory legacy flags if supplied.
+    if (Object.hasOwn(row, "find_profile_enabled") && row.find_profile_enabled !== true) return null;
     const publicProfileId = normalizeString(row.public_profile_id, 36);
     if (!PUBLIC_PROFILE_ID_PATTERN.test(publicProfileId)) return null;
 

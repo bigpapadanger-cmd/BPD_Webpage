@@ -1,5 +1,31 @@
 # Rocket League Private Profile Settings Contract
 
+## Visibility mapping follow-up (2026-10-04)
+
+The subsequently supplied live inspection confirms that BOTH private getters
+currently omit the visibility property entirely. V2 delegates to the base getter
+and adds only platform/notifications/Discord state. Thus there is no live JSON
+path for this boolean yet; the fallback repair below is not sufficient to unlock
+the live editor. The coordinated prepared migration now adds top-level
+`findProfileEnabled` to the exact existing V2 getter from the authoritative saved
+boolean, without a default. A missing preference row raises a sanitized database
+error rather than returning a guessed visibility value. The corrected API path
+is `profile.settings.findProfileEnabled`. Both private getters become executable
+only by postgres/service_role. These SQL corrections have NOT been applied. Explicit
+null may become false only at a confirmed getter field (user-approved rule);
+missing/failed/malformed remains unavailable. The prepared Featured/counters
+migration now includes the authorized V2 correction and private grant hardening;
+the base getter body is not rewritten.
+
+The current reader uses `api.get_rocketleague_profile_v2`. MyProfile opts into
+the read-only legacy getter fallback only when V2 does not provide a visibility
+boolean. A confirmed fallback `true` or `false` is assigned to the normalized
+setting directly: a nested V2 null must not shadow it during re-normalization.
+Missing values in both getters remain null and keep the control locked; the
+complete-settings save safety rule is unchanged. No provider request is involved.
+Regression coverage exercises both booleans and null through the server reader,
+private profile sanitizer, and MyProfile checkbox-state helper.
+
 ## Current DomainData contract
 
 `GET /api/auth/rocketleague/profile` reads the authenticated account through

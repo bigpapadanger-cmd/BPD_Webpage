@@ -293,7 +293,7 @@ test("search rejects short, long, duplicate, and unbounded queries before Supaba
     assert.equal(calls, 0);
 });
 
-test("search includes only explicitly opted-in rows and strips aliases and internal identifiers", async () => {
+test("search accepts the server-filtered public projection and rejects contradictory legacy visibility", async () => {
     let requestBody;
     let rpcName;
     const rows = [
@@ -302,7 +302,6 @@ test("search includes only explicitly opted-in rows and strips aliases and inter
             display_name: "Visible Player",
             epic_display_name: "VisibleEpic",
             rl_platform: "Epic",
-            find_profile_enabled: true,
             presence_shared: false,
             presence_state: "Online",
             aliases: ["FormerName"],
@@ -314,7 +313,7 @@ test("search includes only explicitly opted-in rows and strips aliases and inter
             stats: { wins: 100 }
         },
         { public_profile_id: "c803fe50-fc91-4b2b-8ccb-26496d3e7482", find_profile_enabled: false },
-        { public_profile_id: "581e27d0-39d5-4d9d-bcbf-a4b1ca9b7c0a" }
+        { public_profile_id: "invalid" }
     ];
 
     await withFetch(async (url, options) => {
@@ -335,7 +334,7 @@ test("search includes only explicitly opted-in rows and strips aliases and inter
         assert.equal("aliases" in payload.players[0], false);
         assert.equal("provider" in payload.players[0], false);
         assert.equal("stats" in payload.players[0], false);
-        for (const key of ["account_id", "rl_player_id", "user_id", "epic_account_id", "email", "phone"]) {
+        for (const key of ["find_profile_enabled", "account_id", "rl_player_id", "user_id", "epic_account_id", "email", "phone"]) {
             assert.equal(key in payload.players[0], false);
         }
     });
@@ -377,7 +376,6 @@ test("public-profile RPC sanitization omits aliases and never returns hidden pre
     await withFetch(async () => response({
         public_profile_id: PROFILE_ID,
         display_name: "Player",
-        find_profile_enabled: true,
         aliases: ["PreviousTag"],
         presence_shared: false,
         presence_state: "Online",
@@ -391,6 +389,36 @@ test("public-profile RPC sanitization omits aliases and never returns hidden pre
         assert.equal("aliases" in profile, false);
         assert.equal("account_id" in profile, false);
     });
+});
+
+test("public profile accepts the live server-filtered shape without exposing preferences", async () => {
+    await withFetch(async (url, options) => {
+        assert.equal(new URL(url).pathname.endsWith("/get_public_rocketleague_profile"), true);
+        assert.equal(options.headers["Content-Profile"], "api");
+        assert.equal(options.headers.Authorization, `Bearer ${ENV.SUPABASE_AUTH}`);
+        return response({ public_profile_id: PROFILE_ID, display_name: "Public player", presence_shared: false });
+    }, async () => {
+        const profile = await getPublicRocketLeagueProfile(ENV, PROFILE_ID);
+        assert.equal(profile.display_name, "Public player");
+        assert.equal("find_profile_enabled" in profile, false);
+        assert.equal(profile.presence_state, null);
+    });
+});
+
+test("private V2 top-level findProfileEnabled maps true and false to confirmed MyProfile settings", async () => {
+    for (const saved of [true, false]) {
+        let calls = 0;
+        await withFetch(async url => {
+            calls++;
+            assert.equal(new URL(url).pathname.endsWith("/get_rocketleague_profile_v2"), true);
+            return response({ rl_player_id: "player", findProfileEnabled: saved });
+        }, async () => {
+            const profile = await getRocketLeagueProfileByAccountId(ENV, "account", { includeLegacyFindProfileFallback: true });
+            assert.equal(profile.settings.findProfileEnabled, saved);
+            assert.equal(profile.settingsAvailability.findProfileEnabled, true);
+            assert.equal(calls, 1);
+        });
+    }
 });
 
 test("fresh public presence is visible while stale or unknown presence is neutral", async () => {
@@ -500,13 +528,15 @@ test("private My Profile settings preserve persisted values and fail closed for 
     assert.match(source, /method,\s*credentials: "same-origin"/);
 });
 
-test("public profile is unavailable unless Find Profile is explicitly enabled", async () => {
-    await withFetch(async () => response({
-        public_profile_id: PROFILE_ID,
-        display_name: "Legacy response without opt-in field"
-    }), async () => {
-        assert.equal(await getPublicRocketLeagueProfile(ENV, PROFILE_ID), null);
-    });
+test("contradictory legacy private visibility is rejected even on a public RPC result", async () => {
+    for (const flag of [false, null, "true"]) {
+        await withFetch(async () => response({
+            public_profile_id: PROFILE_ID,
+            find_profile_enabled: flag
+        }), async () => {
+            assert.equal(await getPublicRocketLeagueProfile(ENV, PROFILE_ID), null);
+        });
+    }
 });
 
 test("public presence renders the explicit private label, not Offline", () => {
