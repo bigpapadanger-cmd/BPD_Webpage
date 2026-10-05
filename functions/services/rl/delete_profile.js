@@ -2,6 +2,7 @@
 
 import { authorizeRequest, isAuthorizationError } from "../auth/authorization.js";
 import { json } from "../common_helpers/responses.js";
+import { invalidateRlProbeSession } from "./probe_security.js";
 
 const CONFIRMATION_VALUE = "DELETE_ROCKETLEAGUE_PROFILE";
 const PLAYER_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -69,6 +70,8 @@ export async function handleRocketLeagueProfileDelete(request, env) {
 
     let response;
     let result;
+    try { await invalidateRlProbeSession(env, authorization.accountId, "profile_delete"); }
+    catch { return failure("RL_PROBE_INVALIDATION_REQUIRED", 503, "Temporary Rocket League access could not be revoked. Please try again."); }
     try {
         response = await fetch(`${base}/rest/v1/rpc/delete_rocketleague_profile`, {
             method: "POST",

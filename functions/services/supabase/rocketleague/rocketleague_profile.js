@@ -1,4 +1,5 @@
 "use strict";
+import { withUpstreamDeadline, fetchBoundedResponse, safeUpstreamErrorCode } from "../../http/upstream.js";
 
 import { getProfileSettingsAvailability, normalizeNotificationsV2, normalizeProfileSettings } from "../../rl/profile_settings.js";
 
@@ -114,9 +115,10 @@ function normalizeTimestamp(value) {
     return Number.isFinite(Date.parse(timestamp)) ? timestamp : null;
 }
 
-async function getLegacyFindProfileValue(baseUrl, apiKey, accountId) {
+async function getLegacyFindProfileValue(baseUrl, apiKey, accountId, signal) {
     try {
-        const response = await fetch(`${baseUrl}rpc/get_rocketleague_profile`, {
+        const response = await fetchBoundedResponse(`${baseUrl}rpc/get_rocketleague_profile`, {
+            signal,
             method: "POST",
             headers: {
                 apikey: apiKey,
@@ -158,10 +160,11 @@ function hasObjectData(
 MAIN PROFILE LOOKUP
 ========================================================= */
 
-export async function getRocketLeagueProfileByAccountId(
+async function readRocketLeagueProfile(
     env,
     accountId,
-    { includeLegacyFindProfileFallback = false } = {}
+    { includeLegacyFindProfileFallback = false } = {},
+    signal
 ) {
     const normalizedAccountId =
         normalizeString(
@@ -203,9 +206,10 @@ export async function getRocketLeagueProfileByAccountId(
             : `${supabaseUrl}/`;
 
     const response =
-        await fetch(
+        await fetchBoundedResponse(
             `${baseUrl}rpc/get_rocketleague_profile_v2`,
             {
+                signal,
                 method:
                     "POST",
 
@@ -249,8 +253,9 @@ export async function getRocketLeagueProfileByAccountId(
                 : null;
     }
     catch {
-        responseData =
-            responseText;
+        throw Object.assign(new Error("Supabase profile response was invalid."), {
+            code: "UPSTREAM_RESPONSE_INVALID", status: 503
+        });
     }
 
     /* =====================================================
@@ -295,8 +300,7 @@ export async function getRocketLeagueProfileByAccountId(
 
         const error =
             new Error(
-                message
-                || "Supabase profile request failed."
+                "Supabase profile request failed."
             );
 
         error.upstreamStatus =
@@ -311,10 +315,8 @@ export async function getRocketLeagueProfileByAccountId(
                     responseData
                 )
             )
-                ? normalizeNullableString(
-                    responseData.code
-                )
-                : null;
+                ? safeUpstreamErrorCode(responseData.code)
+                : "UPSTREAM_REJECTED";
 
         throw error;
     }
@@ -458,7 +460,7 @@ export async function getRocketLeagueProfileByAccountId(
     };
     let settings = normalizeProfileSettings(responseData);
     if (includeLegacyFindProfileFallback && typeof settings.findProfileEnabled !== "boolean") {
-        const findProfileEnabled = await getLegacyFindProfileValue(baseUrl, apiKey, normalizedAccountId);
+        const findProfileEnabled = await getLegacyFindProfileValue(baseUrl, apiKey, normalizedAccountId, signal);
         if (typeof findProfileEnabled === "boolean") {
             settings = normalizeProfileSettings({ ...responseData, find_profile_enabled: findProfileEnabled });
         }
@@ -645,4 +647,8 @@ export async function getRocketLeagueProfileByAccountId(
         settings,
         settingsAvailability
     };
+}
+
+export function getRocketLeagueProfileByAccountId(env, accountId, options = {}) {
+    return withUpstreamDeadline(signal => readRocketLeagueProfile(env, accountId, options, signal));
 }

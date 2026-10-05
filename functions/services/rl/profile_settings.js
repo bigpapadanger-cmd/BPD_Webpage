@@ -26,6 +26,42 @@ export const PROFILE_SETTING_FIELDS = Object.freeze({
 export const NOTIFICATION_CHANNELS = Object.freeze(["email", "sms", "discord"]);
 export const REMINDER_LIMITS = Object.freeze({ minMinutes: 15, maxMinutes: 11460, maxPerChannel: 3 });
 
+// Existing-profile edits are complete replacements, not partial patches.
+export const PROFILE_EDITABLE_FIELDS = Object.freeze([
+    "primaryPlatform", "autoDetectRegion", "showOnlineStatus", "findProfileEnabled",
+    "preferredMode", "otherMode", "availability", "email", "phone", "notificationsV2"
+]);
+
+export function getProfileUpdateSafetyError(profile, payload) {
+    const settings = profile?.settings;
+    const availability = profile?.settingsAvailability;
+    if (!settings || !availability || typeof settings !== "object" || Array.isArray(settings)) {
+        return "PROFILE_SETTINGS_UNAVAILABLE";
+    }
+    for (const key of PROFILE_EDITABLE_FIELDS) {
+        const definition = PROFILE_SETTING_FIELDS[key];
+        const value = settings[key];
+        const confirmed = key === "findProfileEnabled"
+            ? typeof value === "boolean"
+            : availability[key] === true;
+        const valid = definition.type === "boolean" ? typeof value === "boolean"
+            : definition.type === "array" ? Array.isArray(value)
+                : key === "notificationsV2" ? NOTIFICATION_CHANNELS.every(channel =>
+                    typeof value?.[channel]?.enabled === "boolean" && Array.isArray(value[channel].reminders))
+                    : value === null || typeof value === "string";
+        if (!confirmed || !valid) return "PROFILE_SETTINGS_UNAVAILABLE";
+    }
+    if (availability.ageConsent !== true || availability.policyConsent !== true
+        || typeof profile.ageConsent !== "boolean" || typeof profile.policyConsent !== "boolean") {
+        return "PROFILE_SETTINGS_UNAVAILABLE";
+    }
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)
+        || PROFILE_EDITABLE_FIELDS.some(key => !Object.hasOwn(payload, key))) {
+        return "INCOMPLETE_PROFILE_SETTINGS";
+    }
+    return null;
+}
+
 function getPath(source, path) {
     return String(path).split(".").reduce((value, key) => value && typeof value === "object" ? value[key] : undefined, source);
 }

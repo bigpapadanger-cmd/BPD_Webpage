@@ -1,5 +1,5 @@
 OCR_CLOUDDATA/: PYTHON OCR SERVICE AND DATA
-Snapshot: 2026-09-27
+Snapshot: 2026-10-04
 
 ROLE
 
@@ -19,6 +19,7 @@ ocr_cloudData/
 +-- requirements.txt        Python dependency manifest.
 +-- .dockerignore           Container build exclusions.
 +-- .gcloudignore           Google Cloud deployment exclusions.
++-- SECURITY_REVIEW.md      Local hardening changes and remaining cloud checks; excluded from deployment.
 |
 +-- ocr/
 |   +-- config.py           Environment/runtime constants and summaries.
@@ -45,12 +46,14 @@ ocr_cloudData/
 |   +-- runtime/
 |       +-- scheduler.py           Bounded CPU work scheduling.
 |       +-- progress_store.py      Job progress reporting/storage client.
+|                                 Coalesces routine updates; non-redirecting, sanitized callbacks.
 |
 +-- debug/
 |   +-- debug_ocr.py         Local pipeline diagnostic runner and artifact writer.
 |   +-- test_ocr.ps1         Local OCR test wrapper; snapshots can be disabled.
 |
 +-- tests/
+|   +-- test_runtime_hardening.py Progress throttling/completion, response cleanup and error-redaction tests.
 |   +-- test_*.py            Python OCR unit and regression tests.
 |   +-- test_numeric_onnx.py ONNX contract, score-band, and fallback routing tests.
 |

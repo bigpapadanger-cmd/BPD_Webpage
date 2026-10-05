@@ -34,6 +34,9 @@ test("upstream credential errors and unknown database details are service failur
             assert.equal(error.code, "ADMIN_TASK_RPC_FAILED");
             assert.equal(error.unavailable, [502, 503, 504].includes(status));
             assert.doesNotMatch(error.message, /private/);
+            assert.equal(error.details, null);
+            assert.equal(error.hint, null);
+            assert.equal(error.databaseCode, null);
             return true;
         });
     }

@@ -1,4 +1,5 @@
 "use strict";
+import { withUpstreamDeadline, fetchBoundedResponse } from "../../http/upstream.js";
 
 /* =========================================================
 BPD GAMING NETWORK
@@ -118,9 +119,10 @@ function getSupabaseConfiguration(
 GET LATEST MMR SNAPSHOT
 ========================================================= */
 
-export async function getLatestRocketLeagueMmrSnapshot(
+async function readLatestRocketLeagueMmrSnapshot(
     env,
-    accountId
+    accountId,
+    signal
 ) {
     const normalizedAccountId =
         normalizeString(
@@ -181,9 +183,10 @@ export async function getLatestRocketLeagueMmrSnapshot(
     );
 
     const response =
-        await fetch(
+        await fetchBoundedResponse(
             url.href,
             {
+                signal,
                 method:
                     "POST",
 
@@ -244,16 +247,7 @@ export async function getLatestRocketLeagueMmrSnapshot(
                 status:
                     response.status,
 
-                response:
-                    responseText
-                        .replace(
-                            /\s+/g,
-                            " "
-                        )
-                        .slice(
-                            0,
-                            300
-                        )
+                code: "LATEST_MMR_SNAPSHOT_FAILED"
             }
         );
 
@@ -432,4 +426,8 @@ export async function getLatestRocketLeagueMmrSnapshot(
     );
 
     return snapshot;
+}
+
+export function getLatestRocketLeagueMmrSnapshot(env, accountId) {
+    return withUpstreamDeadline(signal => readLatestRocketLeagueMmrSnapshot(env, accountId, signal));
 }

@@ -371,7 +371,7 @@ function makeDetails(service) {
     content.className = "worker-status-detail-content";
     const message = service.message || service.detail;
     if (message) content.append(textElement("p", message));
-    if (service.id === "provider-runtime" && service.errorCode) content.append(textElement("p", `Health check: ${service.errorCode}`));
+    if ((service.id === "provider-runtime" || service.id.startsWith("discord-")) && service.errorCode) content.append(textElement("p", `Health check: ${service.errorCode}`));
     const facts = [
         service.checkedAt ? `Checked ${readableTime(service.checkedAt)}` : null,
         Number.isFinite(service.responseTimeMs) ? `${service.responseTimeMs} ms response` : null,
@@ -579,8 +579,9 @@ async function loadStatus() {
             indicator.setAttribute("aria-label", status);
             const identity = document.createElement("div");
             identity.className = "worker-status-identity";
-            const statusLabel = service.id === "provider-runtime"
-                ? ({ healthy: "Online", degraded: "Degraded", down: "Offline" })[status] || "Offline"
+            const botService = service.id === "discord-matchbot" || service.id === "discord-authz-bot";
+            const statusLabel = service.id === "provider-runtime" || botService
+                ? ({ healthy: "Online", degraded: "Degraded", down: "Offline", unknown: "Not checked" })[status] || "Offline"
                 : status;
             identity.append(textElement("strong", service.name, "worker-status-name"), textElement("span", statusLabel, `worker-status-label worker-status-${status}`));
             primary.append(indicator, identity);
@@ -589,10 +590,11 @@ async function loadStatus() {
                 const actions = document.createElement("div");
                 actions.className = "worker-status-card-actions";
                 for (const action of controls.actions) {
-                    const button = textElement("button", action === "run-now" ? "▶ Run" : `↻ ${ACTION_LABELS[action] || action}`);
+                    const actionLabel = botService && action === "recheck" ? "Check connection" : ACTION_LABELS[action] || action;
+                    const button = textElement("button", action === "run-now" ? "▶ Run" : `↻ ${actionLabel}`);
                     button.type = "button";
                     button.disabled = authorizationActive;
-                    button.setAttribute("aria-label", `${ACTION_LABELS[action] || action} for ${service.name}`);
+                    button.setAttribute("aria-label", `${actionLabel} for ${service.name}`);
                     button.addEventListener("click", () => { void runAction(service.id, action, button); });
                     actions.append(button);
                 }

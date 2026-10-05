@@ -221,77 +221,6 @@
                 </div>
             </header>
 
-            <!-- Network stats header -->
-            <!-- Network stats header -->
-            <section
-                class="rocket-league-stat-strip"
-                aria-label="Rocket League network statistics"
-            >
-                <article class="stat-strip-item">
-                    <span class="stat-strip-label">
-                        Players Online
-                    </span>
-
-                    <strong
-                        class="stat-strip-value"
-                        id="rocketLeaguePlayersOnline"
-                    >
-                        —
-                    </strong>
-                </article>
-
-                <article class="stat-strip-item">
-                    <span class="stat-strip-label">
-                        Registered Players
-                    </span>
-
-                    <strong
-                        class="stat-strip-value"
-                        id="rocketLeagueRegisteredPlayers"
-                    >
-                        —
-                    </strong>
-                </article>
-
-                <article class="stat-strip-item">
-                    <span class="stat-strip-label">
-                        Active Seasons
-                    </span>
-
-                    <strong
-                        class="stat-strip-value"
-                        id="rocketLeagueActiveSeasons"
-                    >
-                        —
-                    </strong>
-                </article>
-
-                <article class="stat-strip-item">
-                    <span class="stat-strip-label">
-                        Upcoming Events
-                    </span>
-
-                    <strong
-                        class="stat-strip-value"
-                        id="rocketLeagueUpcomingEvents"
-                    >
-                        —
-                    </strong>
-                </article>
-
-                <article class="stat-strip-item">
-                    <span class="stat-strip-label">
-                        Matches Recorded
-                    </span>
-
-                    <strong
-                        class="stat-strip-value"
-                        id="rocketLeagueMatchesRecorded"
-                    >
-                        —
-                    </strong>
-                </article>
-            </section>
 
             <!-- Top advertisement -->
             <div
@@ -300,6 +229,105 @@
             ></div>
 
             <main class="rocket-league-content">
+
+                <!-- Community statistics -->
+                <section
+                    class="content-card rocket-league-statistics-card"
+                    aria-labelledby="rocketLeagueStatisticsTitle"
+                >
+                    <span class="card-label">
+                        NETWORK STATISTICS
+                    </span>
+
+                    <h2 id="rocketLeagueStatisticsTitle">
+                        Rocket League by the Numbers
+                    </h2>
+                    <p>Network totals are unavailable until authoritative aggregate data is connected. Missing figures are not zero.</p>
+
+                    <div class="rocket-league-stat-grid">
+                        <article class="network-stat">
+                            <span class="network-stat-label">Players Online</span>
+                            <strong class="network-stat-value" id="rocketLeaguePlayersOnline">—</strong>
+                        </article>
+                        <article class="network-stat">
+                            <span class="network-stat-label">
+                                Registered Players
+                            </span>
+
+                            <strong
+                                class="network-stat-value"
+                                id="rocketLeagueRegisteredPlayers"
+                            >
+                                —
+                            </strong>
+                        </article>
+
+                        <article class="network-stat">
+                            <span class="network-stat-label">
+                                Active Seasons
+                            </span>
+
+                            <strong
+                                class="network-stat-value"
+                                id="rocketLeagueSeasonCount"
+                            >
+                                —
+                            </strong>
+                        </article>
+
+                        <article class="network-stat">
+                            <span class="network-stat-label">
+                                Upcoming Seasons & Events
+                            </span>
+
+                            <strong
+                                class="network-stat-value"
+                                id="rocketLeagueUpcomingCount"
+                            >
+                                —
+                            </strong>
+                        </article>
+
+                        <article class="network-stat">
+                            <span class="network-stat-label">
+                                Matches Played
+                            </span>
+
+                            <strong
+                                class="network-stat-value"
+                                id="rocketLeagueMatchesPlayed"
+                            >
+                                —
+                            </strong>
+                        </article>
+
+                        <article class="network-stat">
+                            <span class="network-stat-label">
+                                Scoreboards Submitted
+                            </span>
+
+                            <strong
+                                class="network-stat-value"
+                                id="rocketLeagueScoreboardsSubmitted"
+                            >
+                                —
+                            </strong>
+                        </article>
+
+                        <article class="network-stat">
+                            <span class="network-stat-label">
+                                Goals Recorded
+                            </span>
+
+                            <strong
+                                class="network-stat-value"
+                                id="rocketLeagueGoalsRecorded"
+                            >
+                                —
+                            </strong>
+                        </article>
+                    </div>
+                </section>
 
                 <!-- About -->
                 <section
@@ -471,7 +499,7 @@
                         >
                             <span class="feature-link-label">ITEM SHOP</span>
                             <strong>Rocket League Shop</strong>
-                            <span>Live item data is not available yet. This page will show verified cached rotation details when ready.</span>
+                            <span>Browse the latest saved shop rotation, with capture times and clearly marked unavailable or expired data.</span>
                         </a>
                     </div>
                 </section>
@@ -489,99 +517,6 @@
                     data-ad-location="rocket-league-middle"
                 ></div>
 
-                <!-- Community statistics -->
-                <section
-                    class="content-card rocket-league-statistics-card"
-                    aria-labelledby="rocketLeagueStatisticsTitle"
-                >
-                    <span class="card-label">
-                        NETWORK STATISTICS
-                    </span>
-
-                    <h2 id="rocketLeagueStatisticsTitle">
-                        Rocket League by the Numbers
-                    </h2>
-
-                    <div class="rocket-league-stat-grid">
-                        <article class="network-stat">
-                            <span class="network-stat-label">
-                                Players Registered for Seasons
-                            </span>
-
-                            <strong
-                                class="network-stat-value"
-                                id="rocketLeagueSeasonRegistrations"
-                            >
-                                —
-                            </strong>
-                        </article>
-
-                        <article class="network-stat">
-                            <span class="network-stat-label">
-                                Active Seasons
-                            </span>
-
-                            <strong
-                                class="network-stat-value"
-                                id="rocketLeagueSeasonCount"
-                            >
-                                —
-                            </strong>
-                        </article>
-
-                        <article class="network-stat">
-                            <span class="network-stat-label">
-                                Upcoming Seasons & Events
-                            </span>
-
-                            <strong
-                                class="network-stat-value"
-                                id="rocketLeagueUpcomingCount"
-                            >
-                                —
-                            </strong>
-                        </article>
-
-                        <article class="network-stat">
-                            <span class="network-stat-label">
-                                Matches Played
-                            </span>
-
-                            <strong
-                                class="network-stat-value"
-                                id="rocketLeagueMatchesPlayed"
-                            >
-                                —
-                            </strong>
-                        </article>
-
-                        <article class="network-stat">
-                            <span class="network-stat-label">
-                                Scoreboards Submitted
-                            </span>
-
-                            <strong
-                                class="network-stat-value"
-                                id="rocketLeagueScoreboardsSubmitted"
-                            >
-                                —
-                            </strong>
-                        </article>
-
-                        <article class="network-stat">
-                            <span class="network-stat-label">
-                                Goals Recorded
-                            </span>
-
-                            <strong
-                                class="network-stat-value"
-                                id="rocketLeagueGoalsRecorded"
-                            >
-                                —
-                            </strong>
-                        </article>
-                    </div>
-                </section>
 
                 <!-- Bottom advertisement -->
                 <div

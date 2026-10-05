@@ -41,6 +41,8 @@ import {
     setSidebarCollapsed
 } from "./state.js";
 
+import { resolveHumanPageRoute, getRocketLeagueSettingsContext } from "../../../../routes.js";
+
 import {
     applyAppearancePreferences,
     readPreferences,
@@ -104,10 +106,11 @@ INTERACTIVE INITIALIZATION
 function initializeInteractiveSidebar() {
     initializeSidebarSubmenus();
     const path = window.location.pathname.toLowerCase();
-    if (path.startsWith("/rocketleague/") && path !== "/rocketleague") {
+    const rlSettings = path === "/settings" && getRocketLeagueSettingsContext(window.location.search);
+    if (path.startsWith("/rocketleague/") || rlSettings) {
         void import("/Tabs/RocketLeague/Index/JS/auth.js")
             .then(module => module.initializeRocketLeagueAuthView())
-            .catch(error => console.error("ROCKET LEAGUE SIDEBAR AUTH: Unable to refresh access visibility.", { message: error?.message || "Unknown error" }));
+            .catch(() => console.error("ROCKET LEAGUE SIDEBAR AUTH: Unable to refresh access visibility.", { code: "RL_NAVIGATION_STATE_UNAVAILABLE" }));
     }
 
     /*
@@ -689,7 +692,7 @@ function setupActiveNavigation() {
 
     const navItems =
         document.querySelectorAll(
-            ".nav-item[data-nav-route]"
+            ".nav-item[data-nav-route], .submenu-item[data-nav-route]"
         );
 
     navItems.forEach(
@@ -705,7 +708,18 @@ function setupActiveNavigation() {
                 currentPath ===
                 route;
 
+            if (item.dataset.settingsContext === "rocketleague") {
+                const current = resolveHumanPageRoute(currentPath);
+                const returnPath = currentPath === "/Settings"
+                    ? getRocketLeagueSettingsContext(window.location.search)?.returnPath
+                    : current?.canonicalPath;
+                const params = new URLSearchParams({ context: "rocketleague", returnTo: returnPath || "/RocketLeague" });
+                item.setAttribute("href", `/Settings?${params}`);
+            }
+
             const childMatch =
+                !item.hasAttribute("data-nav-exact")
+                &&
                 route !==
                 "/"
                 && currentPath.startsWith(
@@ -717,6 +731,18 @@ function setupActiveNavigation() {
                 exactMatch
                 || childMatch
             );
+            if (exactMatch) item.setAttribute("aria-current", "page");
+            else item.removeAttribute("aria-current");
+
+            if (item.hasAttribute("data-disable-on-active")) {
+                if (exactMatch) {
+                    item.removeAttribute("href");
+                    item.setAttribute("aria-disabled", "true");
+                } else {
+                    item.setAttribute("href", item.dataset.navRoute);
+                    item.removeAttribute("aria-disabled");
+                }
+            }
         }
     );
 }

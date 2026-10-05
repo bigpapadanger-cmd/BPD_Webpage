@@ -34,6 +34,8 @@ export async function onRequestPost({ request, env }) {
     if (!parsed.success) return json({ success: false, error: "INVALID_INPUT" }, parsed.tooLarge ? 413 : 400);
     const service = typeof parsed.data?.service === "string" ? parsed.data.service.trim() : "";
     const action = typeof parsed.data?.action === "string" ? parsed.data.action.trim() : "";
+    if (["discord-matchbot", "discord-authz-bot"].includes(service)
+        && Object.keys(parsed.data).some(key => !["service", "action"].includes(key))) return json({ success: false, error: "INVALID_INPUT" }, 400);
     const startedAt = Date.now();
     const requestId = crypto.randomUUID();
     try {

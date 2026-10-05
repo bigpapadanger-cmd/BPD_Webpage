@@ -114,7 +114,7 @@ import {
 import {
     getDiscordMatchBotEligibility
 } from "../auth/providers/discord_matchbot/eligibility.js";
-import { getProfileSettingsAvailability, normalizeProfileSettings, PROFILE_SETTING_FIELDS } from "./profile_settings.js";
+import { getProfileSettingsAvailability, getProfileUpdateSafetyError, normalizeProfileSettings, PROFILE_SETTING_FIELDS } from "./profile_settings.js";
 import { getRocketLeagueMmrHistorySafely } from "../supabase/rocketleague/get_mmr_history.js";
 
 /* =========================================================
@@ -380,7 +380,7 @@ function normalizeRanks(
 DATABASE PROFILE NORMALIZATION
 ========================================================= */
 
-function normalizeDatabaseProfile(
+export function normalizeDatabaseProfile(
     databaseProfile,
     sessionContext,
     epicUser
@@ -413,7 +413,10 @@ function normalizeDatabaseProfile(
     const settings = normalizeProfileSettings(databaseProfile);
     const settingsAvailability = {
         ...getProfileSettingsAvailability(databaseProfile),
-        ...normalizeObject(databaseProfile.settingsAvailability)
+        ...normalizeObject(databaseProfile.settingsAvailability),
+        // A valid persisted boolean is authoritative if an older availability
+        // projection incorrectly says this field is unavailable.
+        findProfileEnabled: typeof settings.findProfileEnabled === "boolean"
     };
 
     return {
@@ -1799,18 +1802,7 @@ async function handleProfileGet(
                 + "but permanent Rocket League profile data is not currently available."
             );
 
-        console.error(
-            "ROCKET LEAGUE PROFILE: Profile load failed.",
-            {
-                name:
-                    error?.name
-                    || "Error",
-
-                message:
-                    error?.message
-                    || "Unknown error"
-            }
-        );
+        console.error("ROCKET LEAGUE PROFILE: Profile load failed.", { code: "RL_PROFILE_OPERATION_FAILED" });
     }
 
     const profile =
@@ -1932,28 +1924,7 @@ async function handleProfileGet(
         catch (
             error
         ) {
-            console.error(
-                "ROCKET LEAGUE PROFILE: Latest MMR load failed.",
-                {
-                    accountId,
-
-                    name:
-                        error?.name
-                        || "Error",
-
-                    code:
-                        error?.code
-                        || null,
-
-                    status:
-                        error?.status
-                        || null,
-
-                    message:
-                        error?.message
-                        || "Unknown error"
-                }
-            );
+            console.error("ROCKET LEAGUE PROFILE: Latest MMR load failed.", { code: "RL_PROFILE_OPERATION_FAILED" });
 
             latestMmr = {
                 available:
@@ -2157,18 +2128,7 @@ async function handleProfilePost(
     catch (
         error
     ) {
-        console.error(
-            "ROCKET LEAGUE PROFILE: Registration JSON invalid.",
-            {
-                name:
-                    error?.name
-                    || "Error",
-
-                message:
-                    error?.message
-                    || "Unknown error"
-            }
-        );
+        console.error("ROCKET LEAGUE PROFILE: Registration JSON invalid.", { code: "RL_PROFILE_OPERATION_FAILED" });
 
         return json(
             {
@@ -2262,10 +2222,7 @@ async function handleProfilePost(
             const currentProfile = await getRocketLeagueProfileByAccountId(env, accountId);
             previouslyEnabled = hasSavedDiscordNotificationsEnabled(currentProfile);
         } catch (error) {
-            console.error("ROCKET LEAGUE PROFILE: Existing Discord preference could not be confirmed.", {
-                code: error?.code || null,
-                status: error?.status || null
-            });
+            console.error("ROCKET LEAGUE PROFILE: Existing Discord preference could not be confirmed.", { code: "RL_PROFILE_OPERATION_FAILED" });
             return json({
                 success: false,
                 authenticated: true,
@@ -2290,22 +2247,7 @@ async function handleProfilePost(
     catch (
         error
     ) {
-        console.error(
-            "ROCKET LEAGUE PROFILE: Discord notification verification failed.",
-            {
-                name:
-                    error?.name
-                    || "Error",
-
-                code:
-                    error?.code
-                    || null,
-
-                message:
-                    error?.message
-                    || "Unknown error"
-            }
-        );
+        console.error("ROCKET LEAGUE PROFILE: Discord notification verification failed.", { code: "RL_PROFILE_OPERATION_FAILED" });
 
         return json(
             {
@@ -2394,29 +2336,7 @@ async function handleProfilePost(
     catch (
         error
     ) {
-        console.error(
-            "ROCKET LEAGUE PROFILE: Player initialization failed.",
-            {
-                name:
-                    error?.name
-                    || "Error",
-
-                code:
-                    error?.code
-                    || error
-                        ?.upstreamCode
-                    || null,
-
-                upstreamStatus:
-                    error
-                        ?.upstreamStatus
-                    || null,
-
-                message:
-                    error?.message
-                    || "Unknown error"
-            }
-        );
+        console.error("ROCKET LEAGUE PROFILE: Player initialization failed.", { code: "RL_PROFILE_OPERATION_FAILED" });
 
         if (
             error?.code ===
@@ -2544,28 +2464,7 @@ async function handleProfilePost(
     catch (
         error
     ) {
-        console.error(
-            "ROCKET LEAGUE PROFILE: Profile save failed.",
-            {
-                name:
-                    error?.name
-                    || "Error",
-
-                message:
-                    error?.message
-                    || "Unknown error",
-
-                upstreamStatus:
-                    error
-                        ?.upstreamStatus
-                    || null,
-
-                upstreamCode:
-                    error
-                        ?.upstreamCode
-                    || null
-            }
-        );
+        console.error("ROCKET LEAGUE PROFILE: Profile save failed.", { code: "RL_PROFILE_OPERATION_FAILED" });
 
         return json(
             {
@@ -2745,36 +2644,7 @@ async function handleProfilePost(
         catch (
             error
         ) {
-            console.error(
-                "ROCKET LEAGUE PROFILE: Background stats refresh failed.",
-                {
-                    accountId,
-
-                    name:
-                        error?.name
-                        || "Error",
-
-                    code:
-                        error?.code
-                        || null,
-
-                    status:
-                        error?.status
-                        || null,
-
-                    upstreamCode:
-                        error?.upstreamCode
-                        || null,
-
-                    upstreamStatus:
-                        error?.upstreamStatus
-                        || null,
-
-                    message:
-                        error?.message
-                        || "Unknown error"
-                }
-            );
+            console.error("ROCKET LEAGUE PROFILE: Background stats refresh failed.", { code: "RL_PROFILE_OPERATION_FAILED" });
 
             statsRefresh = {
                 success:
@@ -2930,6 +2800,13 @@ async function handleProfilePatch(request, env, sessionContext, accountId) {
         return json({ success: false, code: "PROFILE_SETUP_REQUIRED", message: "Complete Rocket League profile setup before editing preferences." }, 409);
     }
 
+    const safetyError = getProfileUpdateSafetyError(current, body);
+    if (safetyError) {
+        return json({ success: false, code: safetyError, message: safetyError === "PROFILE_SETTINGS_UNAVAILABLE"
+            ? "Your saved settings could not be confirmed. Reload your profile before saving."
+            : "Send the complete editable profile settings before saving." }, safetyError === "PROFILE_SETTINGS_UNAVAILABLE" ? 503 : 400);
+    }
+
     const settings = normalizeRegistrationPayload(body, request);
     // Consent is setup-owned: preserve the authoritative saved values and never
     // make a My Profile edit act as a fresh consent submission.
@@ -3063,39 +2940,7 @@ export async function handleRocketLeagueProfile(
     catch (
         error
     ) {
-        console.error(
-            "ROCKET LEAGUE PROFILE: Unexpected failure.",
-            {
-                debugId,
-
-                name:
-                    error?.name
-                    || "Error",
-
-                code:
-                    error?.code
-                    || null,
-
-                status:
-                    error?.status
-                    || null,
-
-                upstreamCode:
-                    error?.upstreamCode
-                    || null,
-
-                upstreamStatus:
-                    error?.upstreamStatus
-                    || null,
-
-                message:
-                    error?.message
-                    || "Unknown error",
-
-                method:
-                    request.method
-            }
-        );
+        console.error("ROCKET LEAGUE PROFILE: Unexpected failure.", { code: "RL_PROFILE_OPERATION_FAILED" });
 
         return authorizationErrorResponse(
             error

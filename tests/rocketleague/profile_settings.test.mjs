@@ -2,13 +2,33 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-import { getProfileSettingsAvailability, mapProfileSettingsToRpcArgs, mapProfileSettingsToV2RpcArgs, normalizeNotificationsV2, normalizeProfileSettings, PROFILE_SETTING_FIELDS } from "../../functions/services/rl/profile_settings.js";
-import { buildSettingsPayload, getConfirmedSettings, getDuplicateReminderChannels, getSettingsConfirmationState, isSettingConfirmed, reminderMinutesFromParts, validateNotificationsV2 } from "../../public/Tabs/RocketLeague/MyProfile/JS/settings_view.js";
+import { getProfileSettingsAvailability, getProfileUpdateSafetyError, mapProfileSettingsToRpcArgs, mapProfileSettingsToV2RpcArgs, normalizeNotificationsV2, normalizeProfileSettings, PROFILE_SETTING_FIELDS } from "../../functions/services/rl/profile_settings.js";
+import { buildSettingsPayload, getConfirmedSettings, getDuplicateReminderChannels, getFindProfileVisibilityState, getSettingsConfirmationState, isSettingConfirmed, reminderMinutesFromParts, validateNotificationsV2 } from "../../public/Tabs/RocketLeague/MyProfile/JS/settings_view.js";
+import { normalizeDatabaseProfile } from "../../functions/services/rl/profile.js";
 
 const EMPTY_NOTIFICATIONS_V2 = Object.freeze({
     email: { enabled: false, reminders: [] },
     sms: { enabled: false, reminders: [] },
     discord: { enabled: false, reminders: [] }
+});
+
+test("server complete-settings save rejects missing authoritative or submitted fields", () => {
+    const settings = { primaryPlatform: null, autoDetectRegion: false, showOnlineStatus: true,
+        findProfileEnabled: true, preferredMode: null, otherMode: null, availability: [],
+        email: null, phone: null, notificationsV2: structuredClone(EMPTY_NOTIFICATIONS_V2) };
+    const profile = { settings, ageConsent: true, policyConsent: true,
+        settingsAvailability: Object.fromEntries([...Object.keys(settings), "ageConsent", "policyConsent"].map(key => [key, true])) };
+    assert.equal(getProfileUpdateSafetyError(profile, settings), null);
+    assert.equal(getProfileUpdateSafetyError(profile, {}), "INCOMPLETE_PROFILE_SETTINGS");
+    for (const key of Object.keys(settings)) {
+        const partial = { ...settings };
+        delete partial[key];
+        assert.equal(getProfileUpdateSafetyError(profile, partial), "INCOMPLETE_PROFILE_SETTINGS", key);
+    }
+    assert.equal(getProfileUpdateSafetyError({ ...profile, settingsAvailability: { ...profile.settingsAvailability, email: false } }, settings), "PROFILE_SETTINGS_UNAVAILABLE");
+    assert.equal(getProfileUpdateSafetyError({ ...profile, settings: { ...settings, findProfileEnabled: null } }, settings), "PROFILE_SETTINGS_UNAVAILABLE");
+    assert.equal(getProfileUpdateSafetyError({ ...profile, settingsAvailability: { ...profile.settingsAvailability, findProfileEnabled: false } }, settings), null);
+    assert.equal(getProfileUpdateSafetyError({ ...profile, settings: { ...settings, findProfileEnabled: false } }, { ...settings, findProfileEnabled: false }), null);
 });
 
 test("central settings mapping preserves false, empty, null, and availability values", () => {
@@ -81,6 +101,49 @@ test("Find Players true, false, and null remain distinct from online-status pref
         settingsAvailability: Object.fromEntries([...Object.keys(PROFILE_SETTING_FIELDS), "ageConsent", "policyConsent"].map(key => [key, true]))
     };
     assert.equal(getSettingsConfirmationState(nullProfile).canSave, false);
+});
+
+test("private profile sanitizer trusts the V2 boolean over stale visibility availability", () => {
+    for (const findProfileEnabled of [true, false]) {
+        const profile = normalizeDatabaseProfile({
+            settings: { findProfileEnabled },
+            settingsAvailability: { findProfileEnabled: false }
+        }, { userId: "account" }, { EpicUniqueId: null, EpicDisplayName: null, EpicPreferredUsername: null });
+
+        assert.equal(profile.settings.findProfileEnabled, findProfileEnabled);
+        assert.equal(profile.settingsAvailability.findProfileEnabled, true);
+        assert.deepEqual(getFindProfileVisibilityState(profile), { available: true, checked: findProfileEnabled });
+    }
+});
+
+test("Find Players UI locks only when the authoritative boolean is missing and saves both values", () => {
+    const base = {
+        ageConsent: true,
+        policyConsent: true,
+        settings: { primaryPlatform: null, autoDetectRegion: false, showOnlineStatus: false, preferredMode: null,
+            otherMode: null, availability: [], email: null, phone: null, notificationsV2: structuredClone(EMPTY_NOTIFICATIONS_V2) },
+        settingsAvailability: Object.fromEntries([...Object.keys(PROFILE_SETTING_FIELDS), "ageConsent", "policyConsent"].map(key => [key, true]))
+    };
+    for (const findProfileEnabled of [true, false]) {
+        const profile = { ...base, settings: { ...base.settings, findProfileEnabled },
+            settingsAvailability: { ...base.settingsAvailability, findProfileEnabled: false } };
+        assert.deepEqual(getFindProfileVisibilityState(profile), { available: true, checked: findProfileEnabled });
+        assert.equal(isSettingConfirmed(profile, "findProfileEnabled"), true);
+        const payload = buildSettingsPayload(profile, {
+            autoDetectRegion: false, showOnlineStatus: false, findProfileEnabled, preferredMode: "",
+            otherMode: "", availability: [], email: "", phone: "", notificationsV2: structuredClone(EMPTY_NOTIFICATIONS_V2)
+        });
+        const rpcArgs = mapProfileSettingsToV2RpcArgs(payload);
+        assert.equal(payload.findProfileEnabled, findProfileEnabled);
+        assert.equal(rpcArgs.p_find_profile_enabled, findProfileEnabled);
+        const reloaded = normalizeProfileSettings({ find_profile_enabled: rpcArgs.p_find_profile_enabled });
+        assert.equal(reloaded.findProfileEnabled, findProfileEnabled);
+    }
+
+    const missing = { ...base, settings: { ...base.settings, findProfileEnabled: null },
+        settingsAvailability: { ...base.settingsAvailability, findProfileEnabled: false } };
+    assert.deepEqual(getFindProfileVisibilityState(missing), { available: false, checked: false });
+    assert.equal(isSettingConfirmed(missing, "findProfileEnabled"), false);
 });
 
 test("availability tracks missing separately from explicit null, false, and empty values", () => {

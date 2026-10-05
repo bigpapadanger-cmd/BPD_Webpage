@@ -1,3 +1,8 @@
+export { UserRocketLeagueSession } from "./rl_user_session.js";
+export { RlProbeSecurityAuthority } from "./rl_probe_authority.js";
+export { DiscordLinkedRoleNonceAuthority } from "./discord_linked_role_nonce.js";
+import { fetchBoundedResponse } from "../../../functions/services/http/upstream.js";
+
 const API = "https://discord.com/api/v10";
 const PAGE_SIZE = 200;
 const MAX_PAGES_PER_SHARD = 1000;
@@ -47,6 +52,10 @@ function authorizationFailure(request, env) {
 function authorizationResponse(request, env) {
     const failure = authorizationFailure(request, env);
     if (!failure) return null;
+    if (env?.DISCORD_ELIGIBILITY_DIAGNOSTICS === "true") console.info("DISCORD PROVIDER DIAGNOSTIC", {
+        stage: "internal_authorization", providerResultCode: failure === "configuration"
+            ? "PROVIDER_RUNTIME_CALLER_SECRET_INVALID" : "INTERNAL_AUTH_REQUIRED"
+    });
     return failure === "configuration"
         ? safeFailure("PROVIDER_RUNTIME_CALLER_SECRET_INVALID")
         : json({ success: false, code: "INTERNAL_AUTH_REQUIRED" }, 401);
@@ -76,9 +85,10 @@ async function discordRequest(env, path) {
     let rejectTimeout;
     const timeout = new Promise((_, reject) => { rejectTimeout = reject; });
     const operation = async () => {
-        response = await fetch(`${API}${path}`, {
+        response = await fetchBoundedResponse(`${API}${path}`, {
             method: "GET",
             headers: { Authorization: `Bot ${token}`, Accept: "application/json" },
+            redirect: "manual",
             signal: controller.signal
         });
         let body = null;
@@ -90,6 +100,12 @@ async function discordRequest(env, path) {
         if (!response.ok) {
             const status = response.status;
             const code = errorCode(body);
+            if (env?.DISCORD_ELIGIBILITY_DIAGNOSTICS === "true") console.info("DISCORD PROVIDER DIAGNOSTIC", {
+                stage: path.startsWith("/guilds/") ? "membership" : "guild_inventory",
+                responseStatus: status, providerResultCode: status === 404 && code === 10007
+                    ? "DISCORD_UNKNOWN_MEMBER" : status === 404 && code === 10004
+                        ? "DISCORD_GUILD_UNAVAILABLE" : "DISCORD_PROVIDER_UNAVAILABLE"
+            });
             if (status === 404 && code === 10007) throw Object.assign(new Error("not_member"), { kind: "not_member" });
             if (status === 429) throw Object.assign(new Error("rate_limited"), {
                 kind: "rate_limited", retryAfterSeconds: retryAfterSeconds(response, body)
@@ -120,7 +136,7 @@ async function discordRequest(env, path) {
         return await Promise.race([guardedOperation, timeout]);
     } catch (error) {
         if (error?.kind) throw error;
-        throw Object.assign(new Error("network"), { kind: controller.signal.aborted || error?.name === "AbortError" ? "timeout" : "network" });
+        throw Object.assign(new Error("network"), { kind: controller.signal.aborted || error?.name === "AbortError" || error?.code === "UPSTREAM_TIMEOUT" ? "timeout" : "network" });
     } finally {
         clearTimeout(timer);
     }
@@ -227,9 +243,16 @@ async function inventoryRoute(request, env) {
     if (!hasExactKeys(body, [])) return json({ success: false, code: "REQUEST_SCHEMA_INVALID" }, 400);
     try {
         const guilds = await completeGuildInventory(env);
+        if (env?.DISCORD_ELIGIBILITY_DIAGNOSTICS === "true") console.info("DISCORD PROVIDER DIAGNOSTIC", {
+            stage: "guild_inventory", botGuildInventoryCount: guilds.length,
+            inventoryComplete: true, providerResultCode: "OK", checkedAt: new Date().toISOString()
+        });
         return json({ success: true, complete: true, guilds, count: guilds.length, capturedAt: new Date().toISOString() });
     } catch (error) {
         const failure = mapFailure(error);
+        if (env?.DISCORD_ELIGIBILITY_DIAGNOSTICS === "true") console.info("DISCORD PROVIDER DIAGNOSTIC", {
+            stage: "guild_inventory", inventoryComplete: false, providerResultCode: failure.code
+        });
         return safeFailure(failure.code, 503, failure.retryAfterSeconds);
     }
 }
@@ -242,13 +265,14 @@ async function memberRoute(request, env) {
         return json({ success: false, code: "REQUEST_SCHEMA_INVALID" }, 400);
     }
     const guildIds = [...new Set(body.guildIds)];
-    const counts = { next: 0, mutualGuildCount: 0 };
+    const counts = { next: 0, attempted: 0, mutualGuildCount: 0 };
     const sharedGuildIds = [];
     let failure = null;
     async function checkLoop() {
         while (!failure) {
             const index = counts.next++;
             if (index >= guildIds.length) return;
+            counts.attempted += 1;
             try {
                 const member = await discordRequest(env, `/guilds/${guildIds[index]}/members/${body.discordUserId}`);
                 if (!member || typeof member !== "object" || Array.isArray(member)
@@ -264,22 +288,92 @@ async function memberRoute(request, env) {
         }
     }
     await Promise.all(Array.from({ length: Math.min(MEMBERSHIP_CONCURRENCY, guildIds.length) }, checkLoop));
+    if (env?.DISCORD_ELIGIBILITY_DIAGNOSTICS === "true") console.info("DISCORD PROVIDER DIAGNOSTIC", {
+        stage: "membership", membershipChecksAttempted: counts.attempted,
+        sharedGuildCount: counts.mutualGuildCount,
+        ...(failure ? {} : { eligible: counts.mutualGuildCount > 0 }),
+        providerResultCode: failure ? mapFailure(failure).code : "OK", checkedAt: new Date().toISOString()
+    });
     if (failure) {
         const result = mapFailure(failure);
         return safeFailure(result.code, 503, result.retryAfterSeconds);
     }
     return json({ success: true, status: "available", eligible: counts.mutualGuildCount > 0,
-        mutualGuildCount: counts.mutualGuildCount, sharedGuildIds, countComplete: true, checkedAt: new Date().toISOString() });
+        mutualGuildCount: counts.mutualGuildCount, membershipChecksAttempted: counts.attempted,
+        sharedGuildIds, countComplete: true, checkedAt: new Date().toISOString() });
 }
 
 export default {
     async fetch(request, env) {
         const url = new URL(request.url);
+        if (["create", "begin", "consume"].some(action => url.pathname === `/internal/discord/linked-roles/nonce/${action}`)) {
+            const auth = authorizationResponse(request, env);
+            if (auth) return auth;
+            if (request.method !== "POST") return json({ success: false, code: "METHOD_NOT_ALLOWED" }, 405);
+            const body = await parseBody(request);
+            const nonceAction = url.pathname.split("/").at(-1);
+            const nonceKeys = ["nonce", "accountBinding", "discordBinding", "action"];
+            if (nonceAction === "create") nonceKeys.push("expiresAt");
+            if (!hasExactKeys(body, nonceKeys)
+                || typeof body.nonce !== "string" || !/^[A-Za-z0-9_-]{43}$/u.test(body.nonce)
+                || typeof body.accountBinding !== "string" || !/^[a-f0-9]{64}$/u.test(body.accountBinding)
+                || typeof body.discordBinding !== "string" || !/^[a-f0-9]{64}$/u.test(body.discordBinding)
+                || body.action !== "discord_linked_roles_verify" || (nonceAction === "create" && !Number.isSafeInteger(body.expiresAt))) {
+                return json({ success: false, code: "REQUEST_SCHEMA_INVALID" }, 400);
+            }
+            if (!env.DISCORD_LINKED_ROLE_NONCE?.idFromName) return safeFailure("DISCORD_NONCE_UNAVAILABLE");
+            const id = env.DISCORD_LINKED_ROLE_NONCE.idFromName(body.nonce);
+            try {
+                return await env.DISCORD_LINKED_ROLE_NONCE.get(id).fetch(new Request(`https://discord-nonce.internal/${url.pathname.split("/").at(-1)}`, {
+                    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body)
+                }));
+            } catch { return safeFailure("DISCORD_NONCE_UNAVAILABLE"); }
+        }
+        if (["/internal/rl-probe/epoch/read", "/internal/rl-probe/epoch/bump"].includes(url.pathname)) {
+            const bump = url.pathname.endsWith("/bump");
+            const auth = authorizationResponse(request, bump
+                ? { PROVIDER_RUNTIME_CALLER_SECRET: env.RL_PROBE_REVOCATION_SECRET } : env);
+            if (auth) return auth;
+            if (request.method !== "POST") return json({ success: false, code: "METHOD_NOT_ALLOWED" }, 405);
+            if (env.RL_PROBE_SECURITY_ENABLED !== "true" || !env.RL_PROBE_SECURITY) return safeFailure("RL_PROBE_DISABLED");
+            const body = await parseBody(request);
+            if (!hasExactKeys(body, [])) return json({ success: false, code: "REQUEST_SCHEMA_INVALID" }, 400);
+            const id = env.RL_PROBE_SECURITY.idFromName("global-revocation-authority-v1");
+            return env.RL_PROBE_SECURITY.get(id).fetch(new Request(`https://rl-security.internal/${bump ? "bump" : "read"}`, { method: "POST", body: "{}" }));
+        }
+        if (["bootstrap", "invalidate", "consume", "begin", "claim", "prepare", "execute"].some(operation => url.pathname === `/internal/rl-probe/${operation}`)) {
+            const auth = authorizationResponse(request, env);
+            if (auth) return auth;
+            if (request.method !== "POST") return json({ success: false, code: "METHOD_NOT_ALLOWED" }, 405);
+            if (env.RL_PROBE_SECURITY_ENABLED !== "true" || !env.RL_USER_SESSION) return safeFailure("RL_PROBE_DISABLED");
+            const body = await parseBody(request);
+            if (!body || typeof body.accountKey !== "string" || !/^[a-f0-9]{64}$/u.test(body.accountKey)) return json({ success: false, code: "REQUEST_SCHEMA_INVALID" }, 400);
+            const id = env.RL_USER_SESSION.idFromName(body.accountKey);
+            return env.RL_USER_SESSION.get(id).fetch(new Request(`https://rl-probe.internal${url.pathname}`, {
+                method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body)
+            }));
+        }
         if (url.pathname === "/internal/health") {
             if (request.method !== "GET") return json({ success: false, code: "METHOD_NOT_ALLOWED" }, 405);
             const auth = authorizationResponse(request, env);
             if (auth) return auth;
             return json({ success: true, service: "bpd-provider-runtime", status: "ok", timestamp: new Date().toISOString() });
+        }
+        if (url.pathname === "/internal/discord/bot-health") {
+            if (request.method !== "GET") return json({ success: false, code: "METHOD_NOT_ALLOWED" }, 405);
+            const auth = authorizationResponse(request, env);
+            if (auth) return auth;
+            if (url.search) return json({ success: false, code: "INVALID_INPUT" }, 400);
+            try {
+                const user = await discordRequest(env, "/users/@me");
+                if (!user || typeof user.id !== "string" || !SNOWFLAKE.test(user.id) || user.bot !== true) {
+                    return safeFailure("DISCORD_BOT_RESPONSE_INVALID");
+                }
+                return json({ success: true, botAuthenticated: true, checkedAt: new Date().toISOString() });
+            } catch (error) {
+                return safeFailure(error?.kind === "rate_limited" ? "DISCORD_BOT_RATE_LIMITED"
+                    : error?.kind === "timeout" ? "DISCORD_BOT_TIMEOUT" : "DISCORD_BOT_UNAVAILABLE", 503, error?.retryAfterSeconds);
+            }
         }
         if (request.method !== "POST" || !["/internal/discord/guild-inventory", "/internal/discord/check-membership"].includes(url.pathname)) {
             return json({ success: false, code: "NOT_FOUND" }, 404);

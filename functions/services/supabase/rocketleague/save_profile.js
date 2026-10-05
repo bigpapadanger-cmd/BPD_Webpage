@@ -1,4 +1,5 @@
 "use strict";
+import { withUpstreamDeadline, fetchBoundedResponse, safeUpstreamErrorCode } from "../../http/upstream.js";
 
 import { mapProfileSettingsToV2RpcArgs, REMINDER_LIMITS } from "../../rl/profile_settings.js";
 import { getRocketLeagueProfileByAccountId } from "./rocketleague_profile.js";
@@ -190,7 +191,7 @@ async function createRpcError(
 
     const error =
         new Error(
-            message
+            "Rocket League profile save request failed."
         );
 
     error.code =
@@ -203,9 +204,7 @@ async function createRpcError(
         response.status;
 
     error.upstreamCode =
-        normalizeNullableString(
-            data?.code
-        );
+        safeUpstreamErrorCode(data?.code);
 
     return error;
 }
@@ -298,10 +297,11 @@ function normalizeRpcResult(
 SAVE PROFILE
 ========================================================= */
 
-export async function saveRocketLeagueProfile(
+async function executeProfileSave(
     env,
     accountId,
-    registration
+    registration,
+    signal
 ) {
     const configuration =
         getSupabaseConfiguration(
@@ -507,9 +507,10 @@ export async function saveRocketLeagueProfile(
 
     try {
         response =
-            await fetch(
+            await fetchBoundedResponse(
                 url.href,
                 {
+                    signal,
                     method:
                         "POST",
 
@@ -600,4 +601,8 @@ export async function saveRocketLeagueProfile(
      * values.
      */
     return row;
+}
+
+export function saveRocketLeagueProfile(env, accountId, registration) {
+    return withUpstreamDeadline(signal => executeProfileSave(env, accountId, registration, signal));
 }

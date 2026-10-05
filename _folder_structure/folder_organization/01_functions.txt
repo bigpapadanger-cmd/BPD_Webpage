@@ -37,7 +37,7 @@ functions/
 |   +-- rocketleague/players/search.js, players/profile/[publicProfileId].js
 |   +-- admin/page-settings/route-health.js, system-status.js, suggestions/index.js
 |   |   +-- suggestions/[suggestionId]/review.js
-|   +-- admin/rocketleague/force-refresh.js
+|   +-- admin/rocketleague/force-refresh.js, compatibility-probe.js (Admin-only; execution disabled)
 |   +-- curseforge/mods.js
 |   +-- suggestions/index.js, [suggestionId]/vote.js
 |   +-- health/apihealth.js
@@ -51,6 +51,7 @@ functions/
 +-- services/
     +-- admin/
     |   +-- permissions.js, system_status.js, taskboard_discord.js, taskboard_roles.js
+    |       system_status.js includes manual, read-only Discord bot connection checks; page reads use saved status.
     +-- auth/
     |   +-- authentication.js, authorization.js
     |   +-- account/
@@ -77,11 +78,14 @@ functions/
     +-- config/api_vars.js
     +-- http/responses.js
     +-- http/json.js                Bounded request JSON reader.
+    +-- http/upstream.js            Full-operation deadlines and streamed provider response-size limits.
     +-- ocr/
     |   +-- confirm.js, handler.js, localize.js, storage.js
     |   +-- storeMatch.js, training.js, trainingCandidates.js, trainingStorage.js
     +-- rl/
     |   +-- authorization.js, profile.js, profile_settings.js, admin_force_refresh.js, session.js
+    |   +-- probe_security.js (server-only signing/key derivation, global revocation and gated lifecycle invalidation)
+    |   +-- probe_reauth.js (Admin-only one-time Epic callback orchestration; memory-only handoff)
     |   +-- presence/fetch_presence.js, wake_monitor.js
     |   +-- provider_data/refresh.js        Gated MMR Worker capability fetch and server-side persistence.
     |   +-- stats/
@@ -165,6 +169,12 @@ api/admin/system-status/mmr-deploy.js
     never accepts a repository, branch, workflow, Worker name, or command.
 
 KEY CROSS-FOLDER CONNECTIONS
+
+    api/auth/discord/linked-roles/verify.js
+        -> services/auth/providers/discord/linked_roles.js
+        -> existing Supabase Discord PKCE reauthorization callback
+        -> canonical Discord identity check, then shared-guild eligibility service
+        No OAuth success alone grants Discord notification eligibility.
 
     public/* browser modules
         -> /api/*

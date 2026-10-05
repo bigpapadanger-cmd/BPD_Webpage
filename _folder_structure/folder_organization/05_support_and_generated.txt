@@ -36,6 +36,26 @@ Notes/
 This is operational/design/database reference material. No runtime source file
 imports this directory directly in the inspected application structure.
 
+SECURITY REVIEW SUPPORT
+
+_structure_details/security-remediation-follow-up.md
+    Local remediation scope, Linked Roles fallback lifecycle and remaining
+    transactional nonce authority, bounded upstream reads and live-verification limitations; not a deployment approval.
+
+_structure_details/pre-deployment-operator-checklist.md
+    Prepared but unexecuted binding, secret, eligibility, RPC and diagnostic retirement checks.
+
+tests/ocr/local_tracking_retirement.test.mjs
+tests/ocr/progress_authorization.test.mjs
+tests/rocketleague/discord_linked_roles.test.mjs
+tests/rocketleague/upstream_hardening.test.mjs
+tests/helpers/discord_nonce_fixture.mjs
+tests/route_health/discord_bot_status.test.mjs
+  Manual Admin bot connection checks: private binding, token/guild validation,
+  sanitized errors, bounded timeout/body, cooldown, and provider-free page reads.
+    Retirement/no-forwarding, owner-only progress reads, and fallback privacy,
+    identity/state failures and shared-guild eligibility regression coverage.
+
 DEPENDENCY ENVIRONMENTS
 
 node_modules/

@@ -1,4 +1,5 @@
 "use strict";
+import { withUpstreamDeadline, fetchBoundedResponse, safeUpstreamErrorCode, safeUpstreamErrorMessage } from "../../http/upstream.js";
 
 /* =========================================================
 BPD GAMING NETWORK
@@ -127,16 +128,14 @@ async function createRpcError(
 
     const error =
         new Error(
-            message
+            safeUpstreamErrorMessage(message, fallbackMessage)
         );
 
     error.upstreamStatus =
         response.status;
 
     error.upstreamCode =
-        normalizeNullableString(
-            data?.code
-        );
+        safeUpstreamErrorCode(data?.code);
 
     return error;
 }
@@ -147,7 +146,8 @@ CALL ENSURE PLAYER RPC
 
 async function callEnsureRocketLeaguePlayer(
     env,
-    accountId
+    accountId,
+    signal
 ) {
     const configuration =
         getSupabaseConfiguration(
@@ -163,9 +163,10 @@ async function callEnsureRocketLeaguePlayer(
     }
 
     const response =
-        await fetch(
+        await fetchBoundedResponse(
             `${configuration.url}rpc/ensure_rocketleague_player`,
             {
+                signal,
                 method:
                     "POST",
 
@@ -322,9 +323,10 @@ function normalizeEnsureResult(
 MAIN
 ========================================================= */
 
-export async function ensureRocketLeaguePlayer(
+async function executeEnsurePlayer(
     env,
-    accountId
+    accountId,
+    signal
 ) {
     const normalizedAccountId =
         normalizeString(
@@ -345,7 +347,8 @@ export async function ensureRocketLeaguePlayer(
         result =
             await callEnsureRocketLeaguePlayer(
                 env,
-                normalizedAccountId
+                normalizedAccountId,
+                signal
             );
     }
     catch (
@@ -366,4 +369,8 @@ export async function ensureRocketLeaguePlayer(
         result,
         normalizedAccountId
     );
+}
+
+export function ensureRocketLeaguePlayer(env, accountId) {
+    return withUpstreamDeadline(signal => executeEnsurePlayer(env, accountId, signal));
 }

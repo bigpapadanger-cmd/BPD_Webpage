@@ -125,21 +125,8 @@ async function handleRequest(
                 pathname:
                     requestUrl.pathname,
 
-                name:
-                    error?.name
-                    || "Error",
-
                 code:
-                    error?.code
-                    || null,
-
-                message:
-                    error?.message
-                    || "Unknown error",
-
-                stack:
-                    error?.stack
-                    || null
+                    "PROFILE_ROUTE_FAILED"
             }
         );
 

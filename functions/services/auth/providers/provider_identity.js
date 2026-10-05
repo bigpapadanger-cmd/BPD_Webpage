@@ -1,4 +1,5 @@
 "use strict";
+import { withUpstreamDeadline, fetchBoundedResponse, safeUpstreamErrorCode } from "../../http/upstream.js";
 
 /* =========================================================
 BPD GAMING NETWORK
@@ -222,10 +223,11 @@ function normalizeProviderIdentity(
 VERIFY PROVIDER IDENTITY
 ========================================================= */
 
-export async function verifyAccountProviderIdentity(
+async function verifyProviderIdentity(
     env,
     accountId,
-    provider
+    provider,
+    signal
 ) {
     const normalizedAccountId =
         normalizeString(
@@ -279,9 +281,10 @@ export async function verifyAccountProviderIdentity(
     }
 
     const response =
-        await fetch(
+        await fetchBoundedResponse(
             `${configuration.baseUrl}rpc/verify_account_provider_identity`,
             {
+                signal,
                 method:
                     "POST",
 
@@ -338,15 +341,13 @@ export async function verifyAccountProviderIdentity(
             );
 
         throw createProviderVerificationError(
-            upstreamMessage
-            || "Provider identity verification failed.",
+            "Provider identity verification failed.",
             {
                 status:
                     response.status,
 
                 upstreamCode:
-                    upstreamCode
-                    || "PROVIDER_IDENTITY_VERIFICATION_FAILED"
+                    safeUpstreamErrorCode(upstreamCode)
             }
         );
     }
@@ -462,4 +463,8 @@ export function isProviderIdentityVerificationError(
         error?.name ===
         "ProviderIdentityVerificationError"
     );
+}
+
+export function verifyAccountProviderIdentity(env, accountId, provider) {
+    return withUpstreamDeadline(signal => verifyProviderIdentity(env, accountId, provider, signal));
 }

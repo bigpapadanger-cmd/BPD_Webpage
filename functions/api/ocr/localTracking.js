@@ -1,11 +1,8 @@
-export async function onRequest({ request, env }) {
-  const body = await request.text();
-
-  const response = await fetch(env.OCR_TRACKING_URL, {
-    method: "POST",
-    body,
-    headers: { "Content-Type": "application/json" }
+// No repository caller or supported payload contract remains. Do not forward
+// arbitrary input or upstream responses through this legacy route.
+export function onRequest({ request }) {
+  return Response.json({ success: false, code: "OCR_TRACKING_RETIRED" }, {
+    status: request.method === "POST" ? 410 : 405,
+    headers: { "Cache-Control": "no-store", Allow: "POST" }
   });
-
-  return response;
 }

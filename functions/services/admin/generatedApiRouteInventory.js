@@ -581,6 +581,42 @@ export const PAGE_ROUTE_INVENTORY = Object.freeze([
     ]
   },
   {
+    "path": "/RocketLeague/FindCustomMatches",
+    "lookupKey": "/rocketleague/findcustommatches",
+    "canonicalPath": "/RocketLeague/FindCustomMatches",
+    "routeType": "page",
+    "casePolicy": "human-insensitive",
+    "sourceFiles": [
+      "public/routes.js"
+    ],
+    "handler": "functions/[[path]].js",
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "authRequired": false,
+    "healthStatus": "registered",
+    "deepLinkSupported": true,
+    "targets": [
+      {
+        "path": "/Tabs/RocketLeague/Features/HTML/find-custom-matches.html",
+        "exists": true
+      },
+      {
+        "path": "/Framework/Shell/HTML/Header/header.html",
+        "exists": true
+      },
+      {
+        "path": "/Framework/Shell/HTML/Sidebar/rl_menu.html",
+        "exists": true
+      },
+      {
+        "path": "/Framework/Shell/HTML/Footer/footer.html",
+        "exists": true
+      }
+    ]
+  },
+  {
     "path": "/RocketLeague/WeeklyMatches",
     "lookupKey": "/rocketleague/weeklymatches",
     "canonicalPath": "/RocketLeague/WeeklyMatches",
@@ -1419,6 +1455,22 @@ export const API_ROUTE_INVENTORY = Object.freeze([
     "deepLinkSupported": false
   },
   {
+    "path": "/api/admin/rocketleague/compatibility-probe",
+    "lookupKey": null,
+    "routeType": "api",
+    "casePolicy": "exact",
+    "sourceFiles": [
+      "functions/api/admin/rocketleague/compatibility-probe.js"
+    ],
+    "handler": "functions/api/admin/rocketleague/compatibility-probe.js",
+    "methods": [
+      "POST"
+    ],
+    "authRequired": "handler-defined",
+    "healthStatus": "valid",
+    "deepLinkSupported": false
+  },
+  {
     "path": "/api/admin/rocketleague/force-refresh",
     "lookupKey": null,
     "routeType": "api",
@@ -1735,6 +1787,22 @@ export const API_ROUTE_INVENTORY = Object.freeze([
     "methods": [],
     "authRequired": "handler-defined",
     "healthStatus": "missing-handler",
+    "deepLinkSupported": false
+  },
+  {
+    "path": "/api/auth/discord/linked-roles/verify",
+    "lookupKey": null,
+    "routeType": "api",
+    "casePolicy": "exact",
+    "sourceFiles": [
+      "functions/api/auth/discord/linked-roles/verify.js"
+    ],
+    "handler": "functions/api/auth/discord/linked-roles/verify.js",
+    "methods": [
+      "ALL"
+    ],
+    "authRequired": "handler-defined",
+    "healthStatus": "valid",
     "deepLinkSupported": false
   },
   {

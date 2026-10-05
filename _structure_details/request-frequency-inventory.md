@@ -2,8 +2,19 @@
 
 Snapshot: 2026-10-04. This is a code/config audit, not a production traffic measurement.
 
+RL probe safety gates are manual Admin-only operations, disabled by default.
+Start initiates a new Epic OAuth transaction (five-minute maximum); callback
+claims it once before code exchange and stages a credential in isolated memory
+for at most 60 seconds. Explicit execute consumes the handoff but makes ZERO
+Epic/EOS/PsyNet probe/history calls: independent identity proof remains blocked.
+No scheduler or page-read trigger is added. Global epoch reads are uncached
+internal DO operations at issuance/use; emergency bump is explicit Admin-only,
+uses a separate secret, and clears registered opaque objects sequentially.
+
 | Caller / path | Trigger and expected frequency | Existing control / cost | Result |
 | --- | --- | --- | --- |
+| Admin Discord MatchBot Check connection | Explicit protected Admin click only | One private authenticated Service Binding request, one Discord bot identity GET; 15-second end-to-end Pages deadline, existing 10-second provider deadline, bounded bodies. 60-second advisory cooldown plus Retry-After; no retry loop. | Page loads use stored status only. No messages, guild membership mutations, or eligibility changes. |
+| Admin Discord role-authorization bot Check connection | Explicit protected Admin click only | At most two Discord GETs: bot identity and configured guild. 15-second end-to-end deadline, 256-KiB response limits, 60-second advisory cooldown plus Retry-After. | Confirms token authentication and guild access, not message-delivery permission or Gateway presence. No new schedule. |
 | Browser -> `/api/auth/account/last_login` | Once per authenticated active full page load | One browser request per document; server derives the account from the session. Existing `RL_STATS_CACHE` gate prevents repeat MMR/database refresh work for 24 hours. Provider data is requested only after an actual successful MMR refresh, with a separate per-account 24-hour success gate and 15-minute failure cooldown. Successful MMR/profile/stats outcomes update the shared component refresh ledger. | Updates `last_seen_at`, keeps MMR persistence unchanged, then makes at most one protected `/get-player-data?capabilities=profile,stats` request per due MMR refresh. Worker stats fan out to six PsyNet requests. The hourly candidate scan can skip components just successfully refreshed by this path. |
 | Rocket League private profile GET | Page view from signed-in Rocket League pages | Read-only persisted Supabase profile/MMR data. The authenticated Rocket League home page opts into one progression RPC and one history RPC (up to 90 saved captures); setup/My Profile opts into the legacy private profile RPC only when V2 does not return a confirmed Find Players boolean. | No presence Worker wake, MMR Worker call, or provider polling from any profile GET. History RPC must return up to 90 rows for a full chart. |
 | Rocket League presence monitor | Existing `bpd-rl-presence-monitor` 15-minute cron; explicit authenticated admin Run Now remains separate | Candidate RPC selects active accounts and RL players with `status='complete'`, a completion timestamp, an active matching Epic identity, and `show_online_status=true`. One `/get-player-data?capabilities=presence` MMR Worker request per selected player; concurrency 5, batches separated by 15 seconds. Candidate selection runs every cycle even if all players were offline on the prior cycle. | Only normalized online/offline successes are persisted. Failures/unknown leave existing rows untouched. Public exposure is masked when sharing is disabled and neutralized after 30 minutes. |
@@ -58,5 +69,12 @@ do not switch to 10 or 5 minutes. The configured schedule was not changed.
 4. No general client request throttle is justified by the inspected evidence. A global cap would risk blocking legitimate actions. Search/autocomplete and all individual mutation flows should be tuned only where request traces demonstrate a concrete burst or duplicate submission.
 
 ## Remaining measurement gaps
+
+The Admin RL compatibility probe route is disabled by construction. It performs
+authorization only and makes no Epic/EOS/PsyNet or history request. The separate
+RL security foundation is also off by default. If configured later, logout,
+Epic unlink/link and profile deletion each make one bounded internal invalidation
+call before mutation; failures block the mutation rather than silently continuing.
+Normal page reads, MMR refresh and Discord validation do not touch this namespace.
 
 This source audit does not provide production request counts, external Supabase/Discord billing metrics, Cloudflare invocation counts, nor complete cross-service production telemetry. Those require operator-side telemetry or the corresponding service contract. The status cache is best-effort and cross-isolate KV-backed; in-flight deduplication is per isolate, so simultaneous first requests reaching different isolates can still result in more than one small liveness sweep.

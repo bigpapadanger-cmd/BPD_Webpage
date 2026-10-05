@@ -4,6 +4,7 @@ import { setSidebarCollapsed } from "../../../Framework/Shell/JS/Sidebar/state.j
 import { applyAppearancePreferences, hasReadableContrast, PREFERENCE_DEFAULTS, readPreferences, readSidebarPreference, savePreference } from "../../../Framework/Shell/JS/preferences.js";
 import { BPD_AUTH_ACCOUNT_PROFILE_URL } from "../../../scripts/apiRoutes.js";
 import { renderDisplayNameCooldown } from "./display_name_cooldown.js";
+import { getRocketLeagueSettingsContext } from "../../../routes.js";
 
 let savedDisplayName = "";
 let changeAvailableAt = null;
@@ -171,6 +172,12 @@ function updateColorPreview(id, color, label = "Current") {
 }
 
 export async function initializePage() {
+    const returnLink = document.getElementById("settingsRocketLeagueReturn");
+    const context = getRocketLeagueSettingsContext(window.location?.search);
+    if (returnLink) {
+        returnLink.hidden = !context;
+        returnLink.href = context?.returnPath || "/RocketLeague";
+    }
     const theme = document.getElementById("themeSetting");
     const animations = document.getElementById("animationSetting");
     const sidebar = document.getElementById("sidebarSetting");

@@ -121,7 +121,49 @@ Supabase persistence, and browser-safe status. The private
 `bpd-provider-runtime` Worker owns only stateless Discord bot-guild inventory
 and membership validation, plus its internal health response. DomainData calls
 it through a Service Binding with internal caller authentication; it has no
-public route, Supabase credentials, scheduling, account lookup, or persistence.
+public route, Supabase credentials, scheduling, or account lookup. Discord
+operations remain stateless. Separately, the disabled RL probe foundation uses
+`RL_USER_SESSION` / `UserRocketLeagueSession` for per-account opaque binding,
+ES256 assertion validation, atomic one-time nonce consumption, generation/cutoff
+invalidation and temporary-state cleanup. It stores no Discord state or provider
+credential. Logout, Epic unlink/link and RL profile deletion revoke probe state
+before mutation when this security feature is configured on Pages. It does not
+share the MMR Worker's `bpd-rocket-league` session.
+
+`POST /api/admin/rocketleague/compatibility-probe` is Admin-authorized,
+same-origin and explicitly confirmed, but always returns execution disabled.
+The server-only signing helper is wired only to an explicitly started Admin
+reauthorization transaction, never normal login, page rendering or schedules.
+OAuth transactions are session/account/Epic/generation/epoch-bound and claimed
+atomically before code exchange. The callback verifies the canonical Epic
+identity and holds its credential in isolated memory for at most 60 seconds;
+a separate manual execute action consumes it without provider execution.
+Independent provider-derived identity proof remains BLOCKED; no history is
+requested or persisted. The upstream `AuthPlayer` response does not supply a
+verified Epic identifier, and its client-created `localPlayerID` is not an
+independent session-ownership proof.
+
+The foundation validates ES256, exact issuer/audience/action, credential digest,
+60-second assertion lifetime, 15-second skew, 256-bit `jti`, account/Epic hashes
+and current generation/cutoff. One handoff occupies each temporary context;
+an explicit fresh bootstrap after invalidation is required for another probe.
+Idle/hard deadlines are 10/30 minutes. Alarms delete temporary/nonces state,
+never the monotonic revocation tombstone. Signing-key compromise handling must
+disable execution, rotate the public/private key pair and advance the security
+epoch; active provider sessions do not exist in this implementation.
+`RL_PROBE_SECURITY` / `RlProbeSecurityAuthority` stores the global monotonic
+epoch, uncached and independent of user generation. Atomic bumps commit first,
+then invalidate registered opaque user objects to clear temporary memory/state.
+Cleanup failure cannot roll back epoch; management requires a separate secret
+and Admin-only same-origin confirmation. Authority tombstones must never be reset.
+Discord remains stateless and outside both RL namespaces.
+
+Existing-profile PATCH now rejects incomplete submitted settings or unconfirmed
+authoritative settings before saving; new registration defaults are unchanged.
+MyProfile does not treat stale/unavailable preserved Discord eligibility as
+permission to enable reminders. Shared RL sidebar access initialization also
+runs on RL-context Settings. The homepage has one network-statistics card below
+the hero data, explicitly unavailable until an aggregate contract exists.
 The Worker requests a complete validated paginated guild inventory, explicitly
 enumerates shards when the configured large-bot mode requires it, then checks
 the canonical linked user's membership. Missing/invalid shard configuration,

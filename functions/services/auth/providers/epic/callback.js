@@ -1,4 +1,6 @@
 import { completeOAuthCallback } from "../../oauth/callback_response.js";
+import { withUpstreamDeadline, fetchBoundedResponse, safeUpstreamErrorCode, safeUpstreamErrorMessage } from "../../../http/upstream.js";
+import { invalidateRlProbeSession } from "../../../rl/probe_security.js";
 "use strict";
 
 /* =========================================================
@@ -113,6 +115,7 @@ import {
     isAuthorizationError
 } from "../../authorization.js";
 
+import { claimProbeCallback, prepareProbeCallback } from "../../../rl/probe_reauth.js";
 import {
     verifyAccountProviderIdentity
 } from "../provider_identity.js";
@@ -303,10 +306,11 @@ function getSupabaseConfiguration(
 CALL API RPC
 ========================================================= */
 
-async function callApiRpc(
+async function callApiRpcBounded(
     env,
     rpcName,
-    payload
+    payload,
+    signal
 ) {
     const configuration =
         getSupabaseConfiguration(
@@ -322,9 +326,10 @@ async function callApiRpc(
     }
 
     const response =
-        await fetch(
+        await fetchBoundedResponse(
             `${configuration.url}rpc/${rpcName}`,
             {
+                signal,
                 method:
                     "POST",
 
@@ -395,8 +400,7 @@ async function callApiRpc(
 
         const error =
             new Error(
-                message
-                || `${rpcName} failed.`
+                safeUpstreamErrorMessage(message, "Epic identity persistence request failed.")
             );
 
         error.upstreamStatus =
@@ -411,10 +415,8 @@ async function callApiRpc(
                     responseData
                 )
             )
-                ? normalizeNullableString(
-                    responseData.code
-                )
-                : null;
+                ? safeUpstreamErrorCode(responseData.code)
+                : "UPSTREAM_REJECTED";
 
         throw error;
     }
@@ -589,9 +591,10 @@ async function linkEpicIdentity(
 EPIC TOKEN EXCHANGE
 ========================================================= */
 
-async function exchangeEpicCode(
+async function exchangeEpicCodeBounded(
     env,
-    code
+    code,
+    signal
 ) {
     const clientId =
         normalizeString(
@@ -619,9 +622,10 @@ async function exchangeEpicCode(
     }
 
     const response =
-        await fetch(
+        await fetchBoundedResponse(
             EPIC_TOKEN_URL,
             {
+                signal,
                 method:
                     "POST",
 
@@ -706,9 +710,7 @@ async function exchangeEpicCode(
         accessToken,
 
         tokenAccountId:
-            normalizeNullableString(
-                data?.account_id
-            )
+            data?.account_id ?? null
     };
 }
 
@@ -716,14 +718,16 @@ async function exchangeEpicCode(
 LOAD EPIC PROFILE
 ========================================================= */
 
-async function loadEpicProfile(
+async function loadEpicProfileBounded(
     accessToken,
-    tokenAccountId
+    tokenAccountId,
+    signal
 ) {
     const response =
-        await fetch(
+        await fetchBoundedResponse(
             EPIC_USER_INFO_URL,
             {
+                signal,
                 method:
                     "GET",
 
@@ -778,19 +782,26 @@ async function loadEpicProfile(
         throw error;
     }
 
-    const epicAccountId =
-        normalizeString(
-            profile?.id
-            || profile?.sub
-            || tokenAccountId
-        );
+    // Every supplied identity must agree; never prefer one conflicting field.
+    const candidates = [profile?.id, profile?.sub, tokenAccountId]
+        .filter(value => value !== undefined && value !== null);
+    const identities = candidates.map(normalizeString);
+    const epicAccountId = identities[0];
+
+    if (identities.some(identity => !identity || identity !== epicAccountId)) {
+        const error = new Error("Epic returned inconsistent account identities.");
+        error.code = "EPIC_IDENTITY_MISMATCH";
+        throw error;
+    }
 
     if (
         !epicAccountId
     ) {
-        throw new Error(
+        const error = new Error(
             "Epic authentication returned no account identity."
         );
+        error.code = "EPIC_IDENTITY_MISSING";
+        throw error;
     }
 
     return {
@@ -1674,6 +1685,10 @@ async function executeCallback(
         EPIC TOKEN + PROFILE
         ================================================= */
 
+        let probeContext;
+        try { probeContext = await claimProbeCallback(request, env, mode, state); }
+        catch { return json({ success: false, code: "RL_PROBE_REAUTH_REJECTED", message: "Start a new Admin probe reauthorization." }, 403); }
+
         const token =
             await exchangeEpicCode(
                 env,
@@ -1687,8 +1702,8 @@ async function executeCallback(
             );
 
         /*
-         * token.accessToken intentionally goes no further.
-         * It is never written to KV or Supabase.
+         * Normal OAuth discards this credential. A claimed Admin probe may
+         * escrow it in isolated memory only; never in KV, DO storage or Supabase.
          */
 
         /* =================================================
@@ -1700,6 +1715,9 @@ async function executeCallback(
             OAUTH_MODE_LINK
         ) {
             let linkedAccount;
+
+            try { await invalidateRlProbeSession(env, accountContext.accountId, "identity_change"); }
+            catch { return json({ success: false, code: "RL_PROBE_INVALIDATION_REQUIRED", message: "Temporary Rocket League access could not be revoked. Please try again." }, 503); }
 
             try {
                 linkedAccount =
@@ -1925,12 +1943,14 @@ async function executeCallback(
             console.info(
                 "EPIC CALLBACK: Epic provider reauthorization completed.",
                 {
-                    debugId,
-
-                    accountId:
-                        accountContext.accountId
+                    debugId
                 }
             );
+
+            if (probeContext) {
+                try { await prepareProbeCallback(env, probeContext, epicProfile.epicAccountId, token.accessToken); }
+                catch { return json({ success: false, code: "RL_PROBE_HANDOFF_UNAVAILABLE", message: "Start a new Admin probe reauthorization." }, 503); }
+            }
 
             return redirect(
                 requestedReturnTo,
@@ -2124,7 +2144,9 @@ async function executeCallback(
             || error?.code ===
                 "OAUTH_ACCOUNT_MISMATCH"
             || error?.code ===
-                "PROVIDER_REAUTHORIZATION_MISMATCH";
+                "PROVIDER_REAUTHORIZATION_MISMATCH"
+            || error?.code ===
+                "EPIC_IDENTITY_MISMATCH";
 
         return json(
             {
@@ -2145,10 +2167,20 @@ async function executeCallback(
             },
             conflict
                 ? 409
-                : 500
+                : error?.code === "EPIC_IDENTITY_MISSING" ? 400 : 500
         );
     }
 }
 export async function handleEpicCallback(request, env) {
     return completeOAuthCallback(request, env, () => executeCallback(request, env));
+}
+
+function callApiRpc(env, name, payload) {
+    return withUpstreamDeadline(signal => callApiRpcBounded(env, name, payload, signal));
+}
+function exchangeEpicCode(env, code) {
+    return withUpstreamDeadline(signal => exchangeEpicCodeBounded(env, code, signal));
+}
+function loadEpicProfile(accessToken, tokenAccountId) {
+    return withUpstreamDeadline(signal => loadEpicProfileBounded(accessToken, tokenAccountId, signal));
 }

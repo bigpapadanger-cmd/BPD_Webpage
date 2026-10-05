@@ -77,6 +77,7 @@ test("appearance preferences remain browser-local and preserve existing storage 
         sidebar: createElement(),
         sidebarToggle: createElement()
     };
+    elements.settingsRocketLeagueReturn = createElement();
     globalThis.document = {
         documentElement: { style: { values: {}, setProperty(name, value) { this.values[name] = value; } } },
         body: { dataset: {}, classList: { toggle() {} } },
@@ -88,13 +89,16 @@ test("appearance preferences remain browser-local and preserve existing storage 
     };
     const callback = () => {};
     const callbackQueue = [];
-    globalThis.window = { googlefc: { callbackQueue, showRevocationMessage: callback } };
+    globalThis.window = { googlefc: { callbackQueue, showRevocationMessage: callback },
+        location: { search: "?context=rocketleague&returnTo=%2FRocketLeague%2FMyProfile" } };
 
     try {
         const moduleUrl = pathToFileURL(resolve("public/Global/Settings/JS/settings.js"));
         moduleUrl.searchParams.set("test", String(Date.now()));
         const page = await import(moduleUrl.href);
         await page.initializePage();
+        assert.equal(elements.settingsRocketLeagueReturn.hidden, false);
+        assert.equal(elements.settingsRocketLeagueReturn.href, "/RocketLeague/MyProfile");
 
         assert.equal(elements.themeSetting.value, "purple");
         assert.equal(document.body.dataset.theme, "purple");
@@ -157,7 +161,6 @@ test("sidebar icons use the shared accessible icon slot and consistent dashboard
     const sharedSidebars = await Promise.all(["mainmenu.html", "admin.html", "rl_menu.html"].map(name => readFile(new URL(name, sidebarRoot), "utf8")));
     for (const sidebar of sharedSidebars) {
         assert.match(sidebar, /class="nav-icon"[\s\S]*?aria-hidden="true"/);
-        assert.match(sidebar, /data-tooltip="Dashboard"[\s\S]*?📊/);
     }
     const iconFor = (sidebar, tooltip) => {
         const tooltipIndex = sidebar.indexOf(`data-tooltip="${tooltip}"`);
@@ -166,11 +169,11 @@ test("sidebar icons use the shared accessible icon slot and consistent dashboard
         const item = sidebar.slice(itemStart, itemEnd);
         return item.match(/class="nav-icon"[^>]*>([\s\S]*?)<\/span>/)?.[1].trim();
     };
-    for (const sidebar of sharedSidebars) {
+    for (const sidebar of sharedSidebars.slice(0, 2)) {
         assert.equal(iconFor(sidebar, "Dashboard"), "📊");
     }
     assert.equal(iconFor(sharedSidebars[0], "Rocket League"), "⚽");
-    assert.equal(iconFor(sharedSidebars[2], "Rocket League"), "⚽");
+    assert.equal(iconFor(sharedSidebars[2], "Home"), "⚽");
     assert.equal(iconFor(sharedSidebars[0], "Settings"), "⚙️");
     assert.equal(iconFor(sharedSidebars[1], "User Settings"), "⚙️");
     assert.equal(iconFor(sharedSidebars[2], "Settings"), "⚙️");

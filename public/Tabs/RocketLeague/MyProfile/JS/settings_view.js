@@ -19,6 +19,12 @@ export function getConfirmedSettings(profile) {
         : null;
 }
 
+export function getFindProfileVisibilityState(profile) {
+    const value = profile?.settings?.findProfileEnabled;
+    const available = typeof value === "boolean";
+    return { available, checked: available && value };
+}
+
 const SETTING_LABELS = Object.freeze({
     primaryPlatform: "primary platform",
     autoDetectRegion: "region detection",
@@ -48,7 +54,9 @@ export function isSettingConfirmed(profile, key) {
     return Boolean(settings && availability
         && typeof settings === "object" && !Array.isArray(settings)
         && typeof availability === "object" && !Array.isArray(availability)
-        && availability[key] === true && hasValidSettingValue(settings, key));
+        && (key === "findProfileEnabled"
+            ? getFindProfileVisibilityState(profile).available
+            : availability[key] === true && hasValidSettingValue(settings, key)));
 }
 
 export function getSettingsConfirmationState(profile) {

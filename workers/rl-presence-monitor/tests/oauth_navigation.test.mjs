@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import vm from "node:vm";
+import { isNotificationsV2 } from "../../../public/Tabs/RocketLeague/shared/notificationsV2.js";
 import { completeOAuthCallback } from "../../../functions/services/auth/oauth/callback_response.js";
 import { handleOAuthCallback } from "../../../functions/services/auth/oauth/callback.js";
 
@@ -185,7 +186,7 @@ test("registration drafts stay with their BPD account and never restore unowned 
     source = source.replace(/import\s*\{[\s\S]*?\}\s*from\s*"[^"]+";/g, "")
         .replace("export async function initializePage", "async function initializePage");
     const records = new Map([["bpdRocketLeagueRegistrationDraft", JSON.stringify({ email: "legacy@example.test" })]]);
-    const context = { console, document: { addEventListener() {} }, localStorage: {
+    const context = { console, isNotificationsV2, document: { addEventListener() {} }, localStorage: {
         getItem: key => records.get(key) ?? null,
         setItem: (key, value) => records.set(key, value), removeItem: key => records.delete(key)
     } };

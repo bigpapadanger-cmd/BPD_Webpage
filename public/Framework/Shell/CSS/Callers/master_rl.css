@@ -30,6 +30,7 @@ Used for all valid /RocketLeague routes.
    ========================================================= */
 
 @import url("/Global/Links/links.css");
+@import url("/Global/Settings/CSS/settings-page.css");
 
 /* =========================================================
    ROCKET LEAGUE

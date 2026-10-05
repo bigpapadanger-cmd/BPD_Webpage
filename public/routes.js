@@ -448,6 +448,16 @@ export const ROUTES = {
             false
     },
 
+    "/RocketLeague/FindCustomMatches": {
+        title: "Find Custom Matches | BPD Gaming Network",
+        body: "/Tabs/RocketLeague/Features/HTML/find-custom-matches.html",
+        header: "/Framework/Shell/HTML/Header/header.html",
+        sidebar: "/Framework/Shell/HTML/Sidebar/rl_menu.html",
+        footer: "/Framework/Shell/HTML/Footer/footer.html",
+        module: null,
+        sitemap: false
+    },
+
     "/RocketLeague/WeeklyMatches": {
         auth: { required: true, provider: "epic", rocketLeague: true },
         title:
@@ -1035,6 +1045,19 @@ export function resolveHumanPageRoute(
 /* =========================================================
 ROUTE NORMALIZATION
 ========================================================= */
+
+export function getRocketLeagueSettingsContext(search = "") {
+    const params = new URLSearchParams(search);
+    if (params.get("context") !== "rocketleague") return null;
+    const requested = params.get("returnTo") || "/RocketLeague";
+    const route = requested.startsWith("/RocketLeague") && !requested.includes("?") && !requested.includes("#")
+        ? resolveHumanPageRoute(requested) : null;
+    return {
+        sidebar: "/Framework/Shell/HTML/Sidebar/rl_menu.html",
+        returnPath: route?.config.sidebar === "/Framework/Shell/HTML/Sidebar/rl_menu.html"
+            ? route.canonicalPath : "/RocketLeague"
+    };
+}
 
 export function normalizeRoutePath(
     value

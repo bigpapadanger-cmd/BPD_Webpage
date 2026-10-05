@@ -31,7 +31,8 @@ import {
 } from "../../../services/auth/authorization.js";
 
 import {
-    getDiscordMatchBotEligibility
+    getDiscordMatchBotEligibility,
+    logDiscordEligibilityDiagnostic
 } from "../../../services/auth/providers/discord_matchbot/eligibility.js";
 
 /* =========================================================
@@ -172,7 +173,10 @@ async function handleEligibilityRequest(context, force) {
         // Registration eligibility is available before registration is complete,
         // but still requires current Epic authorization.
         try { await authorizeRequest(request, env, { account: true, provider: "epic" }); }
-        catch (error) { return authorizationErrorResponse(error); }
+        catch (error) {
+            logDiscordEligibilityDiagnostic(env, "epic_authorization", { providerResultCode: "AUTHORIZATION_FAILED" });
+            return authorizationErrorResponse(error);
+        }
 
         let authorization;
 
@@ -193,6 +197,10 @@ async function handleEligibilityRequest(context, force) {
         catch (
             error
         ) {
+            logDiscordEligibilityDiagnostic(env, "discord_authorization", {
+                canonicalDiscordIdentityResolved: false,
+                providerResultCode: error?.code === "PROVIDER_REQUIRED" ? "DISCORD_NOT_LINKED" : "AUTHORIZATION_FAILED"
+            });
             /*
              * No linked Discord identity is an expected
              * eligibility result rather than a route failure.

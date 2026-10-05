@@ -375,7 +375,8 @@ export function startEpicAuthorization(
     {
         mode = OAUTH_MODE_LOGIN,
         accountId = null,
-        returnTo = DEFAULT_RETURN_TO
+        returnTo = DEFAULT_RETURN_TO,
+        probeState = null
     } = {}
 ) {
     const normalizedMode =
@@ -441,8 +442,9 @@ export function startEpicAuthorization(
         throw error;
     }
 
-    const state =
-        createRandomState();
+    // Optional server-generated state for the Admin probe transaction only.
+    if (probeState !== null && !/^[A-Za-z0-9_-]{43}$/u.test(probeState)) throw new Error("OAUTH_STATE_GENERATION_FAILED");
+    const state = probeState || createRandomState();
 
     if (
         !state

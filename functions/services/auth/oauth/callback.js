@@ -1,4 +1,6 @@
 import { completeOAuthCallback } from "./callback_response.js";
+import { withUpstreamDeadline, fetchBoundedResponse, safeUpstreamErrorCode, safeUpstreamErrorMessage } from "../../http/upstream.js";
+import { completeLinkedRolesVerification } from "../providers/discord/linked_roles.js";
 "use strict";
 
 /* =========================================================
@@ -212,10 +214,11 @@ function getSupabaseDataBaseUrl(
 PKCE TOKEN EXCHANGE
 ========================================================= */
 
-async function exchangeSupabaseCode(
+async function exchangeSupabaseCodeBounded(
     env,
     code,
-    verifier
+    verifier,
+    signal
 ) {
     const origin =
         getSupabaseOrigin(
@@ -237,9 +240,10 @@ async function exchangeSupabaseCode(
     }
 
     const response =
-        await fetch(
+        await fetchBoundedResponse(
             `${origin}/auth/v1/token?grant_type=pkce`,
             {
+                signal,
                 method:
                     "POST",
 
@@ -326,9 +330,10 @@ async function exchangeSupabaseCode(
 LOAD AUTHENTICATED SUPABASE USER
 ========================================================= */
 
-async function loadSupabaseAuthUser(
+async function loadSupabaseAuthUserBounded(
     env,
-    accessToken
+    accessToken,
+    signal
 ) {
     const origin =
         getSupabaseOrigin(
@@ -350,9 +355,10 @@ async function loadSupabaseAuthUser(
     }
 
     const response =
-        await fetch(
+        await fetchBoundedResponse(
             `${origin}/auth/v1/user`,
             {
+                signal,
                 method:
                     "GET",
 
@@ -451,15 +457,14 @@ async function readRpcRecord(
 
         const error =
             new Error(
-                errorMessage
-                || failureMessage
+                safeUpstreamErrorMessage(errorMessage, failureMessage)
             );
 
         error.upstreamStatus =
             response.status;
 
         error.upstreamCode =
-            errorCode;
+            safeUpstreamErrorCode(errorCode);
 
         throw error;
     }
@@ -506,11 +511,12 @@ async function readRpcRecord(
 CALL PROVIDER RPC
 ========================================================= */
 
-async function callProviderRpc(
+async function callProviderRpcBounded(
     env,
     rpcName,
     body,
-    failureMessage
+    failureMessage,
+    signal
 ) {
     const baseUrl =
         getSupabaseDataBaseUrl(
@@ -532,9 +538,10 @@ async function callProviderRpc(
     }
 
     const response =
-        await fetch(
+        await fetchBoundedResponse(
             `${baseUrl}rpc/${rpcName}`,
             {
+                signal,
                 method:
                     "POST",
 
@@ -2066,17 +2073,16 @@ async function executeCallback(
                 "OAUTH CALLBACK: Provider reauthorization completed.",
                 {
                     debugId,
-                    provider,
-                    accountId:
-                        accountContext.accountId
+                    provider
                 }
             );
 
+            const verification = provider === "discord"
+                ? await completeLinkedRolesVerification(request, env, accountContext.accountId, providerIdentity)
+                : null;
             return redirect(
-                returnTo,
-                getOAuthClearCookies(
-                    request
-                )
+                verification?.location || returnTo,
+                [...getOAuthClearCookies(request), ...(verification?.cookies || [])]
             );
         }
 
@@ -2341,4 +2347,14 @@ async function executeCallback(
 }
 export async function handleOAuthCallback(request, env) {
     return completeOAuthCallback(request, env, () => executeCallback(request, env));
+}
+
+function exchangeSupabaseCode(env, code, verifier) {
+    return withUpstreamDeadline(signal => exchangeSupabaseCodeBounded(env, code, verifier, signal));
+}
+function loadSupabaseAuthUser(env, accessToken) {
+    return withUpstreamDeadline(signal => loadSupabaseAuthUserBounded(env, accessToken, signal));
+}
+function callProviderRpc(env, name, body, failureMessage) {
+    return withUpstreamDeadline(signal => callProviderRpcBounded(env, name, body, failureMessage, signal));
 }

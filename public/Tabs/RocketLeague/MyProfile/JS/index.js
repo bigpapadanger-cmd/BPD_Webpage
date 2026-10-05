@@ -3,7 +3,7 @@
 import { apiFetch } from "/scripts/apiConnection.js";
 import { DISCORD_NOTIFICATION_STATUS_URL, ROCKET_LEAGUE_PROFILE_URL } from "/scripts/apiRoutes.js";
 import { refreshAuthState } from "/Framework/Auth/auth.js";
-import { buildSettingsPayload, getDuplicateReminderChannels, getSettingsConfirmationState, isSettingConfirmed, NOTIFICATION_CHANNELS, reminderMinutesFromParts, validateNotificationsV2 } from "./settings_view.js";
+import { buildSettingsPayload, getDuplicateReminderChannels, getFindProfileVisibilityState, getSettingsConfirmationState, isSettingConfirmed, NOTIFICATION_CHANNELS, reminderMinutesFromParts, validateNotificationsV2 } from "./settings_view.js";
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const NOTIFICATION_LABELS = Object.freeze({ email: "Email", sms: "Text / SMS", discord: "Discord" });
@@ -46,7 +46,9 @@ async function loadDiscordNotificationAvailability(force = false) {
         const result = await response.json().catch(() => ({}));
         discordEligibilityState = {
             checked: response.ok && result?.success === true,
-            eligible: response.ok && result?.success === true && result?.eligible === true && result?.matchBotAvailable === true,
+            eligible: response.ok && result?.success === true && result?.status === "available"
+                && result?.stale !== true && result?.countComplete === true
+                && result?.eligible === true && result?.matchBotAvailable === true,
             status: response.ok && result?.success === true ? String(result?.status || "unavailable") : "unavailable",
             stale: result?.stale === true
         };
@@ -300,7 +302,7 @@ function renderProfile(result) {
 
     document.getElementById("autoDetectRegion").checked = settings.autoDetectRegion === true;
     document.getElementById("showOnlineStatus").checked = settings.showOnlineStatus === true;
-    document.getElementById("findProfileEnabled").checked = settings.findProfileEnabled === true;
+    document.getElementById("findProfileEnabled").checked = getFindProfileVisibilityState(profile).checked;
     document.getElementById("preferredMode").value = typeof settings.preferredMode === "string" ? settings.preferredMode : "";
     document.getElementById("otherMode").value = typeof settings.otherMode === "string" ? settings.otherMode : "";
     document.getElementById("otherModeField").hidden = settings.preferredMode !== "other" && isSettingConfirmed(profile, "preferredMode");

@@ -20,10 +20,15 @@ HIERARCHY
 
 workers/
 +-- bpd-provider-runtime/
+|   Manual authenticated internal /internal/discord/bot-health checks MatchBot token authentication only; no public surface or schedule.
 |   +-- wrangler.jsonc       Private Worker; workers_dev and preview URLs disabled.
 |   +-- README.md             Internal Discord API contract, secret/config requirements, and integration blocker.
-|   +-- src/index.js          Stateless Discord guild inventory/member validator; no Supabase, schedule, or Durable Object.
+|   +-- src/index.js          Stateless Discord validator and internal disabled RL probe dispatch; no Supabase or schedule.
+|   +-- src/rl_probe_authority.js Global monotonic revocation epoch and bounded opaque-key cleanup registry.
+|   +-- src/rl_user_session.js Separate RL_USER_SESSION security DO; replay/epoch/TTL only, no provider execution.
+|   +-- src/discord_linked_role_nonce.js Separate transactional Linked Roles nonce DO; short-lived replay state only.
 |   +-- tests/discord.test.mjs Inventory completeness, sharding, validation, provider errors, and privacy tests.
+|   +-- tests/discord_nonce.test.mjs Atomic races, replay, expiry, binding mismatch and private dispatch tests.
 +-- google-mtls-diagnostic/
 |   +-- wrangler.jsonc
 |   +-- README.md          Temporary, protected, manually invoked WIF/mTLS probes.

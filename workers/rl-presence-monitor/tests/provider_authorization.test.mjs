@@ -218,6 +218,60 @@ test("matching Epic reauthorization preserves the link and does not record a BPD
     assert.ok(!calls.some(url => /link_epic_identity|resolve_epic_identity/.test(url)));
 });
 
+for (const scenario of [
+    { name: "all provider IDs agree", profile: { id: " epic-subject ", sub: "epic-subject" }, accountId: "epic-subject" },
+    { name: "profile.id conflicts with profile.sub", profile: { id: "epic-subject", sub: "other-subject" }, code: "EPIC_IDENTITY_MISMATCH" },
+    { name: "profile.id conflicts with token account_id", profile: { id: "epic-subject" }, accountId: "other-subject", code: "EPIC_IDENTITY_MISMATCH" },
+    { name: "profile.sub conflicts with token account_id", profile: { sub: "epic-subject" }, accountId: "other-subject", code: "EPIC_IDENTITY_MISMATCH" },
+    { name: "only profile.id present", profile: { id: "epic-subject" } },
+    { name: "only profile.sub present", profile: { sub: "epic-subject" } },
+    { name: "only token account_id present", profile: {}, accountId: " epic-subject " },
+    { name: "all identity fields missing", profile: {}, code: "EPIC_IDENTITY_MISSING" },
+    { name: "malformed supplied identity fails closed", profile: { id: 123, sub: "epic-subject" }, code: "EPIC_IDENTITY_MISMATCH" },
+    { name: "malformed token identity fails closed", profile: { sub: "epic-subject" }, accountId: 123, code: "EPIC_IDENTITY_MISMATCH" },
+    { name: "blank token identity fails closed", profile: { sub: "epic-subject" }, accountId: " ", code: "EPIC_IDENTITY_MISMATCH" },
+    { name: "case differences are not silently normalized", profile: { id: "EPIC-SUBJECT", sub: "epic-subject" }, code: "EPIC_IDENTITY_MISMATCH" },
+    { name: "agreeing provider IDs conflict with canonical link", profile: { id: "other-subject", sub: "other-subject" }, accountId: "other-subject", code: "PROVIDER_REAUTHORIZATION_MISMATCH" }
+]) {
+    test(`Epic identity consistency: ${scenario.name}`, async () => {
+        const { env, records, calls } = fixture();
+        env.EPIC_CLIENT_ID = "client"; env.EPIC_CLIENT_SECRET = "secret";
+        env.EPIC_REDIRECT_URI = "https://bpd.invalid/api/auth/epic/callback";
+        const fallback = globalThis.fetch;
+        const logs = [];
+        const originalInfo = console.info, originalError = console.error;
+        console.info = (...args) => logs.push(args);
+        console.error = (...args) => logs.push(args);
+        const before = structuredClone([...records]);
+        globalThis.fetch = async (url, init) => {
+            if (String(url).endsWith("/token")) return Response.json({
+                access_token: "access-token-must-not-leak", refresh_token: "refresh-token-must-not-leak",
+                ...(scenario.accountId === undefined ? {} : { account_id: scenario.accountId })
+            });
+            if (String(url).endsWith("/userInfo")) return Response.json({ ...scenario.profile, private_payload: "provider-payload-must-not-leak" });
+            return fallback(url, init);
+        };
+        try {
+            const response = await handleEpicCallback(new Request("https://bpd.invalid/api/auth/epic/callback?code=code&state=state", {
+                headers: { cookie: "bpd_session=test-session; bpd_epic_state=state; bpd_oauth_mode=reauthorize; bpd_oauth_account=account-1" }
+            }), env);
+            assert.equal(response.status, 302);
+            const location = new URL(response.headers.get("location"), "https://bpd.invalid");
+            assert.equal(location.searchParams.get("error"), scenario.code ?? null);
+            if (scenario.code) {
+                assert.deepEqual([...records], before, "failure must not mutate account/session state");
+            } else {
+                assert.equal((await getProviderAuthorizationState(env, "account-1", "epic")).authorized, true);
+            }
+            assert.ok(!calls.some(url => /link_epic_identity|resolve_epic_identity/.test(url)));
+            assert.doesNotMatch(JSON.stringify(logs) + response.headers.get("location") + await response.text(),
+                /access-token-must-not-leak|refresh-token-must-not-leak|provider-payload-must-not-leak/);
+        } finally {
+            console.info = originalInfo; console.error = originalError;
+        }
+    });
+}
+
 test("browser policy distinguishes public, recovery, stale, and unavailable", async () => {
     const source = (await readFile(new URL("../../../public/Framework/Auth/auth.js", import.meta.url), "utf8"))
         .replace(/import\s*\{[\s\S]*?\}\s*from\s*"\/scripts\/apiRoutes.js";/,
@@ -271,6 +325,8 @@ test("configured hourly cron dispatches due-aware refresh and does not fetch non
 test("registration saves draft before reauthorization and does not redirect on outage", async () => {
     let source = await readFile(new URL("../../../public/Tabs/RocketLeague/Registration/JS/index.js", import.meta.url), "utf8");
     source = source.replace(/import\s*\{[^}]*\}\s*from\s*"[^"]+";/g, "");
+    const notificationsHelper = new URL("../../../public/Tabs/RocketLeague/shared/notificationsV2.js", import.meta.url).href;
+    source = `import { isNotificationsV2 } from ${JSON.stringify(notificationsHelper)};\n` + source;
     source += "\nregistrationDraftAccountId = 'account-1';\nexport { handleRegistrationAuthFailure };";
     const oldDocument = globalThis.document, oldWindow = globalThis.window, oldStorage = globalThis.localStorage;
     const events = [];

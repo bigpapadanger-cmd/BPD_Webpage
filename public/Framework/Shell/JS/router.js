@@ -64,7 +64,8 @@ import {
     ROUTES,
     HEADER_MAP,
     getMasterCssForRoute,
-    resolveHumanPageRoute
+    resolveHumanPageRoute,
+    getRocketLeagueSettingsContext
 } from "/routes.js";
 
 import {
@@ -385,8 +386,9 @@ function resolveRoute(
             routePath:
                 humanRoute.canonicalPath,
 
-            config:
-                humanRoute.config,
+            config: humanRoute.canonicalPath === "/Settings" && getRocketLeagueSettingsContext(window.location.search)
+                ? { ...humanRoute.config, sidebar: getRocketLeagueSettingsContext(window.location.search).sidebar }
+                : humanRoute.config,
 
             found:
                 true
@@ -632,7 +634,8 @@ async function applyMasterCss(
 ) {
     let desiredCss =
         getMasterCssForRoute(
-            routePath
+            routePath === "/Settings" && getRocketLeagueSettingsContext(window.location.search)
+                ? "/RocketLeague" : routePath
         );
 
     let desiredPath =

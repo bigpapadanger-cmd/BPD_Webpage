@@ -100,7 +100,7 @@ test("rejected build candidate invalidates status and returns a sanitized valida
     try {
         await assert.rejects(updateMmrBuildConfiguration(env, { gameVersion: "260918.75141.528314", featureSet: "PrimeUpdate60", buildSecret: "build-secret" }), { code: "RL_BUILD_UPDATE_REJECTED", status: 422, providerCode: "VersionMismatch" });
         assert.deepEqual(paths, ["/admin/build-configuration"]);
-        assert.ok(deleted.includes("admin:system-status:v2"));
+        assert.ok(deleted.includes("admin:system-status:v3"));
     } finally { globalThis.fetch = originalFetch; }
 });
 

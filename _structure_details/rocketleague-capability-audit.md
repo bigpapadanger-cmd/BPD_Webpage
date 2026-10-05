@@ -5,6 +5,14 @@ measurement. No live Worker calls or Supabase changes were made.
 
 ## Support classifications
 
+The dedicated provider runtime now has a disabled, separate `RL_USER_SESSION`
+security foundation (ES256 verification, atomic replay consumption, monotonic
+generation/cutoff and TTL cleanup). It has no live provider executor and does
+not make Match History supported. Admin-only fresh OAuth handoff orchestration
+and a separate global revocation authority are implemented locally; independent
+provider-derived identity proof remains BLOCKED. No positive proof is inferred
+from constructed/echoed IDs, display names or arbitrary-player lookups. Discord is unchanged.
+
 | Capability / request | Classification | Request construction and useful result | Boundary |
 | --- | --- | --- | --- |
 | `Skills/GetPlayerSkill v1` | SUPPORTED, arbitrary-player | Worker passes the requested `PlayerID`; current skills path uses one request per player. | Existing MMR/Skills path remains authoritative for supported playlists. |

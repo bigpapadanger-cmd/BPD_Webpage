@@ -82,7 +82,8 @@ test("all Worker call schedules are bounded and diagnostic Worker is manual-only
     ]);
     assert.equal("triggers" in diagnosticConfig, false);
     assert.equal("queues" in diagnosticConfig, false);
-    assert.equal(diagnosticConfig.workers_dev, true);
+    assert.equal(diagnosticConfig.workers_dev, false);
+    assert.equal(diagnosticConfig.preview_urls, false);
 });
 
 test("protected manual route returns a safe Taskboard summary and makes only required calls", async () => {

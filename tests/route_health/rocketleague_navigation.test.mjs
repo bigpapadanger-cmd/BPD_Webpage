@@ -3,10 +3,17 @@ import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import test from "node:test";
 
-import { ROUTES, resolveHumanPageRoute } from "../../public/routes.js";
+import { ROUTES, resolveHumanPageRoute, getRocketLeagueSettingsContext } from "../../public/routes.js";
 
 const repoRoot = resolve(import.meta.dirname, "../..");
 const publicRoot = resolve(repoRoot, "public");
+const sidebarSource = readFileSync(resolve(publicRoot, "Framework/Shell/JS/Sidebar/sidebar.js"), "utf8");
+// Exercise the actual shared functions without importing browser-root auth dependencies.
+const setupActiveNavigation = new Function("resolveHumanPageRoute", "getRocketLeagueSettingsContext", "document", "window", `${sidebarSource.slice(
+    sidebarSource.indexOf("function setupActiveNavigation()"), sidebarSource.indexOf("function setupDisabledNavigation()")
+)}\nsetupActiveNavigation();`).bind(null, resolveHumanPageRoute, getRocketLeagueSettingsContext,
+    { querySelectorAll: selector => globalThis.document.querySelectorAll(selector) },
+    { get location() { return globalThis.window.location; } });
 
 function htmlFiles(directory) {
     return readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
@@ -34,7 +41,9 @@ test("Rocket League destinations use the shared shell and route-specific access 
         assert.ok(route, `${path} has no route`);
         assert.equal(route.sidebar, "/Framework/Shell/HTML/Sidebar/rl_menu.html", `${path} does not use the Rocket League shell`);
         assert.ok(route.body.startsWith("/Tabs/RocketLeague/"), `${path} has a page outside the Rocket League area`);
-        assert.match(menu, new RegExp(`href="${path.replaceAll("/", "\\/")}"`));
+        if (["/RocketLeague/Shop", "/RocketLeague/MatchHistory", "/RocketLeague/PrivateMatches"].includes(path)) {
+            assert.match(menu, new RegExp(`href="${path.replaceAll("/", "\\/")}"`));
+        }
     }
     assert.equal(ROUTES["/RocketLeague/Shop"].requiresAuth, undefined);
     assert.equal(ROUTES["/RocketLeague/Shop"].sitemap, true);
@@ -44,12 +53,107 @@ test("Rocket League destinations use the shared shell and route-specific access 
 
 test("all three Rocket League dropdown groups use real controlled submenus", () => {
     const menu = readFileSync(resolve(publicRoot, "Framework/Shell/HTML/Sidebar/rl_menu.html"), "utf8");
-    for (const group of ["competition", "players", "tools"]) {
+    for (const group of ["player", "play", "community"]) {
         assert.match(menu, new RegExp(`aria-controls="${group}Submenu"`));
         assert.match(menu, new RegExp(`id="${group}Submenu"[\\s\\S]*?hidden`));
     }
-    assert.match(menu, /href="\/RocketLeague\/WeeklyMatches"[\s\S]*?data-rl-access="required"/);
-    assert.match(menu, /href="\/RocketLeague\/SubmitMatchResults"[\s\S]*?data-rl-access="required"/);
+    assert.match(menu, /href="\/RocketLeague\/MyProfile"[\s\S]*?data-rl-access="required"/);
+    assert.doesNotMatch(menu, /competitionSubmenu|playersSubmenu|toolsSubmenu|Join Weekly Matches|Submit Scoreboard/);
+});
+
+test("RL-context Settings initializes the same sidebar access view without changing the saved preference", () => {
+    assert.match(sidebarSource, /const rlSettings = path === "\/settings" && getRocketLeagueSettingsContext\(window\.location\.search\)/);
+    assert.match(sidebarSource, /path\.startsWith\("\/rocketleague\/"\) \|\| rlSettings/);
+    assert.match(sidebarSource, /module\.initializeRocketLeagueAuthView\(\)/);
+});
+
+test("homepage has one network statistics card with honest unavailable counters", () => {
+    const home = readFileSync(resolve(publicRoot, "Tabs/RocketLeague/Index/HTML/index.html"), "utf8");
+    assert.equal((home.match(/Rocket League by the Numbers/g) || []).length, 1);
+    assert.doesNotMatch(home, /class="rocket-league-stat-strip"/);
+    assert.equal((home.match(/id="rocketLeaguePlayersOnline"/g) || []).length, 1);
+    assert.equal((home.match(/id="rocketLeagueRegisteredPlayers"/g) || []).length, 1);
+    assert.match(home, /Network totals are unavailable/);
+    assert.ok(home.indexOf("rocketLeagueMmrHistoryGraph") < home.indexOf("rocketLeagueStatisticsTitle"));
+    assert.ok(home.indexOf("rocketLeagueStatisticsTitle") < home.indexOf("rocketLeagueWelcomeTitle"));
+});
+
+test("approved RL groups and bot link use the shared shell without eligibility side effects", () => {
+    const menu = readFileSync(resolve(publicRoot, "Framework/Shell/HTML/Sidebar/rl_menu.html"), "utf8");
+    for (const [group, labels] of [["player", ["My Profile", "Match History"]],
+        ["play", ["Find Players", "Find Custom Matches", "Private Matches"]],
+        ["community", ["Shop", "Add Discord Bot"]]]) {
+        const submenu = menu.match(new RegExp(`<div[^>]*id="${group}Submenu"[^>]*>([\\s\\S]*?)</div>`))?.[1];
+        assert.ok(submenu);
+        for (const label of labels) assert.ok(submenu.includes(label));
+    }
+    const bot = menu.match(/<a[^>]*href="https:\/\/discord.com\/oauth2\/authorize\?client_id=1549606323249877034"[^>]*>Add Discord Bot<\/a>/)?.[0];
+    assert.ok(bot);
+    assert.match(bot, /target="_blank"/);
+    assert.match(bot, /rel="noopener noreferrer"/);
+    assert.doesNotMatch(bot, /data-router-link|onclick|data-auth|eligib/i);
+    assert.doesNotMatch(menu, /<script|onclick|localStorage|fetch\(/);
+    for (const [path, route] of Object.entries(ROUTES)) {
+        if (path.startsWith("/RocketLeague") && route.sidebar) {
+            assert.equal(route.sidebar, "/Framework/Shell/HTML/Sidebar/rl_menu.html", path);
+        }
+    }
+});
+
+test("Find Custom Matches is an independent shared-shell Coming soon page without provider calls", () => {
+    const route = resolveHumanPageRoute("/RocketLeague/FindCustomMatches");
+    assert.ok(route);
+    assert.equal(ROUTES["/RocketLeague/FindCustomMatches"].module, null);
+    const page = readFileSync(resolve(publicRoot, "Tabs/RocketLeague/Features/HTML/find-custom-matches.html"), "utf8");
+    assert.match(page, /Coming soon/);
+    assert.doesNotMatch(page, /<script|fetch\(|<iframe/);
+});
+
+test("Settings RL context is explicit, survives direct loads and rejects unsafe return targets", () => {
+    assert.equal(getRocketLeagueSettingsContext(""), null);
+    assert.equal(getRocketLeagueSettingsContext("?context=admin"), null);
+    const valid = getRocketLeagueSettingsContext("?context=rocketleague&returnTo=%2FRocketLeague%2FMyProfile");
+    assert.equal(valid.sidebar, ROUTES["/RocketLeague/MyProfile"].sidebar);
+    assert.equal(valid.returnPath, "/RocketLeague/MyProfile");
+    for (const target of ["https://evil.invalid", "//evil.invalid", "/Admin", "/RocketLeagueFake", "/RocketLeague/Unknown", "/RocketLeague?secret=value"]) {
+        assert.equal(getRocketLeagueSettingsContext(`?context=rocketleague&returnTo=${encodeURIComponent(target)}`).returnPath, "/RocketLeague");
+    }
+    const router = readFileSync(resolve(publicRoot, "Framework/Shell/JS/router.js"), "utf8");
+    assert.match(router, /humanRoute.canonicalPath === "\/Settings" && getRocketLeagueSettingsContext\(window.location.search\)/);
+    assert.match(router, /routePath === "\/Settings" && getRocketLeagueSettingsContext\(window.location.search\)/);
+    const menu = readFileSync(resolve(publicRoot, "Framework/Shell/HTML/Sidebar/rl_menu.html"), "utf8");
+    assert.match(menu, /data-settings-context="rocketleague"/);
+    const caller = readFileSync(resolve(publicRoot, "Framework/Shell/CSS/Callers/master_rl.css"), "utf8");
+    assert.match(caller, /@import url\("\/Global\/Settings\/CSS\/settings-page.css"\)/);
+});
+
+test("Home is exact-only and non-clickable on the hub; submenu active state follows direct and SPA routes", () => {
+    const originalDocument = globalThis.document;
+    const originalWindow = globalThis.window;
+    function item(route, home = false) {
+        const attributes = new Map([["href", route], ...(home ? [["data-nav-exact", ""], ["data-disable-on-active", ""]] : [])]);
+        return { dataset: { navRoute: route }, active: false,
+            classList: { toggle(name, value) { if (name === "active") this.owner.active = value; }, owner: null },
+            hasAttribute: name => attributes.has(name), getAttribute: name => attributes.get(name),
+            setAttribute: (name, value) => attributes.set(name, value), removeAttribute: name => attributes.delete(name) };
+    }
+    const items = [item("/RocketLeague", true), item("/RocketLeague/MyProfile"), item("/RocketLeague/MatchHistory"),
+        item("/RocketLeague/FindPlayers"), item("/RocketLeague/FindCustomMatches"), item("/RocketLeague/PrivateMatches"), item("/RocketLeague/Shop"), item("/Settings")];
+    items.at(-1).dataset.settingsContext = "rocketleague";
+    items.forEach(element => { element.classList.owner = element; });
+    try {
+        globalThis.document = { querySelectorAll(selector) { assert.ok(selector.includes(".submenu-item[data-nav-route]")); return items; } };
+        for (const selected of items) {
+            globalThis.window = { location: { pathname: selected.dataset.navRoute,
+                search: selected.dataset.navRoute === "/Settings" ? "?context=rocketleague&returnTo=%2FRocketLeague%2FShop" : "" } };
+            setupActiveNavigation();
+            assert.deepEqual(items.filter(element => element.active), [selected]);
+            assert.equal(selected.getAttribute("aria-current"), "page");
+            assert.equal(items[0].getAttribute("href"), selected === items[0] ? undefined : "/RocketLeague");
+            assert.equal(new URL(items.at(-1).getAttribute("href"), "https://bpd-gaming-network.com").searchParams.get("returnTo"),
+                selected.dataset.navRoute === "/Settings" ? "/RocketLeague/Shop" : selected.dataset.navRoute);
+        }
+    } finally { globalThis.document = originalDocument; globalThis.window = originalWindow; }
 });
 
 test("the public hub keeps incomplete profiles visible and offers an explicit setup notification", () => {

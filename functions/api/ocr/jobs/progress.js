@@ -1,4 +1,5 @@
 "use strict";
+import { onRequestGet as readOwnedJob } from "./get_job.js";
 
 // ============================================================
 // BPD GAMING NETWORK
@@ -524,6 +525,15 @@ export async function onRequestGet(
     } = context;
 
     try {
+        // Reuse canonical account/legacy Epic ownership checks and the safe job
+        // projection. A job identifier alone never authorizes a progress read.
+        const ownedResponse = await readOwnedJob(context);
+        if (!ownedResponse.ok) return ownedResponse;
+        const ownedPayload = await ownedResponse.json();
+        const authorizedJob = ownedPayload?.job;
+        if (!authorizedJob || ownedPayload.success !== true) {
+            return jsonResponse({ success: false, code: "OCR_JOB_UNAVAILABLE" }, 503);
+        }
         const configError =
             validateEnvironment(
                 env,
@@ -569,11 +579,7 @@ export async function onRequestGet(
             );
         }
 
-        const status =
-            await readDurableStatus(
-                env,
-                jobId
-            );
+        const status = authorizedJob;
 
         if (
             !status
@@ -611,11 +617,8 @@ export async function onRequestGet(
             );
         }
 
-        const temporaryProgress =
-            await readTemporaryProgress(
-                env,
-                jobId
-            );
+        // readOwnedJob already merges and sanitizes temporary progress.
+        const temporaryProgress = null;
 
         const calculated =
             calculateHybridProgress(

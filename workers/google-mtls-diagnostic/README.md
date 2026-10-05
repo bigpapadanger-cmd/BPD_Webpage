@@ -1,5 +1,14 @@
 # Google mTLS diagnostic Worker
 
+## Local retirement
+
+The checked-in configuration now disables `workers_dev` and `preview_urls`.
+No production OCR caller uses this Worker. Code/tests remain for controlled
+diagnostics; no resource has been deleted or changed in Cloudflare. An operator
+must separately remove the deployed diagnostic Worker, its public endpoint and
+its diagnostic-only secrets when retiring it. Do not remove the certificate or
+credentials used by the separate production OCR transport Worker.
+
 Temporary, manually invoked diagnostics for the existing Cloudflare mTLS binding and Google X.509 Workload Identity Federation flow. This Worker has no cron, queue, retry, or background trigger. Each probe does only the outbound requests needed for that explicitly requested probe:
 
 The operator-verified `/probe/empty`, `/probe/full-sts`, and `/probe/id-token`

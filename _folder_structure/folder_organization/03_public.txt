@@ -43,7 +43,9 @@ public/Framework/
     |   +-- Footer/footer.html
     |   +-- Header/header.html
     |   +-- Sidebar/
-    |       +-- admin.html, dashboard.html, hover.html, mainmenu.html, rl_menu.html
+|       +-- admin.html, dashboard.html, hover.html, mainmenu.html, rl_menu.html
+|           rl_menu.html: shared RL Home / Player / Play / Community navigation; Community includes external Add Discord Bot.
+|           RL Settings links carry explicit context and a registered RL return path; Settings retains the RL sidebar/caller and a return link.
     +-- JS/
         +-- initialization.js       Shared shell initialization.
         +-- router.js               Auth-aware fragment/module route loader.
@@ -112,7 +114,7 @@ public/Tabs/
 |   +-- Features/
 |       +-- CSS/index.css; shared Rocket League destination/status card styling
 |       +-- HTML/shop.html, match-history.html, leaderboards.html, match-results.html,
-|                  weekly-matches.html, my-matches.html, private-matches.html
+|                  weekly-matches.html, my-matches.html, private-matches.html, find-custom-matches.html (Coming soon route)
 +-- Future/              Present empty placeholder directory.
 
 OCR PAGE

@@ -1,5 +1,6 @@
 import { revokeProviderAuthentication } from "../providers/provider_auth_state.js";
 "use strict";
+import { invalidateRlProbeSession } from "../../rl/probe_security.js";
 
 /* =========================================================
 BPD GAMING NETWORK
@@ -773,6 +774,11 @@ export async function handleUnlinkProvider(
 
         let result;
 
+        if (provider === "epic") {
+            try { await invalidateRlProbeSession(env, accountId, "epic_unlink"); }
+            catch { return json({ success: false, code: "RL_PROBE_INVALIDATION_REQUIRED", message: "Temporary Rocket League access could not be revoked. Please try again." }, 503); }
+        }
+
         try {
             result =
                 await unlinkAccountIdentity(
@@ -799,9 +805,7 @@ export async function handleUnlinkProvider(
                         error?.unlinkCode
                         || null,
 
-                    message:
-                        error?.message
-                        || "Unknown error"
+                    code: "UNLINK_RPC_FAILED"
                 }
             );
 
@@ -924,17 +928,7 @@ export async function handleUnlinkProvider(
             {
                 debugId,
 
-                name:
-                    error?.name
-                    || "Error",
-
-                message:
-                    error?.message
-                    || "Unknown error",
-
-                stack:
-                    error?.stack
-                    || null
+                code: "UNLINK_PROVIDER_FAILED"
             }
         );
 

@@ -6,6 +6,14 @@ const SECRET = "p".repeat(64);
 const USER_ID = "123456789012345678";
 const env = { PROVIDER_RUNTIME_CALLER_SECRET: SECRET, DISCORD_MATCHBOT_TOKEN: "test-discord-token", DISCORD_LARGE_BOT_SHARDING: "false" };
 
+test("local provider configuration explicitly selects operator-confirmed normal sharding mode", async () => {
+    const config = JSON.parse(await (await import("node:fs/promises")).readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8"));
+    assert.equal(config.vars.DISCORD_LARGE_BOT_SHARDING, "false");
+    assert.equal(config.workers_dev, false);
+    assert.equal(config.preview_urls, false);
+    assert.equal(config.routes, undefined);
+});
+
 function request(path, body = {}, options = {}) {
     const method = options.method || "POST";
     return new Request(`https://service.internal${path}`, {
@@ -276,10 +284,31 @@ test("caller secret length and formatting fail closed", async t => {
     assert.equal(incorrect.status, 401);
 });
 
-test("Worker contains no Supabase access and does not expose tokens or provider IDs", async () => {
+test("Worker contains no Supabase access and diagnostic logs never expose tokens or provider IDs", async () => {
     const source = await (await import("node:fs/promises")).readFile(new URL("../src/index.js", import.meta.url), "utf8");
     assert.doesNotMatch(source, /SUPABASE|apikey|service_role/iu);
-    assert.doesNotMatch(source, /console\.(?:log|info|warn|error)/u);
+    const logs = [];
+    const previous = console.info;
+    console.info = (...args) => logs.push(args);
+    const guildId = "123456789012345679";
+    try {
+        await withFetch(async () => Response.json({ code: 10004, message: `${USER_ID} ${SECRET} ${env.DISCORD_MATCHBOT_TOKEN}` }, { status: 404 }), async () => {
+            const response = await providerRuntime.fetch(request("/internal/discord/check-membership", {
+                discordUserId: USER_ID, guildIds: [guildId]
+            }), { ...env, DISCORD_ELIGIBILITY_DIAGNOSTICS: "true" });
+            assert.equal(response.status, 503);
+            assert.equal((await response.json()).code, "DISCORD_GUILD_UNAVAILABLE");
+        });
+        assert.ok(logs.some(entry => entry[1].membershipChecksAttempted === 1));
+        assert.doesNotMatch(JSON.stringify(logs), new RegExp(`${USER_ID}|${guildId}|${SECRET}|${env.DISCORD_MATCHBOT_TOKEN}`));
+        logs.length = 0;
+        await withFetch(async () => memberResponse(), async () => {
+            await providerRuntime.fetch(request("/internal/discord/check-membership", {
+                discordUserId: USER_ID, guildIds: [guildId]
+            }), env);
+        });
+        assert.equal(logs.length, 0);
+    } finally { console.info = previous; }
 });
 
 test("missing caller secret fails closed without touching Discord", async () => {

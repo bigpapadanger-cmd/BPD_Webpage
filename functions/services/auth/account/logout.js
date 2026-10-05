@@ -1,4 +1,6 @@
 "use strict";
+import { getSessionContext } from "../sessions/session_context.js";
+import { invalidateRlProbeSession, isRlProbeSecurityEnabled } from "../../rl/probe_security.js";
 
 /* =========================================================
 BPD GAMING NETWORK
@@ -65,6 +67,10 @@ export async function handleLogout(
     );
 
     try {
+        if (isRlProbeSecurityEnabled(env)) {
+            const context = await getSessionContext(request, env);
+            await invalidateRlProbeSession(env, context?.userId, "logout");
+        }
         /* =================================================
         CENTRAL BPD SESSION
 
@@ -150,17 +156,7 @@ export async function handleLogout(
             {
                 debugId,
 
-                name:
-                    error?.name
-                    || "Error",
-
-                message:
-                    error?.message
-                    || "Unknown error",
-
-                stack:
-                    error?.stack
-                    || null
+                code: "LOGOUT_FAILED"
             }
         );
 

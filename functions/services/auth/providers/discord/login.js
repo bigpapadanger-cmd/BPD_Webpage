@@ -632,9 +632,7 @@ export async function handleDiscordLogin(
         console.error(
             "DISCORD LOGIN: Failed to create OAuth request.",
             {
-                message:
-                    error?.message
-                    || "Unknown error"
+                code: "DISCORD_OAUTH_START_FAILED"
             }
         );
 

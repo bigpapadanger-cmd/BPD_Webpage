@@ -204,6 +204,37 @@ test("profile save uses the confirmed V2 RPC contract and preserves independent 
     assert.equal(requestedUrls.at(-1), "https://supabase.example.test/rpc/save_rocketleague_profile_v2");
 });
 
+test("Find Players visibility true and false persist through the V2 save RPC and reload", async () => {
+    for (const findProfileEnabled of [true, false]) {
+        let persistedValue;
+        await withFetch(async (url, options) => {
+            const path = new URL(String(url)).pathname;
+            if (path.endsWith("/save_rocketleague_profile_v2")) {
+                persistedValue = JSON.parse(options.body).p_find_profile_enabled;
+                return response({ saved: true });
+            }
+            return response({
+                account_id: "f6332c75-771a-46bc-ae09-ef5d886a4c35",
+                rl_player_id: PROFILE_ID,
+                find_profile_enabled: persistedValue
+            });
+        }, async () => {
+            await saveRocketLeagueProfile(ENV, "f6332c75-771a-46bc-ae09-ef5d886a4c35", {
+                ageConsent: true,
+                policyConsent: true,
+                findProfileEnabled,
+                showOnlineStatus: false,
+                availability: [],
+                notificationsEnabled: false
+            });
+            const reloaded = await getRocketLeagueProfileByAccountId(ENV, "f6332c75-771a-46bc-ae09-ef5d886a4c35");
+            assert.equal(reloaded.settings.findProfileEnabled, findProfileEnabled);
+            assert.equal(reloaded.settingsAvailability.findProfileEnabled, true);
+        });
+        assert.equal(persistedValue, findProfileEnabled);
+    }
+});
+
 test("profile save preserves already-confirmed V2 platform and channels when an older client omits them", async () => {
     let savedPayload;
     await withFetch(async (url, options) => {

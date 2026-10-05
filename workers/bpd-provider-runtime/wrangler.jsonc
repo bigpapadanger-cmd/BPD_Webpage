@@ -4,7 +4,22 @@
   "compatibility_date": "2026-09-16",
   "workers_dev": false,
   "preview_urls": false,
-  "vars": {},
+  "vars": {
+    "DISCORD_LARGE_BOT_SHARDING": "false",
+    "RL_PROBE_SECURITY_ENABLED": "false"
+  },
+  "durable_objects": {
+    "bindings": [
+      { "name": "RL_USER_SESSION", "class_name": "UserRocketLeagueSession" },
+      { "name": "RL_PROBE_SECURITY", "class_name": "RlProbeSecurityAuthority" },
+      { "name": "DISCORD_LINKED_ROLE_NONCE", "class_name": "DiscordLinkedRoleNonceAuthority" }
+    ]
+  },
+  "migrations": [
+    { "tag": "rl-probe-security-v1", "new_sqlite_classes": ["UserRocketLeagueSession"] },
+    { "tag": "rl-probe-authority-v2", "new_sqlite_classes": ["RlProbeSecurityAuthority"] },
+    { "tag": "discord-linked-role-nonce-v1", "new_sqlite_classes": ["DiscordLinkedRoleNonceAuthority"] }
+  ],
   "observability": {
     "logs": {
       "enabled": true,

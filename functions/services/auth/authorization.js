@@ -518,13 +518,7 @@ export async function requireProvider(
                     error?.status
                     || null,
 
-                upstreamCode:
-                    error?.upstreamCode
-                    || null,
-
-                message:
-                    error?.message
-                    || "Unknown error"
+                code: "PROVIDER_VERIFICATION_UNAVAILABLE"
             }
         );
 
@@ -586,9 +580,7 @@ export async function requireProvider(
                 provider:
                     providerName,
 
-                message:
-                    error?.message
-                    || "Unknown error"
+                code: "PROVIDER_AUTH_STATE_UNAVAILABLE"
             }
         );
 

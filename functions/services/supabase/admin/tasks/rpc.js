@@ -1,4 +1,5 @@
 "use strict";
+import { withUpstreamDeadline, fetchBoundedResponse } from "../../../http/upstream.js";
 
 /* =========================================================
 BPD GAMING NETWORK
@@ -392,10 +393,10 @@ async function readResponseBody(
         );
     }
     catch {
-        return {
-            message:
-                text
-        };
+        if (!response.ok) return null;
+        throw new AdminTaskRpcError("The task database response was invalid.", {
+            code: "ADMIN_TASK_RPC_RESPONSE_INVALID", status: 503, unavailable: true
+        });
     }
 }
 
@@ -557,18 +558,11 @@ function createSupabaseRpcError(
             result
         );
 
-    const databaseCode =
-        normalizeNullableString(
-            result?.code
-        );
-
-    const details =
-        result?.details ??
-        null;
-
-    const hint =
-        result?.hint ??
-        null;
+    // Provider diagnostics may contain SQL, credentials or internal identifiers.
+    // Only the allowlisted task code and fixed message cross this boundary.
+    const databaseCode = null;
+    const details = null;
+    const hint = null;
 
     /* -----------------------------------------------------
     KNOWN TASK-DOMAIN ERROR
@@ -655,10 +649,11 @@ Authorization must already have completed before this
 function is called.
 ========================================================= */
 
-export async function callAdminTaskRpc(
+async function executeAdminTaskRpc(
     env,
     rpcName,
-    parameters = {}
+    parameters = {},
+    signal
 ) {
     const rpc =
         requireAllowedRpc(
@@ -678,22 +673,11 @@ export async function callAdminTaskRpc(
             env
         );
 
-    const controller =
-        new AbortController();
-
-    const timeoutId =
-        setTimeout(
-            () => {
-                controller.abort();
-            },
-            TASK_RPC_TIMEOUT_MS
-        );
-
     let response;
 
     try {
         response =
-            await fetch(
+            await fetchBoundedResponse(
                 `${supabaseUrl.replace(
                     /\/rest\/v1$/,
                     ""
@@ -729,8 +713,7 @@ export async function callAdminTaskRpc(
                             normalizedParameters
                         ),
 
-                    signal:
-                        controller.signal
+                    signal
                 }
             );
     }
@@ -770,11 +753,6 @@ export async function callAdminTaskRpc(
             }
         );
     }
-    finally {
-        clearTimeout(
-            timeoutId
-        );
-    }
 
     const result =
         await readResponseBody(
@@ -805,4 +783,17 @@ export function isAdminTaskRpcError(
         || error?.name ===
             "AdminTaskRpcError"
     );
+}
+
+export async function callAdminTaskRpc(env, name, parameters = {}) {
+    try {
+        return await withUpstreamDeadline(signal => executeAdminTaskRpc(env, name, parameters, signal), TASK_RPC_TIMEOUT_MS);
+    } catch (error) {
+        if (error?.code === "UPSTREAM_TIMEOUT") {
+            throw new AdminTaskRpcError("The task database request timed out.", {
+                code: "ADMIN_TASK_RPC_TIMEOUT", status: 503, unavailable: true
+            });
+        }
+        throw error;
+    }
 }

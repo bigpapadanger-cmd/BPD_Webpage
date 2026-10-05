@@ -1,8 +1,9 @@
 "use strict";
 
 import { isValidProviderRuntimeCallerSecret, withAbortTimeout } from "../auth/providers/discord_matchbot/runtime_contract.js";
+import { withUpstreamDeadline, fetchBoundedResponse } from "../http/upstream.js";
 
-const CACHE_KEY = "admin:system-status:v2";
+const CACHE_KEY = "admin:system-status:v3";
 const CACHE_TTL_SECONDS = 45;
 const CHECK_TIMEOUT_MS = 2000;
 const ACTION_TIMEOUT_MS = 15000;
@@ -10,10 +11,13 @@ const CLOUD_RUN_ACTION_TIMEOUT_MS = 30000;
 const INTERNAL_HOSTNAME = "ocr-google-transport.internal";
 let inFlightCheck = null;
 const actionLocks = new Set();
+const botCooldowns = new WeakMap();
+const BOT_NAMES = { "discord-matchbot": "Discord MatchBot", "discord-authz-bot": "Discord role-authorization bot" };
 const ACTION_COOLDOWNS = { "mmr-api:reconnect-psynet": 30, "mmr-api:refresh-eos": 15, "mmr-api:repair-session": 15, "cloud-run-ocr:recheck": 60, "rl-presence:run-now": 60, "provider-runtime:recheck": 15 };
 const ACTIONS = {
     pages: ["recheck"], "rl-presence": ["recheck", "run-now"], "ocr-transport": ["recheck"],
     "ocr-queue": ["recheck"], "cloud-run-ocr": ["recheck"], "provider-runtime": ["recheck"], supabase: ["recheck"],
+    "discord-matchbot": ["recheck"], "discord-authz-bot": ["recheck"],
     "mmr-api": ["recheck", "refresh-eos", "reauthorize-account", "poll-authorization", "reconnect-psynet", "repair-session", "functional-test"]
 };
 const SERVICE_STATUS_PREFIX = "admin:service-status:";
@@ -138,6 +142,74 @@ async function checkProviderRuntime(env) {
     }
 }
 
+async function readBotStatus(env, id) {
+    const saved = await readStatus(env, id);
+    const entry = statusEntry(id, BOT_NAMES[id], "unknown", "No connection check yet. Use Check connection; page loads do not contact Discord.");
+    if (!saved) return entry;
+    // Whitelist stored fields rather than forwarding a provider payload/cache blob.
+    return { ...entry, status: ["healthy", "degraded", "down", "unknown"].includes(saved.status) ? saved.status : "unknown",
+        checkedAt: safeTimestamp(saved.checkedAt), responseTimeMs: Number.isFinite(saved.responseTimeMs) ? saved.responseTimeMs : null,
+        lastSuccessfulAt: safeTimestamp(saved.lastSuccessfulAt), lastFailureAt: safeTimestamp(saved.lastFailureAt),
+        message: saved.status === "healthy" ? "Last read-only Discord bot connection check succeeded." : "Last Discord bot connection check was unavailable.",
+        detail: saved.status === "healthy" ? "Last read-only Discord bot connection check succeeded." : "Last Discord bot connection check was unavailable.",
+        errorCode: BOT_CODES.has(saved.errorCode) ? saved.errorCode : null,
+        retryAfterSeconds: Number.isSafeInteger(saved.retryAfterSeconds) ? saved.retryAfterSeconds : null };
+}
+
+const BOT_CODES = new Set(["DISCORD_BOT_UNAVAILABLE", "DISCORD_BOT_TIMEOUT", "DISCORD_BOT_RESPONSE_INVALID", "DISCORD_BOT_RATE_LIMITED", "DISCORD_BOT_UNAUTHORIZED", "DISCORD_BOT_GUILD_UNAVAILABLE"]);
+
+async function recheckDiscordBot(env, id) {
+    const started = Date.now();
+    const failed = (code, retryAfterSeconds = null) => statusEntry(id, BOT_NAMES[id], "degraded", "Discord bot connection could not be verified.",
+        { errorCode: BOT_CODES.has(code) ? code : "DISCORD_BOT_UNAVAILABLE", retryAfterSeconds, responseTimeMs: Date.now() - started });
+    try {
+        return await withUpstreamDeadline(async signal => {
+            if (id === "discord-matchbot") {
+                if (typeof env?.PROVIDER_RUNTIME?.fetch !== "function" || !isValidProviderRuntimeCallerSecret(env.PROVIDER_RUNTIME_CALLER_SECRET)) return failed("DISCORD_BOT_UNAVAILABLE");
+                const response = await fetchBoundedResponse("https://bpd-provider-runtime.internal/internal/discord/bot-health", {
+                    method: "GET", signal, headers: { Authorization: `Bearer ${env.PROVIDER_RUNTIME_CALLER_SECRET}`, Accept: "application/json" }, redirect: "manual"
+                }, 1024, (url, init) => env.PROVIDER_RUNTIME.fetch(new Request(url, init)));
+                const payload = await response.json();
+                if (!response.ok || payload?.success !== true) return failed(payload?.code, safeBotRetry(payload?.retryAfterSeconds));
+                const keys = ["success", "botAuthenticated", "checkedAt"];
+                if (Object.keys(payload).length !== keys.length || keys.some(key => !Object.hasOwn(payload, key))
+                    || payload.botAuthenticated !== true || !safeTimestamp(payload.checkedAt)) return failed("DISCORD_BOT_RESPONSE_INVALID");
+            } else {
+                const token = typeof env?.DISCORD_AUTHZ_BOT_TOKEN === "string" ? env.DISCORD_AUTHZ_BOT_TOKEN.trim() : "";
+                const guild = env?.DISCORD_AUTHZ_GUILD_ID;
+                if (!token || typeof guild !== "string" || !/^\d{16,22}$/u.test(guild)) return failed("DISCORD_BOT_UNAVAILABLE");
+                for (const path of ["/users/@me", `/guilds/${guild}`]) {
+                    const response = await fetchBoundedResponse(`https://discord.com/api/v10${path}`, {
+                        method: "GET", signal, redirect: "manual", headers: { Authorization: `Bot ${token}`, Accept: "application/json" }
+                    }, 256 * 1024);
+                    let payload;
+                    try { payload = await response.json(); } catch { return failed("DISCORD_BOT_RESPONSE_INVALID"); }
+                    if (response.status === 429) return failed("DISCORD_BOT_RATE_LIMITED", safeBotRetry(response.headers.get("Retry-After") ?? payload?.retry_after) || 60);
+                    if (response.status === 401) return failed("DISCORD_BOT_UNAUTHORIZED");
+                    if (!response.ok) return failed(path.startsWith("/guilds/") ? "DISCORD_BOT_GUILD_UNAVAILABLE" : "DISCORD_BOT_UNAVAILABLE");
+                    if (!payload || typeof payload.id !== "string" || !/^\d{16,22}$/u.test(payload.id)
+                        || (path === "/users/@me" ? payload.bot !== true : payload.id !== guild)) return failed("DISCORD_BOT_RESPONSE_INVALID");
+                }
+            }
+            return statusEntry(id, BOT_NAMES[id], "healthy", id === "discord-matchbot"
+                ? "Discord accepted the MatchBot credential and returned a valid bot identity. No message or membership change was made."
+                : "Discord accepted the authorization bot credential and confirmed access to its configured guild. No role or membership change was made.",
+            { responseTimeMs: Date.now() - started });
+        }, 15000);
+    } catch (error) { return failed(error?.code === "UPSTREAM_TIMEOUT" ? "DISCORD_BOT_TIMEOUT" : "DISCORD_BOT_UNAVAILABLE"); }
+}
+
+function safeTimestamp(value) {
+    return typeof value === "string" && Number.isFinite(Date.parse(value)) ? new Date(value).toISOString() : null;
+}
+
+function safeBotRetry(value) {
+    if (value === null || value === undefined || value === "") return null;
+    const numeric = Number(value);
+    const seconds = Number.isFinite(numeric) ? numeric : (Date.parse(value) - Date.now()) / 1000;
+    return Number.isFinite(seconds) && seconds >= 0 ? Math.min(86400, Math.ceil(seconds)) : null;
+}
+
 async function checkQueueConsumer(env) {
     const state = await readStatus(env, "ocr-queue");
     if (!state) return statusEntry("ocr-queue", "OCR queue consumer", "Unknown", "No queue invocation has reported status yet; an idle queue is not considered down.");
@@ -253,7 +325,9 @@ async function runChecks(env) {
             cloudRun,
             mmr,
             providerRuntime,
-            supabase
+            supabase,
+            await readBotStatus(env, "discord-matchbot"),
+            await readBotStatus(env, "discord-authz-bot")
         ]
     };
 }
@@ -278,9 +352,16 @@ export async function performSystemStatusAction(env, service, action, input = {}
     if (!ACTIONS[service]?.includes(action)) throw actionError("SYSTEM_ACTION_UNSUPPORTED", 400);
     const lockKey = `${service}:${action}`;
     if (actionLocks.has(lockKey)) throw actionError("SERVICE_ACTION_IN_PROGRESS", 409);
-    const cooldown = ACTION_COOLDOWNS[lockKey] || 0;
+    const bot = Object.hasOwn(BOT_NAMES, service);
+    const cooldown = bot ? 60 : ACTION_COOLDOWNS[lockKey] || 0;
     const cooldownKey = `admin:system-action:${lockKey}`;
     const now = Date.now();
+    if (bot) {
+        const previous = await readStatus(env, service);
+        const until = Math.max(botCooldowns.get(env)?.[service] || 0,
+            previous?.retryAfterSeconds ? Date.parse(previous.checkedAt) + previous.retryAfterSeconds * 1000 : 0);
+        if (until > now) { const error = actionError("SERVICE_ACTION_COOLDOWN", 429); error.retryAfterSeconds = Math.ceil((until - now) / 1000); throw error; }
+    }
     if (cooldown) {
         try {
             const last = Number(await env?.RL_STATS_CACHE?.get(cooldownKey));
@@ -289,6 +370,7 @@ export async function performSystemStatusAction(env, service, action, input = {}
     }
     actionLocks.add(lockKey);
     try {
+        if (bot) botCooldowns.set(env, { ...botCooldowns.get(env), [service]: now + 60000 });
         if (cooldown) try { await env?.RL_STATS_CACHE?.put(cooldownKey, String(now), { expirationTtl: cooldown }); } catch { /* Local lock remains effective. */ }
         if (service === "mmr-api") {
             if (action === "functional-test") return await testMmrSkills(env, service, action, input);
@@ -307,8 +389,10 @@ export async function performSystemStatusAction(env, service, action, input = {}
         } else if (service === "ocr-transport") result = await checkOcrTransport(env);
         else if (service === "ocr-queue") result = await checkQueueConsumer(env);
         else if (service === "provider-runtime") result = await checkProviderRuntime(env);
+        else if (bot) result = await recheckDiscordBot(env, service);
         else if (service === "supabase") result = await recheckSupabase(env);
         else if (service === "cloud-run-ocr") result = await recheckCloudRun(env);
+        if (bot && result?.retryAfterSeconds) botCooldowns.set(env, { ...botCooldowns.get(env), [service]: Date.now() + Math.max(60, result.retryAfterSeconds) * 1000 });
         await storeActionResult(env, result);
         return { success: true, service, action, result };
     } finally { actionLocks.delete(lockKey); }

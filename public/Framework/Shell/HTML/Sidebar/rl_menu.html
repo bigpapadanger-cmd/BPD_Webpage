@@ -1,323 +1,74 @@
-<!--
-=========================================================
-BPD GAMING NETWORK
-ROCKET LEAGUE SIDEBAR
-
-File:
-    Framework/Shell/HTML/Sidebar/rocketleague.html
-
-Purpose:
-    Provides public and Epic-connected Rocket League
-    navigation.
-
-Navigation:
-    - Dashboard
-    - Rocket League
-    - My Profile
-    - Competition
-    - Players
-    - Tools
-    - Settings
-
-Access:
-    - Dashboard, Rocket League, Leaderboards, Match Results,
-      and Find Players are public.
-    - My Profile, Weekly Matches, My Matches, Private Matches,
-      and scoreboard submission require an authenticated/
-      connected Epic account.
-
-Notes:
-    - rocketLeagueOverviewNav is intended to be hidden when
-      the current route is exactly /RocketLeague.
-=========================================================
--->
-
+<!-- Shared Rocket League navigation. Provider eligibility is never changed by navigation. -->
 <div class="sidebar-view sidebar-view-rocketleague">
     <div class="sidebar-toggle-box">
-        <button
-            class="sidebar-toggle"
-            id="sidebarToggle"
-            type="button"
-            aria-label="Toggle navigation"
-            aria-expanded="true"
-        >
+        <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Toggle navigation" aria-expanded="true">
             <span aria-hidden="true"></span>
             <span aria-hidden="true"></span>
             <span aria-hidden="true"></span>
         </button>
     </div>
-
-    <nav
-        class="sidebar-navigation sidebar-nav"
-        aria-label="Rocket League navigation"
-    >
-        <!-- Primary -->
+    <nav class="sidebar-navigation sidebar-nav" aria-label="Rocket League navigation">
         <div class="sidebar-group">
-            <a
-                href="/Dashboard"
-                class="nav-item"
-                data-router-link
-                data-nav-route="/Dashboard"
-                data-tooltip="Dashboard"
-            >
-                <span class="nav-icon" aria-hidden="true">📊</span>
-                <span class="nav-text">
-                    <span class="nav-label">Dashboard</span>
-                </span>
-            </a>
-
-            <a
-                id="rocketLeagueOverviewNav"
-                href="/RocketLeague"
-                class="nav-item"
-                data-router-link
-                data-nav-route="/RocketLeague"
-                data-hide-on-route="/RocketLeague"
-                data-tooltip="Rocket League"
-            >
+            <span class="sidebar-group-label">Rocket League</span>
+            <a id="rocketLeagueOverviewNav" href="/RocketLeague" class="nav-item" data-router-link
+                data-nav-route="/RocketLeague" data-nav-exact data-disable-on-active data-tooltip="Home">
                 <span class="nav-icon" aria-hidden="true">⚽</span>
-                <span class="nav-text">
-                    <span class="nav-label">Rocket League</span>
-                </span>
+                <span class="nav-text"><span class="nav-label">Home</span></span>
             </a>
-
-            <a
-                href="/RocketLeague/Shop"
-                class="nav-item"
-                data-router-link
-                data-nav-route="/RocketLeague/Shop"
-                data-tooltip="Rocket League Shop"
-            >
-                <span class="nav-icon" aria-hidden="true">🛒</span>
-                <span class="nav-text"><span class="nav-label">Shop</span></span>
-            </a>
-
-            <a
-                href="/RocketLeague/MyProfile"
-                class="nav-item"
-                data-router-link
-                data-nav-route="/RocketLeague/MyProfile"
-                data-auth="authenticated"
-                data-rl-access="required"
-                data-tooltip="My Profile"
-                hidden
-            >
+        </div>
+        <div class="nav-divider" role="separator"></div>
+        <div class="sidebar-group sidebar-menu" data-sidebar-menu>
+            <span class="sidebar-group-label">Player</span>
+            <button class="nav-item sidebar-menu-toggle" type="button" aria-expanded="false"
+                aria-controls="playerSubmenu" data-tooltip="Player">
                 <span class="nav-icon" aria-hidden="true">👤</span>
-                <span class="nav-text">
-                    <span class="nav-label">My Profile</span>
-                </span>
-            </a>
-        </div>
-
-        <!-- Competition -->
-        <div class="nav-divider" role="separator"></div>
-
-        <div
-            class="sidebar-group sidebar-menu"
-            data-sidebar-menu
-        >
-            <span class="sidebar-group-label">
-                Competition
-            </span>
-
-            <button
-                class="nav-item sidebar-menu-toggle"
-                type="button"
-                aria-expanded="false"
-                aria-controls="competitionSubmenu"
-                data-tooltip="Competition"
-            >
-                <span class="nav-icon" aria-hidden="true">🏆</span>
-                <span class="nav-text">
-                    <span class="nav-label">Competition</span>
-                </span>
+                <span class="nav-text"><span class="nav-label">Player</span></span>
                 <span class="submenu-arrow" aria-hidden="true">›</span>
             </button>
-
-            <div
-                class="sidebar-submenu"
-                id="competitionSubmenu"
-                hidden
-            >
-                <a
-                    href="/RocketLeague/Leaderboards"
-                    class="submenu-item"
-                    data-router-link
-                    data-nav-route="/RocketLeague/Leaderboards"
-                >
-                    Leaderboards
-                </a>
-
-                <a
-                    href="/RocketLeague/MatchResults"
-                    class="submenu-item"
-                    data-router-link
-                    data-nav-route="/RocketLeague/MatchResults"
-                >
-                    Match Results
-                </a>
-
-                <a
-                    href="/RocketLeague/MatchHistory"
-                    class="submenu-item"
-                    data-router-link
-                    data-nav-route="/RocketLeague/MatchHistory"
-                    data-auth="authenticated"
-                    data-rl-access="required"
-                    hidden
-                >
-                    My Match History
-                </a>
-
-                <a
-                    href="/RocketLeague/WeeklyMatches"
-                    class="submenu-item"
-                    data-router-link
-                    data-nav-route="/RocketLeague/WeeklyMatches"
-                    data-auth="authenticated"
-                    data-rl-access="required"
-                    hidden
-                >
-                    Join Weekly Matches
-                </a>
-
-                <a
-                    href="/RocketLeague/MyMatches"
-                    class="submenu-item"
-                    data-router-link
-                    data-nav-route="/RocketLeague/MyMatches"
-                    data-auth="authenticated"
-                    data-rl-access="required"
-                    hidden
-                >
-                    My Matches
-                </a>
-
-                <a
-                    href="/RocketLeague/PrivateMatches"
-                    class="submenu-item"
-                    data-router-link
-                    data-nav-route="/RocketLeague/PrivateMatches"
-                    data-auth="authenticated"
-                    data-rl-access="required"
-                    hidden
-                >
-                    Private Matches
-                </a>
+            <div class="sidebar-submenu" id="playerSubmenu" hidden>
+                <a href="/RocketLeague/MyProfile" class="submenu-item" data-router-link data-nav-route="/RocketLeague/MyProfile"
+                    data-auth="authenticated" data-rl-access="required" hidden>My Profile</a>
+                <a href="/RocketLeague/MatchHistory" class="submenu-item" data-router-link data-nav-route="/RocketLeague/MatchHistory"
+                    data-auth="authenticated" data-rl-access="required" hidden>Match History</a>
             </div>
         </div>
-
-        <!-- Players -->
         <div class="nav-divider" role="separator"></div>
-
-        <div
-            class="sidebar-group sidebar-menu"
-            data-sidebar-menu
-        >
-            <span class="sidebar-group-label">
-                Players
-            </span>
-
-            <button
-                class="nav-item sidebar-menu-toggle"
-                type="button"
-                aria-expanded="false"
-                aria-controls="playersSubmenu"
-                data-tooltip="Players"
-            >
+        <div class="sidebar-group sidebar-menu" data-sidebar-menu>
+            <span class="sidebar-group-label">Play</span>
+            <button class="nav-item sidebar-menu-toggle" type="button" aria-expanded="false"
+                aria-controls="playSubmenu" data-tooltip="Play">
+                <span class="nav-icon" aria-hidden="true">🎮</span>
+                <span class="nav-text"><span class="nav-label">Play</span></span>
+                <span class="submenu-arrow" aria-hidden="true">›</span>
+            </button>
+            <div class="sidebar-submenu" id="playSubmenu" hidden>
+                <a href="/RocketLeague/FindPlayers" class="submenu-item" data-router-link data-nav-route="/RocketLeague/FindPlayers">Find Players</a>
+                <a href="/RocketLeague/FindCustomMatches" class="submenu-item" data-router-link data-nav-route="/RocketLeague/FindCustomMatches">Find Custom Matches</a>
+                <a href="/RocketLeague/PrivateMatches" class="submenu-item" data-router-link data-nav-route="/RocketLeague/PrivateMatches"
+                    data-auth="authenticated" data-rl-access="required" hidden>Private Matches</a>
+            </div>
+        </div>
+        <div class="nav-divider" role="separator"></div>
+        <div class="sidebar-group sidebar-menu" data-sidebar-menu>
+            <span class="sidebar-group-label">Community</span>
+            <button class="nav-item sidebar-menu-toggle" type="button" aria-expanded="false"
+                aria-controls="communitySubmenu" data-tooltip="Community">
                 <span class="nav-icon" aria-hidden="true">👥</span>
-                <span class="nav-text">
-                    <span class="nav-label">Players</span>
-                </span>
+                <span class="nav-text"><span class="nav-label">Community</span></span>
                 <span class="submenu-arrow" aria-hidden="true">›</span>
             </button>
-
-            <div
-                class="sidebar-submenu"
-                id="playersSubmenu"
-                hidden
-            >
-                <a
-                    href="/RocketLeague/FindPlayers"
-                    class="submenu-item"
-                    data-router-link
-                    data-nav-route="/RocketLeague/FindPlayers"
-                >
-                    Find Players
-                </a>
+            <div class="sidebar-submenu" id="communitySubmenu" hidden>
+                <a href="/RocketLeague/Shop" class="submenu-item" data-router-link data-nav-route="/RocketLeague/Shop">Shop</a>
+                <a href="https://discord.com/oauth2/authorize?client_id=1549606323249877034" class="submenu-item"
+                    target="_blank" rel="noopener noreferrer">Add Discord Bot</a>
             </div>
         </div>
-
-        <!-- Tools -->
-        <div class="nav-divider" role="separator"></div>
-
-        <div
-            class="sidebar-group sidebar-menu"
-            data-sidebar-menu
-            data-auth="authenticated"
-            data-rl-access="required"
-            hidden
-        >
-            <span class="sidebar-group-label">
-                Tools
-            </span>
-
-            <button
-                class="nav-item sidebar-menu-toggle"
-                type="button"
-                aria-expanded="false"
-                aria-controls="toolsSubmenu"
-                data-tooltip="Tools"
-            >
-                <span class="nav-icon" aria-hidden="true">🛠️</span>
-                <span class="nav-text">
-                    <span class="nav-label">Tools</span>
-                </span>
-                <span class="submenu-arrow" aria-hidden="true">›</span>
-            </button>
-
-            <div
-                class="sidebar-submenu"
-                id="toolsSubmenu"
-                hidden
-            >
-                <a
-                    href="/RocketLeague/SubmitMatchResults"
-                    class="submenu-item"
-                    data-router-link
-                    data-nav-route="/RocketLeague/SubmitMatchResults"
-                    data-auth="authenticated"
-                    data-rl-access="required"
-                    hidden
-                >
-                    Submit Scoreboard
-                </a>
-            </div>
-        </div>
-
-        <div
-            class="sidebar-navigation-spacer"
-            aria-hidden="true"
-        ></div>
-
-        <div
-            class="nav-divider sidebar-bottom-divider"
-            role="separator"
-        ></div>
-
-        <!-- Settings -->
+        <div class="sidebar-navigation-spacer" aria-hidden="true"></div>
+        <div class="nav-divider sidebar-bottom-divider" role="separator"></div>
         <div class="sidebar-group sidebar-bottom">
-            <a
-                href="/Settings"
-                class="nav-item"
-                data-router-link
-                data-nav-route="/Settings"
-                data-tooltip="Settings"
-            >
+            <a href="/Settings?context=rocketleague&amp;returnTo=%2FRocketLeague" class="nav-item" data-router-link data-nav-route="/Settings" data-settings-context="rocketleague" data-tooltip="Settings">
                 <span class="nav-icon" aria-hidden="true">⚙️</span>
-                <span class="nav-text">
-                    <span class="nav-label">Settings</span>
-                </span>
+                <span class="nav-text"><span class="nav-label">Settings</span></span>
             </a>
         </div>
     </nav>
