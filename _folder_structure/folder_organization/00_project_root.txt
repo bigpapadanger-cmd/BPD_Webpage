@@ -11,8 +11,9 @@ DomainData/  (saved in Codex as the RLFolderStructuring project)
 |   +-- auth-mobile-compatibility.md Provider flows, cookie boundaries, and manual test matrix.
 |   +-- system_sub_map/account-settings.md BPD display-name safety, session timestamps, and cooldown contract.
 +-- Notes/               Operational notes, schema scripts, and design material.
-+-- scripts/             Route inventory generator and debug-rl-shop.mjs local-only
-                         cached/Worker shop caller; no automatic provider calls or writes.
++-- scripts/             Route inventory generator, debug-rl-shop.mjs and
+                         debug-rl-leaderboard.mjs manual protected diagnostics;
+                         no automatic provider calls or writes.
 |
 +-- .git/                Git repository metadata.
 +-- .ruff_cache/         Root Python lint cache.

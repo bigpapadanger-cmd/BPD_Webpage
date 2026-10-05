@@ -14,11 +14,11 @@ test("catalog diagnostic makes one fixed read and strips private fields and imag
         assert.equal(url.search, "");
         assert.equal(init.headers.Authorization, "Bearer secret");
         return Response.json({ success: true, category: "StarterPack", account: "PRIVATE", products: [
-            { id: 139, title: "Pack", imageUrl: "https://cdn.test/pack.png?token=PRIVATE", productIds: [4284], IsOwned: true }
+            { id: 139, title: "Pack", imageUrl: "https://cdn.test/pack.png?token=PRIVATE", imageStatus: "usable", productIds: [4284], IsOwned: true }
         ] });
     });
     assert.equal(calls, 1);
-    assert.deepEqual(result.products[0], { id: 139, title: "Pack", imageUrl: "https://cdn.test/pack.png", productIds: [4284] });
+    assert.deepEqual(result.products[0], { id: 139, title: "Pack", imageUrl: "https://cdn.test/pack.png", imageStatus: "usable", productIds: [4284] });
     assert.doesNotMatch(JSON.stringify(result), /PRIVATE|IsOwned/);
     await assert.rejects(callShopDebug("catalog", {}, 52), { code: "SHOP_DEBUG_ARGUMENTS_INVALID" });
     await assert.rejects(callShopDebug("catalog", { MMR_API_URL: "https://worker.test", MMR_API_KEY: "secret" }, null,

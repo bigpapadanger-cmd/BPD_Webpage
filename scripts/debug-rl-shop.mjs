@@ -70,6 +70,7 @@ export async function callShopDebug(mode, env, shopId = null, fetcher = fetch) {
             if (shopId !== null || payload?.success !== true || payload.category !== "StarterPack" || !Array.isArray(payload.products) || payload.products.length > 200) throw fail("SHOP_DEBUG_RESPONSE_INVALID");
             return { category: "StarterPack", productCount: payload.products.length, products: payload.products.map(row => ({
                 id: number(row.id), title: text(row.title), imageUrl: image(row.imageUrl),
+                imageStatus: ["missing", "empty", "rejected", "usable"].includes(row.imageStatus) ? row.imageStatus : "unreported",
                 productIds: (Array.isArray(row.productIds) ? row.productIds : []).map(number).filter(id => id !== null)
             })) };
         }
