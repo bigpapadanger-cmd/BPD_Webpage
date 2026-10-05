@@ -20,7 +20,7 @@ test("Shop refresh normalizes provider response, hashes content, saves, and chec
         if (parsed.hostname === "mmr.example.test") {
             assert.equal(parsed.pathname, "/get-shop-data");
             assert.equal(init.headers.Authorization, "Bearer worker-secret");
-            return Response.json({ success: true, shops: [{ id: 7 }], catalogues: [{ shop_id: 7, items: [] }] });
+            return Response.json({ success: true, shops: [{ id: 7, logo_url: "https://assets.test/logo.png" }], catalogues: [{ shop_id: 7, items: [{ id: 9, image_url: "https://assets.test/item.png" }] }] });
         }
         if (parsed.pathname.endsWith("/save_rl_shop_snapshot")) return Response.json({ saved: false, snapshot_id: 21 });
         if (parsed.pathname.endsWith("/record_rl_global_refresh_result")) return Response.json({ success: true });
@@ -35,8 +35,8 @@ test("Shop refresh normalizes provider response, hashes content, saves, and chec
     ]);
     const save = calls.find(call => call.path.endsWith("/save_rl_shop_snapshot")).body;
     assert.match(save.p_content_hash, /^[a-f0-9]{64}$/);
-    assert.deepEqual(save.p_shops, [{ id: 7 }]);
-    assert.deepEqual(save.p_catalogues, [{ shop_id: 7, items: [] }]);
+    assert.deepEqual(save.p_shops, [{ id: 7, logo_url: "https://assets.test/logo.png" }]);
+    assert.deepEqual(save.p_catalogues, [{ shop_id: 7, items: [{ id: 9, image_url: "https://assets.test/item.png" }] }]);
     assert.deepEqual(save.p_notifications, []);
     assert.equal(save.p_provider_schema_version, 1);
     assert.ok(Number.isFinite(Date.parse(save.p_captured_at)));

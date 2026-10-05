@@ -8,6 +8,7 @@ import { existsSync } from "node:fs";
 import { ROUTES } from "../../public/routes.js";
 import { handleAccountMutation } from "../../functions/services/auth/account/mutations.js";
 import { applyAppearancePreferences, hasReadableContrast } from "../../public/Framework/Shell/JS/preferences.js";
+import { SIDEBAR_ICONS } from "../../public/Framework/Shell/JS/Sidebar/icons.js";
 
 function createElement(value = "") {
     return {
@@ -167,7 +168,8 @@ test("sidebar icons use the shared accessible icon slot and consistent dashboard
         const itemStart = sidebar.lastIndexOf("<a", tooltipIndex);
         const itemEnd = sidebar.indexOf("</a>", tooltipIndex) + 4;
         const item = sidebar.slice(itemStart, itemEnd);
-        return item.match(/class="nav-icon"[^>]*>([\s\S]*?)<\/span>/)?.[1].trim();
+        const key = item.match(/data-sidebar-icon="([^"]+)"/)?.[1];
+        return SIDEBAR_ICONS[key];
     };
     for (const sidebar of sharedSidebars.slice(0, 2)) {
         assert.equal(iconFor(sidebar, "Dashboard"), "📊");

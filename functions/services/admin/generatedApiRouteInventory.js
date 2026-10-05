@@ -2423,6 +2423,38 @@ export const API_ROUTE_INVENTORY = Object.freeze([
     "deepLinkSupported": false
   },
   {
+    "path": "/api/rocketleague/network-statistics",
+    "lookupKey": null,
+    "routeType": "api",
+    "casePolicy": "exact",
+    "sourceFiles": [
+      "functions/api/rocketleague/network-statistics.js"
+    ],
+    "handler": "functions/api/rocketleague/network-statistics.js",
+    "methods": [
+      "ALL"
+    ],
+    "authRequired": "handler-defined",
+    "healthStatus": "valid",
+    "deepLinkSupported": false
+  },
+  {
+    "path": "/api/rocketleague/players/featured",
+    "lookupKey": null,
+    "routeType": "api",
+    "casePolicy": "exact",
+    "sourceFiles": [
+      "functions/api/rocketleague/players/featured.js"
+    ],
+    "handler": "functions/api/rocketleague/players/featured.js",
+    "methods": [
+      "ALL"
+    ],
+    "authRequired": "handler-defined",
+    "healthStatus": "valid",
+    "deepLinkSupported": false
+  },
+  {
     "path": "/api/rocketleague/players/profile/:publicProfileId",
     "lookupKey": null,
     "routeType": "api",

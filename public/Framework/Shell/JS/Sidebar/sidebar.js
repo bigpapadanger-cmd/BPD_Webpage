@@ -1,5 +1,7 @@
 "use strict";
 
+import { initializeSidebarIcons } from "./icons.js";
+
 /* =========================================================
 BPD GAMING NETWORK
 SPA SIDEBAR MODULE
@@ -88,6 +90,7 @@ CRITICAL INITIALIZATION
 ========================================================= */
 
 function initializeCriticalSidebar() {
+    initializeSidebarIcons(document.getElementById("sidebar"));
     applyGlobalSettings();
 
     setupSidebarToggle();

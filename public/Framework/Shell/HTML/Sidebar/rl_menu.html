@@ -9,10 +9,17 @@
     </div>
     <nav class="sidebar-navigation sidebar-nav" aria-label="Rocket League navigation">
         <div class="sidebar-group">
+            <a href="/Dashboard" class="nav-item" data-router-link data-nav-route="/Dashboard" data-tooltip="Dashboard">
+                <span class="nav-icon" data-sidebar-icon="dashboard" aria-hidden="true"></span>
+                <span class="nav-text"><span class="nav-label">Dashboard</span></span>
+            </a>
+        </div>
+        <div class="nav-divider" role="separator"></div>
+        <div class="sidebar-group">
             <span class="sidebar-group-label">Rocket League</span>
             <a id="rocketLeagueOverviewNav" href="/RocketLeague" class="nav-item" data-router-link
                 data-nav-route="/RocketLeague" data-nav-exact data-disable-on-active data-tooltip="Home">
-                <span class="nav-icon" aria-hidden="true">⚽</span>
+                <span class="nav-icon" data-sidebar-icon="rocketleague" aria-hidden="true"></span>
                 <span class="nav-text"><span class="nav-label">Home</span></span>
             </a>
         </div>
@@ -21,9 +28,9 @@
             <span class="sidebar-group-label">Player</span>
             <button class="nav-item sidebar-menu-toggle" type="button" aria-expanded="false"
                 aria-controls="playerSubmenu" data-tooltip="Player">
-                <span class="nav-icon" aria-hidden="true">👤</span>
+                <span class="nav-icon" data-sidebar-icon="player" aria-hidden="true"></span>
                 <span class="nav-text"><span class="nav-label">Player</span></span>
-                <span class="submenu-arrow" aria-hidden="true">›</span>
+                <span class="submenu-arrow" data-sidebar-icon="chevron" aria-hidden="true"></span>
             </button>
             <div class="sidebar-submenu" id="playerSubmenu" hidden>
                 <a href="/RocketLeague/MyProfile" class="submenu-item" data-router-link data-nav-route="/RocketLeague/MyProfile"
@@ -37,9 +44,9 @@
             <span class="sidebar-group-label">Play</span>
             <button class="nav-item sidebar-menu-toggle" type="button" aria-expanded="false"
                 aria-controls="playSubmenu" data-tooltip="Play">
-                <span class="nav-icon" aria-hidden="true">🎮</span>
+                <span class="nav-icon" data-sidebar-icon="play" aria-hidden="true"></span>
                 <span class="nav-text"><span class="nav-label">Play</span></span>
-                <span class="submenu-arrow" aria-hidden="true">›</span>
+                <span class="submenu-arrow" data-sidebar-icon="chevron" aria-hidden="true"></span>
             </button>
             <div class="sidebar-submenu" id="playSubmenu" hidden>
                 <a href="/RocketLeague/FindPlayers" class="submenu-item" data-router-link data-nav-route="/RocketLeague/FindPlayers">Find Players</a>
@@ -53,9 +60,9 @@
             <span class="sidebar-group-label">Community</span>
             <button class="nav-item sidebar-menu-toggle" type="button" aria-expanded="false"
                 aria-controls="communitySubmenu" data-tooltip="Community">
-                <span class="nav-icon" aria-hidden="true">👥</span>
+                <span class="nav-icon" data-sidebar-icon="community" aria-hidden="true"></span>
                 <span class="nav-text"><span class="nav-label">Community</span></span>
-                <span class="submenu-arrow" aria-hidden="true">›</span>
+                <span class="submenu-arrow" data-sidebar-icon="chevron" aria-hidden="true"></span>
             </button>
             <div class="sidebar-submenu" id="communitySubmenu" hidden>
                 <a href="/RocketLeague/Shop" class="submenu-item" data-router-link data-nav-route="/RocketLeague/Shop">Shop</a>
@@ -67,7 +74,7 @@
         <div class="nav-divider sidebar-bottom-divider" role="separator"></div>
         <div class="sidebar-group sidebar-bottom">
             <a href="/Settings?context=rocketleague&amp;returnTo=%2FRocketLeague" class="nav-item" data-router-link data-nav-route="/Settings" data-settings-context="rocketleague" data-tooltip="Settings">
-                <span class="nav-icon" aria-hidden="true">⚙️</span>
+                <span class="nav-icon" data-sidebar-icon="settings" aria-hidden="true"></span>
                 <span class="nav-text"><span class="nav-label">Settings</span></span>
             </a>
         </div>

@@ -35,6 +35,7 @@ functions/
 |   |   |   +-- discord-notifications.js, profile.js, session.js
 |   |   +-- steam/callback.js, login.js
 |   +-- rocketleague/players/search.js, players/profile/[publicProfileId].js
+|   +-- rocketleague/players/featured.js, network-statistics.js (public-safe persisted RPC reads)
 |   +-- admin/page-settings/route-health.js, system-status.js, suggestions/index.js
 |   |   +-- suggestions/[suggestionId]/review.js
 |   +-- admin/rocketleague/force-refresh.js, compatibility-probe.js (Admin-only; execution disabled)
@@ -153,8 +154,9 @@ services/supabase/suggestions.js
     and excluded from GitHub by .gitignore.
 
 services/supabase/rocketleague/discovery.js
-    Server-only, allow-listed search/public-profile RPC transport with bounded
-    timeout and explicit public-field sanitization.
+    Server-only, allow-listed search/public-profile/featured/network-statistics
+    RPC transport with an 8-second end-to-end deadline, bounded response bodies,
+    and explicit public-field sanitization. Featured reads are not publicly cached.
 
 services/admin, services/security, services/config, response helpers
     Cross-cutting permissions/Discord roles, Turnstile validation, environment

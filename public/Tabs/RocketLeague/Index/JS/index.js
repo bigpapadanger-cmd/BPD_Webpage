@@ -1,5 +1,7 @@
 "use strict";
 
+import { initializeNetworkStatistics } from "./networkStatistics.js";
+
 /* =========================================================
 BPD GAMING NETWORK
 ROCKET LEAGUE PAGE INITIALIZER
@@ -34,6 +36,7 @@ PAGE INITIALIZATION
 ========================================================= */
 
 export async function initializePage() {
+    void initializeNetworkStatistics();
     document.body.dataset.page =
         "rocket-league";
 

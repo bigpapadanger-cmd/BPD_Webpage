@@ -28,10 +28,20 @@
 .rl-shop-carousel-controls { display: flex; justify-content: flex-end; gap: 10px; margin-bottom: 16px; }
 .rl-shop-carousel-controls button { color: #eaf4ff; font: inherit; cursor: pointer; }
 .rl-shop-carousel-controls button:disabled { opacity: .5; cursor: default; }
-.rl-shop-items { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr)); gap: 16px; }
+.rl-shop-items { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+.rl-shop-categories { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 22px; }
+.rl-shop-category { padding: 9px 13px; border: 1px solid rgba(121,184,255,.3); border-radius: 999px; color: #c4cede; background: rgba(6,13,23,.48); font: inherit; cursor: pointer; }
+.rl-shop-category[aria-pressed="true"] { background: #244d7c; color: #fff; border-color: #79b8ff; }
+.rl-shop-category:focus-visible { outline: 3px solid #79b8ff; outline-offset: 3px; }
+.rl-shop-panel__heading { flex-wrap: wrap; align-items: center; }
+.rl-shop-carousel-controls { flex-wrap: wrap; }
+@media (max-width: 900px) { .rl-shop-items { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 600px) { .rl-shop-items { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 380px) { .rl-shop-items { grid-template-columns: minmax(0, 1fr); } }
 .rl-shop-item { overflow: hidden; border: 1px solid rgba(181, 206, 242, .14); border-radius: 14px; background: rgba(6, 13, 23, .48); }
 .rl-shop-item__image { display: grid; width: 100%; height: 170px; object-fit: contain; background: radial-gradient(ellipse at center, rgba(53, 81, 111, .4), rgba(8, 14, 23, .7)); color: #9eacc0; place-items: center; }
 .rl-shop-item__image--empty { font-size: .9rem; }
+.rl-shop-logo { width: 56px; height: 56px; object-fit: contain; border-radius: 10px; }
 .rl-shop-item__title { margin: 14px 14px 6px; color: #fff; font-size: 1rem; }
 .rl-shop-item__description,.rl-shop-item__price,.rl-shop-item__timing { margin: 0 14px 10px !important; font-size: .88rem; }
 .rl-shop-item__price { color: #b8dfff !important; font-weight: 750; }

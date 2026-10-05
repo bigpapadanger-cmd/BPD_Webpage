@@ -1,6 +1,8 @@
 "use strict";
 
 let root = null;
+let stopCarousel = () => {};
+const FALLBACK_IMAGE = "/Assets/logo/gaming_network_logo_128px_no_border.png";
 const SHOP_STALE_AFTER_MS = 2 * 60 * 60 * 1000;
 
 function element(tag, className, text) {
@@ -13,7 +15,7 @@ function element(tag, className, text) {
 function safeImage(value) {
     try {
         const url = new URL(value);
-        return url.protocol === "https:" ? url.href : null;
+        return url.protocol === "https:" && !url.username && !url.password ? url.href : null;
     } catch {
         return null;
     }
@@ -52,19 +54,22 @@ function timingLabel(startsAt, endsAt) {
     return null;
 }
 
-function itemCard(item) {
+export function shopImage(value, alt, className) {
+    const image = element("img", className);
+    image.src = safeImage(value) || FALLBACK_IMAGE;
+    image.alt = alt;
+    image.loading = "lazy";
+    image.referrerPolicy = "no-referrer";
+    image.addEventListener("error", () => {
+        image.removeAttribute("srcset");
+        image.src = FALLBACK_IMAGE;
+    }, { once: true });
+    return image;
+}
+
+export function itemCard(item) {
     const card = element("article", "rl-shop-item");
-    const imageUrl = safeImage(item.image_url);
-    if (imageUrl) {
-        const image = element("img", "rl-shop-item__image");
-        image.src = imageUrl;
-        image.alt = item.title ? `${item.title} artwork` : "Rocket League item artwork";
-        image.loading = "lazy";
-        image.referrerPolicy = "no-referrer";
-        card.append(image);
-    } else {
-        card.append(element("div", "rl-shop-item__image rl-shop-item__image--empty", "Artwork unavailable"));
-    }
+    card.append(shopImage(item.image_url, item.title ? `${item.title} artwork` : "BPD item artwork placeholder", "rl-shop-item__image"));
     card.append(element("h3", "rl-shop-item__title", item.title || "Shop item"));
     if (item.description) card.append(element("p", "rl-shop-item__description", item.description));
 
@@ -80,7 +85,21 @@ function itemCard(item) {
     return card;
 }
 
+export function shopPages(snapshot) {
+    const shops = new Map(snapshot.shops.map(shop => [String(shop.id), shop]));
+    return snapshot.catalogues.flatMap(catalogue => {
+        const items = Array.isArray(catalogue.items) ? catalogue.items : [];
+        const pages = [];
+        for (let offset = 0; offset < items.length; offset += 5) {
+            pages.push({ shop: shops.get(String(catalogue.shop_id)), shopId: String(catalogue.shop_id),
+                items: items.slice(offset, offset + 5), first: offset + 1, total: items.length });
+        }
+        return pages;
+    });
+}
+
 function initializeCarousel(snapshot) {
+    stopCarousel();
     const catalogues = snapshot.catalogues.filter(entry => Array.isArray(entry.items) && entry.items.length);
     const shopsById = new Map(snapshot.shops.map(shop => [String(shop.id), shop]));
     const sections = catalogues.map(catalogue => ({ catalogue, shop: shopsById.get(String(catalogue.shop_id)) }));
@@ -106,40 +125,82 @@ function initializeCarousel(snapshot) {
     status.textContent = stale ? "Saved shop rotation may be out of date" : "Current saved shop rotation";
     root.querySelector("[data-shop-capture]").textContent = captured ? `Data captured ${captured}` : "Showing the latest saved shop data.";
     panel.hidden = false;
+    const pages = shopPages(snapshot);
+    const categories = root.querySelector("[data-shop-categories]");
+    const pause = root.querySelector("[data-shop-pause]");
+    const carouselRoot = root;
+    const listeners = new AbortController();
+    let paused = false;
+    let interacting = false;
     let index = 0;
+    const categoryButtons = sections.map(entry => {
+        const button = element("button", "rl-shop-category", entry.shop?.title || entry.shop?.name || entry.shop?.type || "Shop category");
+        button.type = "button";
+        button.addEventListener("click", () => {
+            index = pages.findIndex(page => page.shopId === String(entry.catalogue.shop_id));
+            render();
+        }, { signal: listeners.signal });
+        return button;
+    });
+    categories.replaceChildren(...categoryButtons);
     const render = () => {
-        const entry = sections[index];
+        const entry = pages[index];
         const shop = entry.shop;
         sectionTitle.textContent = shop?.title || shop?.name || shop?.type || "Shop rotation";
+        const logo = root.querySelector("[data-shop-logo]");
+        if (logo) logo.replaceChildren(shopImage(shop?.logo_url, `${sectionTitle.textContent} logo`, "rl-shop-logo"));
         sectionTiming.textContent = timingLabel(shop?.starts_at, shop?.ends_at) || "Shop dates unavailable";
-        position.textContent = `${index + 1} of ${sections.length}`;
-        items.replaceChildren(...entry.catalogue.items.map(itemCard));
-        previous.disabled = sections.length < 2;
-        next.disabled = sections.length < 2;
-        previous.setAttribute("aria-label", "Previous shop section");
-        next.setAttribute("aria-label", "Next shop section");
+        position.textContent = `Items ${entry.first}–${entry.first + entry.items.length - 1} of ${entry.total} · ${index + 1}/${pages.length}`;
+        items.replaceChildren(...entry.items.map(itemCard));
+        categoryButtons.forEach((button, categoryIndex) => button.setAttribute("aria-pressed",
+            String(String(sections[categoryIndex].catalogue.shop_id) === entry.shopId)));
+        previous.disabled = pages.length < 2;
+        next.disabled = pages.length < 2;
+        pause.disabled = pages.length < 2;
+        previous.setAttribute("aria-label", "Previous shop items");
+        next.setAttribute("aria-label", "Next shop items");
     };
-    previous.addEventListener("click", () => { index = (index - 1 + sections.length) % sections.length; render(); });
-    next.addEventListener("click", () => { index = (index + 1) % sections.length; render(); });
+    const advance = direction => { index = (index + direction + pages.length) % pages.length; render(); };
+    previous.addEventListener("click", () => advance(-1), { signal: listeners.signal });
+    next.addEventListener("click", () => advance(1), { signal: listeners.signal });
+    pause.addEventListener("click", () => {
+        paused = !paused;
+        pause.textContent = paused ? "Resume cycling" : "Pause cycling";
+        pause.setAttribute("aria-pressed", String(paused));
+    }, { signal: listeners.signal });
+    carouselRoot.addEventListener("pointerenter", () => { interacting = true; }, { signal: listeners.signal });
+    carouselRoot.addEventListener("pointerleave", () => { interacting = false; }, { signal: listeners.signal });
+    // Cycling only changes the displayed cached items; it never fetches data.
+    const timer = pages.length > 1 ? setInterval(() => {
+        if (!carouselRoot.isConnected) { stopCarousel(); return; }
+        if (!paused && !interacting && !document.hidden && !carouselRoot.contains(document.activeElement)
+            && document.body.dataset.animations !== "off"
+            && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) advance(1);
+    }, 8000) : null;
+    stopCarousel = () => { clearInterval(timer); listeners.abort(); };
     render();
 }
 
 async function loadShop() {
     if (!root) return;
+    const loadingRoot = root;
     const status = root.querySelector("[data-shop-status]");
     try {
         const response = await fetch("/api/rocketleague/shop", { headers: { Accept: "application/json" } });
         if (!response.ok) throw new Error("shop unavailable");
         const payload = await response.json();
+        if (root !== loadingRoot || !loadingRoot.isConnected) return;
         if (!payload || payload.success !== true || !Array.isArray(payload.shops) || !Array.isArray(payload.catalogues)) throw new Error("invalid shop response");
         initializeCarousel(payload);
     } catch {
+        if (root !== loadingRoot || !loadingRoot.isConnected) return;
         status.textContent = "Shop rotation unavailable";
         root.querySelector("[data-shop-capture]").textContent = "The saved shop data could not be loaded. Please try again later.";
     }
 }
 
 export async function initializePage() {
+    stopCarousel();
     root = document.querySelector("[data-rl-shop]");
     if (!root) return;
     await loadShop();

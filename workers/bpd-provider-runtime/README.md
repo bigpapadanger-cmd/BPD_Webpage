@@ -5,6 +5,9 @@ validation is stateless and does not access Supabase, resolve BPD accounts, or
 persist eligibility results. Its separate Linked Roles nonce authority stores
 only short-lived transaction security state, not provider/account/session data.
 
+The local Wrangler configuration enables Smart Placement (`placement.mode: "smart"`).
+This does not change its private Service Binding boundary or caller authentication.
+
 ## Manual Admin bot connection check
 
 `GET /internal/discord/bot-health` requires the existing internal caller secret,

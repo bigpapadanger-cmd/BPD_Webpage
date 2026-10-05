@@ -56,7 +56,8 @@ public/Framework/
         +-- ocr_results.js          OCR result handling.
         +-- ocr_review_policy.js    OCR review decision policy.
         +-- Admin/sidebar.js
-        +-- Sidebar/admin_navigation.js, sidebar.js, submenu.js, state.js
+        +-- Sidebar/admin_navigation.js, icons.js, sidebar.js, submenu.js, state.js
+        |   icons.js owns shared sidebar artwork; templates reference data-sidebar-icon keys.
         +-- preferences.js    Shared browser-local appearance preference applicator.
         +-- Sidebar/RocketLeague/sidebar_auth.js
 
@@ -91,6 +92,8 @@ public/Required/
 +-- TOS/                 CSS/index.css, HTML/index.html, JS/index.js
 
 public/Tabs/
+RocketLeague/Index/JS/networkStatistics.js reads public persisted network totals;
+its single card follows the authorized MMR history panel in the homepage markup.
 +-- Ark/
 |   +-- CSS/index.css
 |   +-- HTML/index.html, mods.html, announcements.html
@@ -110,7 +113,7 @@ public/Tabs/
 |   +-- PublicProfile/   Public-safe profile by public_profile_id; shell fragment, styles via master_rl.css
 |   +-- shared/          notificationsV2.js (shared channel/reminder validation), profile visibility/presence (normalized online/offline only), and timestamp presentation helpers.
 |   +-- MatchResults/, PrivateMatches/, WeeklyMatches/ Legacy full-page sources; routes use shell fragments below
-|   +-- FindPlayers/     Public opt-in search; CSS/index.css, HTML/index.html, JS/index.js, view.js; responsive cards
+|   +-- FindPlayers/     Public opt-in search and UTC daily featured player; CSS/index.css, HTML/index.html, JS/index.js, view.js; responsive cards
 |   +-- Features/
 |       +-- CSS/index.css; shared Rocket League destination/status card styling
 |       +-- HTML/shop.html, match-history.html, leaderboards.html, match-results.html,
@@ -159,7 +162,7 @@ ROUTE-TO-FOLDER MAP
 /RocketLeague/Profile -> Registration onboarding; established accounts redirect to /RocketLeague/MyProfile
 /RocketLeague/MyProfile -> Private field-aware settings editor; full-save action fails closed on any unconfirmed RPC field
 /RocketLeague/FindPlayers -> Public opt-in directory search and public profile links
-/RocketLeague/Shop -> Public information page; no live shop data/provider integration
+/RocketLeague/Shop -> Cached Supabase shop snapshot; item artwork/section logos with BPD fallback; no provider call on page views
 /RocketLeague/MatchHistory -> Auth-gated status page; arbitrary linked-player match history is unsupported
 /RocketLeague/Leaderboards, /MatchResults, /WeeklyMatches, /MyMatches, /PrivateMatches -> Shell-integrated status pages until verified data workflows exist
     /RocketLeague*        -> Rocket League home/profile/discovery/feature pages plus public/ocr submission workflow

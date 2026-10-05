@@ -1,8 +1,11 @@
 "use strict";
+import { withUpstreamDeadline, fetchBoundedResponse } from "../../http/upstream.js";
 
 const RPC_NAMES = Object.freeze({
     SEARCH: "search_rocketleague_players",
-    PUBLIC_PROFILE: "get_public_rocketleague_profile"
+    PUBLIC_PROFILE: "get_public_rocketleague_profile",
+    FEATURED: "get_rl_featured_player",
+    NETWORK: "get_rocketleague_network_statistics"
 });
 
 const ALLOWED_RPCS = new Set(Object.values(RPC_NAMES));
@@ -62,7 +65,7 @@ function sanitizePublicProfile(value) {
     const normalizedPresenceState = normalizeString(row.presence_state, 20).toLowerCase();
     const presenceState = presenceFresh && ["online", "offline", "unknown"].includes(normalizedPresenceState)
         ? normalizedPresenceState
-        : "unknown";
+        : null;
 
     return {
         public_profile_id: publicProfileId,
@@ -71,7 +74,7 @@ function sanitizePublicProfile(value) {
         rl_platform: normalizeString(row.rl_platform, 40) || null,
         presence_shared: presenceShared,
         presence_state: presenceShared ? presenceState : null,
-        presence_checked_at: presenceShared && presenceFresh ? presenceCheckedAt : null,
+        presence_checked_at: presenceShared && presenceState !== null ? presenceCheckedAt : null,
         mmr: {
             captured_at: normalizeTimestamp(mmr.captured_at),
             ones_mmr: normalizeNumber(mmr.ones_mmr),
@@ -134,46 +137,43 @@ async function callDiscoveryRpc(env, rpcName, parameters) {
         throw new RocketLeagueDiscoveryError("ROCKET_LEAGUE_DISCOVERY_UNAVAILABLE", 503);
     }
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-
     try {
-        const response = await fetch(`${supabaseUrl}/rest/v1/rpc/${rpcName}`, {
-            method: "POST",
-            headers: {
-                apikey: serviceRoleKey,
-                Authorization: `Bearer ${serviceRoleKey}`,
-                "Content-Type": "application/json",
-                Accept: "application/json",
-                "Content-Profile": "api",
-                "Accept-Profile": "api"
-            },
-            body: JSON.stringify(parameters),
-            signal: controller.signal
-        });
-
-        if (!response.ok) {
-            console.error("Rocket League discovery RPC failed.", {
-                rpcName,
-                status: response.status
+        return await withUpstreamDeadline(async signal => {
+            const response = await fetchBoundedResponse(`${supabaseUrl}/rest/v1/rpc/${rpcName}`, {
+                method: "POST",
+                headers: {
+                    apikey: serviceRoleKey,
+                    Authorization: `Bearer ${serviceRoleKey}`,
+                    "Content-Type": "application/json",
+                    Accept: "application/json",
+                    "Content-Profile": "api",
+                    "Accept-Profile": "api"
+                },
+                body: JSON.stringify(parameters),
+                signal
             });
-            throw new RocketLeagueDiscoveryError("ROCKET_LEAGUE_DISCOVERY_UNAVAILABLE", 503);
-        }
 
-        try {
-            return await response.json();
-        } catch {
-            throw new RocketLeagueDiscoveryError("ROCKET_LEAGUE_DISCOVERY_UNAVAILABLE", 502);
-        }
+            if (!response.ok) {
+                console.error("Rocket League discovery RPC failed.", {
+                    rpcName,
+                    status: response.status
+                });
+                throw new RocketLeagueDiscoveryError("ROCKET_LEAGUE_DISCOVERY_UNAVAILABLE", 503);
+            }
+
+            try {
+                return await response.json();
+            } catch {
+                throw new RocketLeagueDiscoveryError("ROCKET_LEAGUE_DISCOVERY_UNAVAILABLE", 502);
+            }
+        }, REQUEST_TIMEOUT_MS);
     } catch (error) {
         if (error instanceof RocketLeagueDiscoveryError) throw error;
-        if (error?.name === "AbortError") {
+        if (error?.name === "AbortError" || error?.code === "UPSTREAM_TIMEOUT") {
             throw new RocketLeagueDiscoveryError("ROCKET_LEAGUE_DISCOVERY_UNAVAILABLE", 504);
         }
         console.error("Rocket League discovery RPC transport failed.", { rpcName });
         throw new RocketLeagueDiscoveryError("ROCKET_LEAGUE_DISCOVERY_UNAVAILABLE", 503);
-    } finally {
-        clearTimeout(timeout);
     }
 }
 
@@ -192,6 +192,34 @@ export async function getPublicRocketLeagueProfile(env, publicProfileId) {
     });
     const row = Array.isArray(result) ? result[0] : result;
     return row ? sanitizePublicProfile(row) : null;
+}
+
+export async function getFeaturedRocketLeaguePlayer(env) {
+    const result = await callDiscoveryRpc(env, RPC_NAMES.FEATURED, {});
+    if (!result || typeof result !== "object" || Array.isArray(result)
+        || !/^\d{4}-\d{2}-\d{2}$/.test(result.featuredDate)
+        || !normalizeTimestamp(result.validUntil)
+        || !(result.player === null || (typeof result.player === "object" && !Array.isArray(result.player)))) {
+        throw new RocketLeagueDiscoveryError("ROCKET_LEAGUE_DISCOVERY_UNAVAILABLE", 502);
+    }
+    return {
+        featuredDate: result.featuredDate,
+        validUntil: normalizeTimestamp(result.validUntil),
+        player: result.player === null ? null : sanitizePublicProfile(result.player)
+    };
+}
+
+export async function getRocketLeagueNetworkStatistics(env) {
+    const result = await callDiscoveryRpc(env, RPC_NAMES.NETWORK, {});
+    if (!result || typeof result !== "object" || Array.isArray(result)) {
+        throw new RocketLeagueDiscoveryError("ROCKET_LEAGUE_DISCOVERY_UNAVAILABLE", 502);
+    }
+    const output = {};
+    for (const key of ["playersOnline", "registeredPlayers", "activeSeasons", "upcomingEvents", "matchesPlayed", "scoreboardsSubmitted", "goalsRecorded"]) {
+        output[key] = Number.isSafeInteger(result[key]) && result[key] >= 0 ? result[key] : null;
+    }
+    output.generatedAt = normalizeTimestamp(result.generatedAt);
+    return output;
 }
 
 export const ROCKET_LEAGUE_DISCOVERY_RPCS = RPC_NAMES;

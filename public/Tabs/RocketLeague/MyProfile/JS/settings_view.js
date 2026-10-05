@@ -28,7 +28,7 @@ export function getFindProfileVisibilityState(profile) {
 const SETTING_LABELS = Object.freeze({
     primaryPlatform: "primary platform",
     autoDetectRegion: "region detection",
-    showOnlineStatus: "online status sharing",
+    showOnlineStatus: "Rocket League online presence sharing",
     findProfileEnabled: "Find Players visibility",
     notificationsV2: "notification channel settings",
     preferredMode: "preferred mode",

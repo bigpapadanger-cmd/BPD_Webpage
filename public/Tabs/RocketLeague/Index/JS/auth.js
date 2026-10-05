@@ -770,6 +770,9 @@ function applyRocketLeagueAuthView(
             || !rocketLeagueAccess;
     }
 
+    const historyPanel = document.getElementById("rocketLeagueMmrHistoryPanel");
+    if (historyPanel) historyPanel.hidden = playerProfile?.hidden !== false;
+
     if (
         accessCallout
     ) {
@@ -865,6 +868,8 @@ function applyRocketLeagueUnavailableView(
     }
 
     const accessHeading = document.getElementById("rocketLeagueAccessHeading");
+    const historyPanel = document.getElementById("rocketLeagueMmrHistoryPanel");
+    if (historyPanel) historyPanel.hidden = true;
     const accessMessage = document.getElementById("rocketLeagueAccessMessage");
     const profileNotice = document.getElementById("rocketLeagueProfileNotice");
     if (accessHeading) accessHeading.textContent = "Rocket League access check unavailable";

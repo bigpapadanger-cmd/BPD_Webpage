@@ -70,6 +70,15 @@ do not switch to 10 or 5 minutes. The configured schedule was not changed.
 
 ## Remaining measurement gaps
 
+Rocket League public page reads (2026-10-05): the homepage requests network
+statistics once per initialization; the public response caches for 60 seconds.
+Find Players requests the selected UTC-day featured profile once per page
+initialization (no-store for read-time privacy). Explicit valid search submission
+makes one directory request, aborting any previous search; clearing the query
+restores the already loaded featured card without another request. Neither path
+calls a provider or triggers a scheduled refresh. Shop page reads remain cached
+Supabase-only; rendering artwork/logos introduces no new provider RPCs.
+
 The Admin RL compatibility probe route is disabled by construction. It performs
 authorization only and makes no Epic/EOS/PsyNet or history request. The separate
 RL security foundation is also off by default. If configured later, logout,

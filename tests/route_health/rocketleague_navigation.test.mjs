@@ -73,7 +73,7 @@ test("homepage has one network statistics card with honest unavailable counters"
     assert.doesNotMatch(home, /class="rocket-league-stat-strip"/);
     assert.equal((home.match(/id="rocketLeaguePlayersOnline"/g) || []).length, 1);
     assert.equal((home.match(/id="rocketLeagueRegisteredPlayers"/g) || []).length, 1);
-    assert.match(home, /Network totals are unavailable/);
+    assert.match(home, /Unavailable figures are shown as —, not estimated/);
     assert.ok(home.indexOf("rocketLeagueMmrHistoryGraph") < home.indexOf("rocketLeagueStatisticsTitle"));
     assert.ok(home.indexOf("rocketLeagueStatisticsTitle") < home.indexOf("rocketLeagueWelcomeTitle"));
 });

@@ -2,7 +2,7 @@
 
 import { apiFetch } from "/scripts/apiConnection.js";
 import { ROCKET_LEAGUE_PLAYER_SEARCH_URL } from "/scripts/apiRoutes.js";
-import { renderPlayers, renderSearchState } from "./view.js";
+import { renderPlayers, renderSearchState, createPlayerCard } from "./view.js";
 
 const MAX_RESULTS = 20;
 
@@ -32,6 +32,29 @@ export async function initializePage() {
     const submit = document.getElementById("playerSearchSubmit");
     if (!form || !queryInput || !results || !status || !submit) return;
 
+    const featured = document.getElementById("featuredPlayerSection");
+    const featuredCard = document.getElementById("featuredPlayerCard");
+    if (featuredCard) {
+        void (async () => {
+            try {
+                const response = await apiFetch("/api/rocketleague/players/featured", { cache: "no-store", headers: { accept: "application/json" } });
+                const payload = await response.json();
+                if (!response.ok || payload?.success !== true) throw new Error("unavailable");
+                if (payload.player) featuredCard.replaceChildren(createPlayerCard(document, payload.player, { featured: true }));
+                else featuredCard.textContent = "No eligible public player is available today.";
+            } catch { featuredCard.textContent = "Today’s featured player is temporarily unavailable."; }
+        })();
+    }
+    queryInput.addEventListener("input", () => {
+        if (!queryInput.value.trim()) {
+            activeController?.abort();
+            submit.disabled = false;
+            if (featured) featured.hidden = false;
+            status.textContent = "";
+            renderSearchState(document, results, "initial", "Search above to find public players.");
+        }
+    });
+
     status.textContent = "";
     status.dataset.state = "ready";
     renderSearchState(document, results, "initial", "Search above to find players who enabled profile discovery.");
@@ -50,25 +73,28 @@ export async function initializePage() {
 
         activeController?.abort();
         activeController = new AbortController();
+        const controller = activeController;
+        if (featured) featured.hidden = true;
         submit.disabled = true;
         status.dataset.state = "loading";
         status.textContent = "Searching opted-in profiles…";
         renderSearchState(document, results, "loading", "Searching public profiles…");
 
         try {
-            const players = await searchPlayers(query, activeController.signal);
+            const players = await searchPlayers(query, controller.signal);
+            if (controller.signal.aborted) return;
             renderPlayers(document, results, players);
             status.dataset.state = "ready";
             status.textContent = players.length
                 ? `${players.length} player${players.length === 1 ? "" : "s"} found.`
                 : "No public players found.";
         } catch (error) {
-            if (error?.name === "AbortError") return;
+            if (error?.name === "AbortError" || controller.signal.aborted) return;
             status.dataset.state = "error";
             status.textContent = "Player search is temporarily unavailable. Please try again later.";
             renderSearchState(document, results, "error", "Player search could not be completed. Please try again later.");
         } finally {
-            if (activeController?.signal.aborted !== true) submit.disabled = false;
+            if (activeController === controller && !controller.signal.aborted) submit.disabled = false;
         }
     });
 }

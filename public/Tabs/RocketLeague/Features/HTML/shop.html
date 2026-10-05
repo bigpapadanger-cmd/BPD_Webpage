@@ -9,14 +9,17 @@
         <h2 id="rlShopStatusTitle">Current item rotation</h2>
         <p data-shop-capture>No shop request is made to Rocket League when this page is opened.</p>
         <div class="rl-shop-panel" data-shop-panel hidden>
+            <nav class="rl-shop-categories" data-shop-categories aria-label="Shop categories"></nav>
             <div class="rl-shop-panel__heading">
+                <span data-shop-logo></span>
                 <h3 data-shop-section-title></h3>
-                <span data-shop-position aria-live="polite"></span>
+                <span data-shop-position></span>
             </div>
             <p class="rl-shop-section-timing" data-shop-section-timing></p>
             <div class="rl-shop-carousel-controls" aria-label="Shop section navigation">
                 <button type="button" class="rl-feature-link" data-shop-previous>Previous</button>
                 <button type="button" class="rl-feature-link" data-shop-next>Next</button>
+                <button type="button" class="rl-feature-link" data-shop-pause aria-pressed="false">Pause cycling</button>
             </div>
             <div class="rl-shop-items" data-shop-items></div>
         </div>

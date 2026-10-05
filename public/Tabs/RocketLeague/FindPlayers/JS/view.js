@@ -24,7 +24,7 @@ function getPresenceState(player) {
     return ["online", "offline"].includes(state) ? state : "unknown";
 }
 
-export function createPlayerCard(documentRef, player) {
+export function createPlayerCard(documentRef, player, { featured = false } = {}) {
     const card = documentRef.createElement("article");
     card.className = "rl-player-card";
 
@@ -65,6 +65,10 @@ export function createPlayerCard(documentRef, player) {
         ranks.append(rank);
     }
     card.append(ranks);
+
+    const career = Object.entries(featured ? player.stats || {} : {}).filter(([key, value]) =>
+        ["wins", "goals", "assists", "saves", "shots", "mvps"].includes(key) && Number.isSafeInteger(value) && value >= 0);
+    if (career.length) card.append(textElement(documentRef, "p", career.map(([key, value]) => `${value.toLocaleString()} ${key === "mvps" ? "MVPs" : key}`).join(" · "), "rl-player-career"));
 
     const profileLink = documentRef.createElement("a");
     profileLink.className = "rl-player-profile-link";

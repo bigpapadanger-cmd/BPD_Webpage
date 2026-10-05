@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-05T03:48:06.493Z",
+  "generatedAt": "2026-10-05T11:55:32.267Z",
   "policy": {
     "humanPagePaths": "case-insensitive lookup; canonical TitleCase path",
     "apiAndAssetPaths": "exact-case; never normalized by the human-page router",
@@ -2421,6 +2421,38 @@
         "functions/api/ocr/training.js"
       ],
       "handler": "functions/api/ocr/training.js",
+      "methods": [
+        "ALL"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/rocketleague/network-statistics",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/rocketleague/network-statistics.js"
+      ],
+      "handler": "functions/api/rocketleague/network-statistics.js",
+      "methods": [
+        "ALL"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/rocketleague/players/featured",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/rocketleague/players/featured.js"
+      ],
+      "handler": "functions/api/rocketleague/players/featured.js",
       "methods": [
         "ALL"
       ],

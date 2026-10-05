@@ -6,6 +6,7 @@ import { onRequestGet as searchRoute } from "../../functions/api/rocketleague/pl
 import { onRequestGet as publicProfileRoute } from "../../functions/api/rocketleague/players/profile/[publicProfileId].js";
 import {
     getPublicRocketLeagueProfile,
+    getFeaturedRocketLeaguePlayer,
     searchPublicRocketLeaguePlayers
 } from "../../functions/services/supabase/rocketleague/discovery.js";
 import { getRocketLeagueProfileByAccountId } from "../../functions/services/supabase/rocketleague/rocketleague_profile.js";
@@ -430,12 +431,52 @@ test("fresh public presence is visible while stale or unknown presence is neutra
         { public_profile_id: PROFILE_ID, find_profile_enabled: true, presence_shared: true, presence_state: "unknown", presence_checked_at: fresh }
     ];
 
-    for (const [index, expectedState] of [[0, "online"], [1, "unknown"], [2, "unknown"]]) {
+    for (const [index, expectedState] of [[0, "online"], [1, null], [2, "unknown"]]) {
         await withFetch(async () => response(records[index]), async () => {
             const profile = await getPublicRocketLeagueProfile(ENV, PROFILE_ID);
             assert.equal(profile.presence_state, expectedState);
             assert.equal(profile.presence_checked_at, index === 1 ? null : fresh);
         });
+    }
+});
+
+test("search, public profile and featured share the same 30-minute consent/freshness mask", async () => {
+    const originalNow = Date.now;
+    const now = Date.parse("2026-10-05T12:00:00Z");
+    Date.now = () => now;
+    try {
+        for (const sample of [
+            { shared: true, age: 0, state: "Online", expected: "online" },
+            { shared: true, age: 30 * 60 * 1000, state: "Offline", expected: "offline" },
+            { shared: true, age: 30 * 60 * 1000 + 1, state: "online", expected: null },
+            { shared: true, age: -1, state: "online", expected: null },
+            { shared: false, age: 0, state: "online", expected: null },
+            { shared: true, age: 0, state: "invalid", expected: null }
+        ]) {
+            const row = { public_profile_id: PROFILE_ID, presence_shared: sample.shared,
+                presence_state: sample.state, presence_checked_at: new Date(now - sample.age).toISOString() };
+            await withFetch(async url => response(String(url).endsWith("search_rocketleague_players") ? [row]
+                : String(url).endsWith("get_rl_featured_player") ? {
+                    featuredDate: "2026-10-05", validUntil: "2026-10-06T00:00:00Z", player: row
+                } : row), async () => {
+                const results = [await getPublicRocketLeagueProfile(ENV, PROFILE_ID),
+                    ...(await searchPublicRocketLeaguePlayers(ENV, "Pilot")),
+                    (await getFeaturedRocketLeaguePlayer(ENV)).player];
+                for (const result of results) {
+                    assert.equal(result.presence_state, sample.expected);
+                    assert.equal(result.presence_checked_at, sample.expected === null ? null : row.presence_checked_at);
+                }
+            });
+        }
+    } finally { Date.now = originalNow; }
+});
+
+test("registration and MyProfile describe Rocket League polling consent consistently", async () => {
+    for (const page of ["Registration", "MyProfile"]) {
+        const html = await readFile(new URL(`../../public/Tabs/RocketLeague/${page}/HTML/index.html`, import.meta.url), "utf8");
+        assert.match(html, /Share Rocket League Online Presence/);
+        assert.match(html, /check your Rocket League online status/);
+        assert.match(html, /online-player counter and player discovery/);
     }
 });
 
@@ -557,7 +598,8 @@ test("Find Players cards stay compact and use three, two, then one responsive co
     assert.match(source, /\["ones_tier", "ones_mmr", "1v1"\]/);
     assert.match(source, /\["twos_tier", "twos_mmr", "2v2"\]/);
     assert.match(source, /\["threes_tier", "threes_mmr", "3v3"\]/);
-    assert.doesNotMatch(source, /career|aliases|accountId|rlPlayerId/i);
+    assert.doesNotMatch(source, /aliases|accountId|rlPlayerId/i);
+    assert.match(source, /featured \? player.stats/);
 });
 
 function fakeDocument() {
