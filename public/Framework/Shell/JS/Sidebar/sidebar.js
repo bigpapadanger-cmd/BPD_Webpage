@@ -44,6 +44,7 @@ import {
 } from "./state.js";
 
 import { resolveHumanPageRoute, getRocketLeagueSettingsContext } from "../../../../routes.js";
+import { applySidebarAuthState } from "./RocketLeague/sidebar_auth.js";
 
 import {
     applyAppearancePreferences,
@@ -113,7 +114,10 @@ function initializeInteractiveSidebar() {
     if (path.startsWith("/rocketleague/") || rlSettings) {
         void import("/Tabs/RocketLeague/Index/JS/auth.js")
             .then(module => module.initializeRocketLeagueAuthView())
-            .catch(() => console.error("ROCKET LEAGUE SIDEBAR AUTH: Unable to refresh access visibility.", { code: "RL_NAVIGATION_STATE_UNAVAILABLE" }));
+            .catch(() => {
+                applySidebarAuthState({ authenticated: false, profileLoaded: false, profileComplete: false, rocketLeagueAccess: false });
+                console.error("ROCKET LEAGUE SIDEBAR AUTH: Unable to refresh access visibility.", { code: "RL_NAVIGATION_STATE_UNAVAILABLE" });
+            });
     }
 
     /*

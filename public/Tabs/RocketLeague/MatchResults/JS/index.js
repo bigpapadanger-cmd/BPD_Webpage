@@ -1,6 +1,6 @@
 "use strict";
 import { apiFetch } from "../../../../scripts/apiConnection.js";
-import { ROCKET_LEAGUE_PROFILE_URL, ROCKET_LEAGUE_SESSION_URL } from "../../../../scripts/apiRoutes.js";
+import { initializeRocketLeagueProtectedPage } from "../../Index/JS/auth_terminal_state.js";
 const ROCKET_LEAGUE_PLAYLISTS = [
     {
         key: "duel",
@@ -15,59 +15,6 @@ const ROCKET_LEAGUE_PLAYLISTS = [
         elementId: "rocketLeagueRank3"
     }
 ];
-function applyRocketLeagueAuthView(authSession) {
-    const unavailable = authSession?.available === false || authSession?.authenticated === null;
-    const epicAuthorized = authSession?.epicAuthorized === true;
-    const access = authSession?.rocketLeagueAccess === true;
-    const authenticated =
-        authSession?.authenticated === true;
-    const loggedOutContent =
-        document.getElementById(
-            "rocketLeagueLoggedOut"
-        );
-    const authenticatedContent =
-        document.getElementById(
-            "rocketLeagueAuthenticatedContent"
-        );
-    const playerProfile =
-        document.getElementById(
-            "rocketLeaguePlayerProfile"
-        );
-    if (loggedOutContent) {
-        loggedOutContent.hidden = unavailable || authenticated;
-    }
-    if (authenticatedContent) {
-        authenticatedContent.hidden = !access;
-    }
-    if (playerProfile) {
-        playerProfile.hidden = !epicAuthorized;
-    }
-    document.body.dataset.authenticated =
-        unavailable ? "unknown" : String(authenticated);
-    document.body.dataset.rlAccess = String(access);
-    if (authSession?.requiresEpicReauthorization) {
-        renderUnavailableRocketLeagueRanks("Verify Epic Again in BPD Account to use Rocket League features.");
-    }
-}
-async function loadAuthenticatedRocketLeagueUser() {
-    const response = await apiFetch(
-        ROCKET_LEAGUE_SESSION_URL,
-        {
-            method: "GET",
-            credentials: "same-origin",
-            cache: "no-store",
-            headers: {
-                "accept": "application/json"
-            }
-        }
-    );
-    if (!response.ok) {
-        throw new Error(
-            `Authentication request failed with ${response.status}.`
-        );
-    }
-    return response.json();
-}
 function getRankTheme(rankName) {
     const normalizedRank =
         String(rankName || "")
@@ -237,75 +184,10 @@ function renderRocketLeagueProfile(
         statusElement.dataset.state = "ready";
     }
 }
-async function loadRocketLeagueProfile(authUser) {
-    const playerNameElement =
-        document.getElementById(
-            "rocketLeaguePlayerName"
-        );
-    if (playerNameElement) {
-        playerNameElement.textContent =
-            authUser?.displayName ||
-            "Epic Player";
-    }
-    const response = await apiFetch(
-        `${ROCKET_LEAGUE_PROFILE_URL}?includePresence=false`,
-        {
-            method: "GET",
-            credentials: "same-origin",
-            cache: "no-store",
-            headers: {
-                "accept": "application/json"
-            }
-        }
-    );
-    const result =
-        await response.json().catch(
-            function() {
-                return {};
-            }
-        );
-    if (!response.ok || result.success !== true) {
-        throw new Error(
-            result.message ||
-            "Rocket League profile could not be loaded."
-        );
-    }
-    renderRocketLeagueProfile(
-        authUser,
-        result.profile
-    );
+export async function initializePage() {
+    return initializeRocketLeagueProtectedPage({
+        fetcher: apiFetch,
+        renderProfile: renderRocketLeagueProfile,
+        renderUnavailableRanks: renderUnavailableRocketLeagueRanks
+    });
 }
-async function initializeRocketLeagueAuthView() {
-    try {
-        const authSession =
-            await loadAuthenticatedRocketLeagueUser();
-        applyRocketLeagueAuthView(authSession);
-        if (!authSession?.authenticated || authSession.epicAuthorized !== true) {
-            return;
-        }
-        try {
-            await loadRocketLeagueProfile(
-                authSession.user
-            );
-        } catch (profileError) {
-            console.warn(
-                "ROCKET LEAGUE PROFILE: Unable to load ranks.",
-                profileError
-            );
-            renderUnavailableRocketLeagueRanks(
-                profileError.message
-            );
-        }
-    } catch (error) {
-        console.warn(
-            "ROCKET LEAGUE AUTH: Unable to load session.",
-            error
-        );
-        applyRocketLeagueAuthView({
-            authenticated: null,
-            available: false,
-            user: null
-        });
-    }
-}
-export { initializeRocketLeagueAuthView as initializePage };

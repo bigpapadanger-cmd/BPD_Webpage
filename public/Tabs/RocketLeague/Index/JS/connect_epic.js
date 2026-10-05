@@ -63,6 +63,9 @@ import {
     apiFetch
 } from "../../../../scripts/apiConnection.js";
 
+import { settleUnresolvedRocketLeagueValidation } from "./auth_terminal_state.js";
+import { showVerificationOutcome } from "/scripts/verificationNotice.js";
+
 /* =========================================================
 PAGE CONSTANTS
 ========================================================= */
@@ -325,8 +328,13 @@ export function releaseMainRocketLeagueAction() {
      *
      * This function only releases the button.
      */
-    button.disabled =
-        button.dataset.action === "validating";
+    if (button.dataset.action === "validating") {
+        settleUnresolvedRocketLeagueValidation({ button });
+        showVerificationOutcome(button, "Rocket League access could not be verified. Please retry.", { state: "error" });
+        return;
+    }
+
+    button.disabled = false;
 }
 
 /* =========================================================

@@ -785,6 +785,16 @@ export async function loadRocketLeagueProfile(
             result.profile
         );
 
+    if (
+        typeof result.profileExists !== "boolean"
+        || typeof result.profileComplete !== "boolean"
+        || typeof result.registrationAccepted !== "boolean"
+        || typeof result.rocketLeagueAccess !== "boolean"
+        || (result.profileExists && Object.keys(profile).length === 0)
+    ) {
+        handleProfileRequestFailure(response, { code: "ROCKET_LEAGUE_PROFILE_RESPONSE_INVALID" });
+    }
+
     const exists =
         profileExists(
             result,
@@ -803,15 +813,21 @@ export async function loadRocketLeagueProfile(
         );
     }
 
-    const {
-        inputRanked,
-        currentRanked
-    } =
-        renderRocketLeagueProfile(
-            result,
-            authUser,
-            profile
-        );
+    const inputRanked = getInputRanked(profile);
+    const currentRanked = getCurrentRanked(profile);
+    try {
+        renderRocketLeagueProfile(result, authUser, profile);
+    } catch (error) {
+        console.error("ROCKET LEAGUE PROFILE PRESENTATION: unavailable.", {
+            name: error?.name || "Error"
+        });
+        setProfileWarning(true, "Some Rocket League profile details are temporarily unavailable.");
+        try {
+            renderUnavailableRanks("Rank display is temporarily unavailable.");
+        } catch {
+            // A failed display component must not invalidate server-confirmed profile state.
+        }
+    }
 
     const profileComplete =
         isProfileComplete(

@@ -73,6 +73,8 @@ import {
     renderUnavailableRanks
 } from "./ranks.js";
 
+import { settleUnresolvedRocketLeagueValidation } from "./auth_terminal_state.js";
+
 import {
     getRocketLeagueAccessPresentation
 } from "./access_presentation.js";
@@ -1190,6 +1192,7 @@ export async function initializeRocketLeagueAuthView() {
                 true
             || authState.status ===
                 "unavailable"
+            || typeof authState.authenticated !== "boolean"
         ) {
             applyRocketLeagueUnavailableView();
 
@@ -1338,12 +1341,32 @@ export async function initializeRocketLeagueAuthView() {
         ROCKET LEAGUE PROFILE
         ================================================= */
 
+        let rocketLeagueSession;
         try {
-            const rocketLeagueSession =
-                await loadProfileState(
-                    authState
-                );
+            rocketLeagueSession = await loadProfileState(authState);
+        } catch (profileError) {
+            console.error("ROCKET LEAGUE PROFILE: Unable to load profile.", {
+                name: profileError?.name || "Error",
+                hasCode: typeof profileError?.code === "string"
+            });
 
+            const unavailableSession = createRocketLeagueSession(authState, {
+                epicLinked: true,
+                epicAuthorized: true,
+                requiresEpicReauthorization: false
+            });
+            applyRocketLeagueAuthView(unavailableSession, { updateAccessButton: false });
+            setRocketLeagueAccessButtonUnavailable("Profile validation unavailable");
+            try {
+                renderUnavailableRanks("Rocket League profile validation is temporarily unavailable. Please retry.");
+            } catch {
+                // The terminal auth state must not depend on the rank component rendering successfully.
+            }
+            redirectProtectedRouteToProfile();
+            return unavailableSession;
+        }
+
+        try {
             /*
              * The profile request has completed successfully.
              *
@@ -1373,63 +1396,12 @@ export async function initializeRocketLeagueAuthView() {
 
             return rocketLeagueSession;
         }
-        catch (
-            profileError
-        ) {
-            console.error(
-                "ROCKET LEAGUE PROFILE: Unable to load profile.",
-                {
-                    name:
-                        profileError?.name
-                        || "Error",
-                    hasCode:
-                        typeof profileError?.code === "string"
-                }
-            );
-
-            const unavailableSession =
-                createRocketLeagueSession(
-                    authState,
-                    {
-                        epicLinked:
-                            true,
-
-                        epicAuthorized:
-                            true,
-
-                        requiresEpicReauthorization:
-                            false
-                    }
-                );
-
-            /*
-             * Preserve known account/provider state without
-             * converting a profile-service failure into a
-             * false "Create Profile" state.
-             */
-            applyRocketLeagueAuthView(
-                unavailableSession,
-                {
-                    updateAccessButton:
-                        false
-                }
-            );
-
-            setRocketLeagueAccessButtonUnavailable(
-                "Profile validation unavailable"
-            );
-
-            renderUnavailableRanks(
-                "Rocket League profile validation is temporarily unavailable. Please retry."
-            );
-
-            /*
-             * Public Rocket League pages remain available.
-             * Protected routes continue to fail closed.
-             */
-            redirectProtectedRouteToProfile();
-
-            return unavailableSession;
+        catch (renderError) {
+            console.error("ROCKET LEAGUE AUTH PRESENTATION: unavailable.", {
+                name: renderError?.name || "Error"
+            });
+            applyRocketLeagueUnavailableView("Rocket League access display is temporarily unavailable");
+            return null;
         }
     }
     catch (
@@ -1449,5 +1421,22 @@ export async function initializeRocketLeagueAuthView() {
         applyRocketLeagueUnavailableView();
 
         return null;
+    } finally {
+        try {
+            const settled = settleUnresolvedRocketLeagueValidation({
+                button: getRocketLeagueAccessButton()
+            });
+            if (settled) renderUnavailableRanks("Rocket League access could not be verified.");
+        } catch {
+            const button = getRocketLeagueAccessButton();
+            if (button?.dataset.action === "validating") {
+                button.disabled = false;
+                button.dataset.action = "retry-validation";
+                button.removeAttribute("aria-busy");
+                const text = getRocketLeagueAccessButtonText(button);
+                if (text) text.textContent = "Retry access check";
+            }
+            document.body.dataset.rlAccess = "false";
+        }
     }
 }
