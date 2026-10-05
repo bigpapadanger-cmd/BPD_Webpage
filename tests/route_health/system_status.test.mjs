@@ -562,6 +562,51 @@ test("MMR functional test validates Epic player IDs and sanitizes skill records"
     } finally { globalThis.fetch = originalFetch; }
 });
 
+test("force shop uses only the protected scheduled Shop job, sanitizes output and enforces cooldown", async () => {
+    const originalFetch = globalThis.fetch;
+    const values = new Map();
+    const env = { RL_PRESENCE_MONITOR_URL: "https://presence.test", PRESENCE_TRIGGER_KEY: "k".repeat(48),
+        RL_STATS_CACHE: { get: async key => values.get(key), put: async (key, value) => values.set(key, value) } };
+    let calls = 0;
+    globalThis.fetch = async (url, init) => {
+        if (new URL(url).pathname === "/admin/health") return Response.json({ success: true });
+        calls++;
+        assert.equal(new URL(url).hostname, "presence.test");
+        assert.equal(new URL(url).pathname, "/admin/run-scheduled");
+        assert.deepEqual(JSON.parse(init.body), { job: "shop" });
+        assert.equal(init.headers.Authorization, `Bearer ${env.PRESENCE_TRIGGER_KEY}`);
+        assert.equal(init.redirect, "manual");
+        return Response.json({ success: true, job: "shop", summary: { success: true }, token: "must-not-leak" });
+    };
+    try {
+        const result = await performSystemStatusAction(env, "rl-presence", "refresh-shop");
+        assert.equal(result.success, true);
+        assert.equal(JSON.stringify(result).includes("must-not-leak"), false);
+        await assert.rejects(performSystemStatusAction(env, "rl-presence", "refresh-shop"), { code: "SERVICE_ACTION_COOLDOWN", status: 429 });
+        assert.equal(calls, 1);
+    } finally { globalThis.fetch = originalFetch; }
+});
+
+test("force shop fails closed on unauthenticated/cross-origin requests and malformed Worker success", async () => {
+    const originalFetch = globalThis.fetch;
+    let calls = 0;
+    globalThis.fetch = async () => { calls++; return Response.json({ success: true, token: "private" }); };
+    try {
+        for (const origin of ["https://evil.test", "https://site.example.test"]) {
+            const response = await onRequestPost({ env: {}, request: new Request("https://site.example.test/api/admin/system-status", {
+                method: "POST", headers: { Origin: origin, "Content-Type": "application/json" },
+                body: JSON.stringify({ service: "rl-presence", action: "refresh-shop" })
+            }) });
+            assert.ok([401, 403, 503].includes(response.status));
+        }
+        assert.equal(calls, 0);
+        await assert.rejects(performSystemStatusAction({ RL_PRESENCE_MONITOR_URL: "https://presence.test", PRESENCE_TRIGGER_KEY: "k".repeat(48) }, "rl-presence", "refresh-shop"), { code: "SHOP_REFRESH_FAILED", status: 502 });
+        const source = await readFile(new URL("../../functions/api/admin/system-status.js", import.meta.url), "utf8");
+        assert.match(source, /await authorize\(request, env, ADMIN_PERMISSIONS.RL_FORCE_REFRESH\)/);
+        assert.match(source, /action === "refresh-shop"\)[\s\S]*?Object.keys\(parsed.data\)/);
+    } finally { globalThis.fetch = originalFetch; }
+});
+
 test("system-status POST requires JSON and authorization before outbound calls", async () => {
     let calls = 0;
     const originalFetch = globalThis.fetch;

@@ -130,15 +130,18 @@ test("featured card shows authoritative career totals while regular search cards
     assert.equal(regularCard.children.some(node => node.className === "rl-player-career"), false);
 });
 
-test("shop images use HTTPS only and fall back on missing, invalid and broken images", () => {
+test("shop images use HTTPS only and never substitute placeholder artwork", () => {
     globalThis.document = fakeDocument;
     for (const url of [null, "javascript:alert(1)", "data:image/png;base64,bad", "http://image.test/x", "https://user:pass@image.test/x"]) {
-        assert.equal(shopImage(url, "Item", "image").src, "/Assets/logo/gaming_network_logo_128px_no_border.png");
+        assert.equal(shopImage(url, "Item", "image"), null);
     }
     const image = shopImage("https://image.test/item.png", "Item", "image");
     assert.equal(image.src, "https://image.test/item.png");
+    let removed = false;
+    image.closest = () => null;
+    image.remove = () => { removed = true; };
     image.listeners.error();
-    assert.equal(image.src, "/Assets/logo/gaming_network_logo_128px_no_border.png");
+    assert.equal(removed, true);
 });
 
 test("shop renders section logos without any browser provider request", async () => {

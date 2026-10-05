@@ -8,9 +8,9 @@ function json(body, status = 200, headers = {}) {
     return Response.json(body, { status, headers: { "Cache-Control": "no-store", ...headers } });
 }
 
-async function authorize(request, env) {
+async function authorize(request, env, permission = ADMIN_PERMISSIONS.ADMIN_SETTINGS_MANAGE) {
     try {
-        return await authorizeAdminPermission(request, env, ADMIN_PERMISSIONS.ADMIN_SETTINGS_MANAGE);
+        return await authorizeAdminPermission(request, env, permission);
     } catch (error) {
         const status = [401, 403].includes(Number(error?.status)) ? Number(error.status) : 503;
         throw Object.assign(new Error("Authorization failed."), { status, code: status === 401 ? "AUTHENTICATION_REQUIRED" : status === 403 ? "ADMIN_PERMISSION_REQUIRED" : "AUTHORIZATION_UNAVAILABLE" });
@@ -34,7 +34,11 @@ export async function onRequestPost({ request, env }) {
     if (!parsed.success) return json({ success: false, error: "INVALID_INPUT" }, parsed.tooLarge ? 413 : 400);
     const service = typeof parsed.data?.service === "string" ? parsed.data.service.trim() : "";
     const action = typeof parsed.data?.action === "string" ? parsed.data.action.trim() : "";
-    if (["discord-matchbot", "discord-authz-bot"].includes(service)
+    if (action === "refresh-shop") {
+        try { await authorize(request, env, ADMIN_PERMISSIONS.RL_FORCE_REFRESH); }
+        catch (error) { return json({ success: false, error: error.code }, error.status); }
+    }
+    if ((["discord-matchbot", "discord-authz-bot"].includes(service) || action === "refresh-shop")
         && Object.keys(parsed.data).some(key => !["service", "action"].includes(key))) return json({ success: false, error: "INVALID_INPUT" }, 400);
     const startedAt = Date.now();
     const requestId = crypto.randomUUID();

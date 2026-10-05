@@ -20,7 +20,7 @@ let authorizationActive = false;
 
 const ACTION_LABELS = {
     recheck: "Recheck", "refresh-eos": "Refresh EOS", "reauthorize-account": "Reauthorize Account",
-    "reconnect-psynet": "Reconnect PsyNet", "repair-session": "Repair Session", "run-now": "Run"
+    "reconnect-psynet": "Reconnect PsyNet", "repair-session": "Repair Session", "run-now": "Run", "refresh-shop": "Force Refresh Shop"
 };
 
 function textElement(tag, text, className) {
@@ -115,13 +115,14 @@ async function runAction(service, action, button) {
         "reconnect-psynet": "Reconnect BPD MMR API to PsyNet now?",
         "refresh-eos": "Refresh the Epic alt-account authorization now?",
         "repair-session": "Run the deterministic MMR session repair now?",
-        "run-now": "Run the RL presence check now?"
+        "run-now": "Run the RL presence check now?",
+        "refresh-shop": "Fetch and save the current Rocket League shop now? This makes provider requests and has a 60-second cooldown."
     };
     if (confirmations[action] && !window.confirm(confirmations[action])) return;
     actionInFlight = true;
     button.disabled = true;
     const originalText = button.textContent;
-    button.textContent = action === "recheck" ? "Rechecking…" : "Repairing…";
+    button.textContent = action === "recheck" ? "Rechecking…" : action === "refresh-shop" ? "Refreshing shop…" : "Repairing…";
     const message = document.getElementById("workerStatusMessage");
     if (service === "mmr-api" && action !== "recheck") startOperationPolling();
     try {

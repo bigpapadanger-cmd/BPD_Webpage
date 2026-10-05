@@ -13,19 +13,33 @@ const env = {
     SUPABASE_AUTH: "service-role-secret"
 };
 
-test("shop pages preserve provider categories/order and show at most five items without loss", () => {
-    const items = Array.from({ length: 12 }, (_, id) => ({ id }));
+test("shop pages finish each active category in three-item groups without placeholders", () => {
+    const items = Array.from({ length: 12 }, (_, id) => ({ id, title: `Item ${id}`, image_url: "https://images.test/item.png" }));
     const snapshot = { shops: [{ id: 7, name: "Featured", type: "Daily" }, { id: 8, title: "Bundles" }],
-        catalogues: [{ shop_id: 7, items }, { shop_id: 8, items: [{ id: 20 }] }, { shop_id: 9, items: [] }] };
+        catalogues: [{ shop_id: 7, items }, { shop_id: 8, items: [{ ...items[0], id: 20 }] }, { shop_id: 9, items: [] }] };
     const pages = shopPages(snapshot);
-    assert.deepEqual(pages.map(page => page.items.length), [5, 5, 2, 1]);
+    assert.deepEqual(pages.map(page => page.items.length), [3, 3, 3, 3, 1]);
     assert.deepEqual(pages.flatMap(page => page.items.map(item => item.id)), [...items.map(item => item.id), 20]);
     assert.equal(pages[0].shop.name, "Featured");
-    assert.equal(pages[3].shop.title, "Bundles");
+    assert.equal(pages[4].shop.title, "Bundles");
     assert.deepEqual(shopPages({ shops: [], catalogues: [] }), []);
 });
 
-test("carousel cycles cached five-item groups, pauses, honors preferences and cleans up on navigation", async () => {
+test("shop excludes expired/future shops, technical names, missing artwork and inactive items", () => {
+    const now = Date.parse("2026-10-05T12:00:00Z");
+    const item = { title: "Real item", image_url: "https://images.test/item.png" };
+    const shops = [{ id: 1, title: "Region:NA", name: "Featured" }, { id: 2, title: "Region:NA" },
+        { id: 3, name: "Expired", ends_at: "2026-10-05T12:00:00Z" },
+        { id: 4, name: "Future", starts_at: "2026-10-05T13:00:00Z" }];
+    const pages = shopPages({ shops, catalogues: shops.map(shop => ({ shop_id: shop.id, items: [item,
+        { ...item, image_url: null }, { ...item, image_url: "javascript:bad" }, { ...item, title: null },
+        { ...item, ends_at: "2026-10-05T11:59:59Z" }] })) }, now);
+    assert.equal(pages.length, 1);
+    assert.equal(pages[0].shopId, "1");
+    assert.deepEqual(pages[0].items, [item]);
+});
+
+test("carousel cycles cached three-item groups, pauses, honors preferences and cleans up on navigation", async () => {
     const saved = { document: globalThis.document, window: globalThis.window, setInterval: globalThis.setInterval, clearInterval: globalThis.clearInterval };
     const node = () => ({ children: [], handlers: {}, attributes: {},
         append(...children) { this.children.push(...children); },
@@ -42,23 +56,23 @@ test("carousel cycles cached five-item groups, pauses, honors preferences and cl
     globalThis.clearInterval = () => { cleared = true; };
     globalThis.fetch = async () => { requests++; return Response.json({ success: true, available: true,
         capturedAt: new Date().toISOString(), shops: [{ id: 1, name: "Featured" }, { id: 2, name: "Bundles" }],
-        catalogues: [{ shop_id: 1, items: Array.from({ length: 6 }, (_, id) => ({ title: `Item ${id}`, costs: [] })) },
-            { shop_id: 2, items: [{ title: "Bundle", costs: [] }] }] }); };
+        catalogues: [{ shop_id: 1, items: Array.from({ length: 4 }, (_, id) => ({ title: `Item ${id}`, image_url: "https://images.test/item.png", costs: [] })) },
+            { shop_id: 2, items: [{ title: "Bundle", image_url: "https://images.test/item.png", costs: [] }] }] }); };
     try {
         await initializePage();
         const items = slots.get("[data-shop-items]");
-        assert.equal(items.children.length, 5);
+        assert.equal(items.children.length, 3);
         tick(); assert.equal(items.children.length, 1);
         slots.get("[data-shop-next]").handlers.click();
         assert.equal(slots.get("[data-shop-section-title]").textContent, "Bundles");
-        slots.get("[data-shop-categories]").children[0].handlers.click();
-        assert.equal(items.children.length, 5);
-        slots.get("[data-shop-pause]").handlers.click(); tick(); assert.equal(items.children.length, 5);
+        slots.get("[data-shop-next]").handlers.click();
+        assert.equal(items.children.length, 3);
+        slots.get("[data-shop-pause]").handlers.click(); tick(); assert.equal(items.children.length, 3);
         slots.get("[data-shop-pause]").handlers.click();
-        document.body.dataset.animations = "off"; tick(); assert.equal(items.children.length, 5);
-        document.body.dataset.animations = "on"; reduced = true; tick(); assert.equal(items.children.length, 5);
-        reduced = false; root.handlers.pointerenter(); tick(); assert.equal(items.children.length, 5);
-        root.handlers.pointerleave(); document.hidden = true; tick(); assert.equal(items.children.length, 5);
+        document.body.dataset.animations = "off"; tick(); assert.equal(items.children.length, 3);
+        document.body.dataset.animations = "on"; reduced = true; tick(); assert.equal(items.children.length, 3);
+        reduced = false; root.handlers.pointerenter(); tick(); assert.equal(items.children.length, 3);
+        root.handlers.pointerleave(); document.hidden = true; tick(); assert.equal(items.children.length, 3);
         document.hidden = false; tick(); assert.equal(items.children.length, 1);
         assert.equal(requests, 1);
         root.isConnected = false; tick(); assert.equal(cleared, true);

@@ -2,7 +2,6 @@
 
 let root = null;
 let stopCarousel = () => {};
-const FALLBACK_IMAGE = "/Assets/logo/gaming_network_logo_128px_no_border.png";
 const SHOP_STALE_AFTER_MS = 2 * 60 * 60 * 1000;
 
 function element(tag, className, text) {
@@ -55,22 +54,26 @@ function timingLabel(startsAt, endsAt) {
 }
 
 export function shopImage(value, alt, className) {
+    const url = safeImage(value);
+    if (!url) return null;
     const image = element("img", className);
-    image.src = safeImage(value) || FALLBACK_IMAGE;
+    image.src = url;
     image.alt = alt;
     image.loading = "lazy";
     image.referrerPolicy = "no-referrer";
     image.addEventListener("error", () => {
-        image.removeAttribute("srcset");
-        image.src = FALLBACK_IMAGE;
+        image.closest(".rl-shop-item")?.remove();
+        image.remove();
     }, { once: true });
     return image;
 }
 
 export function itemCard(item) {
     const card = element("article", "rl-shop-item");
-    card.append(shopImage(item.image_url, item.title ? `${item.title} artwork` : "BPD item artwork placeholder", "rl-shop-item__image"));
-    card.append(element("h3", "rl-shop-item__title", item.title || "Shop item"));
+    const image = shopImage(item.image_url, `${item.title} artwork`, "rl-shop-item__image");
+    if (!image || !item.title) return null;
+    card.append(image);
+    card.append(element("h3", "rl-shop-item__title", item.title));
     if (item.description) card.append(element("p", "rl-shop-item__description", item.description));
 
     const price = item.costs.flatMap(cost => cost.prices).find(value => Number.isSafeInteger(value.amount));
@@ -85,14 +88,28 @@ export function itemCard(item) {
     return card;
 }
 
-export function shopPages(snapshot) {
+export function shopCategoryName(shop) {
+    return [shop?.title, shop?.name, shop?.type].find(value => typeof value === "string" && value.trim()
+        && !/^(region\s*:|shop category$|shop rotation$)/i.test(value.trim()))?.trim() || null;
+}
+
+function isActive(value, now) {
+    const start = Date.parse(value?.starts_at || "");
+    const end = Date.parse(value?.ends_at || "");
+    return (!Number.isFinite(start) || start <= now) && (!Number.isFinite(end) || end > now);
+}
+
+export function shopPages(snapshot, now = Date.now()) {
     const shops = new Map(snapshot.shops.map(shop => [String(shop.id), shop]));
     return snapshot.catalogues.flatMap(catalogue => {
-        const items = Array.isArray(catalogue.items) ? catalogue.items : [];
+        const shop = shops.get(String(catalogue.shop_id));
+        if (!shopCategoryName(shop) || !isActive(shop, now)) return [];
+        const items = Array.isArray(catalogue.items) ? catalogue.items.filter(item =>
+            typeof item.title === "string" && item.title.trim() && safeImage(item.image_url) && isActive(item, now)) : [];
         const pages = [];
-        for (let offset = 0; offset < items.length; offset += 5) {
-            pages.push({ shop: shops.get(String(catalogue.shop_id)), shopId: String(catalogue.shop_id),
-                items: items.slice(offset, offset + 5), first: offset + 1, total: items.length });
+        for (let offset = 0; offset < items.length; offset += 3) {
+            pages.push({ shop, shopId: String(catalogue.shop_id),
+                items: items.slice(offset, offset + 3), first: offset + 1, total: items.length });
         }
         return pages;
     });
@@ -100,9 +117,7 @@ export function shopPages(snapshot) {
 
 function initializeCarousel(snapshot) {
     stopCarousel();
-    const catalogues = snapshot.catalogues.filter(entry => Array.isArray(entry.items) && entry.items.length);
-    const shopsById = new Map(snapshot.shops.map(shop => [String(shop.id), shop]));
-    const sections = catalogues.map(catalogue => ({ catalogue, shop: shopsById.get(String(catalogue.shop_id)) }));
+    const pages = shopPages(snapshot);
     const status = root.querySelector("[data-shop-status]");
     const panel = root.querySelector("[data-shop-panel]");
     const previous = root.querySelector("[data-shop-previous]");
@@ -112,8 +127,9 @@ function initializeCarousel(snapshot) {
     const sectionTiming = root.querySelector("[data-shop-section-timing]");
     const items = root.querySelector("[data-shop-items]");
 
-    if (!snapshot.available || !sections.length) {
-        status.textContent = "Shop rotation unavailable";
+    if (!snapshot.available || !pages.length) {
+        panel.hidden = true;
+        status.textContent = "No active shop artwork available";
         root.querySelector("[data-shop-capture]").textContent = snapshot.capturedAt
             ? `Last saved snapshot: ${dateLabel(snapshot.capturedAt) || snapshot.capturedAt}`
             : "No saved shop snapshot is available yet.";
@@ -125,35 +141,24 @@ function initializeCarousel(snapshot) {
     status.textContent = stale ? "Saved shop rotation may be out of date" : "Current saved shop rotation";
     root.querySelector("[data-shop-capture]").textContent = captured ? `Data captured ${captured}` : "Showing the latest saved shop data.";
     panel.hidden = false;
-    const pages = shopPages(snapshot);
-    const categories = root.querySelector("[data-shop-categories]");
     const pause = root.querySelector("[data-shop-pause]");
     const carouselRoot = root;
     const listeners = new AbortController();
     let paused = false;
     let interacting = false;
     let index = 0;
-    const categoryButtons = sections.map(entry => {
-        const button = element("button", "rl-shop-category", entry.shop?.title || entry.shop?.name || entry.shop?.type || "Shop category");
-        button.type = "button";
-        button.addEventListener("click", () => {
-            index = pages.findIndex(page => page.shopId === String(entry.catalogue.shop_id));
-            render();
-        }, { signal: listeners.signal });
-        return button;
-    });
-    categories.replaceChildren(...categoryButtons);
     const render = () => {
         const entry = pages[index];
         const shop = entry.shop;
-        sectionTitle.textContent = shop?.title || shop?.name || shop?.type || "Shop rotation";
+        sectionTitle.textContent = shopCategoryName(shop);
         const logo = root.querySelector("[data-shop-logo]");
-        if (logo) logo.replaceChildren(shopImage(shop?.logo_url, `${sectionTitle.textContent} logo`, "rl-shop-logo"));
+        if (logo) {
+            const image = shopImage(shop?.logo_url, `${sectionTitle.textContent} logo`, "rl-shop-logo");
+            logo.replaceChildren(...(image ? [image] : []));
+        }
         sectionTiming.textContent = timingLabel(shop?.starts_at, shop?.ends_at) || "Shop dates unavailable";
         position.textContent = `Items ${entry.first}–${entry.first + entry.items.length - 1} of ${entry.total} · ${index + 1}/${pages.length}`;
-        items.replaceChildren(...entry.items.map(itemCard));
-        categoryButtons.forEach((button, categoryIndex) => button.setAttribute("aria-pressed",
-            String(String(sections[categoryIndex].catalogue.shop_id) === entry.shopId)));
+        items.replaceChildren(...entry.items.map(itemCard).filter(Boolean));
         previous.disabled = pages.length < 2;
         next.disabled = pages.length < 2;
         pause.disabled = pages.length < 2;
@@ -173,6 +178,10 @@ function initializeCarousel(snapshot) {
     // Cycling only changes the displayed cached items; it never fetches data.
     const timer = pages.length > 1 ? setInterval(() => {
         if (!carouselRoot.isConnected) { stopCarousel(); return; }
+        if (pages.some(page => !isActive(page.shop, Date.now()) || page.items.some(item => !isActive(item, Date.now())))) {
+            initializeCarousel(snapshot);
+            return;
+        }
         if (!paused && !interacting && !document.hidden && !carouselRoot.contains(document.activeElement)
             && document.body.dataset.animations !== "off"
             && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) advance(1);

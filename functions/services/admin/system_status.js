@@ -13,9 +13,9 @@ let inFlightCheck = null;
 const actionLocks = new Set();
 const botCooldowns = new WeakMap();
 const BOT_NAMES = { "discord-matchbot": "Discord MatchBot", "discord-authz-bot": "Discord role-authorization bot" };
-const ACTION_COOLDOWNS = { "mmr-api:reconnect-psynet": 30, "mmr-api:refresh-eos": 15, "mmr-api:repair-session": 15, "cloud-run-ocr:recheck": 60, "rl-presence:run-now": 60, "provider-runtime:recheck": 15 };
+const ACTION_COOLDOWNS = { "mmr-api:reconnect-psynet": 30, "mmr-api:refresh-eos": 15, "mmr-api:repair-session": 15, "cloud-run-ocr:recheck": 60, "rl-presence:run-now": 60, "rl-presence:refresh-shop": 60, "provider-runtime:recheck": 15 };
 const ACTIONS = {
-    pages: ["recheck"], "rl-presence": ["recheck", "run-now"], "ocr-transport": ["recheck"],
+    pages: ["recheck"], "rl-presence": ["recheck", "run-now", "refresh-shop"], "ocr-transport": ["recheck"],
     "ocr-queue": ["recheck"], "cloud-run-ocr": ["recheck"], "provider-runtime": ["recheck"], supabase: ["recheck"],
     "discord-matchbot": ["recheck"], "discord-authz-bot": ["recheck"],
     "mmr-api": ["recheck", "refresh-eos", "reauthorize-account", "poll-authorization", "reconnect-psynet", "repair-session", "functional-test"]
@@ -57,7 +57,7 @@ async function readSmallJson(response, maximumBytes = 4096) {
 async function checkPresenceMonitor(env) {
     const endpoint = String(env?.RL_PRESENCE_MONITOR_URL || "").trim();
     const triggerKey = String(env?.PRESENCE_TRIGGER_KEY || "");
-    const actions = endpoint && triggerKey.length >= 32 ? ["recheck", "run-now"] : ["recheck"];
+    const actions = endpoint && triggerKey.length >= 32 ? ["recheck", "run-now", "refresh-shop"] : ["recheck"];
     if (!endpoint) return statusEntry("rl-presence", "RL presence monitor", "Unknown", "Health endpoint is not configured.", { actions });
     if (triggerKey.length < 32) return statusEntry("rl-presence", "RL presence monitor", "Unknown", "Protected health authorization is not configured.", { actions });
     const started = Date.now();
@@ -379,6 +379,29 @@ export async function performSystemStatusAction(env, service, action, input = {}
         let result;
         if (service === "pages") result = statusEntry("pages", "Pages Functions", "healthy", "Authenticated Pages API is responding.", { responseTimeMs: 0 });
         else if (service === "rl-presence") {
+            if (action === "refresh-shop") {
+                const endpoint = String(env?.RL_PRESENCE_MONITOR_URL || "").trim();
+                const token = String(env?.PRESENCE_TRIGGER_KEY || "");
+                if (!endpoint || token.length < 32) throw actionError("SHOP_REFRESH_NOT_CONFIGURED", 503);
+                try {
+                    await withUpstreamDeadline(async signal => {
+                        const response = await fetchBoundedResponse(new URL("/admin/run-scheduled", endpoint), {
+                            method: "POST", redirect: "manual", signal,
+                            headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+                            body: JSON.stringify({ job: "shop" })
+                        }, 4096);
+                        if (response.status === 409) throw actionError("SERVICE_ACTION_IN_PROGRESS", 409);
+                        if (!response.ok) throw actionError("SHOP_REFRESH_FAILED", 502);
+                        const payload = await response.json();
+                        if (payload?.success !== true || payload.job !== "shop" || payload.summary?.success !== true) {
+                            throw actionError("SHOP_REFRESH_FAILED", 502);
+                        }
+                    }, 60000);
+                } catch (error) {
+                    if (["SHOP_REFRESH_FAILED", "SERVICE_ACTION_IN_PROGRESS"].includes(error?.code)) throw error;
+                    throw actionError(error?.code === "UPSTREAM_TIMEOUT" ? "SHOP_REFRESH_TIMEOUT" : "SHOP_REFRESH_FAILED", error?.code === "UPSTREAM_TIMEOUT" ? 504 : 502);
+                }
+            }
             if (action === "run-now") {
                 const endpoint = String(env?.RL_PRESENCE_MONITOR_URL || "").trim(); const token = String(env?.PRESENCE_TRIGGER_KEY || "");
                 if (!endpoint || token.length < 32) throw actionError("PRESENCE_RUN_NOT_CONFIGURED", 503);

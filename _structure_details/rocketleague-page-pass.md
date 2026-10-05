@@ -2,16 +2,35 @@
 
 ## Shop category carousel
 
+Local debug caller: `node scripts/debug-rl-shop.mjs plan` lists the current request
+chain without network activity. `cached --shop 52` reads the public cached response;
+`worker --shop 52` manually calls the fixed protected `/get-shop-data` endpoint using
+`MMR_API_URL` and `MMR_API_KEY` from local environment (e.g. Node `--env-file=.dev.vars`).
+It has a 40-second deadline, 2 MiB streaming response cap, no redirects/retries/writes,
+and only prints public shop fields/counts/product IDs. Image query strings and raw
+provider errors/credentials are excluded. This sees normalized Worker output, not raw
+PsyNet responses; nulls there still require upstream-versus-normalizer investigation.
+
 The Shop page groups the cached catalogues by provider shop ID and shows provider
-title/name/type plus logo as category navigation. It never imports live rlshop.gg
+title/name/type plus a real logo in one active-category header. It never imports live rlshop.gg
 data or assumes product names/artwork beyond the normalized provider snapshot.
-Each group contains at most five items, preserving catalogue order. Previous/Next
-and category buttons navigate locally; an eight-second timer advances groups and
+Each group contains at most three named items with HTTPS artwork, preserving catalogue order.
+Expired/future shops/items, absent artwork and generic Region/unnamed categories are excluded.
+Missing/broken artwork is not replaced by BPD logos. Previous/Next
+navigate locally; an eight-second timer finishes each category's groups and
 wraps across categories. Pause/Resume is explicit. Hover, keyboard focus, hidden
 tabs, reduced motion and disabled site animations suppress automatic advancement.
 Timers/listeners are cleared on reinitialization or after detecting a detached page;
 late fetch responses cannot overwrite a newer page. Cycling makes no network calls.
-Five columns fit wide screens, with three/two/one columns at smaller widths.
+Three columns fit wide screens, with two/one columns at smaller widths.
+Supabase stores provider artwork URLs, not image bytes; no R2 copy is currently necessary.
+
+Admin System Status exposes Force Refresh Shop on the RL presence monitor card.
+POST `/api/admin/system-status` with service `rl-presence` and action `refresh-shop`
+requires both settings-manage and RL force-refresh permission, same-origin validation,
+JSON-only strict fields and a 60-second cooldown. It runs only the existing authenticated
+`/admin/run-scheduled` Shop job, with a bounded 60-second request/body deadline and 4 KiB
+response cap. Errors are sanitized; no raw provider data or credentials reach the browser.
 
 ## Network statistics
 
@@ -100,3 +119,9 @@ The synthetic preview server was stopped and its temporary script removed.
 - _folder_structure/route-health/routes.json (generated)
 - _structure_details/request-frequency-inventory.md
 - _structure_details/rocketleague-page-pass.md (new)
+
+# Manual MTX artwork diagnostic
+
+The local debugger accepts `catalog` to call the protected MMR Worker `/get-mtx-catalog` endpoint once. The Worker fixes the request to `Microtransaction/GetCatalog v1`, category `StarterPack`, with its server-owned authenticated Epic PlayerID. It shares existing API-key authorization and lookup rate limiting; no arbitrary RPC, player, category, purchase, persistence or scheduled call is added. The allowlisted response contains catalogue IDs, titles, HTTPS artwork locations (without queries/fragments), and contained ProductIDs only. Ownership/platform account details are excluded.
+
+Run manually after independently approving deployment of the Worker change: `node --env-file=.dev.vars scripts/debug-rl-shop.mjs catalog`. Local implementation alone does not make the live endpoint available. Upstream documents StarterPack and permits empty artwork; this diagnostic does not establish a universal Featured Shop icon mapping.
