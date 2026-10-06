@@ -58,8 +58,8 @@ export function renderDisplayNameCooldown(elements, { displayName, proposed, ava
             : state.cooldownUnknown
                 ? "Display-name availability could not be confirmed. Refresh account status before editing."
                 : displayName
-                    ? "You can update your BPD display name. Use 3–32 characters; names must be unique."
-                    : "Choose a BPD display name for your account.";
+                    ? "You can update your Account Display Name. Use 3–32 characters; names must be unique."
+                    : "Choose an Account Display Name for your account.";
     }
     if (elements.remaining) elements.remaining.textContent = coolingDown ? cooldown.remaining || "Your cooldown is active." : "";
     if (elements.available) elements.available.textContent = coolingDown && cooldown.availableAt ? `Next change available: ${cooldown.availableAt}` : "";

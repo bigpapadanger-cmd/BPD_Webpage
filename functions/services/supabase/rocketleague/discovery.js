@@ -1,10 +1,10 @@
 "use strict";
 import { withUpstreamDeadline, fetchBoundedResponse } from "../../http/upstream.js";
-import { getRocketLeagueMmrHistorySafely } from "./get_mmr_history.js";
 
 const RPC_NAMES = Object.freeze({
     SEARCH: "search_rocketleague_players",
     PUBLIC_PROFILE: "get_public_rocketleague_profile",
+    PUBLIC_SUMMARY: "get_public_rl_player_summary",
     FEATURED: "get_rl_featured_player",
     NETWORK: "get_rl_homepage_counters"
 });
@@ -13,7 +13,6 @@ const ALLOWED_RPCS = new Set(Object.values(RPC_NAMES));
 const PUBLIC_PROFILE_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const REQUEST_TIMEOUT_MS = 8000;
 const PRESENCE_STALE_AFTER_MS = 30 * 60 * 1000;
-const ACCOUNT_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export class RocketLeagueDiscoveryError extends Error {
     constructor(code, status = 503) {
@@ -156,6 +155,11 @@ async function callDiscoveryRpc(env, rpcName, parameters) {
             });
 
             if (!response.ok) {
+                const failure = await response.json().catch(() => null);
+                if (rpcName === RPC_NAMES.PUBLIC_SUMMARY && failure?.code === "P0002"
+                    && failure?.message === "PUBLIC_RL_PROFILE_NOT_FOUND") {
+                    throw new RocketLeagueDiscoveryError("PROFILE_UNAVAILABLE", 404);
+                }
                 console.error("Rocket League discovery RPC failed.", {
                     rpcName,
                     status: response.status
@@ -196,49 +200,55 @@ export async function getPublicRocketLeagueProfile(env, publicProfileId) {
     return row ? sanitizePublicProfile(row) : null;
 }
 
-async function getPublicProfileAccountId(env, publicProfileId) {
-    const root = typeof env?.SUPABASE_URL === "string" ? env.SUPABASE_URL.trim().replace(/\/+$/, "").replace(/\/rest\/v1$/i, "") : "";
-    const key = typeof env?.SUPABASE_AUTH === "string" ? env.SUPABASE_AUTH.trim() : "";
-    if (!root || !key) return null;
-    try {
-        if (new URL(root).protocol !== "https:") return null;
-        return await withUpstreamDeadline(async signal => {
-            const url = new URL(`${root}/rest/v1/rl_players`);
-            url.search = new URLSearchParams({
-                select: "account_id",
-                public_profile_id: `eq.${publicProfileId}`,
-                active: "eq.true",
-                limit: "2"
-            }).toString();
-            const response = await fetchBoundedResponse(url, {
-                method: "GET",
-                headers: {
-                    apikey: key,
-                    Authorization: `Bearer ${key}`,
-                    Accept: "application/json",
-                    "Accept-Profile": "core"
-                },
-                signal
-            }, 4096);
-            if (!response.ok) throw new Error("PUBLIC_PROFILE_OWNER_LOOKUP_FAILED");
-            const rows = await response.json();
-            if (!Array.isArray(rows) || rows.length !== 1 || !ACCOUNT_ID_PATTERN.test(rows[0]?.account_id || "")) return null;
-            return rows[0].account_id;
-        }, REQUEST_TIMEOUT_MS);
-    } catch {
-        console.error("Rocket League public MMR history owner lookup unavailable.", { code: "PUBLIC_HISTORY_OWNER_LOOKUP_FAILED" });
-        return null;
+export async function getPublicRocketLeaguePlayerSummary(env, publicProfileId) {
+    if (!PUBLIC_PROFILE_ID_PATTERN.test(publicProfileId || "")) {
+        throw new RocketLeagueDiscoveryError("PROFILE_UNAVAILABLE", 404);
     }
-}
-
-export async function getPublicRocketLeagueProfileWithMmrHistory(env, publicProfileId) {
-    const profile = await getPublicRocketLeagueProfile(env, publicProfileId);
-    if (!profile) return null;
-    const accountId = await getPublicProfileAccountId(env, profile.public_profile_id);
-    const history = accountId
-        ? await getRocketLeagueMmrHistorySafely(env, accountId, { maxCaptures: 1000 })
-        : null;
-    return { ...profile, mmrHistory: history };
+    const result = await callDiscoveryRpc(env, RPC_NAMES.PUBLIC_SUMMARY, { p_public_profile_id: publicProfileId });
+    const row = result?.player;
+    if (result?.success !== true || !row || typeof row !== "object" || Array.isArray(row)
+        || !Array.isArray(row.mmrHistory) || row.mmrHistory.length > 14) {
+        throw new RocketLeagueDiscoveryError("PROFILE_UNAVAILABLE", 502);
+    }
+    const currentMmr = { capturedAt: normalizeTimestamp(row.currentMmr?.capturedAt) };
+    for (const key of ["ones", "twos", "threes"]) {
+        const value = row.currentMmr?.[key];
+        if (!value || typeof value !== "object" || Array.isArray(value)) {
+            throw new RocketLeagueDiscoveryError("PROFILE_UNAVAILABLE", 502);
+        }
+        currentMmr[key] = { mmr: normalizeNumber(value.mmr), tier: normalizeString(value.tier, 60) || null };
+    }
+    const stats = { capturedAt: normalizeTimestamp(row.stats?.capturedAt) };
+    for (const key of ["wins", "goals", "assists", "saves", "shots", "mvps"]) stats[key] = normalizeNumber(row.stats?.[key]);
+    const today = new Date().toISOString().slice(0, 10);
+    const start = new Date(`${today}T00:00:00Z`);
+    start.setUTCDate(start.getUTCDate() - 13);
+    const firstDay = start.toISOString().slice(0, 10);
+    let previous = "";
+    const mmrHistory = row.mmrHistory.map(value => {
+        const day = value?.date;
+        if (typeof day !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(day)
+            || !Number.isFinite(Date.parse(`${day}T00:00:00Z`))
+            || new Date(`${day}T00:00:00Z`).toISOString().slice(0, 10) !== day
+            || day < firstDay || day > today || day <= previous) {
+            throw new RocketLeagueDiscoveryError("PROFILE_UNAVAILABLE", 502);
+        }
+        previous = day;
+        const point = { date: day };
+        for (const key of ["ones", "twos", "threes"]) {
+            if (value[key] !== null && (!Number.isSafeInteger(value[key]) || value[key] < 0)) {
+                throw new RocketLeagueDiscoveryError("PROFILE_UNAVAILABLE", 502);
+            }
+            point[key] = value[key];
+        }
+        return point;
+    });
+    return { success: true, player: {
+        displayName: normalizeString(row.displayName, 80) || null,
+        epicDisplayName: normalizeString(row.epicDisplayName, 80) || null,
+        primaryPlatform: normalizeString(row.primaryPlatform, 40) || null,
+        currentMmr, stats, mmrHistory
+    }, capturedAt: normalizeTimestamp(result.capturedAt) };
 }
 
 export async function getFeaturedRocketLeaguePlayer(env) {

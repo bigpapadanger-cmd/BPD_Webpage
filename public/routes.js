@@ -583,7 +583,7 @@ export const ROUTES = {
             "/Framework/Shell/HTML/Footer/footer.html",
 
         module:
-            null,
+            "/Required/FAQ/JS/index.js",
 
         sitemap:
             true
@@ -917,6 +917,27 @@ export const ROUTES = {
 
         sitemap:
             false
+    },
+
+    "/Admin/FAQReview": {
+        title: "FAQ Review | BPD Gaming Network",
+        body: "/Global/Admin/FAQ/HTML/index.html",
+        header: "/Framework/Shell/HTML/Header/header.html",
+        sidebar: "/Framework/Shell/HTML/Sidebar/admin.html",
+        footer: "/Framework/Shell/HTML/Footer/footer.html",
+        module: "/Global/Admin/FAQ/JS/index.js",
+        requiresAuth: true,
+        sitemap: false
+    },
+    "/Admin/UserManagement": {
+        title: "User Management | BPD Gaming Network",
+        body: "/Global/Admin/UserManagement/HTML/index.html",
+        header: "/Framework/Shell/HTML/Header/header.html",
+        sidebar: "/Framework/Shell/HTML/Sidebar/admin.html",
+        footer: "/Framework/Shell/HTML/Footer/footer.html",
+        module: "/Global/Admin/UserManagement/JS/index.js",
+        requiresAuth: true,
+        sitemap: false
     },
 
     "/Admin/PageSettings": {

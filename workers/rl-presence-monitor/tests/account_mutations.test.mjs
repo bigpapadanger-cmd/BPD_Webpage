@@ -22,6 +22,10 @@ function fixture({ providers = ["epic"], active = true, ageConsent = true } = {}
     globalThis.fetch = async (input, init = {}) => {
         const url = String(input); calls.push(url);
         const body = typeof init.body === "string" ? JSON.parse(init.body) : {};
+        if (url.endsWith("get_account_access_state")) return Response.json({ exists: true,
+            state: active ? "active" : "inactive", accountActive: active, suspended: false, suspendedUntil: null,
+            banned: false, removed: false, rocketLeague: { exists: true, active: true } });
+        if (url.endsWith("can_account_perform")) return Response.json(active);
         if (url.endsWith("get_account_session_identity")) return Response.json([{ id: "account-1", role: "user", active }]);
         if (url.endsWith("verify_account_provider_identity")) return Response.json(providers.includes(body.p_provider)
             ? [{ account_id: "account-1", provider: body.p_provider, provider_subject: `${body.p_provider}-subject`, active: true }] : []);

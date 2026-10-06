@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import { getProfileSettingsAvailability, getProfileUpdateSafetyError, mapProfileSettingsToRpcArgs, mapProfileSettingsToV2RpcArgs, normalizeNotificationsV2, normalizeProfileSettings, PROFILE_SETTING_FIELDS } from "../../functions/services/rl/profile_settings.js";
-import { buildSettingsPayload, getConfirmedSettings, getDuplicateReminderChannels, getFindProfileVisibilityState, getSettingsConfirmationState, isSettingConfirmed, reminderMinutesFromParts, validateNotificationsV2 } from "../../public/Tabs/RocketLeague/MyProfile/JS/settings_view.js";
+import { areSavedSettingsConfirmed, buildSettingsPayload, getConfirmedSettings, getDuplicateReminderChannels, getFindProfileVisibilityState, getSettingsConfirmationState, isSettingConfirmed, reminderMinutesFromParts, validateNotificationsV2 } from "../../public/Tabs/RocketLeague/MyProfile/JS/settings_view.js";
 import { normalizeDatabaseProfile } from "../../functions/services/rl/profile.js";
 import { getRocketLeagueProfileByAccountId } from "../../functions/services/supabase/rocketleague/rocketleague_profile.js";
 
@@ -11,6 +11,19 @@ const EMPTY_NOTIFICATIONS_V2 = Object.freeze({
     email: { enabled: false, reminders: [] },
     sms: { enabled: false, reminders: [] },
     discord: { enabled: false, reminders: [] }
+});
+
+test("MyProfile redirect confirmation requires the submitted values, not merely available old settings", () => {
+    const submitted = { primaryPlatform: null, autoDetectRegion: false, showOnlineStatus: false, findProfileEnabled: true,
+        preferredMode: "2s", otherMode: null, email: null, phone: null,
+        availability: [{ day: "Monday", start: "12:00", end: "13:00" }], notificationsV2: EMPTY_NOTIFICATIONS_V2 };
+    const settingsAvailability = Object.fromEntries([...Object.keys(submitted), "ageConsent", "policyConsent"].map(key => [key, true]));
+    const profile = { settings: { ...submitted, availability: [{ day: "monday", start: "12:00", end: "13:00" }] },
+        settingsAvailability, ageConsent: true, policyConsent: true };
+    assert.equal(areSavedSettingsConfirmed(profile, submitted), true);
+    assert.equal(areSavedSettingsConfirmed({ ...profile, settings: { ...profile.settings, findProfileEnabled: false } }, submitted), false);
+    assert.equal(areSavedSettingsConfirmed({ ...profile, settingsAvailability: { ...settingsAvailability, notificationsV2: false } }, submitted), false);
+    assert.equal(areSavedSettingsConfirmed(profile, { ...submitted, phone: "" }), false);
 });
 
 test("confirmed fallback visibility survives a nested V2 null through the MyProfile read path", async () => {
@@ -395,7 +408,7 @@ test("setup redirects completed players to the standalone My Profile route", asy
     const source = await readFile(new URL("../../public/Tabs/RocketLeague/Registration/JS/index.js", import.meta.url), "utf8");
     const myProfile = await readFile(new URL("../../public/Tabs/RocketLeague/MyProfile/JS/index.js", import.meta.url), "utf8");
     const profileService = await readFile(new URL("../../functions/services/rl/profile.js", import.meta.url), "utf8");
-    assert.match(source, /profileComplete && rocketLeagueAccess/);
+    assert.match(source, /profileResult\.registrationAccepted === true && rocketLeagueAccess/);
     assert.match(source, /navigate\("\/RocketLeague\/MyProfile", \{ replace: true \}\)/);
     assert.doesNotMatch(source, /isMyProfileRoute|profileUpdateMode|renderMyProfileReadOnlyData/);
     assert.match(source, /const settings = profile\.settings \|\| profile/);
@@ -409,6 +422,11 @@ test("setup redirects completed players to the standalone My Profile route", asy
     assert.match(source, /profileLookupConfirmed:?[\s\S]{0,100}true/);
     assert.match(profileService, /typeof body\.findProfileEnabled === "boolean"/);
     assert.match(profileService, /getProfileSettingsAvailability\(databaseProfile\)/);
+    assert.match(source, /window\.location\.replace\("\/RocketLeague\/MyProfile"\)/);
+    assert.match(myProfile, /saved\.profileSaved === true && settingsConfirmed/);
+    assert.match(myProfile, /if \(!form\.isConnected \|\| window\.location\.pathname !== "\/RocketLeague\/MyProfile"\) return/);
+    assert.match(myProfile, /}, 3000\)/);
+    assert.match(myProfile, /if \(!redirecting && !form\.hidden && profileSnapshot\) save\.disabled = false/);
     assert.match(source, /profileExists === true[\s\S]{0,360}settingsAvailability\?\.findProfileEnabled/);
     const payloadBuilder = source.slice(source.indexOf("function buildRegistrationPayload"), source.indexOf("function validateRegistrationPayload"));
     assert.doesNotMatch(payloadBuilder, /provider|careerStats|stats|ranked/i);

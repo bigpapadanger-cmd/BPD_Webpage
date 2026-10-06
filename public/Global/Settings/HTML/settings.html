@@ -7,6 +7,19 @@
         <a id="settingsRocketLeagueReturn" href="/RocketLeague" data-router-link hidden>Return to Rocket League</a>
     </header>
 
+    <section class="user-settings__section" id="accountDisplayNameSettings" aria-labelledby="displayNameTitle" hidden>
+        <h2 id="displayNameTitle">Account Display Name</h2>
+        <p>This is your name on BPD Gaming Network. It does not change your Epic Games, Discord, or other provider names. Display names can be changed once every 30 days.</p>
+        <label class="user-settings__name-field" for="displayNameSetting">
+            <span>Account Display Name</span>
+            <input id="displayNameSetting" type="text" maxlength="32" autocomplete="nickname" aria-describedby="displayNameSettingStatus">
+        </label>
+        <button id="saveDisplayNameSetting" type="button" disabled>Save display name</button>
+        <p id="displayNameSettingStatus" role="status" aria-live="polite"></p>
+        <p id="displayNameCooldownRemaining" class="user-settings__cooldown" aria-live="off"></p>
+        <p id="displayNameCooldownAvailableAt" class="user-settings__cooldown"></p>
+    </section>
+
     <section class="user-settings__section" aria-labelledby="appearanceTitle">
         <h2 id="appearanceTitle">Appearance</h2>
         <label class="user-settings__row" for="themeSetting">
@@ -14,10 +27,11 @@
             <select id="themeSetting">
                 <option value="blue">Blue</option><option value="orange">Orange</option>
                 <option value="purple">Purple</option><option value="green">Green</option>
+                <option value="cyan">Cyan</option><option value="emerald">Emerald</option>
             </select>
         </label>
         <label class="user-settings__row user-settings__color-row" for="backgroundColorSetting">
-            <span><strong>Background Color</strong><small>Changes the shared page background; Rocket League cards and branded accents stay the same. Colors that reduce text contrast are not applied.</small><output id="backgroundColorPreview" class="user-settings__color-preview" for="backgroundColorSetting"><span aria-hidden="true"></span><span>Current: #0d0f13</span></output><output id="backgroundColorPreviewPending" class="user-settings__color-preview user-settings__color-preview--pending" for="backgroundColorSetting" hidden><span aria-hidden="true"></span><span></span></output><small id="backgroundColorStatus" role="status" aria-live="polite"></small></span>
+            <span><strong>Background Color</strong><small>Changes the shared page background; Rocket League cards and branded accents stay the same. Low-contrast colors are allowed with a warning.</small><output id="backgroundColorPreview" class="user-settings__color-preview" for="backgroundColorSetting"><span aria-hidden="true"></span><span>Current: #0d0f13</span></output><output id="backgroundColorPreviewPending" class="user-settings__color-preview user-settings__color-preview--pending" for="backgroundColorSetting" hidden><span aria-hidden="true"></span><span></span></output><small id="backgroundColorStatus" role="status" aria-live="polite"></small></span>
             <input id="backgroundColorSetting" type="color" value="#0d0f13" aria-describedby="backgroundColorPreview backgroundColorPreviewPending backgroundColorStatus">
         </label>
         <label class="user-settings__row user-settings__color-row" for="hoverTextColorSetting">
@@ -47,7 +61,7 @@
     </section>
 
     <section class="user-settings__section" id="accountDisplayNameSettings" aria-labelledby="displayNameTitle" hidden>
-        <h2 id="displayNameTitle">BPD display name</h2>
+        <h2 id="displayNameTitle">Account Display Name</h2>
         <p>This is your name on BPD Gaming Network. It does not change your Epic Games, Discord, or other provider names. Display names can be changed once every 30 days.</p>
         <label class="user-settings__name-field" for="displayNameSetting">
             <span>Display name</span>

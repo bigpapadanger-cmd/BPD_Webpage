@@ -68,6 +68,8 @@ public/Global/
 +-- Account/             CSS/index.css, HTML/index.html, JS/index.js
 +-- Admin/
 |   +-- Home/            CSS/index.css, HTML/index.html, JS/index.js
+|   +-- UserManagement/  CSS/index.css, HTML/index.html, JS/index.js
+|   +-- Shared/          CSS/accordion.css, JS/accordion.js; native Admin disclosures and idempotent ARIA synchronization
 |   +-- WorkerStatus/    CSS/index.css, HTML/index.html, JS/index.js, JS/mmr_controls.js, JS/rocket_league_capabilities.js; Admin-only Rocket League force refresh
 |   +-- TaskBoard/
 |       +-- CSS/index.css, overlay.css
@@ -77,17 +79,22 @@ public/Global/
 |                task_detail.js, task_edit.js, task_history.js, task_lifecycle.js
 |   +-- PageSettings/      CSS/index.css, HTML/index.html, JS/index.js
 |   +-- Suggestions/       CSS/index.css, HTML/index.html, JS/index.js
+|   +-- FAQ/               CSS/index.css, HTML/index.html, JS/index.js; BPD-authorized review, 30/page, all statuses, revision-aware actions
 +-- Ads/                 CSS/ads.css, HTML/ads.html, JS/ads.js
 +-- Index/               CSS/index.css (main menu), CSS/dashboard.css,
 |                        HTML/home.html and JS/index.js (personal dashboard)
 +-- Links/               links.css, links.html, links.js
 +-- Login/               CSS/index.css, HTML/index.html, JS/index.js
 +-- Settings/            CSS/settings-page.css, HTML/settings.html, JS/settings.js and display_name_cooldown.js
+|                       Account Display Name precedes Appearance; browser-local themes include Blue/Orange/Purple/Green/Cyan/Emerald. Hex color contrast warns rather than blocks Apply/reload.
 +-- Suggestions/         CSS/index.css, HTML/index.html, JS/index.js (canonical public route)
 
 public/Required/
 +-- About/               CSS/index.css, HTML/index.html, JS/index.js
-+-- FAQ/                 CSS/index.css, HTML/index.html; curated static answers
++-- FAQ/                 CSS/index.css, HTML/index.html, JS/index.js, JS/shared.js
+|                        Eight curated answers retained; published answers loaded
+|                        through /api/faq. Deterministic candidate matching precedes
+|                        explicit unresolved-question submission. No AI or upvotes.
 +-- PrivacyPolicy/       CSS/index.css, HTML/index.html, JS/index.js
 +-- TOS/                 CSS/index.css, HTML/index.html, JS/index.js
 
@@ -160,7 +167,9 @@ ROUTE-TO-FOLDER MAP
 
     /, /Dashboard         -> Framework shell and Global/Index
     /Account, /Login      -> Global/Account and Global/Login
-    /Admin*               -> Global/Admin/Home and Global/Admin/TaskBoard
+    /Admin                -> Global/Admin/Home
+    /Admin/UserManagement -> Global/Admin/UserManagement; BPD-authenticated API delegates view/actions to live User Management RPC permissions
+    /Admin/Taskboard      -> Global/Admin/TaskBoard
 /RocketLeague/Profile -> Registration onboarding; established accounts redirect to /RocketLeague/MyProfile
 /RocketLeague/MyProfile -> Private field-aware settings editor; full-save action fails closed on any unconfirmed RPC field
 /RocketLeague/FindPlayers -> Public opt-in directory search and public profile links
@@ -176,6 +185,7 @@ ROUTE-TO-FOLDER MAP
     /Settings             -> Global/Settings
     /Suggestions          -> Global/Suggestions
     /Admin/PageSettings   -> compatibility alias for /Admin/WorkerStatus; legacy source folder is retained but not mounted
+    /Admin/FAQReview      -> Global/Admin/FAQ; BPD view permission and Owner/Admin review authority, not Discord role state
     /Admin/WorkerStatus  -> Global/Admin/WorkerStatus; unified system health and route diagnostics
     /Admin/SuggestionReview -> Global/Admin/Suggestions
     /Error                -> Global/404

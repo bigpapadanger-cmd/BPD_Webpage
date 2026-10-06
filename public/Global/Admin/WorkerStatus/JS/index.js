@@ -1,6 +1,7 @@
 "use strict";
 
 import { getAuthState, hasAdminPermission } from "/Framework/Auth/auth.js";
+import { initializeAdminAccordions } from "../../Shared/JS/accordion.js";
 import { beginVerificationNotice, finishVerificationNotice, showVerificationOutcome } from "/scripts/verificationNotice.js";
 import { getMmrControlModel } from "./mmr_controls.js";
 import { ROCKET_LEAGUE_CAPABILITIES, ROCKET_LEAGUE_CAPABILITY_CATEGORIES } from "./rocket_league_capabilities.js";
@@ -18,6 +19,7 @@ let lastDeploymentState = null;
 let operationPollTimer = null;
 let authorizationPollTimer = null;
 let authorizationActive = false;
+let initializationGeneration = 0;
 
 const ACTION_LABELS = {
     recheck: "Recheck", "refresh-eos": "Refresh EOS", "reauthorize-account": "Reauthorize Account",
@@ -334,6 +336,7 @@ async function forceRocketLeagueRefresh(event) {
 function renderRocketLeagueCapabilities(services) {
     const target = document.getElementById("rocketLeagueCapabilities");
     if (!target) return;
+    const previousOpen = new Map([...target.querySelectorAll("details")].map(group => [group.dataset.category, group.open]));
     const serviceById = new Map(services.map(service => [service.id, service]));
     const fragment = document.createDocumentFragment();
     for (const category of ROCKET_LEAGUE_CAPABILITY_CATEGORIES) {
@@ -341,6 +344,9 @@ function renderRocketLeagueCapabilities(services) {
         if (!capabilities.length) continue;
         const group = document.createElement("details");
         group.className = "rocket-capability-category worker-status-row";
+        group.setAttribute("data-admin-accordion", "");
+        group.dataset.category = category.id;
+        group.open = previousOpen.get(category.id) === true;
         const summary = document.createElement("summary");
         const activeCount = capabilities.filter(capability => capability.status === "active").length;
         const inactiveCount = capabilities.length - activeCount;
@@ -392,6 +398,7 @@ function renderRocketLeagueCapabilities(services) {
         fragment.append(group);
     }
     target.replaceChildren(fragment);
+    initializeAdminAccordions(target);
 }
 
 function makeDetails(service) {
@@ -614,6 +621,7 @@ async function loadStatus() {
             const previous = previousGroups.get(status);
             const group = document.createElement("details");
             group.className = `worker-status-group worker-status-${status}`;
+            group.setAttribute("data-admin-accordion", "");
             group.dataset.status = status;
             group.dataset.count = String(services.length);
             const autoExpanded = ["degraded", "down"].includes(status) && services.length > 0;
@@ -664,6 +672,12 @@ async function loadStatus() {
             fragment.append(group);
         }
         groups.replaceChildren(fragment);
+        initializeAdminAccordions(groups);
+        const issues = document.getElementById("workerStatusIssues");
+        if (issues) {
+            const attention = [...groupedServices.get("down"), ...groupedServices.get("degraded")];
+            issues.textContent = attention.length ? `Needs attention: ${attention.map(service => `${service.name} (${statusNames[service.canonicalStatus]})`).join(", ")}` : "";
+        }
         renderRocketLeagueCapabilities(payload.services);
         document.getElementById("workerStatusGenerated").textContent = `Updated ${readableTime(payload.generatedAt)}`;
         finishVerificationNotice(document.getElementById("workerStatusMessage"), "");
@@ -672,26 +686,37 @@ async function loadStatus() {
 }
 
 export async function initializePage() {
+    const generation = ++initializationGeneration;
     const message = document.getElementById("workerStatusMessage");
     const refresh = document.getElementById("workerStatusRefresh");
     if (!message || !refresh) return;
+    const content = document.getElementById("workerStatusContent");
+    if (content) content.hidden = true;
+    refresh.disabled = true;
+    refresh.onclick = null;
+    initializeAdminAccordions();
     beginVerificationNotice(message, {
         checkingText: "Checking your access…",
         fallbackText: "System status"
     });
     try {
         const auth = await getAuthState({ force: true });
+        if (generation !== initializationGeneration) return;
         if (!hasAdminPermission(REQUIRED_PERMISSION, auth)) { finishVerificationNotice(message, "You do not have permission to view worker status."); return; }
+        if (content) content.hidden = false;
         canDeployMmr = hasAdminPermission(DEPLOY_PERMISSION, auth);
         canForceRocketLeagueRefresh = hasAdminPermission(RL_FORCE_REFRESH_PERMISSION, auth);
         const forceRefreshPanel = document.getElementById("rocketLeagueForceRefresh");
         if (forceRefreshPanel) forceRefreshPanel.hidden = !canForceRocketLeagueRefresh;
-        if (canForceRocketLeagueRefresh) document.getElementById("rlForceRefreshForm")?.addEventListener("submit", forceRocketLeagueRefresh);
+        const forceMessage = document.getElementById("rlForceRefreshMessage");
+        if (forceMessage) forceMessage.hidden = !canForceRocketLeagueRefresh;
+        const forceForm = document.getElementById("rlForceRefreshForm");
+        if (forceForm) forceForm.onsubmit = canForceRocketLeagueRefresh ? forceRocketLeagueRefresh : null;
         refresh.disabled = false;
-        refresh.addEventListener("click", () => {
+        refresh.onclick = () => {
             beginVerificationNotice(message, { checkingText: "Refreshing status…", fallbackText: "System status" });
             Promise.all([loadStatus(), loadRouteDiagnostics()]).catch(() => finishVerificationNotice(message, "Status is unavailable. Please retry later."));
-        });
+        };
         await Promise.all([loadStatus(), loadRouteDiagnostics()]);
         await loadDeploymentStatus();
     } catch { finishVerificationNotice(message, "Status is unavailable. Please retry later."); }

@@ -630,7 +630,8 @@ export async function authorizeAdminContext(
     const authorization =
         await authorizeDiscordStaff(
             request,
-            env
+            env,
+            { action: "manage_account" }
         );
 
     return createAdminPermissionContext(

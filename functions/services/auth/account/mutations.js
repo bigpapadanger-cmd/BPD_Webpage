@@ -82,7 +82,10 @@ export async function handleAccountMutation(request, env, operation) {
 
     let authorization;
     try {
-        authorization = await authorizeRequest(request, env, { account: true });
+        authorization = await authorizeRequest(request, env, {
+            account: true,
+            action: operation === "profile" ? "manage_profile" : "manage_account"
+        });
         authorization = await requireCurrentSessionProvider(authorization, env);
     } catch (error) {
         if (!isAuthorizationError(error) || error.status >= 500) return failure("AUTH_SERVICE_UNAVAILABLE");

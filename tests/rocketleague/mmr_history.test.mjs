@@ -88,30 +88,26 @@ test("30-day chart normalization retains more than the homepage 90-capture limit
     assert.equal(averaged[29].ones.captureCount, 4);
 });
 
-test("public profile server flow checks discoverability before private history lookup and returns no internal IDs", async () => {
-    const { getPublicRocketLeagueProfileWithMmrHistory } = await import("../../functions/services/supabase/rocketleague/discovery.js");
+test("public profile server flow uses the privacy-filtered daily summary without private history lookup", async () => {
+    const { getPublicRocketLeaguePlayerSummary } = await import("../../functions/services/supabase/rocketleague/discovery.js");
     const calls = [];
     const accountId = "f6332c75-771a-46bc-ae09-ef5d886a4c35";
     const result = await withFetch(async (url, init) => {
         const parsed = new URL(url);
         calls.push({ url: parsed, init });
-        if (parsed.pathname.endsWith("get_public_rocketleague_profile")) {
-            return response({ public_profile_id: "38c395e6-cac4-4f27-86c0-f88f7304c618", display_name: "Public pilot", find_profile_enabled: true });
-        }
-        if (parsed.pathname === "/rest/v1/rl_players") {
-            assert.equal(init.headers["Accept-Profile"], "core");
-            assert.equal(parsed.searchParams.get("public_profile_id"), "eq.38c395e6-cac4-4f27-86c0-f88f7304c618");
-            return response([{ account_id: accountId }]);
-        }
-        if (parsed.pathname.endsWith("get_rl_player_mmr_history")) {
-            assert.deepEqual(JSON.parse(init.body), { p_account_id: accountId });
-            return response([snapshot(0)]);
+        if (parsed.pathname.endsWith("get_public_rl_player_summary")) {
+            assert.deepEqual(JSON.parse(init.body), { p_public_profile_id: "38c395e6-cac4-4f27-86c0-f88f7304c618" });
+            return response({ success: true, capturedAt: new Date().toISOString(), player: {
+                displayName: "Public pilot", account_id: accountId,
+                currentMmr: { ones: { mmr: 10, tier: "Gold" }, twos: { mmr: null, tier: null }, threes: { mmr: null, tier: null } },
+                mmrHistory: [{ date: new Date().toISOString().slice(0, 10), ones: 10, twos: null, threes: null }]
+            } });
         }
         throw new Error(`unexpected ${parsed.pathname}`);
-    }, () => getPublicRocketLeagueProfileWithMmrHistory({ SUPABASE_URL: "https://db.example.test", SUPABASE_AUTH: "server-only" }, "38c395e6-cac4-4f27-86c0-f88f7304c618"));
-    assert.equal(calls.length, 3);
-    assert.equal(result.display_name, "Public pilot");
-    assert.equal(result.mmrHistory.length, 1);
+    }, () => getPublicRocketLeaguePlayerSummary({ SUPABASE_URL: "https://db.example.test", SUPABASE_AUTH: "server-only" }, "38c395e6-cac4-4f27-86c0-f88f7304c618"));
+    assert.equal(calls.length, 1);
+    assert.equal(result.player.displayName, "Public pilot");
+    assert.equal(result.player.mmrHistory.length, 1);
     assert.equal("account_id" in result, false);
     assert.equal("player_id" in result, false);
     assert.doesNotMatch(JSON.stringify(result), new RegExp(accountId));

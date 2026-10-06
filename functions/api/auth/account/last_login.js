@@ -13,6 +13,7 @@ Purpose:
 ========================================================= */
 
 import { authorizeRequest } from "../../../services/auth/authorization.js";
+import { canAccountPerform } from "../../../services/auth/account/access.js";
 import { authorizationErrorResponse } from "../../../services/rl/authorization.js";
 
 import {
@@ -35,7 +36,7 @@ export async function onRequestPost(
         crypto.randomUUID();
 
     try {
-        const authorization = await authorizeRequest(request, env, { account: true });
+        const authorization = await authorizeRequest(request, env, { account: true, action: "view_account" });
         const session = authorization.sessionContext;
 
         if (
@@ -82,7 +83,11 @@ export async function onRequestPost(
         }
 
         // Activity must not advance the successful BPD login timestamp.
-        const { lastSeenAt, statsRefresh, providerDataRefresh } = await handleAccountLastLogin(env, authorization.accountId);
+        let mayRefreshRocketLeague = false;
+        try { mayRefreshRocketLeague = await canAccountPerform(env, authorization.accountId, "refresh_rl_stats"); }
+        catch { /* Fail closed for provider work while keeping account activity safe. */ }
+        const { lastSeenAt, statsRefresh, providerDataRefresh } = await handleAccountLastLogin(env, authorization.accountId,
+            { allowRocketLeagueRefresh: mayRefreshRocketLeague });
 
         return json(
             {

@@ -76,5 +76,5 @@ test("profile-complete players receive the ready state", () => {
         profileLoaded: true,
         rocketLeagueAccess: true
     });
-    assert.match(ready.title, /profile ready/i);
+    assert.match(ready.title, /registration complete/i);
 });

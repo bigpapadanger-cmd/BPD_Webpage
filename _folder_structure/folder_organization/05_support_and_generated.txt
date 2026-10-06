@@ -1,5 +1,5 @@
 SUPPORT, DATA, DEPENDENCIES, CACHES, AND GENERATED TREES
-Snapshot: 2026-09-26
+Snapshot: 2026-10-05
 
 ROLE
 
@@ -53,8 +53,15 @@ _structure_details/pre-deployment-operator-checklist.md
 
 tests/ocr/local_tracking_retirement.test.mjs
 tests/ocr/progress_authorization.test.mjs
+tests/auth/account_access.test.mjs
+tests/admin/accordion.test.mjs
+    Shared native Admin disclosures: ARIA, repeated initialization, pending
+    suggestion counts/review recovery, and visible failure messages.
 tests/rocketleague/discord_linked_roles.test.mjs
 tests/rocketleague/upstream_hardening.test.mjs
+tests/rocketleague/public_summary.test.mjs
+    Minimal public daily-summary projection and privacy, history bounds,
+    five-minute polling, overlap/visibility handling and navigation cleanup.
 tests/helpers/discord_nonce_fixture.mjs
 tests/route_health/discord_bot_status.test.mjs
   Manual Admin bot connection checks: private binding, token/guild validation,
@@ -63,6 +70,11 @@ tests/route_health/discord_bot_status.test.mjs
     identity/state failures and shared-guild eligibility regression coverage.
 
 DEPENDENCY ENVIRONMENTS
+
+tests/admin/faq.test.mjs
+    Verified FAQ RPC projections, session actor derivation, current mutation
+    access, domain errors, idempotency forwarding, role authority, revisions,
+    deterministic matching, public/Admin UI gates and recovery, plain-text safety.
 
 node_modules/
     Installed Node dependency tree used by Wrangler and its transitive packages.

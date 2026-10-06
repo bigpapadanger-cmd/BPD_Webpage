@@ -45,6 +45,9 @@ test("delete uses only the authenticated account and returns a safe normalized r
     const originalFetch = globalThis.fetch;
     let captured;
     globalThis.fetch = async (url, options) => {
+        if (String(url).endsWith("get_account_access_state")) return Response.json({ exists: true, state: "active", accountActive: true,
+            suspended: false, suspendedUntil: null, banned: false, removed: false, rocketLeague: { exists: true, active: true } });
+        if (String(url).endsWith("can_account_perform")) return Response.json(true);
         captured = { url: String(url), body: JSON.parse(options.body), headers: options.headers };
         return Response.json({ success: true, playerId: PLAYER_ID, epicIdentitiesRemoved: 1 });
     };
@@ -67,7 +70,13 @@ test("delete uses only the authenticated account and returns a safe normalized r
 test("arbitrary browser account targets are rejected before Supabase is called", async () => {
     const originalFetch = globalThis.fetch;
     let fetchCalls = 0;
-    globalThis.fetch = async () => { fetchCalls += 1; throw new Error("unexpected RPC"); };
+    globalThis.fetch = async url => {
+        fetchCalls += 1;
+        if (String(url).endsWith("get_account_access_state")) return Response.json({ exists: true, state: "active", accountActive: true,
+            suspended: false, suspendedUntil: null, banned: false, removed: false, rocketLeague: { exists: true, active: true } });
+        if (String(url).endsWith("can_account_perform")) return Response.json(true);
+        throw new Error("unexpected RPC");
+    };
     try {
         const response = await handleRocketLeagueProfileDelete(deleteRequest({
             confirmation: CONFIRMATION,
@@ -84,7 +93,13 @@ test("arbitrary browser account targets are rejected before Supabase is called",
 test("missing confirmation, cross-site requests, and unauthenticated callers cannot delete", async () => {
     const originalFetch = globalThis.fetch;
     let fetchCalls = 0;
-    globalThis.fetch = async () => { fetchCalls += 1; throw new Error("unexpected RPC"); };
+    globalThis.fetch = async url => {
+        if (String(url).endsWith("get_account_access_state")) return Response.json({ exists: true, state: "active", accountActive: true,
+            suspended: false, suspendedUntil: null, banned: false, removed: false, rocketLeague: { exists: true, active: true } });
+        if (String(url).endsWith("can_account_perform")) return Response.json(true);
+        fetchCalls += 1;
+        throw new Error("unexpected RPC");
+    };
     try {
         const missingConfirmation = await handleRocketLeagueProfileDelete(deleteRequest({}), makeEnv());
         assert.equal(missingConfirmation.status, 400);
@@ -104,11 +119,17 @@ test("missing confirmation, cross-site requests, and unauthenticated callers can
 test("inactive accounts and wrong origins fail closed", async () => {
     const originalFetch = globalThis.fetch;
     let fetchCalls = 0;
-    globalThis.fetch = async () => { fetchCalls += 1; throw new Error("unexpected RPC"); };
+    globalThis.fetch = async (url, options) => {
+        if (String(url).endsWith("get_account_access_state")) return Response.json({ exists: true, state: "inactive", accountActive: false,
+            suspended: false, suspendedUntil: null, banned: false, removed: false, rocketLeague: { exists: true, active: true } });
+        if (String(url).endsWith("can_account_perform")) return Response.json(false);
+        fetchCalls += 1;
+        throw new Error("unexpected RPC");
+    };
     try {
         const inactive = await handleRocketLeagueProfileDelete(deleteRequest(), makeEnv({ active: false }));
         assert.equal(inactive.status, 403);
-        assert.equal((await inactive.json()).code, "ACCOUNT_INACTIVE");
+        assert.equal((await inactive.json()).code, "ACCOUNT_ACCESS_RESTRICTED");
 
         const wrongOrigin = await handleRocketLeagueProfileDelete(deleteRequest(undefined, { origin: "https://attacker.example" }), makeEnv());
         assert.equal(wrongOrigin.status, 403);
@@ -120,11 +141,16 @@ test("inactive accounts and wrong origins fail closed", async () => {
 
 test("known deletion errors are sanitized and unknown database details stay private", async () => {
     const originalFetch = globalThis.fetch;
-    globalThis.fetch = async () => Response.json({
+    globalThis.fetch = async url => {
+        if (String(url).endsWith("get_account_access_state")) return Response.json({ exists: true, state: "active", accountActive: true,
+            suspended: false, suspendedUntil: null, banned: false, removed: false, rocketLeague: { exists: true, active: true } });
+        if (String(url).endsWith("can_account_perform")) return Response.json(true);
+        return Response.json({
         code: "P0001",
         message: "ROCKET_LEAGUE_PLAYER_NOT_FOUND",
         details: "private table detail"
     }, { status: 400 });
+    };
     try {
         const known = await handleRocketLeagueProfileDelete(deleteRequest(), makeEnv());
         const knownBody = await known.json();
@@ -132,7 +158,12 @@ test("known deletion errors are sanitized and unknown database details stay priv
         assert.equal(knownBody.code, "ROCKET_LEAGUE_PLAYER_NOT_FOUND");
         assert.equal(JSON.stringify(knownBody).includes("private table detail"), false);
 
-        globalThis.fetch = async () => Response.json({ message: "private database details" }, { status: 500 });
+        globalThis.fetch = async url => {
+            if (String(url).endsWith("get_account_access_state")) return Response.json({ exists: true, state: "active", accountActive: true,
+                suspended: false, suspendedUntil: null, banned: false, removed: false, rocketLeague: { exists: true, active: true } });
+            if (String(url).endsWith("can_account_perform")) return Response.json(true);
+            return Response.json({ message: "private database details" }, { status: 500 });
+        };
         const unknown = await handleRocketLeagueProfileDelete(deleteRequest(), makeEnv());
         const unknownBody = await unknown.json();
         assert.equal(unknown.status, 503);

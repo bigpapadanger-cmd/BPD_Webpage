@@ -58,6 +58,16 @@ body[data-theme="purple"] {
     --accent-soft: rgba(169, 112, 255, 0.15);
 }
 
+body[data-theme="cyan"] {
+    --accent: #67e8f9;
+    --accent-soft: rgba(103, 232, 249, 0.15);
+}
+
+body[data-theme="emerald"] {
+    --accent: #34d399;
+    --accent-soft: rgba(52, 211, 153, 0.15);
+}
+
 body[data-theme="green"] {
     --accent: #55d68a;
     --accent-soft: rgba(85, 214, 138, 0.15);

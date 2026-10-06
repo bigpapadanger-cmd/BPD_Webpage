@@ -15,7 +15,7 @@ Description:
     - Loads normalized BPD session context.
     - Verifies authenticated browser sessions.
     - Resolves canonical identity.accounts.id ownership.
-    - Requires active global BPD accounts.
+    - Rechecks current Supabase account access state and action permissions.
     - Verifies linked provider identities against Supabase.
     - Verifies provider authentication freshness against KV.
     - Enforces provider reauthorization requirements.
@@ -74,7 +74,8 @@ Important:
     - Protected account operations require:
           authenticated session
           + canonical userId
-          + active account
+          + current api.get_account_access_state
+          + allowed api.can_account_perform action
     - Protected provider operations additionally require:
           active canonical provider identity in Supabase
           + valid provider authentication state in KV
@@ -97,6 +98,11 @@ import {
 import {
     getProviderAuthorizationState
 } from "./providers/provider_auth_state.js";
+
+import {
+    assertAccountCanPerform,
+    safeAccountAccessSummary
+} from "./account/access.js";
 
 /* =========================================================
 NORMALIZATION
@@ -327,14 +333,11 @@ export function requireActiveAccount(
         );
     }
 
-    if (
-        authorization.active !==
-        true
-    ) {
+    if (!authorization.accountAccessState) {
         throw new AuthorizationError(
-            "ACCOUNT_INACTIVE",
-            "This BPD account is not active.",
-            403
+            "ACCOUNT_ACCESS_UNAVAILABLE",
+            "Account access could not be verified.",
+            503
         );
     }
 
@@ -448,7 +451,8 @@ AUTHORITATIVE PROVIDER REQUIREMENT
 export async function requireProvider(
     authorization,
     env,
-    provider
+    provider,
+    { requireFresh = true } = {}
 ) {
     requireActiveAccount(
         authorization
@@ -604,9 +608,7 @@ export async function requireProvider(
      * invalidated by the configured login-gap policy.
      */
     if (
-        providerAuthState
-            ?.authorized !==
-        true
+        requireFresh && providerAuthState?.authorized !== true
     ) {
         throw new AuthorizationError(
             "PROVIDER_REAUTHORIZATION_REQUIRED",
@@ -706,10 +708,10 @@ export async function requireProvider(
          * Current provider authorization state.
          */
         authorized:
-            true,
+            providerAuthState?.authorized === true,
 
         requiresReauthorization:
-            false,
+            providerAuthState?.authorized !== true,
 
         connectedAt:
             providerAuthState
@@ -749,11 +751,11 @@ export async function requireProvider(
         || !verifiedProvider.subject
         || verifiedProvider.active !==
             true
-        || verifiedProvider.authorized !==
-            true
-        || verifiedProvider
+        || (requireFresh && verifiedProvider.authorized !==
+            true)
+        || (requireFresh && verifiedProvider
             .requiresReauthorization ===
-            true
+            true)
     ) {
         throw new AuthorizationError(
             "PROVIDER_IDENTITY_INVALID",
@@ -838,6 +840,11 @@ Supported Requirements:
 
     {
         account: true,
+        action: "post"
+    }
+
+    {
+        account: true,
         provider: "epic"
     }
 
@@ -888,6 +895,40 @@ export async function authorizeRequest(
         requirements?.account ===
         true
     ) {
+        requireAuthenticatedSession(authorization);
+        if (!normalizeString(authorization.accountId)) {
+            throw new AuthorizationError(
+                "ACCOUNT_IDENTITY_MISSING",
+                "The authenticated BPD account identity could not be resolved.",
+                401
+            );
+        }
+        try {
+            const state = await assertAccountCanPerform(
+                env,
+                authorization.accountId,
+                requirements.action || "view_account"
+            );
+            const effectiveActive = state.accountActive === true || state.state === "suspended";
+            const sessionContext = {
+                ...authorization.sessionContext,
+                active: effectiveActive
+            };
+            authorization = {
+                ...authorization,
+                accountAccessState: state,
+                accountAccess: safeAccountAccessSummary(state),
+                active: effectiveActive,
+                sessionContext
+            };
+        } catch (error) {
+            if (error?.name === "AccountAccessError") {
+                throw new AuthorizationError(error.code, error.message, error.status, {
+                    accountAccess: safeAccountAccessSummary(error.accessState)
+                });
+            }
+            throw error;
+        }
         requireActiveAccount(
             authorization
         );
@@ -919,7 +960,8 @@ export async function authorizeRequest(
             await requireProvider(
                 authorization,
                 env,
-                provider
+                provider,
+                { requireFresh: requirements.requireFreshProvider !== false }
             );
     }
 

@@ -1,0 +1,10 @@
+.admin-faq { width: min(100% - 2rem, 70rem); margin: 2rem auto; }
+.admin-faq button, .admin-faq select, .admin-faq textarea { font: inherit; color: #f2f4f8; background: #111827; padding: .65rem; border: 1px solid var(--site-accent); border-radius: .6rem; }
+.admin-faq select option { background: #111827; color: #f2f4f8; }
+.admin-faq button:disabled { opacity: .5; cursor: not-allowed; }
+.admin-faq-card { margin: 1rem 0; padding: 1rem; border: 1px solid #394456; border-radius: .8rem; }
+.admin-faq-card h2, .admin-faq-card p { overflow-wrap: anywhere; white-space: pre-wrap; }
+.admin-faq-card label { display: grid; gap: .4rem; margin-block: .75rem; }
+.admin-faq-card textarea { width: 100%; box-sizing: border-box; resize: vertical; }
+.admin-faq-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+.admin-faq nav { display: flex; align-items: center; gap: 1rem; margin-top: 1rem; }

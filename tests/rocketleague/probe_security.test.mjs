@@ -85,7 +85,10 @@ test("profile delete invalidates before Supabase and blocks deletion on invalida
     const request = () => new Request("https://bpd.invalid/api/auth/rocketleague/profile", { method: "DELETE",
         headers: { cookie: "bpd_session=session-1", origin: "https://bpd.invalid", "Content-Type": "application/json" },
         body: JSON.stringify({ confirmation: "DELETE_ROCKETLEAGUE_PROFILE" }) });
-    globalThis.fetch = async () => {
+    globalThis.fetch = async url => {
+        if (String(url).endsWith("get_account_access_state")) return Response.json({ exists: true, state: "active", accountActive: true,
+            suspended: false, suspendedUntil: null, banned: false, removed: false, rocketLeague: { exists: true, active: true } });
+        if (String(url).endsWith("can_account_perform")) return Response.json(true);
         writes++;
         assert.equal(f.calls[0].reason, "profile_delete");
         return Response.json({ success: true, playerId: "22222222-2222-4222-8222-222222222222", epicIdentitiesRemoved: 1 });

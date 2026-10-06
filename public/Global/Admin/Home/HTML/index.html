@@ -160,7 +160,7 @@ Important:
                     ADMIN OVERVIEW
                     ====================================== -->
 
-                    <section
+<details data-admin-accordion
                         class="admin-dashboard"
                         aria-labelledby="adminDashboardTitle"
                     >
@@ -168,23 +168,7 @@ Important:
                         OVERVIEW HEADING
                         ================================== -->
 
-                        <header class="admin-section-heading">
-                            <div>
-                                <p class="admin-section-eyebrow">
-                                    Overview
-                                </p>
-
-                                <h2 id="adminDashboardTitle">
-                                    Admin Overview
-                                </h2>
-
-                                <p>
-                                    Current administrative
-                                    workload and service
-                                    information.
-                                </p>
-                            </div>
-                        </header>
+                        <summary><span id="adminDashboardTitle">Admin Overview</span><span class="admin-accordion-meta">Saved task and service information</span></summary>
 
                         <!-- =================================
                         STAT CARDS
@@ -256,7 +240,7 @@ Important:
                                 </strong>
 
                                 <a
-                                    href="/Admin/Users"
+                                    href="/Admin/UserManagement"
                                     data-router-link
                                 >
                                     Manage Users →
@@ -284,7 +268,7 @@ Important:
                                 </span>
                             </article>
                         </div>
-                    </section>
+                    </details>
 
                     <!-- =====================================
                     MANAGEMENT CENTER
@@ -319,166 +303,49 @@ Important:
                         MANAGEMENT NAVIGATION
                         ================================== -->
 
-                        <nav
-                            class="admin-management-grid"
-                            aria-label="Admin management areas"
-                        >
-                            <!-- =============================
-                            USER MANAGEMENT
-                            ============================== -->
-
-                            <a
-                                href="/Admin/Users"
-                                class="admin-management-card"
-                                data-router-link
-                            >
-                                <span
-                                    class="admin-management-icon"
-                                    aria-hidden="true"
-                                >
-                                    👥
-                                </span>
-
-                                <span class="admin-management-content">
-                                    <strong>
-                                        User Management
-                                    </strong>
-
-                                    <span>
-                                        Review accounts,
-                                        provider connections,
-                                        responsibility roles,
-                                        access, and account
-                                        status.
-                                    </span>
-                                </span>
-
-                                <span
-                                    class="admin-management-arrow"
-                                    aria-hidden="true"
-                                >
-                                    →
-                                </span>
-                            </a>
-
-                            <!-- =============================
-                            TASKBOARD
-                            ============================== -->
-
-                            <a
-                                href="/Admin/TaskBoard"
-                                class="admin-management-card"
-                                data-router-link
-                            >
-                                <span
-                                    class="admin-management-icon"
-                                    aria-hidden="true"
-                                >
-                                    📋
-                                </span>
-
-                                <span class="admin-management-content">
-                                    <strong>
-                                        Taskboard
-                                    </strong>
-
-                                    <span>
-                                        Create tasks, review
-                                        assigned work, update
-                                        progress, and
-                                        participate in task
-                                        discussions.
-                                    </span>
-                                </span>
-
-                                <span
-                                    class="admin-management-arrow"
-                                    aria-hidden="true"
-                                >
-                                    →
-                                </span>
-                            </a>
-
-                            <!-- =============================
-                            ANNOUNCEMENTS
-                            ============================== -->
-
-                            <a
-                                href="/Admin/Announcements"
-                                class="admin-management-card"
-                                data-router-link
-                            >
-                                <span
-                                    class="admin-management-icon"
-                                    aria-hidden="true"
-                                >
-                                    📣
-                                </span>
-
-                                <span class="admin-management-content">
-                                    <strong>
-                                        Announcements
-                                    </strong>
-
-                                    <span>
-                                        Prepare and distribute
-                                        administrative
-                                        announcements across
-                                        connected communities.
-                                    </span>
-                                </span>
-
-                                <span
-                                    class="admin-management-arrow"
-                                    aria-hidden="true"
-                                >
-                                    →
-                                </span>
-                            </a>
-
-                            <!-- =============================
-                            ADMIN SETTINGS
-                            ============================== -->
-
-                            <a
-                                href="/Admin/WorkerStatus"
-                                class="admin-management-card"
-                                data-router-link
-                            >
-                                <span
-                                    class="admin-management-icon"
-                                    aria-hidden="true"
-                                >
-                                    ⚙️
-                                </span>
-
-                                <span class="admin-management-content">
-                                    <strong>
-                                        System Status &amp; Health
-                                    </strong>
-
-                                    <span>
-                                        Review registered pages,
-                                        route health, and safe
-                                        connection status.
-                                    </span>
-                                </span>
-
-                                <span
-                                    class="admin-management-arrow"
-                                    aria-hidden="true"
-                                >
-                                    →
-                                </span>
-                            </a>
-                        </nav>
+<div class="admin-management-sections" aria-label="Admin management areas">
+                            <details data-admin-accordion>
+                                <summary><span>User Management</span><span class="admin-accordion-meta">Accounts, access and moderation</span></summary>
+                                <div class="admin-accordion-body">
+                                    <p>Search accounts, review connected providers, and manage access using your User Management permissions.</p>
+                                    <a class="admin-accordion-link" href="/Admin/UserManagement" data-router-link>Open User Management</a>
+                                </div>
+                            </details>
+                            <details id="adminSuggestionSection" data-admin-accordion hidden>
+                                <summary><span>Review Suggestions</span><span class="admin-accordion-meta">Community moderation</span></summary>
+                                <div class="admin-accordion-body">
+                                    <p>Review pending suggestions before they appear publicly.</p>
+                                    <a class="admin-accordion-link" href="/Admin/SuggestionReview" data-router-link>Open Suggestion Review</a>
+                                </div>
+                            </details>
+                            <details data-admin-accordion>
+                                <summary><span>Review FAQ Questions</span><span class="admin-accordion-meta">Questions and publishing</span></summary>
+                                <div class="admin-accordion-body">
+                                    <a class="admin-accordion-link" href="/Admin/FAQReview" data-router-link>Open FAQ Review</a>
+                                </div>
+                            </details>
+                            <details data-admin-accordion>
+                                <summary><span>System Status &amp; Configuration</span><span class="admin-accordion-meta">Health and route diagnostics</span></summary>
+                                <div class="admin-accordion-body">
+                                    <p>Review saved service health, run authorized checks, and inspect registered routes and configuration.</p>
+                                    <a class="admin-accordion-link" href="/Admin/WorkerStatus" data-router-link>Open System Status</a>
+                                </div>
+                            </details>
+                            <details data-admin-accordion>
+                                <summary><span>Taskboard &amp; Administration</span><span class="admin-accordion-meta">Tasks and planned announcements</span></summary>
+                                <div class="admin-accordion-body">
+                                    <a class="admin-accordion-link" href="/Admin/Taskboard" data-router-link>Open Taskboard</a>
+                                    <p>Announcements: coming soon.</p>
+                                </div>
+                            </details>
+                        </div>
                     </section>
 
                     <!-- =====================================
                     RECENT ACTIVITY
                     ====================================== -->
 
-                    <section
+<details data-admin-accordion
                         class="admin-activity"
                         aria-labelledby="adminActivityTitle"
                     >
@@ -486,23 +353,7 @@ Important:
                         ACTIVITY HEADING
                         ================================== -->
 
-                        <header class="admin-section-heading">
-                            <div>
-                                <p class="admin-section-eyebrow">
-                                    Recent Activity
-                                </p>
-
-                                <h2 id="adminActivityTitle">
-                                    Management Activity
-                                </h2>
-
-                                <p>
-                                    Recent administrative
-                                    changes, Taskboard events,
-                                    and management activity.
-                                </p>
-                            </div>
-                        </header>
+                        <summary><span id="adminActivityTitle">Management Activity</span><span class="admin-accordion-meta">Recent administrative changes</span></summary>
 
                         <!-- =================================
                         ACTIVITY FEED
@@ -518,7 +369,7 @@ Important:
                                 activity...
                             </p>
                         </div>
-                    </section>
+                    </details>
                 </div>
             </div>
         </div>

@@ -51,7 +51,7 @@ export async function handleRocketLeagueProfileDelete(request, env) {
 
     let authorization;
     try {
-        authorization = await authorizeRequest(request, env, { account: true });
+        authorization = await authorizeRequest(request, env, { account: true, action: "rocket_league" });
     } catch (error) {
         if (!isAuthorizationError(error)) {
             return failure("AUTH_SERVICE_UNAVAILABLE", 503, "Account services are temporarily unavailable. Please try again.");
@@ -59,7 +59,7 @@ export async function handleRocketLeagueProfileDelete(request, env) {
         const status = error.status >= 500 ? 503 : error.status;
         return failure(status === 503 ? "AUTH_SERVICE_UNAVAILABLE" : error.code, status,
             status === 401 ? "Sign in to delete your Rocket League profile."
-                : status === 403 ? "This BPD account is not active."
+                : status === 403 ? (error.message || "Account access is restricted.")
                     : "Account services are temporarily unavailable. Please try again.");
     }
 

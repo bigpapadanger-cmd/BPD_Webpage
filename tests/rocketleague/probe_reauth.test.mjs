@@ -47,6 +47,9 @@ async function fixture(admin = true) {
     env.PROVIDER_RUNTIME = { fetch: (url, init) => runtime.fetch(new Request(url, init), workerEnv) };
     globalThis.fetch = async (input, init = {}) => {
         const url = String(input);
+        if (url.endsWith("get_account_access_state")) return Response.json({ exists: true, state: "active", accountActive: true,
+            suspended: false, suspendedUntil: null, banned: false, removed: false, rocketLeague: { exists: true, active: true } });
+        if (url.endsWith("can_account_perform")) return Response.json(true);
         if (url.startsWith("https://discord.com/")) return Response.json({ user: { id: "discord-test" }, roles: [admin === true ? env.DISCORD_AUTHZ_ADMIN_ROLE_ID : admin === false ? env.DISCORD_AUTHZ_MOD_ROLE_ID : "100000000000000007"], pending: false });
         if (url.endsWith("get_account_session_identity")) return Response.json([{ id: "account-test", role: "user", active: true }]);
         if (url.endsWith("verify_account_provider_identity")) {

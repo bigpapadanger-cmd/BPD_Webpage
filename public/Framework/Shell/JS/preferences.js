@@ -16,6 +16,11 @@ const KEYS = Object.freeze({
     hoverTextColor: "bpdHoverTextColor"
 });
 
+// Color pickers use six-digit hex; never accept declarations or CSS expressions.
+export function isValidPreferenceColor(value) {
+    return typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value);
+}
+
 function readColorPreference(key, fallback) {
     try {
         const value = localStorage.getItem(key);
@@ -55,15 +60,11 @@ export function readPreferences() {
         const backgroundColor = readColorPreference(KEYS.backgroundColor, PREFERENCE_DEFAULTS.backgroundColor);
         const savedHoverTextColor = readColorPreference(KEYS.hoverTextColor, PREFERENCE_DEFAULTS.hoverTextColor);
         return {
-            theme: ["blue", "orange", "purple", "green"].includes(theme) ? theme : PREFERENCE_DEFAULTS.theme,
+            theme: ["blue", "orange", "purple", "green", "cyan", "emerald"].includes(theme) ? theme : PREFERENCE_DEFAULTS.theme,
             animations: localStorage.getItem(KEYS.animations) === "off" ? "off" : PREFERENCE_DEFAULTS.animations,
             sidebar: readSidebarPreference() ?? PREFERENCE_DEFAULTS.sidebar,
-            backgroundColor: hasReadableContrast("#ffffff", backgroundColor)
-                ? backgroundColor
-                : PREFERENCE_DEFAULTS.backgroundColor,
-            hoverTextColor: hasReadableContrast(savedHoverTextColor, "#24202f")
-                ? savedHoverTextColor
-                : PREFERENCE_DEFAULTS.hoverTextColor
+            backgroundColor,
+            hoverTextColor: savedHoverTextColor
         };
     } catch {
         return { ...PREFERENCE_DEFAULTS };
@@ -93,10 +94,10 @@ export function applyAppearancePreferences(preferences = readPreferences()) {
     document.body.dataset.theme = preferences.theme;
     document.body.dataset.animations = preferences.animations;
     document.body.classList.toggle("animations-off", preferences.animations === "off");
-    const backgroundColor = hasReadableContrast("#ffffff", preferences.backgroundColor)
+    const backgroundColor = isValidPreferenceColor(preferences.backgroundColor)
         ? preferences.backgroundColor
         : PREFERENCE_DEFAULTS.backgroundColor;
-    const hoverTextColor = hasReadableContrast(preferences.hoverTextColor, "#24202f")
+    const hoverTextColor = isValidPreferenceColor(preferences.hoverTextColor)
         ? preferences.hoverTextColor
         : PREFERENCE_DEFAULTS.hoverTextColor;
     document.documentElement.style.setProperty("--bpd-user-background", backgroundColor);

@@ -1,0 +1,39 @@
+/* Shared Admin disclosure presentation. Native details retains keyboard support. */
+details[data-admin-accordion] {
+    margin: .85rem 0;
+    border: 1px solid rgb(150 180 215 / 25%);
+    border-radius: .9rem;
+    background: rgb(16 26 42 / 55%);
+    overflow: clip;
+}
+details[data-admin-accordion] > summary {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    min-height: 3.5rem;
+    padding: .9rem 1rem;
+    color: var(--text-primary, #e4eefb);
+    font-size: .95rem;
+    font-weight: 700;
+    cursor: pointer;
+    list-style: none;
+    transition: background-color .15s ease;
+}
+details[data-admin-accordion] > summary::-webkit-details-marker { display: none; }
+details[data-admin-accordion] > summary::after { content: "+"; margin-left: auto; font-size: 1.15rem; }
+details[data-admin-accordion][open] > summary::after { content: "−"; }
+details[data-admin-accordion] > summary:hover { background: rgb(255 255 255 / 4%); }
+details[data-admin-accordion] > summary:focus-visible { outline: 3px solid #9ec7ff; outline-offset: -4px; border-radius: .8rem; }
+.admin-accordion-meta { color: var(--text-secondary, #b8c8dd); font-size: .8rem; font-weight: 400; }
+.admin-accordion-body { padding: 1rem; border-top: 1px solid rgb(150 180 215 / 18%); }
+.admin-accordion-body > :first-child { margin-top: 0; }
+.admin-accordion-body > :last-child { margin-bottom: 0; }
+details[data-admin-accordion].rl-force-refresh { padding: 0; }
+details[data-admin-accordion] > .admin-stat-grid,
+details[data-admin-accordion] > .admin-activity-list { padding: 1rem; }
+details[data-admin-accordion] > summary.worker-status-group-summary { display: flex; }
+.admin-accordion-link { display: inline-block; padding: .55rem .8rem; border: 1px solid rgb(150 180 215 / 35%); border-radius: .6rem; color: inherit; background: #163454; text-decoration: none; }
+.admin-accordion-link:focus-visible { outline: 3px solid #9ec7ff; outline-offset: 2px; }
+body[data-animations="off"] details[data-admin-accordion] > summary { transition: none; }
+@media (prefers-reduced-motion: reduce) { details[data-admin-accordion] > summary { transition: none; } }
+@media (max-width: 600px) { .admin-accordion-meta { max-width: 50%; } }

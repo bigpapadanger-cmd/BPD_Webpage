@@ -49,10 +49,18 @@ function makeAuthenticatedSession() {
         LastSeenAt: Date.now(),
         UserId: "server-account-id",
         Active: true,
-        Role: "user"
+        Role: "user",
+        Providers: { epic: { AccountId: "epic-subject", Linked: true, Authenticated: true } }
     };
     return {
-        AUTH_SESSIONS: { async get(key) { assert.equal(key, "session:session-1"); return session; } }
+        SUPABASE_URL: "https://supabase.example", SUPABASE_AUTH: "server-key",
+        AUTH_SESSIONS: { async get(key) {
+            if (key === "session:session-1") return session;
+            if (key === "provider_auth_id:server-account-id:epic") return { accountId: "server-account-id", provider: "epic",
+                connectedAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 86400000).toISOString() };
+            if (key === "account_login_status:server-account-id") return { accountId: "server-account-id", lastLoginAt: new Date().toISOString(), providerReauthAfter: null };
+            return null;
+        }, async put() {} }
     };
 }
 
@@ -70,14 +78,21 @@ function profileRequest(displayName, { authenticated = true } = {}) {
 
 test("unauthenticated callers cannot use appropriateness validation as a name oracle", async () => {
     const originalFetch = globalThis.fetch;
-    let fetchCalls = 0;
-    globalThis.fetch = async () => { fetchCalls += 1; throw new Error("unexpected fetch"); };
+    let mutationCalls = 0;
+    globalThis.fetch = async url => {
+        if (String(url).endsWith("get_account_access_state")) return Response.json({ exists: true, state: "active", accountActive: true,
+            suspended: false, suspendedUntil: null, banned: false, removed: false, rocketLeague: { exists: false, active: false } });
+        if (String(url).endsWith("can_account_perform")) return Response.json(true);
+        if (String(url).endsWith("verify_account_provider_identity")) return Response.json([{ account_id: "server-account-id", provider: "epic", provider_subject: "epic-subject", active: true }]);
+        if (String(url).endsWith("update_account_display_name")) mutationCalls += 1;
+        throw new Error("unexpected fetch");
+    };
     try {
         const response = await handleAccountMutation(profileRequest("mother-fucker", { authenticated: false }), makeAuthenticatedSession(), "profile");
         const body = await response.json();
         assert.equal(response.status, 401);
         assert.notEqual(body.code, "DISPLAY_NAME_INAPPROPRIATE");
-        assert.equal(fetchCalls, 0);
+        assert.equal(mutationCalls, 0);
     } finally {
         globalThis.fetch = originalFetch;
     }
@@ -85,16 +100,23 @@ test("unauthenticated callers cannot use appropriateness validation as a name or
 
 test("authenticated unsafe-name rejection happens before the Supabase mutation", async () => {
     const originalFetch = globalThis.fetch;
-    let fetchCalls = 0;
-    globalThis.fetch = async () => { fetchCalls += 1; throw new Error("unexpected fetch"); };
+    let mutationCalls = 0;
+    globalThis.fetch = async url => {
+        if (String(url).endsWith("get_account_access_state")) return Response.json({ exists: true, state: "active", accountActive: true,
+            suspended: false, suspendedUntil: null, banned: false, removed: false, rocketLeague: { exists: false, active: false } });
+        if (String(url).endsWith("can_account_perform")) return Response.json(true);
+        if (String(url).endsWith("verify_account_provider_identity")) return Response.json([{ account_id: "server-account-id", provider: "epic", provider_subject: "epic-subject", active: true }]);
+        mutationCalls++;
+        throw new Error("unexpected mutation");
+    };
     try {
         const response = await handleAccountMutation(profileRequest("m0ther.fucker"), makeAuthenticatedSession(), "profile");
         const body = await response.json();
-        assert.equal(response.status, 400);
+        assert.equal(response.status, 400, JSON.stringify(body));
         assert.equal(body.code, "DISPLAY_NAME_INAPPROPRIATE");
         assert.equal(body.message, "That display name isn't allowed. Please choose another name.");
         assert.equal(JSON.stringify(body).includes("motherfucker"), false);
-        assert.equal(fetchCalls, 0);
+        assert.equal(mutationCalls, 0);
     } finally {
         globalThis.fetch = originalFetch;
     }
@@ -106,13 +128,17 @@ test("display-name mutation returns authoritative timestamps and derives account
     const changedAt = "2026-10-02T16:00:00Z";
     const availableAt = "2026-11-01T16:00:00Z";
     globalThis.fetch = async (url, options) => {
+        if (String(url).endsWith("get_account_access_state")) return Response.json({ exists: true, state: "active", accountActive: true,
+            suspended: false, suspendedUntil: null, banned: false, removed: false, rocketLeague: { exists: false, active: false } });
+        if (String(url).endsWith("can_account_perform")) return Response.json(true);
+        if (String(url).endsWith("verify_account_provider_identity")) return Response.json([{ account_id: "server-account-id", provider: "epic", provider_subject: "epic-subject", active: true }]);
         captured.url = String(url);
         captured.body = JSON.parse(options.body);
         return Response.json({ accountId: "server-account-id", displayName: "Player Name", displayNameChangedAt: changedAt, displayNameChangeAvailableAt: availableAt });
     };
     try {
         const response = await handleAccountMutation(profileRequest("Player Name"), {
-            ...makeAuthenticatedSession(), SUPABASE_URL: "https://supabase.example", SUPABASE_AUTH: "server-key"
+            ...makeAuthenticatedSession()
         }, "profile");
         const body = await response.json();
         assert.equal(response.status, 200);
@@ -198,6 +224,10 @@ test("authenticated session endpoint carries only the normalized display-name co
     globalThis.fetch = async url => String(url).includes("rpc/get_account_session_identity")
         ? Response.json([{ id: "server-account-id", display_name: "Player", role: "user", active: true,
             display_name_changed_at: changedAt, display_name_change_available_at: availableAt }])
+        : String(url).endsWith("get_account_access_state")
+            ? Response.json({ exists: true, state: "active", accountActive: true, suspended: false, suspendedUntil: null,
+                banned: false, removed: false, rocketLeague: { exists: false, active: false } })
+            : String(url).endsWith("can_account_perform") ? Response.json(true)
         : Response.json([]);
     try {
         const response = await handleAuthSession(new Request("https://bpd-gaming-network.com/api/auth/session", {
@@ -210,7 +240,8 @@ test("authenticated session endpoint carries only the normalized display-name co
         assert.equal(body.user.displayName, "Player");
         assert.equal(body.user.displayNameChangedAt, Date.parse(changedAt));
         assert.equal(body.user.displayNameChangeAvailableAt, Date.parse(availableAt));
-        assert.deepEqual(Object.keys(body.user).sort(), ["active", "displayName", "displayNameChangeAvailableAt", "displayNameChangedAt", "role", "userId"].sort());
+        assert.deepEqual(Object.keys(body.user).sort(), ["active", "access", "displayName", "displayNameChangeAvailableAt", "displayNameChangedAt", "role", "userId"].sort());
+        assert.equal(body.user.access.state, "active");
     } finally {
         globalThis.fetch = originalFetch;
     }

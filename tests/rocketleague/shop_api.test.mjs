@@ -70,6 +70,27 @@ test("item cards remain useful without artwork and show verified variant metadat
     } finally { globalThis.document = originalDocument; }
 });
 
+test("multi-product bundles receive distinct cards without fabricated prices, artwork or discounts", () => {
+    const savedDocument = globalThis.document;
+    globalThis.document = { createElement: tag => ({ tagName: tag, className: "", children: [], textContent: "",
+        classList: { add() {} }, append(...children) { this.children.push(...children); }, addEventListener() {} }) };
+    try {
+        const item = { title: "Verified offer", image_url: null, costs: [{ prices: [{ amount: 900, currency_id: 13 }] }],
+            products: [{ product_id: 1, count: 1 }, { product_id: 2, count: 2 }] };
+        const bundle = itemCard(item);
+        const text = bundle.children.map(child => child.textContent).join(" ");
+        assert.ok(bundle.children.some(child => child.className === "rl-shop-bundle-badge" && child.textContent === "Bundle"));
+        assert.match(text, /3 items in the listed contents/);
+        assert.match(text, /900 · Currency 13/);
+        assert.doesNotMatch(text, /discount|saving|rarity|original|product 1/i);
+        assert.equal(bundle.children.some(child => child.tagName === "img"), false);
+        const ordinary = itemCard({ ...item, products: [item.products[0]] });
+        assert.equal(ordinary.children.some(child => child.className === "rl-shop-bundle-badge"), false);
+        const unknownCount = itemCard({ ...item, products: [{ product_id: 1 }, { product_id: 2 }] });
+        assert.doesNotMatch(unknownCount.children.map(child => child.textContent).join(" "), /listed contents/);
+    } finally { globalThis.document = savedDocument; }
+});
+
 test("carousel cycles cached three-item groups, pauses, honors preferences and cleans up on navigation", async () => {
     const saved = { document: globalThis.document, window: globalThis.window, setInterval: globalThis.setInterval, clearInterval: globalThis.clearInterval };
     const node = () => ({ children: [], handlers: {}, attributes: {},

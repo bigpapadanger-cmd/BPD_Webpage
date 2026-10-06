@@ -10,6 +10,13 @@
 .faq-header h1 { margin: .5rem 0; font-size: clamp(2rem, 5vw, 3.25rem); }
 .faq-header p, .faq-item p, .faq-suggestion p { color: #b9c2d1; line-height: 1.65; }
 .faq-list { display: grid; gap: .8rem; }
+.faq-list:not(:empty) { margin-block: 1rem; }
+#faqAskForm { display: grid; gap: .75rem; }
+#faqAskForm textarea { width: 100%; box-sizing: border-box; resize: vertical; }
+#faqAskForm button, #faqAskForm textarea { padding: .75rem; border-radius: .6rem; border: 1px solid var(--site-accent); background: #111827; color: #f2f4f8; font: inherit; }
+#faqAskForm button:disabled { opacity: .55; cursor: not-allowed; }
+#faqAskForm [hidden] { display: none; }
+.faq-item p { white-space: pre-wrap; overflow-wrap: anywhere; }
 .faq-item { padding: 1rem 1.2rem; border: 1px solid rgba(255,255,255,.13); border-radius: .85rem; background: rgba(12,18,30,.84); }
 .faq-item[open] { border-color: var(--site-accent); background: var(--site-accent-soft); }
 .faq-item summary { cursor: pointer; font-weight: 700; }

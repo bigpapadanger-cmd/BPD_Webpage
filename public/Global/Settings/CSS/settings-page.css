@@ -128,6 +128,17 @@
     opacity: 0.58;
 }
 
+.user-settings button:not(:disabled):hover,
+.user-settings button:not(:disabled):focus-visible {
+    border-color: var(--site-accent);
+    box-shadow: 0 0 14px var(--site-accent-soft);
+}
+
+.user-settings button:not(:disabled):focus-visible {
+    outline: 2px solid var(--site-accent);
+    outline-offset: 3px;
+}
+
 .user-settings a {
     display: inline-block;
     margin-top: 0.75rem;

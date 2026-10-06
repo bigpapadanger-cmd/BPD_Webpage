@@ -66,13 +66,23 @@ body.page-loading .site-content {
 
 .verification-action-result {
     margin: 6px 0 0;
+    padding: .65rem .85rem;
+    border: 1px solid var(--verification-border, #53647d);
+    border-radius: .75rem;
     font-size: .9em;
     line-height: 1.4;
+    opacity: 1;
+    transition: opacity 250ms ease;
 }
+.verification-action-result.is-fading { opacity: 0; }
 
-.verification-action-result[data-state="success"] { color: #7ee0a5; }
-.verification-action-result[data-state="error"] { color: #ff9d9d; }
-.verification-action-result[data-state="info"] { color: var(--muted-text-color, #a1a8b8); }
+.verification-action-result[data-state="success"] { color: #7ee0a5; --verification-border: #278b54; }
+.verification-action-result[data-state="warning"] { color: #ffd27a; --verification-border: #a87516; }
+.verification-action-result[data-state="error"] { color: #ff9d9d; --verification-border: #a83e4d; }
+.verification-action-result[data-state="info"] { color: var(--muted-text-color, #a1a8b8); --verification-border: #53647d; }
+@media (prefers-reduced-motion: reduce) {
+    .verification-action-result { transition: none; }
+}
 /* =========================================================
 GLOBAL BOX MODEL
 ========================================================= */

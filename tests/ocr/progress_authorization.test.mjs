@@ -20,6 +20,9 @@ function fixture({ signedIn = true, owner = "account-1", legacy = false } = {}) 
     ]);
     globalThis.fetch = async (input, init = {}) => {
         const url = String(input);
+        if (url.endsWith("get_account_access_state")) return Response.json({ exists: true, state: "active", accountActive: true,
+            suspended: false, suspendedUntil: null, banned: false, removed: false, rocketLeague: { exists: true, active: true } });
+        if (url.endsWith("can_account_perform")) return Response.json(true);
         if (url.endsWith("get_account_session_identity")) return Response.json([{ id: "account-1", role: "user", active: true }]);
         if (url.endsWith("verify_account_provider_identity")) return Response.json([{ account_id: "account-1", provider: "epic", provider_subject: "epic-subject", active: true }]);
         if (url.endsWith("get_rocketleague_profile_v2")) return Response.json({ account_id: "account-1", rl_player_id: "player-1", active: true,

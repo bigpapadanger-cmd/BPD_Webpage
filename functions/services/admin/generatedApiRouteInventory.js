@@ -801,6 +801,10 @@ export const PAGE_ROUTE_INVENTORY = Object.freeze([
       {
         "path": "/Framework/Shell/HTML/Footer/footer.html",
         "exists": true
+      },
+      {
+        "path": "/Required/FAQ/JS/index.js",
+        "exists": true
       }
     ]
   },
@@ -1321,6 +1325,86 @@ export const PAGE_ROUTE_INVENTORY = Object.freeze([
     ]
   },
   {
+    "path": "/Admin/FAQReview",
+    "lookupKey": "/admin/faqreview",
+    "canonicalPath": "/Admin/FAQReview",
+    "routeType": "page",
+    "casePolicy": "human-insensitive",
+    "sourceFiles": [
+      "public/routes.js"
+    ],
+    "handler": "functions/[[path]].js",
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "authRequired": true,
+    "healthStatus": "registered",
+    "deepLinkSupported": true,
+    "targets": [
+      {
+        "path": "/Global/Admin/FAQ/HTML/index.html",
+        "exists": true
+      },
+      {
+        "path": "/Framework/Shell/HTML/Header/header.html",
+        "exists": true
+      },
+      {
+        "path": "/Framework/Shell/HTML/Sidebar/admin.html",
+        "exists": true
+      },
+      {
+        "path": "/Framework/Shell/HTML/Footer/footer.html",
+        "exists": true
+      },
+      {
+        "path": "/Global/Admin/FAQ/JS/index.js",
+        "exists": true
+      }
+    ]
+  },
+  {
+    "path": "/Admin/UserManagement",
+    "lookupKey": "/admin/usermanagement",
+    "canonicalPath": "/Admin/UserManagement",
+    "routeType": "page",
+    "casePolicy": "human-insensitive",
+    "sourceFiles": [
+      "public/routes.js"
+    ],
+    "handler": "functions/[[path]].js",
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "authRequired": true,
+    "healthStatus": "registered",
+    "deepLinkSupported": true,
+    "targets": [
+      {
+        "path": "/Global/Admin/UserManagement/HTML/index.html",
+        "exists": true
+      },
+      {
+        "path": "/Framework/Shell/HTML/Header/header.html",
+        "exists": true
+      },
+      {
+        "path": "/Framework/Shell/HTML/Sidebar/admin.html",
+        "exists": true
+      },
+      {
+        "path": "/Framework/Shell/HTML/Footer/footer.html",
+        "exists": true
+      },
+      {
+        "path": "/Global/Admin/UserManagement/JS/index.js",
+        "exists": true
+      }
+    ]
+  },
+  {
     "path": "/Admin/PageSettings",
     "lookupKey": "/admin/pagesettings",
     "canonicalPath": "/Admin/PageSettings",
@@ -1443,6 +1527,38 @@ export const PAGE_ROUTE_INVENTORY = Object.freeze([
 ]);
 export const API_ROUTE_INVENTORY = Object.freeze([
   {
+    "path": "/api/admin/faq/:questionId/review",
+    "lookupKey": null,
+    "routeType": "api",
+    "casePolicy": "exact",
+    "sourceFiles": [
+      "functions/api/admin/faq/[questionId]/review.js"
+    ],
+    "handler": "functions/api/admin/faq/[questionId]/review.js",
+    "methods": [
+      "ALL"
+    ],
+    "authRequired": "handler-defined",
+    "healthStatus": "valid",
+    "deepLinkSupported": false
+  },
+  {
+    "path": "/api/admin/faq",
+    "lookupKey": null,
+    "routeType": "api",
+    "casePolicy": "exact",
+    "sourceFiles": [
+      "functions/api/admin/faq/index.js"
+    ],
+    "handler": "functions/api/admin/faq/index.js",
+    "methods": [
+      "ALL"
+    ],
+    "authRequired": "handler-defined",
+    "healthStatus": "valid",
+    "deepLinkSupported": false
+  },
+  {
     "path": "/api/admin/page-settings/route-health",
     "lookupKey": null,
     "routeType": "api",
@@ -1551,6 +1667,87 @@ export const API_ROUTE_INVENTORY = Object.freeze([
     "methods": [
       "GET",
       "POST"
+    ],
+    "authRequired": "handler-defined",
+    "healthStatus": "valid",
+    "deepLinkSupported": false
+  },
+  {
+    "path": "/api/admin/user-management/:targetAccountId",
+    "lookupKey": null,
+    "routeType": "api",
+    "casePolicy": "exact",
+    "sourceFiles": [
+      "functions/api/admin/user-management/[targetAccountId].js"
+    ],
+    "handler": "functions/api/admin/user-management/[targetAccountId].js",
+    "methods": [
+      "GET"
+    ],
+    "authRequired": "handler-defined",
+    "healthStatus": "valid",
+    "deepLinkSupported": false
+  },
+  {
+    "path": "/api/admin/user-management/:targetAccountId/actions",
+    "lookupKey": null,
+    "routeType": "api",
+    "casePolicy": "exact",
+    "sourceFiles": [
+      "functions/api/admin/user-management/[targetAccountId]/actions.js"
+    ],
+    "handler": "functions/api/admin/user-management/[targetAccountId]/actions.js",
+    "methods": [
+      "POST"
+    ],
+    "authRequired": "handler-defined",
+    "healthStatus": "valid",
+    "deepLinkSupported": false
+  },
+  {
+    "path": "/api/admin/user-management/:targetAccountId/notes",
+    "lookupKey": null,
+    "routeType": "api",
+    "casePolicy": "exact",
+    "sourceFiles": [
+      "functions/api/admin/user-management/[targetAccountId]/notes.js"
+    ],
+    "handler": "functions/api/admin/user-management/[targetAccountId]/notes.js",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "authRequired": "handler-defined",
+    "healthStatus": "valid",
+    "deepLinkSupported": false
+  },
+  {
+    "path": "/api/admin/user-management/history",
+    "lookupKey": null,
+    "routeType": "api",
+    "casePolicy": "exact",
+    "sourceFiles": [
+      "functions/api/admin/user-management/history.js"
+    ],
+    "handler": "functions/api/admin/user-management/history.js",
+    "methods": [
+      "GET"
+    ],
+    "authRequired": "handler-defined",
+    "healthStatus": "valid",
+    "deepLinkSupported": false
+  },
+  {
+    "path": "/api/admin/user-management",
+    "lookupKey": null,
+    "routeType": "api",
+    "casePolicy": "exact",
+    "sourceFiles": [
+      "functions/api/admin/user-management/index.js"
+    ],
+    "handler": "functions/api/admin/user-management/index.js",
+    "methods": [
+      "GET"
     ],
     "authRequired": "handler-defined",
     "healthStatus": "valid",
@@ -2203,6 +2400,38 @@ export const API_ROUTE_INVENTORY = Object.freeze([
     "deepLinkSupported": false
   },
   {
+    "path": "/api/faq",
+    "lookupKey": null,
+    "routeType": "api",
+    "casePolicy": "exact",
+    "sourceFiles": [
+      "functions/api/faq/index.js"
+    ],
+    "handler": "functions/api/faq/index.js",
+    "methods": [
+      "ALL"
+    ],
+    "authRequired": "handler-defined",
+    "healthStatus": "valid",
+    "deepLinkSupported": false
+  },
+  {
+    "path": "/api/faq/questions",
+    "lookupKey": null,
+    "routeType": "api",
+    "casePolicy": "exact",
+    "sourceFiles": [
+      "functions/api/faq/questions.js"
+    ],
+    "handler": "functions/api/faq/questions.js",
+    "methods": [
+      "ALL"
+    ],
+    "authRequired": "handler-defined",
+    "healthStatus": "valid",
+    "deepLinkSupported": false
+  },
+  {
     "path": "/api/health/apihealth",
     "lookupKey": null,
     "routeType": "api",
@@ -2501,6 +2730,7 @@ export const API_ROUTE_INVENTORY = Object.freeze([
     ],
     "handler": "functions/api/rocketleague/players/profile/[publicProfileId].js",
     "methods": [
+      "ALL",
       "GET"
     ],
     "authRequired": "handler-defined",

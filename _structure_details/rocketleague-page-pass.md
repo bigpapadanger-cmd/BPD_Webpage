@@ -87,13 +87,40 @@ shows the internal presence-check timestamp. Public Find Players and Player rank
 badges use the shared Rocket League tier-to-color mapper. `master_rl.css` already
 imports both page stylesheets; page styles remain in their owning folders.
 
-After the existing public-profile RPC confirms the profile is currently
-discoverable, DomainData resolves its account server-side from `core.rl_players`
-by `public_profile_id`, then calls the existing private history RPC with the
-server-derived account ID. Only normalized MMR capture fields reach the browser;
-neither account nor player IDs do. The Player graph shows the last 30 days as UTC
-daily averages and keeps playlist gaps independent. The browser never calls
-Supabase or the provider.
+The public Player endpoint now calls only `api.get_public_rl_player_summary`
+with the public profile UUID. The live RPC filters active/discoverable players;
+DomainData allowlists display/ Epic display names, primary platform, current
+three-playlist MMR/tier/capture time, six career totals/capture time, and daily
+MMR history. No internal ownership lookup, private history call, presence,
+provider metadata or raw snapshots are used for this endpoint. Not-found/private
+results share the same 404. History must be ascending, unique UTC dates within
+today and the previous 13 days, with at most 14 points. The database supplies
+the daily averages; the existing SVG helper renders them without re-averaging.
+Null playlist values remain gaps; missing totals are not turned into zero.
+
+Player data refreshes every five minutes without document reload. Hidden tabs
+skip polling; returning visibility refreshes if due. Requests cannot overlap,
+have a ten-second client deadline, and intervals/listeners are cleaned up on
+page replacement/reinitialization. Transient refresh failures preserve the last
+display; a definitive 404 hides it. The browser never calls Supabase/provider.
+
+## Registration/access and bundle follow-up (2026-10-06)
+
+Normal RL permissions come from current `api.can_account_perform`, whose live
+policy requires active account/player and registration status `complete`.
+Optional `profileComplete` flags remain informational, not access requirements.
+Canonical Epic linkage is still server-verified; stale authorization leaves the
+link intact and allows stored-data access, while live stats refresh still needs
+fresh authorization. Registration saves require confirmed completion before
+redirecting to MyProfile with a one-time completion notice. Confirmed MyProfile
+saves show success and return to the hub after three seconds; failures remain
+on the editor with settings locked where confirmation is unavailable.
+
+Per user-confirmed catalog semantics, multi-product offers receive a wider
+bundle card/badge and source price. Counts describe only listed contents,
+because the existing cache projection is bounded. Component artwork/names,
+discounts and rarity are not invented. Ordinary item cards and cache/carousel
+requests are unchanged; the existing master stylesheet imports the owning CSS.
 
 ## Verification boundary
 

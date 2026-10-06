@@ -273,7 +273,7 @@ export async function handleOCRRequest(
         ================================================= */
 
         let verifiedAuthorization;
-        try { verifiedAuthorization = await authorizeRocketLeagueRequest(request, env); }
+        try { verifiedAuthorization = await authorizeRocketLeagueRequest(request, env, "submit_scoreboard"); }
         catch (error) { return authorizationErrorResponse(error); }
         const session = { ...verifiedAuthorization.sessionContext, providers: {
             ...verifiedAuthorization.sessionContext.providers,

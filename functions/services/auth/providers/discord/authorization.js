@@ -101,7 +101,11 @@ function normalizeRequirements(
 
         leagueStaff:
             requirements?.leagueStaff ===
-            true
+            true,
+
+        action: typeof requirements?.action === "string"
+            ? requirements.action
+            : "view_account"
     };
 }
 
@@ -459,6 +463,9 @@ export async function authorizeDiscordRequest(
                 account:
                     true,
 
+                action:
+                    normalizedRequirements.action,
+
                 provider:
                     "discord"
             }
@@ -550,14 +557,16 @@ export async function authorizeDiscordGuildMember(
 
 export async function authorizeDiscordStaff(
     request,
-    env
+    env,
+    options = {}
 ) {
     return authorizeDiscordRequest(
         request,
         env,
         {
             staff:
-                true
+                true,
+            action: options.action || "view_account"
         }
     );
 }

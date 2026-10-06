@@ -228,6 +228,9 @@ export async function authorizeDiscordMatchBotConfiguration(
                 account:
                     true,
 
+                action:
+                    "manage_account",
+
                 provider:
                     "discord"
             }

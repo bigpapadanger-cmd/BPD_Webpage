@@ -79,6 +79,12 @@ import {
     getProviderAuthorizationState
 } from "../providers/provider_auth_state.js";
 
+import {
+    canAccountPerform,
+    getAccountAccessState,
+    safeAccountAccessSummary
+} from "./access.js";
+
 /* =========================================================
 SUPPORTED PROVIDERS
 ========================================================= */
@@ -1031,6 +1037,17 @@ export async function handleAuthSession(
             );
         }
 
+        // Session KV is not the authority for restrictions: an enforcement
+        // change must take effect for sessions created before that change.
+        const accountAccessState = await getAccountAccessState(env, account.userId);
+        if (!await canAccountPerform(env, account.userId, "login")
+            || !await canAccountPerform(env, account.userId, "view_account")) {
+            return json({
+                ...createUnauthenticatedResponse(),
+                code: "ACCOUNT_ACCESS_RESTRICTED"
+            });
+        }
+
         /* =================================================
         PERMANENT PROVIDER LINKAGE + AUTH FRESHNESS
         ================================================= */
@@ -1073,8 +1090,10 @@ export async function handleAuthSession(
                         || "user",
 
                     active:
-                        account.active ===
-                        true
+                        accountAccessState.accountActive === true || accountAccessState.state === "suspended",
+
+                    access:
+                        safeAccountAccessSummary(accountAccessState)
                 },
 
                 /*

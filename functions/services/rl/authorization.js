@@ -17,10 +17,11 @@ export async function verifyBackgroundEpicAccount(env, accountId, epicAccountId)
     return freshness.authorized === true;
 }
 
-// Registration uses account + Epic authorization. Private features additionally
-// require completed registration and persisted consent through this guard.
-export async function authorizeRocketLeagueRequest(request, env) {
-    const authorization = await authorizeRequest(request, env, { account: true, provider: "epic" });
+// Current action policy owns registration eligibility. Canonical Epic linkage
+// remains verified; freshness is required only for live stats refresh.
+export async function authorizeRocketLeagueRequest(request, env, action = "rocket_league") {
+    const authorization = await authorizeRequest(request, env, { account: true, action, provider: "epic",
+        requireFreshProvider: action === "refresh_rl_stats" });
     let profile;
     try {
         profile = await getRocketLeagueProfileByAccountId(env, authorization.accountId);
@@ -33,11 +34,9 @@ export async function authorizeRocketLeagueRequest(request, env) {
         throw new AuthorizationError("RL_PROFILE_UNAVAILABLE", "Rocket League profile identity could not be verified.", 503);
     }
     const complete = (profile?.registrationStatus ?? profile?.registration_status) === "complete";
-    const age = (profile?.ageConsent ?? profile?.age_consent ?? profile?.ageConsentVerified ?? profile?.age_consent_verified) === true;
-    const policy = (profile?.policyConsent ?? profile?.policy_consent ?? profile?.policyConsentVerified ?? profile?.policy_consent_verified) === true;
-    if (!playerId || profile?.active !== true || !complete || !age || !policy
-        || (profile?.profileComplete ?? profile?.profile_complete) !== true
-        || (profile?.rocketLeagueAccess ?? profile?.rocket_league_access) !== true) {
+    // The centralized current-state action policy has already authorized this
+    // action. Optional profile completeness is not an additional permission.
+    if (!playerId || profile?.active !== true || !complete) {
         throw new AuthorizationError("RL_REGISTRATION_REQUIRED", "Complete Rocket League registration and required consent first.", 403);
     }
     return { ...authorization, profile };

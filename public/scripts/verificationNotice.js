@@ -15,16 +15,22 @@ export function showVerificationOutcome(anchor, message, { state = "info", durat
         const container = actionGroup || anchor.parentElement;
         if (container?.insertAdjacentElement) container.insertAdjacentElement("afterend", element);
         else anchor.insertAdjacentElement("afterend", element);
-        record = { element, timer: null };
+        record = { element, timer: null, fadeTimer: null };
         outcomeStates.set(anchor, record);
     }
     if (record.timer) clearTimeout(record.timer);
-    record.element.dataset.state = ["success", "error", "info"].includes(state) ? state : "info";
+    if (record.fadeTimer) clearTimeout(record.fadeTimer);
+    record.element.classList?.remove("is-fading");
+    record.element.dataset.state = ["success", "warning", "error", "info"].includes(state) ? state : "info";
     record.element.textContent = String(message).slice(0, 240);
     record.element.hidden = false;
     record.timer = setTimeout(() => {
-        record.element.textContent = "";
-        record.element.hidden = true;
+        record.element.classList?.add("is-fading");
+        record.fadeTimer = setTimeout(() => {
+            record.element.textContent = "";
+            record.element.hidden = true;
+            record.fadeTimer = null;
+        }, 250);
         record.timer = null;
     }, Math.min(10000, Math.max(5000, Number(durationMs) || 7000)));
 }

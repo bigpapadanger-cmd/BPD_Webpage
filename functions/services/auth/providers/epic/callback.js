@@ -1,6 +1,7 @@
 import { completeOAuthCallback } from "../../oauth/callback_response.js";
 import { withUpstreamDeadline, fetchBoundedResponse, safeUpstreamErrorCode, safeUpstreamErrorMessage } from "../../../http/upstream.js";
 import { invalidateRlProbeSession } from "../../../rl/probe_security.js";
+import { assertAccountCanPerform } from "../../account/access.js";
 "use strict";
 
 /* =========================================================
@@ -1973,25 +1974,11 @@ async function executeCallback(
                     .preferredUsername
             );
 
-        if (
-            identity.active !==
-            true
-        ) {
-            return json(
-                {
-                    success:
-                        false,
-
-                    code:
-                        "ACCOUNT_INACTIVE",
-
-                    message:
-                        "This BPD account is not active.",
-
-                    debugId
-                },
-                403
-            );
+        try {
+            await assertAccountCanPerform(env, identity.accountId, "login");
+        } catch {
+            return json({ success: false, code: "ACCOUNT_ACCESS_RESTRICTED",
+                message: "Account access is restricted.", debugId }, 403);
         }
 
         const session =

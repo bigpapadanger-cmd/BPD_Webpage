@@ -873,7 +873,7 @@ export async function handleLinkProvider(
                     request,
                     env,
                     {
-                        account: true, recovery: true
+                        account: true, action: "manage_account", recovery: true
                     }
                 );
         }

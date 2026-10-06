@@ -635,7 +635,7 @@ export async function handleUnlinkProvider(
                     request,
                     env,
                     {
-                        account: true, recovery: true
+                        account: true, action: "manage_account", recovery: true
                     }
                 );
         }

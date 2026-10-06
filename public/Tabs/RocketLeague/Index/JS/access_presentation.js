@@ -29,6 +29,12 @@ export function getRocketLeagueAccessPresentation(session) {
         };
     }
 
+    if (session.rocketLeagueAccess === true) {
+        return { title: "Rocket League registration complete", message: session.requiresEpicReauthorization === true
+            ? "Your saved Rocket League data is available. Verify Epic Again before live provider operations."
+            : "Your saved Rocket League profile is ready." };
+    }
+
     if (session.requiresEpicReauthorization === true) {
         return {
             title: "Epic verification required",

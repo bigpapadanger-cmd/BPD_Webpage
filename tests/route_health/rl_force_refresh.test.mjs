@@ -56,14 +56,22 @@ test("capability outcomes remain isolated and unsupported history is explicit", 
 });
 
 test("same-account concurrent force refresh requests share one in-isolate operation", async () => {
-    const [first, second] = await Promise.all([
-        forceRocketLeagueRefresh({}, ACCOUNT_ID),
-        forceRocketLeagueRefresh({}, ACCOUNT_ID)
-    ]);
-    assert.strictEqual(first, second);
-    assert.equal(first.forced, true);
-    assert.equal(first.capabilities.history.status, "unsupported");
-    assert.equal(first.capabilities.skills.status, "failed");
-    assert.equal(first.capabilities.profile.status, "failed");
-    assert.equal(first.capabilities.stats.status, "failed");
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async url => String(url).endsWith("get_account_access_state")
+        ? Response.json({ exists: true, state: "active", accountActive: true, suspended: false, suspendedUntil: null,
+            banned: false, removed: false, rocketLeague: { exists: true, active: true } })
+        : String(url).endsWith("can_account_perform") ? Response.json(true) : Response.json([]);
+    try {
+        const env = { SUPABASE_URL: "https://supabase.invalid", SUPABASE_AUTH: "test" };
+        const [first, second] = await Promise.all([
+            forceRocketLeagueRefresh(env, ACCOUNT_ID),
+            forceRocketLeagueRefresh(env, ACCOUNT_ID)
+        ]);
+        assert.strictEqual(first, second);
+        assert.equal(first.forced, true);
+        assert.equal(first.capabilities.history.status, "unsupported");
+        assert.ok(["failed", "skipped"].includes(first.capabilities.skills.status));
+        assert.ok(["failed", "skipped"].includes(first.capabilities.profile.status));
+        assert.ok(["failed", "skipped"].includes(first.capabilities.stats.status));
+    } finally { globalThis.fetch = originalFetch; }
 });

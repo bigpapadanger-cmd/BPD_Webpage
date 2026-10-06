@@ -97,3 +97,28 @@ export function buildSettingsPayload(profile, values) {
         notificationsV2: values.notificationsV2
     };
 }
+
+export function areSavedSettingsConfirmed(profile, submitted) {
+    if (!getSettingsConfirmationState(profile).canSave || !submitted) return false;
+    const stable = value => {
+        if (Array.isArray(value)) return value.map(stable);
+        if (value && typeof value === "object") {
+            return Object.fromEntries(Object.keys(value).sort().map(key => [key, stable(value[key])]));
+        }
+        return value;
+    };
+    const canonical = (value, key) => {
+        if (key === "availability" && Array.isArray(value)) {
+            return value.map(row => ({ day: row.day?.toLowerCase(), start: row.start, end: row.end }))
+                .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+        }
+        if (key === "notificationsV2" && isNotificationsV2(value)) {
+            return Object.fromEntries(NOTIFICATION_CHANNELS.map(channel => [channel, {
+                enabled: value[channel].enabled, reminders: [...value[channel].reminders].sort((a, b) => a - b)
+            }]));
+        }
+        return value;
+    };
+    return EDITABLE_FIELDS.every(key => Object.hasOwn(submitted, key)
+        && JSON.stringify(stable(canonical(profile.settings[key], key))) === JSON.stringify(stable(canonical(submitted[key], key))));
+}

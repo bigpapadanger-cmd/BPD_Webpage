@@ -2,6 +2,7 @@
 
 import { refreshStats } from "./stats/refresh.js";
 import { refreshProviderDataForced } from "./provider_data/refresh.js";
+import { assertAccountCanPerform } from "../auth/account/access.js";
 
 const activeRefreshes = new Map();
 
@@ -59,6 +60,7 @@ export async function forceRocketLeagueRefresh(env, accountId) {
         error.status = 400;
         throw error;
     }
+    await assertAccountCanPerform(env, normalizedAccountId, "refresh_rl_stats");
     if (activeRefreshes.has(normalizedAccountId)) return activeRefreshes.get(normalizedAccountId);
     const task = runForceRefresh(env, normalizedAccountId).finally(() => activeRefreshes.delete(normalizedAccountId));
     activeRefreshes.set(normalizedAccountId, task);

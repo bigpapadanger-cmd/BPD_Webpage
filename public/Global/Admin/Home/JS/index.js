@@ -44,9 +44,11 @@ IMPORTS
 
 import {
     getAuthState,
+    hasAdminPermission,
     hasAdminAccess,
     getAdminResponsibilityRoles
 } from "/Framework/Auth/auth.js";
+import { initializeAdminAccordions } from "../../Shared/JS/accordion.js";
 import {
     beginVerificationNotice,
     clearVerificationNotice
@@ -1566,6 +1568,7 @@ ROUTER ENTRY POINT
 ========================================================= */
 
 export async function initializePage() {
+    initializeAdminAccordions();
     showLoading();
 
     setupAdminRetry();
@@ -1625,6 +1628,9 @@ export async function initializePage() {
 
         adminState.auth =
             state;
+
+        const suggestionSection = document.getElementById("adminSuggestionSection");
+        if (suggestionSection) suggestionSection.hidden = !hasAdminPermission("admin.suggestions.manage", state);
 
         renderAdminRoles(
             state

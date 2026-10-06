@@ -2168,7 +2168,7 @@ export async function handleOcrConfirmation(
         ================================================= */
 
         let verifiedAuthorization;
-        try { verifiedAuthorization = await authorizeRocketLeagueRequest(request, env); }
+        try { verifiedAuthorization = await authorizeRocketLeagueRequest(request, env, "submit_result"); }
         catch (error) { return authorizationErrorResponse(error); }
         const session = { ...verifiedAuthorization.sessionContext, providers: {
             ...verifiedAuthorization.sessionContext.providers,

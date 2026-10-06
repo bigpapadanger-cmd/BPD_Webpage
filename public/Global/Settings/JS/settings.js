@@ -1,8 +1,9 @@
 "use strict";
 
 import { setSidebarCollapsed } from "../../../Framework/Shell/JS/Sidebar/state.js";
-import { applyAppearancePreferences, hasReadableContrast, PREFERENCE_DEFAULTS, readPreferences, readSidebarPreference, savePreference } from "../../../Framework/Shell/JS/preferences.js";
+import { applyAppearancePreferences, hasReadableContrast, isValidPreferenceColor, PREFERENCE_DEFAULTS, readPreferences, readSidebarPreference, savePreference } from "../../../Framework/Shell/JS/preferences.js";
 import { BPD_AUTH_ACCOUNT_PROFILE_URL } from "../../../scripts/apiRoutes.js";
+import { showVerificationOutcome } from "../../../scripts/verificationNotice.js";
 import { renderDisplayNameCooldown } from "./display_name_cooldown.js";
 import { getRocketLeagueSettingsContext } from "../../../routes.js";
 
@@ -102,7 +103,7 @@ async function saveDisplayName() {
     let statusMessage = "";
     nameSaving = true;
     updateDisplayNameLock();
-    status.textContent = "Saving your BPD display name…";
+    status.textContent = "Saving your Account Display Name…";
     try {
         const { apiFetch } = await import("../../../scripts/apiConnection.js");
         const response = await apiFetch(BPD_AUTH_ACCOUNT_PROFILE_URL, {
@@ -147,13 +148,16 @@ async function saveDisplayName() {
         } catch {}
         updateDisplayNameLock();
         scheduleCooldownRefresh();
-        statusMessage = "Your BPD display name is saved.";
+        statusMessage = "Your Account Display Name is saved.";
     } catch {
         statusMessage = "Account services are temporarily unavailable. Your name was not changed.";
     } finally {
         nameSaving = false;
         updateDisplayNameLock();
-        if (statusMessage) status.textContent = statusMessage;
+        if (statusMessage) {
+            status.textContent = statusMessage;
+            showVerificationOutcome(save, statusMessage, { state: statusMessage === "Your Account Display Name is saved." ? "success" : "error" });
+        }
     }
 }
 
@@ -215,42 +219,31 @@ export async function initializePage() {
         }
     });
 
-    backgroundColor?.addEventListener("input", () => {
-        const color = backgroundColor.value.toLowerCase();
-        const status = document.getElementById("backgroundColorStatus");
-        if (!hasReadableContrast("#ffffff", color)) {
-            if (status) status.textContent = "That background is too light for readable page text. Choose a darker color.";
-            pendingColors.backgroundColor = color;
-            updateColorPreview("backgroundColorPreview", color, "Pending");
-            if (applyColors) applyColors.disabled = false;
-            return;
+    function updatePendingColor(input, key, previewId, statusId, foreground, background) {
+        const color = input.value.toLowerCase();
+        const status = document.getElementById(statusId);
+        pendingColors[key] = color;
+        const valid = isValidPreferenceColor(color);
+        if (valid) updateColorPreview(previewId, color, "Pending");
+        if (status) {
+            status.textContent = !valid ? "Choose a valid six-digit hex color."
+                : !hasReadableContrast(foreground || color, background || color)
+                    ? "Warning: this color has low text contrast. You can still apply it." : "";
+            status.dataset && (status.dataset.state = valid ? "warning" : "error");
         }
-        pendingColors.backgroundColor = color;
-        updateColorPreview("backgroundColorPreview", color, "Pending");
-        if (applyColors) applyColors.disabled = pendingColors.backgroundColor === preferences.backgroundColor && pendingColors.hoverTextColor === preferences.hoverTextColor;
-        if (status) status.textContent = "";
-    });
-
-    hoverTextColor?.addEventListener("input", () => {
-        const color = hoverTextColor.value.toLowerCase();
-        const status = document.getElementById("hoverTextColorStatus");
-        if (!hasReadableContrast(color, "#24202f")) {
-            if (status) status.textContent = "That color is too close to the navigation hover background. Choose a color with more contrast.";
-            pendingColors.hoverTextColor = color;
-            updateColorPreview("hoverTextColorPreview", color, "Pending");
-            if (applyColors) applyColors.disabled = false;
-            return;
-        }
-        pendingColors.hoverTextColor = color;
-        updateColorPreview("hoverTextColorPreview", color, "Pending");
-        if (applyColors) applyColors.disabled = pendingColors.backgroundColor === preferences.backgroundColor && pendingColors.hoverTextColor === preferences.hoverTextColor;
-        if (status) status.textContent = "";
-    });
+        if (applyColors) applyColors.disabled = !isValidPreferenceColor(pendingColors.backgroundColor)
+            || !isValidPreferenceColor(pendingColors.hoverTextColor)
+            || (pendingColors.backgroundColor === preferences.backgroundColor && pendingColors.hoverTextColor === preferences.hoverTextColor);
+    }
+    backgroundColor?.addEventListener("input", () =>
+        updatePendingColor(backgroundColor, "backgroundColor", "backgroundColorPreview", "backgroundColorStatus", "#ffffff", null));
+    hoverTextColor?.addEventListener("input", () =>
+        updatePendingColor(hoverTextColor, "hoverTextColor", "hoverTextColorPreview", "hoverTextColorStatus", null, "#24202f"));
 
     applyColors?.addEventListener("click", () => {
-        if (!hasReadableContrast("#ffffff", pendingColors.backgroundColor)
-            || !hasReadableContrast(pendingColors.hoverTextColor, "#24202f")) {
-            if (applyColorsStatus) applyColorsStatus.textContent = "Choose colors with sufficient text contrast before applying.";
+        if (!isValidPreferenceColor(pendingColors.backgroundColor)
+            || !isValidPreferenceColor(pendingColors.hoverTextColor)) {
+            if (applyColorsStatus) applyColorsStatus.textContent = "Choose valid six-digit hex colors before applying.";
             return;
         }
         const previousBackground = preferences.backgroundColor;
@@ -268,7 +261,11 @@ export async function initializePage() {
         applyAppearancePreferences(preferences);
         updateColorPreview("backgroundColorPreview", preferences.backgroundColor);
         updateColorPreview("hoverTextColorPreview", preferences.hoverTextColor);
-        if (applyColorsStatus) applyColorsStatus.textContent = "Colors applied to this browser.";
+        const poorContrast = !hasReadableContrast("#ffffff", preferences.backgroundColor)
+            || !hasReadableContrast(preferences.hoverTextColor, "#24202f");
+        const message = poorContrast ? "Colors applied. Warning: text contrast is low." : "Colors applied to this browser.";
+        if (applyColorsStatus) applyColorsStatus.textContent = message;
+        showVerificationOutcome(applyColors, message, { state: poorContrast ? "warning" : "success" });
         applyColors.disabled = true;
     });
 

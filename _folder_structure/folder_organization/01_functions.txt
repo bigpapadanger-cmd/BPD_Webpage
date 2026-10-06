@@ -1,5 +1,5 @@
 FUNCTIONS/: CLOUDFLARE PAGES API AND SERVICES
-Snapshot: 2026-09-26
+Snapshot: 2026-10-05
 
 ROLE
 
@@ -38,9 +38,13 @@ functions/
 |   +-- rocketleague/players/featured.js, network-statistics.js (public-safe persisted RPC reads)
 |   +-- admin/page-settings/route-health.js, system-status.js, suggestions/index.js
 |   |   +-- suggestions/[suggestionId]/review.js
+|   +-- admin/user-management/index.js, history.js, [targetAccountId].js
+|       +-- [targetAccountId]/actions.js, notes.js
 |   +-- admin/rocketleague/force-refresh.js, compatibility-probe.js (Admin-only; execution disabled)
 |   +-- curseforge/mods.js
 |   +-- suggestions/index.js, [suggestionId]/vote.js
+|   +-- faq/index.js, questions.js
+|   +-- admin/faq/index.js, [questionId]/review.js
 |   +-- health/apihealth.js
 |   +-- ocr/
 |       +-- compare.js, confirm.js, index.js, localize.js
@@ -52,10 +56,12 @@ functions/
 +-- services/
     +-- admin/
     |   +-- permissions.js, system_status.js, taskboard_discord.js, taskboard_roles.js
+    |   +-- user_management.js, user_management_http.js
     |       system_status.js includes manual, read-only Discord bot connection checks; page reads use saved status.
     +-- auth/
     |   +-- authentication.js, authorization.js
     |   +-- account/
+    |   |   +-- access.js (current Supabase account/action enforcement)
     |   |   +-- get_session.js, last_login.js, link_provider.js
     |   |   +-- display_name_policy.js, display_name_validation.js
     |   |   +-- logout.js, mutations.js, unlink_provider.js
@@ -149,6 +155,16 @@ services/supabase
 services/supabase/suggestions.js
     Calls only the five website-suggestion RPCs defined by the local-only,
     operator-prepared Supabase contract under Notes/supabase/suggestions/.
+
+services/faq/service.js
+    Published FAQ projection, authenticated question submission, and BPD User
+    Management-authorized review. Uses only list_published_faqs,
+    submit_faq_question, admin_list_faq_questions, admin_review_faq_question RPCs.
+    Service-role key stays server-side; current post access gates mutations.
+    Admin list derives read-only/review UX from existing admin_list_users
+    permissions; FAQ RPCs remain final authority. No Discord role authorization.
+    Strict origin/body validation, bounded provider responses/deadlines, private
+    field stripping, safe domain errors, idempotency and revision forwarding.
     Service credentials remain server-side; public browser clients never
     receive direct Supabase access. The SQL is outside the Pages deployment tree
     and excluded from GitHub by .gitignore.

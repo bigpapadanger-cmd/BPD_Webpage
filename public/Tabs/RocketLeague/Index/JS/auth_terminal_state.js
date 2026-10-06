@@ -38,16 +38,17 @@ function showRocketLeagueRecovery(documentRef, { title, message, href, label } =
 }
 
 function applyRocketLeaguePageAccess(documentRef, session, { allow = true } = {}) {
-    const profileValidated = session?.authenticated === true && session?.epicAuthorized === true
-        && session?.profileLoaded === true && session?.profileComplete === true
+    const profileValidated = session?.authenticated === true
+        && session?.profileLoaded === true
         && session?.registrationAccepted === true && session?.rocketLeagueAccess === true;
     const access = allow && profileValidated;
     const loggedOut = documentRef.getElementById("rocketLeagueLoggedOut");
     const content = documentRef.getElementById("rocketLeagueAuthenticatedContent");
     const profile = documentRef.getElementById("rocketLeaguePlayerProfile");
     if (content) content.hidden = !access;
-    if (profile) profile.hidden = !(session?.epicAuthorized === true && session?.authenticated === true);
-    if (loggedOut && session?.authenticated === true && session?.epicLinked === true && session?.requiresEpicReauthorization !== true) loggedOut.hidden = true;
+    if (profile) profile.hidden = !access;
+    if (loggedOut && session?.authenticated === true && session?.epicLinked === true
+        && (session?.rocketLeagueAccess === true || session?.requiresEpicReauthorization !== true)) loggedOut.hidden = true;
     documentRef.body.dataset.authenticated = session?.authenticated === true ? "true" : "false";
     documentRef.body.dataset.rlAccess = String(access);
     return access;
@@ -88,7 +89,7 @@ export async function initializeRocketLeagueProtectedPage({
             terminal = true;
             return { state: "not-applicable", session };
         }
-        if (session.requiresEpicReauthorization) {
+        if (session.requiresEpicReauthorization && session.rocketLeagueAccess !== true) {
             showRocketLeagueRecovery(documentRef, { title: "Verify Epic Again", message: "Your Epic account remains linked. Reauthorize it to restore Rocket League access.", href: "/Account?reauthorize=epic", label: "Verify Epic Again" });
             try { renderUnavailableRanks("Verify Epic Again in BPD Account to use Rocket League features."); } catch { clearRocketLeaguePageLoading(documentRef, "Rank display unavailable while Epic reauthorization is required."); }
             terminal = true;
@@ -99,7 +100,6 @@ export async function initializeRocketLeagueProtectedPage({
             terminal = true;
             return { state: "not-applicable", session };
         }
-        if (!session.epicAuthorized) throw Object.assign(new Error("Epic authorization state is incomplete"), { stage: "auth" });
 
         const profileResponse = await fetcher(`${ROCKET_LEAGUE_PROFILE_URL}?includePresence=false`, {
             method: "GET", credentials: "same-origin", cache: "no-store", headers: { accept: "application/json" }

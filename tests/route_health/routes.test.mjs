@@ -50,10 +50,10 @@ test("Rocket League setup and established My Profile routes stay distinct and ga
     const myProfile = readFileSync(resolve(repoRoot, "public", `.${mine.module}`), "utf8");
     const sidebar = readFileSync(resolve(repoRoot, "public/Framework/Shell/JS/Sidebar/RocketLeague/sidebar_auth.js"), "utf8");
     const menu = readFileSync(resolve(repoRoot, "public/Framework/Shell/HTML/Sidebar/rl_menu.html"), "utf8");
-    assert.match(registration, /isSetupRoute && profileComplete && rocketLeagueAccess/);
+    assert.match(registration, /isSetupRoute && profileResult\.registrationAccepted === true && rocketLeagueAccess/);
     assert.match(myProfile, /ROCKET_LEAGUE_PROFILE_URL/);
-    assert.match(myProfile, /profileComplete !== true \|\| result\.rocketLeagueAccess !== true/);
-    assert.match(sidebar, /profileComplete && rocketLeagueAccess/);
+    assert.match(myProfile, /registrationAccepted !== true \|\| result\.rocketLeagueAccess !== true/);
+    assert.match(sidebar, /if \(rocketLeagueAccess\)/);
     assert.match(menu, /href="\/RocketLeague\/MyProfile"[\s\S]*?data-rl-access="required"/);
 });
 
@@ -146,7 +146,9 @@ test("route-health diagnostics report binding presence only and no credential va
     assert.ok(payload.routes.some((route) => route.path === "/Settings" && !route.authRequired));
     assert.ok(payload.routes.some((route) => route.path === "/Suggestions" && !route.authRequired));
     assert.ok(payload.routes.some((route) => route.path === "/Admin/SuggestionReview" && route.authRequired));
-    assert.doesNotMatch(serialized, /\/api\/faq(?:\/upvote)?/);
+    assert.ok(payload.routes.some(route => route.path === "/api/faq"));
+    assert.ok(payload.routes.some(route => route.path === "/Admin/FAQReview" && route.authRequired));
+    assert.doesNotMatch(serialized, /\/api\/faq\/upvote/);
     assert.doesNotMatch(serialized, /do-not-return|secret-value/);
     assert.equal(payload.connections.find((item) => item.name === "OCR storage").status, "Configured");
 });

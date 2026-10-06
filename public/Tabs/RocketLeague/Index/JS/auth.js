@@ -607,9 +607,7 @@ function createRocketLeagueSession(
             true,
 
         rocketLeagueAccess:
-            epicAuthorized ===
-                true
-            && rocketLeagueAccess ===
+            rocketLeagueAccess ===
                 true
     };
 }
@@ -781,7 +779,6 @@ function applyRocketLeagueAuthView(
         playerProfile.hidden =
             !authenticated
             || !epicLinked
-            || !epicAuthorized
             || !rocketLeagueAccess;
     }
 
@@ -1128,10 +1125,10 @@ async function loadProfileState(
                 true,
 
             epicAuthorized:
-                true,
+                hasAuthorizedRocketLeagueProvider(authState),
 
             requiresEpicReauthorization:
-                false,
+                requiresRocketLeagueProviderReauthorization(authState),
 
             profileLoaded:
                 true,
@@ -1152,9 +1149,6 @@ async function loadProfileState(
 
             rocketLeagueAccess:
                 profileExists
-                && profileResult
-                    ?.profileComplete ===
-                    true
                 && profileResult
                     ?.registrationAccepted ===
                     true
@@ -1290,35 +1284,8 @@ export async function initializeRocketLeagueAuthView() {
         not be loaded without current provider authorization.
         ================================================= */
 
-        if (
-            !epicAuthorized
-        ) {
-            applyRocketLeagueAuthView(
-                baseSession
-            );
-
-            document.body.dataset.rlAccess =
-                "false";
-
-            renderUnavailableRanks(
-                requiresEpicReauthorization
-                    ? "Epic Games reauthorization is required before your Rocket League account data can be used."
-                    : "Epic Games authorization is currently unavailable."
-            );
-
-            if (
-                requiresEpicReauthorization
-            ) {
-                redirectProtectedRouteToEpicReauthorization();
-            }
-            else {
-                applyRocketLeagueUnavailableView(
-                    "Epic authorization temporarily unavailable"
-                );
-            }
-
-            return baseSession;
-        }
+        // Stored Supabase data requires registration/current action permission,
+        // not fresh Epic authorization. Keep reauthorization as a recovery CTA.
 
         /* =================================================
         EPIC AUTHORIZED — PROFILE VALIDATION REQUIRED

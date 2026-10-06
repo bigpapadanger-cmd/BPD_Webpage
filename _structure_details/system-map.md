@@ -1,6 +1,6 @@
 # DomainData System Map
 
-Snapshot: 2026-10-04
+Snapshot: 2026-10-05
 
 ## Runtime overview
 
@@ -22,6 +22,17 @@ OAuth/session cookies are Secure, HttpOnly, host-only, `Path=/`, and
 Discord account linking is independent of the REST-based MatchBot mutual-guild
 eligibility check. See [authentication and mobile compatibility](auth-mobile-compatibility.md)
 for the detailed flow map, provider-console checks, and physical-device matrix.
+
+Every protected Pages path using central account authorization now checks current Supabase
+`api.get_account_access_state` and `api.can_account_perform` contracts through
+`functions/services/auth/account/access.js`; the session's cached `active` bit
+is not the enforcement authority. Suspended users may log in and view account
+or suspension information, while account mutations and Rocket League actions
+use their specific server-side action. Banned, removed, and inactive states
+fail closed; a disabled Rocket League profile blocks RL actions while leaving
+general BPD access intact. OAuth provider resolve/link restrictions return only
+the generic `ACCOUNT_ACCESS_RESTRICTED` code. Verification outcome notices use
+the shared timed component and state-specific rounded borders/fade behavior.
 
 The shared Rocket League sidebar is implemented in
 `public/Framework/Shell/JS/Sidebar/`. A collapsed sidebar temporarily expands

@@ -85,6 +85,7 @@ import {
 import {
     getRocketLeagueProfileByAccountId
 } from "../supabase/rocketleague/rocketleague_profile.js";
+import { canAccountPerform } from "../auth/account/access.js";
 
 /* =========================================================
 NORMALIZATION
@@ -349,6 +350,8 @@ export async function handleRocketLeagueSession(
                 request,
                 env,
                 {
+                    account: true,
+                    action: "view_account",
                     recovery:
                         true
                 }
@@ -483,7 +486,8 @@ export async function handleRocketLeagueSession(
                 await requireProvider(
                     authorization,
                     env,
-                    "epic"
+                    "epic",
+                    { requireFresh: false }
                 );
 
             verifiedEpic =
@@ -653,7 +657,8 @@ export async function handleRocketLeagueSession(
                     true,
 
                 authorized:
-                    true
+                    verifiedEpic.authorized === true,
+                requiresReauthorization: verifiedEpic.requiresReauthorization === true
             });
 
         /* =================================================
@@ -828,11 +833,7 @@ export async function handleRocketLeagueSession(
             profileLoaded ===
                 true
             && registrationStatus ===
-                "complete"
-            && ageConsent ===
-                true
-            && policyConsent ===
-                true;
+                "complete";
 
         const profileComplete =
             profileLoaded ===
@@ -845,28 +846,10 @@ export async function handleRocketLeagueSession(
                 true;
 
         /*
-         * Full Rocket League access fails closed.
-         *
-         * At this point current Epic authorization has
-         * already been verified by requireProvider().
+         * Current centralized action policy owns registration/active state.
+         * Fresh Epic authorization is separate from stored-data access.
          */
-        const rocketLeagueAccess =
-            profileLoaded ===
-                true
-            && epicState.epicLinked ===
-                true
-            && epicState.epicAuthorized ===
-                true
-            && active ===
-                true
-            && registrationAccepted ===
-                true
-            && profileComplete ===
-                true
-            && getStoredRocketLeagueAccess(
-                profile
-            ) ===
-                true;
+        const rocketLeagueAccess = await canAccountPerform(env, accountId, "rocket_league");
 
         const user =
             buildBaseUser(

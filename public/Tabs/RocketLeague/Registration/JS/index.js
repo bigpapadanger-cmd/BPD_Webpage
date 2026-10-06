@@ -2834,8 +2834,6 @@ async function submitRegistration(
         if (
             result.registrationAccepted !==
                 true
-            || result.profileComplete !==
-                true
             || result.rocketLeagueAccess !==
                 true
         ) {
@@ -2867,7 +2865,8 @@ async function submitRegistration(
             "success"
         );
 
-        window.location.replace(result.redirectTo || "/RocketLeague");
+        try { sessionStorage.setItem("bpdRlRegistrationCompleted", String(Date.now())); } catch { /* Notice only; no access state. */ }
+        window.location.replace("/RocketLeague/MyProfile");
     }
     catch (
         error
@@ -3088,13 +3087,11 @@ export async function initializePage() {
     form.dataset.discordPreviouslyEnabled = profileResult.profile?.settingsAvailability?.notificationsV2 === true
         && savedNotificationsV2?.discord?.enabled === true ? "true" : "false";
 
-    const profileComplete = profileResult.profileComplete === true
-        || profileResult.profile?.profileComplete === true;
     const rocketLeagueAccess = profileResult.rocketLeagueAccess === true;
     const path = window.location.pathname.replace(/\/+$/u, "").toLowerCase();
     const isSetupRoute = path === "/rocketleague/profile";
 
-    if (isSetupRoute && profileComplete && rocketLeagueAccess) {
+    if (isSetupRoute && profileResult.registrationAccepted === true && rocketLeagueAccess) {
         if (window.BPDRouter?.navigate) {
             await window.BPDRouter.navigate("/RocketLeague/MyProfile", { replace: true });
         } else {
@@ -3131,7 +3128,7 @@ export async function initializePage() {
     updateNotificationState();
 }
 function restoreRegistrationDraft(profileResult) {
-    if (profileResult?.profile?.profileComplete === true) return false;
+    if (profileResult?.registrationAccepted === true && profileResult?.rocketLeagueAccess === true) return false;
     const draft = readRegistrationDraft();
     if (!draft) return false;
     populateDraft(draft);

@@ -351,7 +351,7 @@ test("public-profile routing uses public_profile_id and hidden/missing profiles 
             path: new URL(url).pathname,
             body: JSON.parse(options.body)
         });
-        return response(null);
+        return response({ code: "P0002", message: "PUBLIC_RL_PROFILE_NOT_FOUND" }, 404);
     }, async () => {
         const hidden = await publicProfileRoute({
             request: new Request(`https://bpd-gaming-network.com/api/rocketleague/players/profile/${PROFILE_ID}`),
@@ -369,7 +369,7 @@ test("public-profile routing uses public_profile_id and hidden/missing profiles 
         assert.deepEqual(await hidden.json(), await missing.json());
     });
 
-    assert.equal(calls[0].path.endsWith("/get_public_rocketleague_profile"), true);
+    assert.equal(calls[0].path.endsWith("/get_public_rl_player_summary"), true);
     assert.deepEqual(calls[0].body, { p_public_profile_id: PROFILE_ID });
 });
 
@@ -513,7 +513,7 @@ test("Find Players cards stay lightweight and do not render career or unsupporte
 
 test("public profile UI exposes supported career fields and uses available MMR freshness", async () => {
     const source = await readFile(new URL("../../public/Tabs/RocketLeague/PublicProfile/JS/index.js", import.meta.url), "utf8");
-    assert.match(source, /profile\.mmr\?\.captured_at/);
+    assert.match(source, /profile\.currentMmr\?\.capturedAt/);
     assert.doesNotMatch(source, /profile\.provider\?\.(?:level|xp|creator_code)/);
     assert.match(source, /Number\.isSafeInteger\(value\) && value >= 0/);
     assert.doesNotMatch(source, /Last checked/);

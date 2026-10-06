@@ -1,0 +1,37 @@
+<section class="admin-user-management" aria-labelledby="userManagementTitle">
+    <header class="um-header">
+        <div>
+            <p class="admin-eyebrow">ACCOUNT GOVERNANCE</p>
+            <h1 id="userManagementTitle">User Management</h1>
+            <p>Review BPD accounts, Rocket League access, and moderation history.</p>
+        </div>
+        <button id="umRefresh" class="um-button" type="button">Refresh</button>
+    </header>
+    <p id="umStatus" class="um-status" role="status" aria-live="polite">Loading User Management…</p>
+    <nav id="umTabs" class="um-tabs" aria-label="User Management sections">
+        <button type="button" data-tab="users" aria-selected="true">User List</button>
+        <button type="button" data-tab="suspended" aria-selected="false">Suspended</button>
+        <button type="button" data-tab="banned" aria-selected="false">Banned</button>
+        <button type="button" data-tab="history" aria-selected="false">History</button>
+    </nav>
+    <details id="umFilterSection" data-admin-accordion>
+    <summary>Search and filters <span class="admin-accordion-meta">30 accounts per page</span></summary>
+    <form id="umFilters" class="um-filters">
+        <label>Search accounts<input name="query" type="search" maxlength="100" placeholder="Name or account search"></label>
+        <label>Role<select name="role"><option value="">Any role</option><option value="owner">Owner</option><option value="admin">Admin</option><option value="moderator">Moderator</option><option value="staff">Staff</option></select></label>
+        <label>Provider<select name="provider"><option value="">Any provider</option><option value="epic">Epic</option><option value="discord">Discord</option><option value="google">Google</option><option value="steam">Steam</option></select></label>
+        <label>Rocket League<select name="hasRocketLeague"><option value="">Any</option><option value="true">Has account</option><option value="false">No account</option></select></label>
+        <label>RL status<select name="rlActive"><option value="">Any</option><option value="true">Active</option><option value="false">Disabled</option></select></label>
+        <label>Status<select name="status"><option value="active">Active</option><option value="all">All users</option><option value="inactive">Inactive</option><option value="suspended">Suspended</option><option value="banned">Banned</option><option value="removed">Removed</option></select></label>
+        <label>Sort<select name="sort"><option value="created_desc">Newest accounts</option><option value="created_asc">Oldest accounts</option><option value="name_asc">Name A–Z</option><option value="name_desc">Name Z–A</option><option value="last_seen_desc">Recently seen</option></select></label>
+        <button class="um-button um-filter-submit" type="submit">Apply filters</button>
+    </form>
+    </details>
+    <section id="umUsers" class="um-results" aria-label="User results" hidden></section>
+    <section id="umHistory" class="um-results" aria-label="Management history" hidden></section>
+    <nav id="umPagination" class="um-pagination" aria-label="Result pages" hidden>
+        <button id="umPrevious" class="um-button" type="button">Previous</button>
+        <span id="umPageLabel">Page 1</span>
+        <button id="umNext" class="um-button" type="button">Next</button>
+    </nav>
+</section>

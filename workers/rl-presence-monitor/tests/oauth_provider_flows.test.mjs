@@ -22,6 +22,10 @@ function setup(provider, { created = false, mode = "login", mismatch = false, ac
     globalThis.fetch = async (input, init = {}) => {
         const url = String(input), body = init.body ? JSON.parse(init.body) : null;
         calls.push({ url, body });
+        if (url.endsWith("/rpc/get_account_access_state")) return Response.json({ exists: true, state: "active",
+            accountActive: true, suspended: false, suspendedUntil: null, banned: false, removed: false,
+            rocketLeague: { exists: true, active: true } });
+        if (url.endsWith("/rpc/can_account_perform")) return Response.json(true);
         if (url.includes("/auth/v1/token")) return Response.json({ access_token: "test-token" });
         if (url.endsWith("/auth/v1/user")) return Response.json({ id: "auth-user-1",
             app_metadata: { provider }, identities: [{ provider, identity_data: { sub: mismatch ? "other-subject" : "subject-1" } }] });
@@ -56,7 +60,8 @@ for (const provider of ["google", "discord"]) {
             assert.ok(records.get(`provider_auth_id:account-1:${provider}`));
             assert.ok(records.get("account_login_status:account-1").lastLoginAt);
             assert.equal(calls.filter(call => call.url.endsWith("touch_account_last_seen")).length, 1);
-            assert.equal(calls.filter(call => call.url === "kv:mmr-refresh-gate:account-1").length, 1);
+            assert.ok(calls.some(call => call.url.endsWith("/rpc/get_account_access_state")));
+            assert.ok(calls.some(call => call.url.endsWith("/rpc/can_account_perform")));
             assert.ok(!calls.some(call => /\/link_/.test(call.url)));
         });
     }

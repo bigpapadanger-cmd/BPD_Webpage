@@ -1,0 +1,23 @@
+<main class="admin-faq" id="adminFaqPage">
+    <h1>Review FAQ Questions</h1>
+    <p>Staff can view questions. Only BPD Owners and Admins can review or publish them.</p>
+    <p id="adminFaqStatus" role="status" aria-live="polite"></p>
+    <button id="adminFaqRefresh" type="button">Reload questions</button>
+    <details data-admin-accordion open>
+        <summary><span>FAQ Questions</span><span id="adminFaqCount" class="admin-accordion-meta">Not loaded</span></summary>
+        <section id="adminFaqBody" class="admin-accordion-body">
+            <label for="adminFaqFilter">Status</label>
+            <select id="adminFaqFilter">
+                <option value="pending">Pending</option><option value="approved">Approved</option>
+                <option value="answered">Answered</option><option value="duplicate">Duplicate</option>
+                <option value="rejected">Rejected</option><option value="all">All</option>
+            </select>
+            <div id="adminFaqList"></div>
+            <nav aria-label="FAQ review pages">
+                <button id="adminFaqPrevious" type="button" disabled>Previous</button>
+                <span id="adminFaqPageNumber">Page 1</span>
+                <button id="adminFaqNext" type="button" disabled>Next</button>
+            </nav>
+        </section>
+    </details>
+</main>

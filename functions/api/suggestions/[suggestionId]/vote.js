@@ -23,11 +23,14 @@ export async function onRequestPost(context) {
 
     let authorization;
     try {
-        authorization = await authorizeRequest(context.request, context.env, { session: true, account: true });
+        authorization = await authorizeRequest(context.request, context.env, { session: true, account: true, action: "post" });
     } catch (error) {
         const status = Number(error?.status);
         if (status === 401 || status === 403) {
-            return json({ success: false, error: status === 401 ? "AUTHENTICATION_REQUIRED" : "ACCOUNT_INACTIVE" }, status);
+            const code = status === 401 ? "AUTHENTICATION_REQUIRED"
+                : error?.code === "ACCOUNT_SUSPENDED" ? "ACCOUNT_SUSPENDED"
+                    : "ACCOUNT_ACCESS_RESTRICTED";
+            return json({ success: false, error: code }, status);
         }
         return json({ success: false, error: "SUGGESTIONS_UNAVAILABLE" }, 503);
     }

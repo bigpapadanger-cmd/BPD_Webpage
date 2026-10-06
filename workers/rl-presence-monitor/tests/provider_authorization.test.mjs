@@ -32,7 +32,8 @@ test("registration API refuses missing consent, stale Epic, and inactive account
     }
 });
 
-function fixture({ providers = ["epic"], active = true, ageConsent = true } = {}) {
+function fixture({ providers = ["epic"], active = true, ageConsent = true,
+    registrationStatus = "complete", rlActive = true, profileComplete = true } = {}) {
     Date.now = () => NOW;
     const records = new Map();
     const calls = [];
@@ -52,11 +53,19 @@ function fixture({ providers = ["epic"], active = true, ageConsent = true } = {}
     globalThis.fetch = async (input, init = {}) => {
         const url = String(input); calls.push(url);
         const body = typeof init.body === "string" ? JSON.parse(init.body) : {};
+        if (url.endsWith("get_account_access_state")) return Response.json({ exists: true,
+            state: active ? "active" : "inactive", accountActive: active, suspended: false, suspendedUntil: null,
+            banned: false, removed: false, rocketLeague: { exists: true, active: rlActive,
+                registrationStatus, registrationComplete: registrationStatus === "complete" } });
+        if (url.endsWith("can_account_perform")) {
+            const rlActions = ["rocket_league", "join_series", "join_match", "create_private_match", "join_private_match", "submit_scoreboard", "submit_result", "refresh_rl_stats"];
+            return Response.json(active && (!rlActions.includes(body.p_action) || (rlActive && registrationStatus === "complete")));
+        }
         if (url.endsWith("get_account_session_identity")) return Response.json([{ id: "account-1", role: "user", active }]);
         if (url.endsWith("verify_account_provider_identity")) return Response.json(providers.includes(body.p_provider)
             ? [{ account_id: "account-1", provider: body.p_provider, provider_subject: `${body.p_provider}-subject`, active: true }] : []);
         if (url.endsWith("get_rocketleague_profile_v2")) return Response.json({ account_id: "account-1", rl_player_id: "player-1",
-            active, registration_status: "complete", profile_complete: true, rocket_league_access: true,
+            active: rlActive && active, registration_status: registrationStatus, profile_complete: profileComplete, rocket_league_access: profileComplete,
             age_consent: ageConsent, policy_consent: true });
         if (url.endsWith("touch_account_last_seen")) return Response.json({ updated: true });
         if (url.endsWith("get_stats_refresh_state")) return Response.json([]);
@@ -117,16 +126,45 @@ test("Steam-only account can access BPD account features but cannot access Rocke
 
 test("database active state overrides cached session active", async () => {
     const { env, request } = fixture({ active: false });
-    await assert.rejects(authorizeRocketLeagueRequest(request, env), { code: "ACCOUNT_INACTIVE" });
+    await assert.rejects(authorizeRocketLeagueRequest(request, env), { code: "ACCOUNT_ACCESS_RESTRICTED" });
 });
 
-test("private RL guard requires registration consent and canonical provider subject", async () => {
+test("private RL guard uses completed registration and canonical provider subject, not optional completeness", async () => {
     let f = fixture({ ageConsent: false });
-    await assert.rejects(authorizeRocketLeagueRequest(f.request, f.env), { code: "RL_REGISTRATION_REQUIRED" });
+    assert.equal((await authorizeRocketLeagueRequest(f.request, f.env)).accountId, "account-1");
     f = fixture();
     const result = await authorizeRocketLeagueRequest(f.request, f.env);
     assert.equal(result.provider.subject, "epic-subject");
     assert.equal(result.profile.rlPlayerId, "player-1");
+});
+
+for (const registrationStatus of ["incomplete", "suspended", "revoked"]) {
+    test(`central RL action policy denies ${registrationStatus} registration`, async () => {
+        const { request, env, calls } = fixture({ registrationStatus });
+        await assert.rejects(authorizeRocketLeagueRequest(request, env), { status: 403, code: "ACCOUNT_ACCESS_RESTRICTED" });
+        assert.equal(calls.some(url => url.endsWith("get_rocketleague_profile_v2")), false);
+    });
+}
+
+test("completed registration permits stored data with incomplete optional profile and stale Epic, but live refresh requires freshness", async () => {
+    const { request, env, records } = fixture({ profileComplete: false });
+    records.delete("provider_auth_id:account-1:epic");
+    const allowed = await authorizeRocketLeagueRequest(request, env);
+    assert.equal(allowed.provider.subject, "epic-subject");
+    assert.equal(allowed.provider.authorized, false);
+    assert.equal(allowed.profile.profileComplete, false);
+    const rlSession = await (await handleRocketLeagueSession(request, env)).json();
+    assert.equal(rlSession.rocketLeagueAccess, true);
+    assert.equal(rlSession.registrationAccepted, true);
+    assert.equal(rlSession.profileComplete, false);
+    assert.equal(rlSession.epicLinked, true);
+    assert.equal(rlSession.requiresEpicReauthorization, true);
+    await assert.rejects(authorizeRocketLeagueRequest(request, env, "refresh_rl_stats"), { code: "PROVIDER_REAUTHORIZATION_REQUIRED", status: 403 });
+});
+
+test("RL-disabled player cannot use protected RL actions", async () => {
+    const { request, env } = fixture({ rlActive: false });
+    await assert.rejects(authorizeRocketLeagueRequest(request, env), { code: "ROCKET_LEAGUE_DISABLED", status: 403 });
 });
 
 test("stale Epic stays linked in global and RL session responses", async () => {
@@ -139,7 +177,7 @@ test("stale Epic stays linked in global and RL session responses", async () => {
     assert.equal(rl.epicLinked, true);
     assert.equal(rl.requiresEpicReauthorization, true);
     assert.equal(rl.requiresEpicLogin, false);
-    assert.equal(rl.rocketLeagueAccess, false);
+    assert.equal(rl.rocketLeagueAccess, true);
 });
 
 test("KV/database failures are unavailable, never confirmed logout", async () => {
@@ -283,18 +321,18 @@ test("browser policy distinguishes public, recovery, stale, and unavailable", as
     assert.equal(client.evaluateRouteAuth({ required: true, recovery: true }, state).allowed, true);
     assert.equal(client.evaluateRouteAuth({ required: true }, state).status, "profile_provider_required");
     assert.equal(client.evaluateRouteAuth({ provider: "epic" }, state).status, "provider_reauthorization_required");
+    assert.equal(client.evaluateRouteAuth({ required: true, provider: "epic", rocketLeague: true }, state).allowed, true);
     assert.equal(client.evaluateRouteAuth({ required: true }, { available: false }).status, "unavailable");
 });
 
-test("OCR job API denies stale Epic before reading another user's job", async () => {
+test("OCR job API still rejects a request without a job ID when Epic is stale", async () => {
     const { env, records, request } = fixture();
     records.delete("provider_auth_id:account-1:epic");
     env.OCR_OWNER_SECRET = "test";
     env.OCR_STORAGE = { get() { throw new Error("Job storage must not be read"); } };
     env.OCR_PROGRESS = {};
     const response = await getJob({ request, env });
-    assert.equal(response.status, 403);
-    assert.equal((await response.json()).requiresEpicReauthorization, true);
+    assert.equal(response.status, 400);
 });
 
 test("configured hourly cron dispatches due-aware refresh and does not fetch non-due capabilities", async () => {

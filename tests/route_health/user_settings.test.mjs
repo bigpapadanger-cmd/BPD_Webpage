@@ -108,6 +108,32 @@ test("appearance preferences remain browser-local and preserve existing storage 
         elements.themeSetting.value = "green";
         elements.themeSetting.listeners.change();
         assert.equal(store.get("bpdTheme"), "green");
+        for (const name of ["blue", "orange", "purple", "green", "cyan", "emerald"]) {
+            elements.themeSetting.value = name;
+            elements.themeSetting.listeners.change();
+            assert.equal(store.get("bpdTheme"), name);
+            await page.initializePage();
+            assert.equal(elements.themeSetting.value, name);
+            assert.equal(document.body.dataset.theme, name);
+        }
+
+        elements.backgroundColorSetting.value = "#ffffff";
+        elements.backgroundColorSetting.listeners.input();
+        assert.equal(elements.applyColors.disabled, false);
+        elements.applyColors.listeners.click();
+        assert.match(elements.applyColorsStatus.textContent, /Warning/);
+        await page.initializePage();
+        assert.equal(elements.backgroundColorSetting.value, "#ffffff");
+        assert.equal(document.documentElement.style.values["--bpd-user-background"], "#ffffff");
+        elements.backgroundColorSetting.value = "red; background: url(https://invalid.example)";
+        elements.backgroundColorSetting.listeners.input();
+        assert.equal(elements.applyColors.disabled, true);
+        elements.applyColors.listeners.click();
+        assert.equal(store.get("bpdBackgroundColor"), "#ffffff");
+        elements.backgroundColorSetting.value = "#121212";
+        elements.backgroundColorSetting.listeners.input();
+        elements.applyColors.listeners.click();
+        store.delete("bpdHoverTextColor");
 
         elements.backgroundColorSetting.value = "#223344";
         elements.backgroundColorSetting.listeners.input();
@@ -155,6 +181,22 @@ test("appearance preferences remain browser-local and preserve existing storage 
         globalThis.localStorage = originalStorage;
         globalThis.window = originalWindow;
     }
+});
+
+test("Appearance keeps account name first, existing contract, and scoped enabled-button glow", async () => {
+    const html = await readFile(new URL("../../public/Global/Settings/HTML/settings.html", import.meta.url), "utf8");
+    const css = await readFile(new URL("../../public/Global/Settings/CSS/settings-page.css", import.meta.url), "utf8");
+    const js = await readFile(new URL("../../public/Global/Settings/JS/settings.js", import.meta.url), "utf8");
+    assert.ok(html.indexOf('id="accountDisplayNameSettings"') < html.indexOf('id="themeSetting"'));
+    assert.match(html, /Account Display Name/);
+    assert.doesNotMatch(html, /BPD display name/i);
+    for (const theme of ["purple", "cyan", "emerald"]) assert.match(html, new RegExp(`value="${theme}"`));
+    assert.match(css, /button:not\(:disabled\):hover/);
+    assert.match(css, /button:not\(:disabled\):focus-visible/);
+    assert.match(css, /outline: 2px solid var\(--site-accent\)/);
+    assert.match(js, /JSON.stringify\(\{ displayName: value \}\)/);
+    assert.match(js, /finally \{\s*nameSaving = false/);
+    assert.match(js, /showVerificationOutcome\(save/);
 });
 
 test("sidebar icons use the shared accessible icon slot and consistent dashboard symbol", async () => {
@@ -247,15 +289,16 @@ test("global color customizations use neutral shared variables and preserve Rock
     }
 });
 
-test("FAQ is curated static content and Suggestions remains a separate destination", async () => {
+test("FAQ retains curated answers alongside the published workflow and Suggestions stays separate", async () => {
     const html = await readFile(new URL("../../public/Required/FAQ/HTML/index.html", import.meta.url), "utf8");
     const routes = await readFile(new URL("../../public/routes.js", import.meta.url), "utf8");
     const apiRoutes = await readFile(new URL("../../public/scripts/apiRoutes.js", import.meta.url), "utf8");
-    assert.equal(ROUTES["/FAQ"].module, null);
+    assert.equal(ROUTES["/FAQ"].module, "/Required/FAQ/JS/index.js");
     assert.doesNotMatch(html, /\/api\/faq(?:\/upvote)?/i);
     assert.match(html, /href="\/Suggestions"/);
     assert.doesNotMatch(routes + apiRoutes, /FAQ_API_URL|FAQ_UPVOTE_URL/);
-    assert.equal(existsSync(resolve("public/Required/FAQ/JS/index.js")), false);
+    assert.equal(existsSync(resolve("public/Required/FAQ/JS/index.js")), true);
+    assert.match(html, /id="faqCurated"/);
 });
 
 test("legacy ImageScanning resolves through a replace redirect to SubmitMatchResults", async () => {

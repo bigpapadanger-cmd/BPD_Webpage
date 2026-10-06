@@ -3,7 +3,7 @@
 import { apiFetch } from "/scripts/apiConnection.js";
 import { DISCORD_NOTIFICATION_STATUS_URL, ROCKET_LEAGUE_GLOBAL_LEADERBOARD_PREFERENCE_URL, ROCKET_LEAGUE_PROFILE_URL } from "/scripts/apiRoutes.js";
 import { refreshAuthState } from "/Framework/Auth/auth.js";
-import { buildSettingsPayload, getDuplicateReminderChannels, getFindProfileVisibilityState, getSettingsConfirmationState, isSettingConfirmed, NOTIFICATION_CHANNELS, reminderMinutesFromParts, validateNotificationsV2 } from "./settings_view.js";
+import { areSavedSettingsConfirmed, buildSettingsPayload, getDuplicateReminderChannels, getFindProfileVisibilityState, getSettingsConfirmationState, isSettingConfirmed, NOTIFICATION_CHANNELS, reminderMinutesFromParts, validateNotificationsV2 } from "./settings_view.js";
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const NOTIFICATION_LABELS = Object.freeze({ email: "Email", sms: "Text / SMS", discord: "Discord" });
@@ -557,30 +557,49 @@ export async function initializePage() {
         const save = document.getElementById("myProfileSave");
         save.disabled = true;
         save.textContent = "Saving…";
+        let redirecting = false;
         try {
             const saved = await requestProfile("PATCH", payload);
             const refreshed = await requestProfile();
-            const settingsConfirmed = renderProfile(refreshed);
-            setStatus(saved.profileSaved === true && settingsConfirmed ? "Profile settings updated." : "The saved settings could not be confirmed; editing is locked.", saved.profileSaved === true && settingsConfirmed ? "ready" : "error");
+            const settingsConfirmed = renderProfile(refreshed) && areSavedSettingsConfirmed(refreshed.profile, payload);
+            setStatus(saved.profileSaved === true && settingsConfirmed ? "Profile settings updated. Returning to Rocket League in 3 seconds…" : "The saved settings could not be confirmed; editing is locked.", saved.profileSaved === true && settingsConfirmed ? "ready" : "error");
             if (saved.profileSaved !== true || !settingsConfirmed) lockSettings();
+            else {
+                redirecting = true;
+                setTimeout(() => {
+                    if (!form.isConnected || window.location.pathname !== "/RocketLeague/MyProfile") return;
+                    if (window.BPDRouter?.navigate) void window.BPDRouter.navigate("/RocketLeague");
+                    else window.location.assign("/RocketLeague");
+                }, 3000);
+            }
         } catch {
             lockSettings();
             setStatus("Your settings could not be confirmed after saving. Editing is locked until the profile can be reloaded.", "error");
         } finally {
             save.textContent = "Update Profile";
-            if (!form.hidden && profileSnapshot) save.disabled = false;
+            if (!redirecting && !form.hidden && profileSnapshot) save.disabled = false;
         }
     });
 
     try {
         const [profileResult] = await Promise.all([requestProfile(), loadDiscordNotificationAvailability()]);
         const result = profileResult;
-        if (result.profileComplete !== true || result.rocketLeagueAccess !== true) {
+        if (result.registrationAccepted !== true || result.rocketLeagueAccess !== true) {
             window.BPDRouter?.navigate ? await window.BPDRouter.navigate("/RocketLeague/Profile", { replace: true }) : window.location.replace("/RocketLeague/Profile");
             return;
         }
         const confirmed = renderProfile(result);
         await loadGlobalLeaderboardPreference();
+        let completedAt = 0;
+        try {
+            completedAt = Number(sessionStorage.getItem("bpdRlRegistrationCompleted"));
+            sessionStorage.removeItem("bpdRlRegistrationCompleted");
+        } catch { /* Optional completion notice only. */ }
+        const completionNotice = document.getElementById("myProfileRegistrationNotice");
+        if (completionNotice && completedAt > 0 && Date.now() - completedAt >= 0 && Date.now() - completedAt < 60000) {
+            completionNotice.textContent = "Rocket League account creation completed successfully.";
+            completionNotice.hidden = false;
+        }
         if (confirmed) setStatus("Manage your Rocket League profile settings and privacy.");
     } catch {
         lockSettings();

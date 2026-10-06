@@ -48,6 +48,20 @@ function profile() {
         registrationAccepted: true, rocketLeagueAccess: true, profile: { stats: { ranked: {} } } };
 }
 
+test("stored-data page validation does not require optional profile completeness or fresh Epic", async () => {
+    const doc = pageDocument();
+    const fetcher = fetchSequence([
+        session({ epicAuthorized: false, requiresEpicReauthorization: true, profileComplete: false }),
+        { ...profile(), profileComplete: false }
+    ]).fetcher;
+    const result = await initializeRocketLeagueProtectedPage({ fetcher, documentRef: doc,
+        windowRef: { location: { pathname: "/RocketLeague/WeeklyMatches" } }, renderProfile() {} });
+    assert.equal(result.state, "validated");
+    assert.equal(doc.body.dataset.rlAccess, "true");
+    assert.equal(doc.nodes.rocketLeagueAuthenticatedContent.hidden, false);
+    assert.equal(doc.nodes.rocketLeagueLoggedOut.hidden, true);
+});
+
 function fetchSequence(responses) {
     const calls = [];
     const fetcher = async url => {

@@ -77,6 +77,15 @@ export function shopImage(value, alt, className) {
 export function itemCard(item) {
     const card = element("article", "rl-shop-item");
     if (typeof item?.title !== "string" || !item.title.trim()) return null;
+    // Multi-product offers are the confirmed bundle discriminator.
+    const products = Array.isArray(item.products) ? item.products : [];
+    if (products.length > 1) {
+        card.classList.add("rl-shop-item--bundle");
+        card.append(element("span", "rl-shop-bundle-badge", "Bundle"));
+        const count = products.every(product => Number.isSafeInteger(product.count) && product.count > 0)
+            ? products.reduce((sum, product) => sum + product.count, 0) : null;
+        if (Number.isSafeInteger(count)) card.append(element("p", "rl-shop-item__metadata", `${count} items in the listed contents`));
+    }
     const image = shopImage(item.image_url, `${item.title} artwork`, "rl-shop-item__image");
     if (image) card.append(image);
     card.append(element("h3", "rl-shop-item__title", item.title));

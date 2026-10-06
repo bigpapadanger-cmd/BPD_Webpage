@@ -95,6 +95,7 @@ import {
     authorizeRequest,
     isAuthorizationError
 } from "../auth/authorization.js";
+import { canAccountPerform } from "../auth/account/access.js";
 
 import {
     ensureRocketLeaguePlayer
@@ -1324,7 +1325,8 @@ AUTHENTICATED ROCKET LEAGUE CONTEXT
 
 async function getAuthenticatedContext(
     request,
-    env
+    env,
+    action = "manage_profile"
 ) {
     let authorization;
 
@@ -1336,6 +1338,9 @@ async function getAuthenticatedContext(
                 {
                     account:
                         true,
+
+                    action,
+                    requireFreshProvider: request.method === "POST",
 
                     provider:
                         "epic"
@@ -1820,11 +1825,7 @@ async function handleProfileGet(
     const registrationAccepted =
         profileExists
         && profile.registrationStatus ===
-            "complete"
-        && profile.ageConsent ===
-            true
-        && profile.policyConsent ===
-            true;
+            "complete";
 
     const profileComplete =
         profileExists
@@ -1833,18 +1834,7 @@ async function handleProfileGet(
         && profile.profileComplete ===
             true;
 
-    const rocketLeagueAccess =
-        epicUser.linked ===
-            true
-        && profileExists
-        && profile.active ===
-            true
-        && registrationAccepted ===
-            true
-        && profileComplete ===
-            true
-        && profile.rocketLeagueAccess ===
-            true;
+    const rocketLeagueAccess = await canAccountPerform(env, accountId, "rocket_league");
 
     // Normal profile reads stay read-only: refresh jobs are triggered by
     // explicit/session lifecycle paths, not by every page load.
@@ -2562,23 +2552,10 @@ async function handleProfilePost(
         || result?.profileComplete ===
             true;
 
-    const storedRocketLeagueAccess =
-        result
-            ?.rocket_league_access ===
-            true
-        || result
-            ?.rocketLeagueAccess ===
-            true;
-
     const registrationAccepted =
         profileSaved ===
             true
-        && registration.ageConsent ===
-            true
-        && registration.policyConsent ===
-            true
-        && storedProfileComplete ===
-            true;
+        && (result?.registrationStatus ?? result?.registration_status) === "complete";
 
     const profileComplete =
         registrationAccepted ===
@@ -2586,13 +2563,7 @@ async function handleProfilePost(
         && storedProfileComplete ===
             true;
 
-    const rocketLeagueAccess =
-        registrationAccepted ===
-            true
-        && profileComplete ===
-            true
-        && storedRocketLeagueAccess ===
-            true;
+    const rocketLeagueAccess = await canAccountPerform(env, accountId, "rocket_league");
 
     /* =====================================================
     INITIAL / GATED MMR REFRESH
@@ -2619,11 +2590,15 @@ async function handleProfilePost(
             true
         && registrationAccepted ===
             true
-        && profileComplete ===
-            true
         && rocketLeagueAccess ===
             true
     ) {
+        let mayRefreshRocketLeague = false;
+        try { mayRefreshRocketLeague = await canAccountPerform(env, accountId, "refresh_rl_stats"); }
+        catch { /* Fail closed for background provider work; retain the saved profile. */ }
+        if (!mayRefreshRocketLeague) {
+            statsRefresh = { success: false, refreshed: false, skipped: true, code: "RL_REFRESH_NOT_AUTHORIZED" };
+        } else {
         try {
             statsRefresh =
                 await refreshStatsWithGate(
@@ -2672,6 +2647,7 @@ async function handleProfilePost(
                     reason: error?.code || "PROVIDER_REFRESH_FAILED"
                 };
             }
+        }
         }
     }
 
@@ -2773,7 +2749,7 @@ async function handleProfilePost(
                 profileSaved
                 && registrationAccepted
                 && rocketLeagueAccess
-                    ? "/RocketLeague"
+                    ? "/RocketLeague/MyProfile"
                     : null
         },
         profileSaved
@@ -2796,7 +2772,7 @@ async function handleProfilePatch(request, env, sessionContext, accountId) {
     } catch {
         return json({ success: false, code: "PROFILE_SETTINGS_UNAVAILABLE", message: "Your saved profile could not be verified." }, 503);
     }
-    if (!current?.profileComplete || !current?.registrationAccepted || !current?.rocketLeagueAccess) {
+    if (!await canAccountPerform(env, accountId, "rocket_league")) {
         return json({ success: false, code: "PROFILE_SETUP_REQUIRED", message: "Complete Rocket League profile setup before editing preferences." }, 409);
     }
 
@@ -2853,7 +2829,8 @@ export async function handleRocketLeagueProfile(
         const authenticated =
             await getAuthenticatedContext(
                 request,
-                env
+                env,
+                request.method === "GET" ? "view_account" : "manage_profile"
             );
 
         if (

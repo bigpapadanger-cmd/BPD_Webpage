@@ -164,7 +164,7 @@ test("the public hub keeps incomplete profiles visible and offers an explicit se
     assert.match(home, /href="\/RocketLeague\/Profile" data-router-link/);
     assert.match(auth, /profileNotice\.hidden = !\([\s\S]*?rocketLeagueSession\?\.profileLoaded === true[\s\S]*?!rocketLeagueAccess/);
     assert.doesNotMatch(auth, /redirectIncompleteHubProfile|shouldRedirectToRocketLeagueProfile/);
-    assert.match(auth, /playerProfile\.hidden =\s*!authenticated\s*\|\| !epicLinked\s*\|\| !epicAuthorized\s*\|\| !rocketLeagueAccess/);
+    assert.match(auth, /playerProfile\.hidden =\s*!authenticated\s*\|\| !epicLinked\s*\|\| !rocketLeagueAccess/);
     assert.match(home, /href="\/RocketLeague\/Profile"[\s\S]*?Complete profile/);
 });
 

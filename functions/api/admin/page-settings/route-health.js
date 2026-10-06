@@ -74,7 +74,6 @@ export function buildRouteHealthPayload(env, generatedAt = new Date().toISOStrin
             { category: "unregistered-page", path: "/RocketLeague/WeeklyMatches", detail: "Legacy standalone files and navigation references exist; no SPA route registration is present." },
             { category: "unregistered-page", path: "/RocketLeague/PrivateMatches", detail: "Legacy standalone files and navigation references exist; no SPA route registration is present." },
             { category: "unregistered-page", path: "/Admin/MatchManagement", detail: "Admin sidebar reference is not in the human route registry." },
-            { category: "unregistered-page", path: "/Admin/UserManagement", detail: "Admin sidebar reference is not in the human route registry." },
             { category: "missing-handler", path: "/api/auth/discord/callback", detail: "The Functions entry file is empty; current Discord OAuth uses the shared Supabase callback path." },
             { category: "missing-handler", path: "/api/auth/steam/login", detail: "The Functions entry file is empty; no local login handler is implemented." },
             { category: "missing-handler", path: "/api/auth/steam/callback", detail: "The Functions entry file is empty; no local callback handler is implemented." },

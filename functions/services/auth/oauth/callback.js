@@ -1,6 +1,7 @@
 import { completeOAuthCallback } from "./callback_response.js";
 import { withUpstreamDeadline, fetchBoundedResponse, safeUpstreamErrorCode, safeUpstreamErrorMessage } from "../../http/upstream.js";
 import { completeLinkedRolesVerification } from "../providers/discord/linked_roles.js";
+import { assertAccountCanPerform } from "../account/access.js";
 "use strict";
 
 /* =========================================================
@@ -2136,25 +2137,11 @@ async function executeCallback(
             );
         }
 
-        if (
-            resolvedAccount.active !==
-            true
-        ) {
-            return json(
-                {
-                    success:
-                        false,
-
-                    code:
-                        "ACCOUNT_INACTIVE",
-
-                    message:
-                        "This BPD account is not active.",
-
-                    debugId
-                },
-                403
-            );
+        try {
+            await assertAccountCanPerform(env, resolvedAccount.accountId, "login");
+        } catch {
+            return json({ success: false, code: "ACCOUNT_ACCESS_RESTRICTED",
+                message: "Account access is restricted.", debugId }, 403);
         }
 
         const sessionResult =

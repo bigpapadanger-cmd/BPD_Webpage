@@ -2,7 +2,9 @@
 
 import { getAuthState, hasAdminPermission } from "/Framework/Auth/auth.js";
 import { ADMIN_SUGGESTIONS_API_URL, adminSuggestionReviewApiUrl } from "/scripts/apiRoutes.js";
+import { initializeAdminAccordions, setAdminAccordionSummary } from "../../Shared/JS/accordion.js";
 const REQUIRED_PERMISSION = "admin.suggestions.manage";
+const loadGenerations = new WeakMap();
 
 function node(tag, text, className) {
     const element = document.createElement(tag);
@@ -20,20 +22,30 @@ export async function initializePage() {
     const status = document.getElementById("suggestionReviewStatus");
     const list = document.getElementById("suggestionReviewList");
     if (!status || !list) return;
+    const section = document.getElementById("suggestionReviewSection");
+    const count = document.getElementById("suggestionReviewCount");
+    const generation = (loadGenerations.get(list) || 0) + 1;
+    loadGenerations.set(list, generation);
+    initializeAdminAccordions();
+    section.hidden = true;
+    list.hidden = true;
 
     try {
         const auth = await getAuthState({ force: true });
+        if (loadGenerations.get(list) !== generation) return;
         if (!hasAdminPermission(REQUIRED_PERMISSION, auth)) {
             status.textContent = "You do not have permission to review suggestions.";
             return;
         }
-        await loadPending(status, list);
+        section.hidden = false;
+        await loadPending(status, list, count, generation);
     } catch {
+        if (loadGenerations.get(list) !== generation) return;
         status.textContent = "Suggestion review is unavailable. Please retry later.";
     }
 }
 
-async function loadPending(status, list) {
+async function loadPending(status, list, count, generation) {
     status.textContent = "Loading pending suggestions…";
     list.replaceChildren();
     try {
@@ -43,17 +55,21 @@ async function loadPending(status, list) {
             cache: "no-store"
         });
         const result = await response.json();
+        if (loadGenerations.get(list) !== generation) return;
         if (!response.ok || result.success !== true) throw new Error("PENDING_LOAD_FAILED");
         const suggestions = Array.isArray(result.suggestions) ? result.suggestions : [];
         status.textContent = suggestions.length ? "" : "There are no suggestions awaiting review.";
         list.hidden = false;
-        for (const suggestion of suggestions) list.append(createReviewCard(suggestion, status, list));
+        for (const suggestion of suggestions) list.append(createReviewCard(suggestion, status, list, count));
+        setAdminAccordionSummary(count, `${suggestions.length} pending loaded`);
     } catch {
+        if (loadGenerations.get(list) !== generation) return;
         status.textContent = "Pending suggestions could not be loaded. Please retry later.";
+        setAdminAccordionSummary(count, "Pending list unavailable");
     }
 }
 
-function createReviewCard(suggestion, status, list) {
+function createReviewCard(suggestion, status, list, count) {
     const card = node("article", undefined, "admin-suggestion-card");
     const title = node("h2", suggestion.title);
     const meta = node("p", `${suggestion.creator_display_name || "BPD member"} · Submitted ${formatDate(suggestion.created_at)} · ${Number(suggestion.upvotes) || 0} votes`, "admin-suggestion-meta");
@@ -81,6 +97,7 @@ function createReviewCard(suggestion, status, list) {
                 const result = await response.json();
                 if (!response.ok || result.success !== true) throw new Error("REVIEW_FAILED");
                 card.remove();
+                setAdminAccordionSummary(count, `${list.children.length} pending loaded`);
                 status.textContent = "Suggestion reviewed.";
                 if (!list.children.length) status.textContent = "There are no suggestions awaiting review.";
             } catch {

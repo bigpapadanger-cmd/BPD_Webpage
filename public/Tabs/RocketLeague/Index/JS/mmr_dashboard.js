@@ -163,7 +163,9 @@ export function renderMmrHistory(history, documentRef = document, options = {}) 
         status.hidden = false;
         return;
     }
-    status.textContent = options.averageByUtcDay === true
+    status.textContent = options.dailyAverages === true
+        ? `${snapshots.length} UTC daily average${snapshots.length === 1 ? "" : "s"}; these are not match results.`
+        : options.averageByUtcDay === true
         ? `${snapshots.length} UTC daily average${snapshots.length === 1 ? "" : "s"} from saved captures; these are not match results.`
         : `${snapshots.length} saved capture${snapshots.length === 1 ? "" : "s"}; observations are not match results.`;
     status.hidden = false;
@@ -191,7 +193,7 @@ export function renderMmrHistory(history, documentRef = document, options = {}) 
     });
     svg.append(
         svgElement(documentRef, "title", { id: "rocketLeagueMmrHistorySvgTitle" }, "Rocket League MMR history"),
-        svgElement(documentRef, "desc", { id: "rocketLeagueMmrHistorySvgDescription" }, options.averageByUtcDay === true
+        svgElement(documentRef, "desc", { id: "rocketLeagueMmrHistorySvgDescription" }, options.averageByUtcDay === true || options.dailyAverages === true
             ? "Per-playlist average MMR for each UTC day in the selected period."
             : "Playlist MMR values across saved captures, positioned by capture time.")
     );
@@ -206,8 +208,8 @@ export function renderMmrHistory(history, documentRef = document, options = {}) 
     }
 
     svg.append(
-        svgElement(documentRef, "text", { x: margin.left, y: height - 10, "text-anchor": "start", class: "rl-mmr-chart-axis-label" }, dateLabel(snapshots[0].capturedAt, options.averageByUtcDay === true)),
-        svgElement(documentRef, "text", { x: width - margin.right, y: height - 10, "text-anchor": "end", class: "rl-mmr-chart-axis-label" }, dateLabel(snapshots.at(-1).capturedAt, options.averageByUtcDay === true))
+        svgElement(documentRef, "text", { x: margin.left, y: height - 10, "text-anchor": "start", class: "rl-mmr-chart-axis-label" }, dateLabel(snapshots[0].capturedAt, options.averageByUtcDay === true || options.dailyAverages === true)),
+        svgElement(documentRef, "text", { x: width - margin.right, y: height - 10, "text-anchor": "end", class: "rl-mmr-chart-axis-label" }, dateLabel(snapshots.at(-1).capturedAt, options.averageByUtcDay === true || options.dailyAverages === true))
     );
 
     for (const series of SERIES) {
@@ -230,7 +232,7 @@ export function renderMmrHistory(history, documentRef = document, options = {}) 
             }
             for (const point of points) {
                 const circle = svgElement(documentRef, "circle", { cx: point.x, cy: point.y, r: 4.5, class: "rl-mmr-chart-point", fill: series.color });
-                const pointDate = options.averageByUtcDay === true ? dateLabel(point.snapshot.capturedAt, true) : dateTooltip(point.snapshot.capturedAt);
+                const pointDate = options.averageByUtcDay === true || options.dailyAverages === true ? dateLabel(point.snapshot.capturedAt, true) : dateTooltip(point.snapshot.capturedAt);
                 const averageInfo = options.averageByUtcDay === true ? ` · average of ${point.snapshot[series.key].captureCount} values` : "";
                 circle.append(svgElement(documentRef, "title", {}, `${series.label}: ${point.mmr.toLocaleString()} MMR · ${pointDate}${averageInfo}`));
                 svg.append(circle);

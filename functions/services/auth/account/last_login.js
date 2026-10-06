@@ -236,7 +236,8 @@ request itself to fail.
 
 export async function handleAccountLastLogin(
     env,
-    accountId
+    accountId,
+    { allowRocketLeagueRefresh = false } = {}
 ) {
     const normalizedAccountId =
         normalizeString(
@@ -270,6 +271,14 @@ export async function handleAccountLastLogin(
         null;
     let providerDataRefresh =
         null;
+
+    if (allowRocketLeagueRefresh !== true) {
+        return {
+            lastSeenAt,
+            statsRefresh: { success: false, skipped: true, code: "RL_REFRESH_NOT_AUTHORIZED" },
+            providerDataRefresh: { refreshed: false, skipped: true, reason: "RL_REFRESH_NOT_AUTHORIZED" }
+        };
+    }
 
     try {
         statsRefresh =

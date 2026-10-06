@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
-import { beginVerificationNotice, finishVerificationNotice } from "../../public/scripts/verificationNotice.js";
+import { beginVerificationNotice, finishVerificationNotice, showVerificationOutcome } from "../../public/scripts/verificationNotice.js";
 
 test("verification copy falls back after its short visible window", async () => {
     const element = { textContent: "" };
@@ -17,6 +17,54 @@ test("completed verification cancels the fallback", async () => {
     finishVerificationNotice(element, "Verified");
     await new Promise(resolve => setTimeout(resolve, 15));
     assert.equal(element.textContent, "Verified");
+});
+
+test("verification outcome uses state-specific notice styling and fades after its existing duration", () => {
+    const originalDocument = globalThis.document;
+    const originalSetTimeout = globalThis.setTimeout;
+    const originalClearTimeout = globalThis.clearTimeout;
+    const scheduled = new Map();
+    let nextTimer = 1;
+    const makeClassList = () => {
+        const values = new Set();
+        return { add: value => values.add(value), remove: value => values.delete(value), contains: value => values.has(value) };
+    };
+    const parent = { insertAdjacentElement(_position, element) { element.parentNode = parent; parent.inserted = element; } };
+    const anchor = { parentNode: parent, parentElement: parent, closest: () => null, insertAdjacentElement(_position, element) { element.parentNode = parent; } };
+    globalThis.document = { createElement: () => ({ dataset: {}, classList: makeClassList(), setAttribute() {}, hidden: true, textContent: "" }) };
+    globalThis.setTimeout = (fn, delay) => { const id = nextTimer++; scheduled.set(id, { fn, delay }); return id; };
+    globalThis.clearTimeout = id => scheduled.delete(id);
+    try {
+        for (const state of ["success", "warning", "error", "info"]) {
+            showVerificationOutcome(anchor, `Result: ${state}`, { state, durationMs: 7000 });
+            assert.equal(parent.inserted.dataset.state, state);
+        }
+        const record = [...scheduled.entries()][0];
+        assert.equal(record[1].delay, 7000);
+        assert.equal(parent.inserted.dataset.state, "info");
+        assert.equal(parent.inserted.textContent, "Result: info");
+        const timers = [...scheduled.values()];
+        timers[0].fn();
+        assert.equal(parent.inserted.classList.contains("is-fading"), true);
+        const fade = [...scheduled.values()].at(-1);
+        assert.equal(fade.delay, 250);
+        fade.fn();
+        assert.equal(parent.inserted.hidden, true);
+    } finally {
+        globalThis.document = originalDocument;
+        globalThis.setTimeout = originalSetTimeout;
+        globalThis.clearTimeout = originalClearTimeout;
+    }
+});
+
+test("verification outcome CSS presents rounded success, warning, error, and info states", async () => {
+    const css = await readFile("public/Framework/Shell/CSS/General/body.css", "utf8");
+    assert.match(css, /\.verification-action-result\s*\{[^}]*border-radius/s);
+    assert.match(css, /data-state="success"[^}]*--verification-border/s);
+    assert.match(css, /data-state="warning"[^}]*--verification-border/s);
+    assert.match(css, /data-state="error"[^}]*--verification-border/s);
+    assert.match(css, /data-state="info"[^}]*--verification-border/s);
+    assert.match(css, /\.verification-action-result\.is-fading\s*\{[^}]*opacity:\s*0/s);
 });
 
 test("shared timed verification is used by the site-wide account/admin surfaces", async () => {

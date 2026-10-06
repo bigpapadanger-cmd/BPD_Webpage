@@ -2317,6 +2317,7 @@ export function evaluateRouteAuth(
 
     if (
         policy.provider
+        && !policy.rocketLeague
         && !hasAuthorizedProvider(
             policy.provider,
             state
@@ -2341,6 +2342,7 @@ export function evaluateRouteAuth(
 
     if (
         !policy.recovery
+        && !policy.rocketLeague
         && !hasProfileAuthorization(
             state
         )
@@ -2459,6 +2461,7 @@ export async function authorizeRoute(
             else if (
                 result
                     ?.requiresEpicReauthorization
+                && result?.rocketLeagueAccess !== true
             ) {
                 evaluation = {
                     allowed:

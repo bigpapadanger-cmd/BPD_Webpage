@@ -43,6 +43,11 @@
 .rl-shop-item__price { color: #b8dfff !important; font-weight: 750; }
 .rl-shop-item__metadata { margin: 0 14px 10px !important; color: #c8d7e9 !important; font-size: .8rem; }
 .rl-shop-item__timing { color: #9eacc0 !important; }
+.rl-shop-item--bundle { grid-column: span 2; border-color: rgba(180, 154, 255, .55); background: linear-gradient(135deg, rgba(63, 40, 104, .5), rgba(6, 13, 23, .8)); }
+.rl-shop-bundle-badge { display: inline-block; margin: 14px 14px 8px; padding: 4px 10px; border: 1px solid #b49aff; border-radius: 999px; color: #e4d9ff; font-size: .8rem; font-weight: 700; }
+.rl-shop-item--bundle .rl-shop-item__title { font-size: 1.2rem; }
+.rl-shop-item--bundle .rl-shop-item__price { font-size: 1rem; }
+@media (max-width: 380px) { .rl-shop-item--bundle { grid-column: auto; } }
 @media (prefers-reduced-motion: reduce) { .rl-shop-card *, .rl-shop-card *::before, .rl-shop-card *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; } }
 
 @media (max-width: 600px) { .rl-feature-links { flex-direction: column; } .rl-feature-link { justify-content: center; } }
