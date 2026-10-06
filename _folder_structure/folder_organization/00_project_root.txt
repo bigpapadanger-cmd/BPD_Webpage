@@ -13,6 +13,7 @@ DomainData/  (saved in Codex as the RLFolderStructuring project)
 +-- Notes/               Operational notes, schema scripts, and design material.
 +-- scripts/             Route inventory generator, debug-rl-shop.mjs and
                          debug-rl-leaderboard.mjs manual protected diagnostics;
+                         debug-data-readiness.mjs fixed read-only RPC checks;
                          no automatic provider calls or writes.
 |
 +-- .git/                Git repository metadata.

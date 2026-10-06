@@ -30,8 +30,13 @@ function requireShape(condition) { if (!condition) fail(); }
 async function rpc(env, name, args, normalize, fetcher = fetch) {
     if (!RPCS.has(name)) fail("FAQ_UNAVAILABLE");
     const base = typeof env.SUPABASE_URL === "string" ? env.SUPABASE_URL.trim().replace(/\/+$/, "").replace(/\/rest\/v1$/i, "") : "";
-    const key = typeof env.SUPABASE_SERVICE_ROLE_KEY === "string" ? env.SUPABASE_SERVICE_ROLE_KEY.trim() : "";
-    if (!base || !key) fail("FAQ_UNAVAILABLE");
+    const key = (typeof env.SUPABASE_SERVICE_ROLE_KEY === "string" ? env.SUPABASE_SERVICE_ROLE_KEY.trim() : "")
+        || (typeof env.SUPABASE_AUTH === "string" ? env.SUPABASE_AUTH.trim() : "");
+    if (!base || !key) {
+        console.warn("FAQ RPC unavailable.", { rpc: name, stage: "configuration" });
+        fail("FAQ_UNAVAILABLE");
+    }
+    try { if (new URL(base).protocol !== "https:") fail("FAQ_UNAVAILABLE"); } catch { fail("FAQ_UNAVAILABLE"); }
     return withUpstreamDeadline(async signal => {
         const response = await fetchBoundedResponse(`${base}/rest/v1/rpc/${name}`, {
             method: "POST", signal, redirect: "error", headers: { apikey: key, Authorization: `Bearer ${key}`,
@@ -40,6 +45,8 @@ async function rpc(env, name, args, normalize, fetcher = fetch) {
         }, 2 * 1024 * 1024, fetcher);
         const body = await response.json();
         if (!response.ok) {
+            console.warn("FAQ RPC unavailable.", { rpc: name, stage: "upstream", status: response.status,
+                code: ["PGRST202", "PGRST301", "42501", "42883"].includes(body?.code) ? body.code : "UPSTREAM_REJECTED" });
             const code = [body?.message, body?.code, body?.error].find(value => Object.hasOwn(ERRORS, value || ""));
             fail(code || "FAQ_UNAVAILABLE", ERRORS[code] || 503);
         }

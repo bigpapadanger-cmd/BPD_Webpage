@@ -2,6 +2,7 @@
 
 import {
     getPublicPresenceLabel,
+    getPlatformDisplayName,
     getPublicProfilePageUrl
 } from "../../shared/profileView.js";
 import { getRocketLeagueRankClass } from "../../shared/profilePresentation.js";
@@ -45,7 +46,7 @@ export function createPlayerCard(documentRef, player, { featured = false } = {})
 
     const badges = documentRef.createElement("div");
     badges.className = "rl-player-badges";
-    badges.append(textElement(documentRef, "span", player.rl_platform || "Platform not listed", "rl-player-platform"));
+    badges.append(textElement(documentRef, "span", getPlatformDisplayName(player.rl_platform), "rl-player-platform"));
     const presence = textElement(documentRef, "span", getPublicPresenceLabel(player), "rl-player-presence");
     presence.dataset.presence = getPresenceState(player);
     badges.append(presence);

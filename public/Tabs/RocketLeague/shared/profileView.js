@@ -1,5 +1,11 @@
 "use strict";
 
+export function getPlatformDisplayName(value) {
+    const labels = { epic: "Epic", steam: "Steam", xbox: "Xbox", xboxone: "Xbox", playstation: "PlayStation",
+        ps4: "PlayStation", ps5: "PlayStation", switch: "Nintendo Switch", nintendo_switch: "Nintendo Switch", psynet: "PsyNet" };
+    return typeof value === "string" && value.trim() ? labels[value.trim().toLowerCase()] || value.trim() : "Platform not listed";
+}
+
 export function getPublicPresenceLabel(profile) {
     if (profile?.presence_shared !== true) {
         return "Presence not shared.";

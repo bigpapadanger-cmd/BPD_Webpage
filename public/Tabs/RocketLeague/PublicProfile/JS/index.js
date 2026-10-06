@@ -4,6 +4,7 @@ import { apiFetch } from "/scripts/apiConnection.js";
 import { getRocketLeaguePublicProfileUrl } from "/scripts/apiRoutes.js";
 import { getRocketLeagueRankClass } from "../../shared/profilePresentation.js";
 import { renderMmrHistory } from "../../Index/JS/mmr_dashboard.js";
+import { getPlatformDisplayName } from "../../shared/profileView.js";
 
 const REFRESH_MS = 300000;
 let cleanup = () => {};
@@ -50,7 +51,7 @@ function renderProfile(profile) {
         epicName.hidden = !profile.epicDisplayName || profile.epicDisplayName === profile.displayName;
     }
 
-    setText("publicProfilePlatform", profile.primaryPlatform, "Platform not listed");
+    setText("publicProfilePlatform", getPlatformDisplayName(profile.primaryPlatform));
 
     const ranks = document.getElementById("publicProfileRanks");
     ranks?.replaceChildren();

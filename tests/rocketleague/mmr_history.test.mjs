@@ -163,7 +163,8 @@ function fakeElement(tagName) {
         tagName, children: [], attributes: {}, dataset: {}, textContent: "", className: "",
         append(...nodes) { this.children.push(...nodes); },
         replaceChildren(...nodes) { this.children = nodes; },
-        setAttribute(key, value) { this.attributes[key] = value; }
+        setAttribute(key, value) { this.attributes[key] = value; },
+        addEventListener(name, callback) { this[name] = callback; }
     };
 }
 
@@ -179,7 +180,7 @@ test("chart renders a single capture, preserves null gaps, and has safe unavaila
         capturedAt: "2026-01-01T00:00:00.000Z",
         ones: { mmr: 0, tier: "Gold" }, twos: { mmr: null, tier: null }, threes: { mmr: 200, tier: "Diamond" }
     }], documentRef);
-    assert.equal(graph.children.length, 2);
+    assert.equal(graph.children.length, 4);
     assert.equal(graph.children[0].tagName, "svg");
     assert.match(status.textContent, /1 saved capture/);
     renderMmrHistory([{ capturedAt: "bad" }], documentRef);
@@ -208,4 +209,26 @@ test("chart displays no more than the newest 90 captures", () => {
     assert.match(status.textContent, /^90 saved captures/);
     assert.equal(graph.children[0].children.filter(node => node.tagName === "circle").length, 270);
     assert.match(graph.children[0].children.find(node => node.tagName === "title").textContent, /history/i);
+});
+
+test("rank guides default to doubles, switch without losing series and retain selection on refresh", () => {
+    const graph = fakeElement("div"), status = fakeElement("p");
+    const documentRef = { getElementById: id => id === "rocketLeagueMmrHistoryGraph" ? graph : status,
+        createElement: fakeElement, createElementNS: (_ns, tag) => fakeElement(tag) };
+    const history = [{ capturedAt: "2026-10-06T00:00:00Z", ones: { mmr: 850 }, twos: { mmr: 1200 }, threes: { mmr: 1100 } }];
+    const labels = () => graph.children[0].children.filter(node => node.attributes.class === "rl-mmr-chart-rank-label").map(node => node.textContent);
+    renderMmrHistory(history, documentRef);
+    assert.equal(graph.dataset.rankReferencePlaylist, "twos");
+    assert.ok(labels().includes("Champion I · 1075"));
+    const controls = graph.children[2];
+    assert.equal(controls.children[2].attributes["aria-pressed"], "true");
+    controls.children[1].click();
+    assert.equal(graph.dataset.rankReferencePlaylist, "ones");
+    assert.ok(labels().includes("Champion I · 995"));
+    assert.equal(graph.children[0].children.filter(node => node.tagName === "circle").length, 3);
+    renderMmrHistory(history, documentRef);
+    assert.equal(graph.dataset.rankReferencePlaylist, "ones");
+    graph.children[2].children[3].click();
+    assert.equal(graph.dataset.rankReferencePlaylist, "threes");
+    assert.ok(labels().includes("Diamond III · 980"));
 });

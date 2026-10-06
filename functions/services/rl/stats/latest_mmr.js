@@ -8,17 +8,12 @@ File:
     functions/services/rl/stats/latest_mmr.js
 
 Purpose:
-    Resolves the latest known Rocket League MMR for a BPD
-    account using Cloudflare KV as the primary read cache
-    and Supabase as the authoritative source.
+    Reads the latest successful Supabase snapshot from the hourly collector.
+    Cloudflare KV retains last-known data for database outages only.
 
 Flow:
-    1. Read persistent latest-MMR cache from RL_STATS_CACHE.
-    2. If cache exists and verification is not due:
-       - return KV immediately.
-       - do not query Supabase.
-    3. If cache is missing or verification is due:
-       - query Supabase for the latest snapshot.
+    1. Read persistent latest-MMR fallback from RL_STATS_CACHE.
+    2. Query Supabase for the latest snapshot on each profile read.
     4. If Supabase succeeds:
        - update KV.
        - return authoritative snapshot.
@@ -30,8 +25,7 @@ Important:
     - KV is persistent last-known state.
     - Existing KV is never deleted because Supabase is
       temporarily unavailable.
-    - Normal profile reads should cause at most one latest
-      snapshot Supabase verification per interval.
+    - Normal reads never call the provider or collect another snapshot.
 ========================================================= */
 
 import {
@@ -230,39 +224,8 @@ export async function getLatestMmr(
             normalizedAccountId
         );
 
-    if (
-        cached
-        && cached.verificationDue !==
-            true
-    ) {
-        console.info(
-            "LATEST MMR: Returning verified KV cache.",
-            {
-                accountId:
-                    normalizedAccountId,
-
-                capturedAt:
-                    cached.capturedAt,
-
-                verifiedAt:
-                    cached.verifiedAt
-            }
-        );
-
-        return buildResult(
-            cached,
-            {
-                source:
-                    "kv-cache",
-
-                stale:
-                    false,
-
-                verified:
-                    true
-            }
-        );
-    }
+    // The hourly scheduler persists independently of website activity. Always
+    // read its latest successful snapshot; KV is outage fallback only.
 
     console.info(
         "LATEST MMR: Supabase verification required.",

@@ -46,6 +46,7 @@ async function callRpc(env, name, parameters) {
         throw new RocketLeagueLeaderboardError();
     }
     let upstreamStatus = null;
+    let upstreamDiagnosticCode = null;
     try {
         return await withUpstreamDeadline(async signal => {
             const response = await fetchBoundedResponse(`${root}/rest/v1/rpc/${name}`, {
@@ -59,6 +60,8 @@ async function callRpc(env, name, parameters) {
             }, 1024 * 1024);
             upstreamStatus = response.status;
             if (!response.ok) {
+                const failure = await response.clone().json().catch(() => null);
+                upstreamDiagnosticCode = ["PGRST202", "PGRST301", "42501", "42883"].includes(failure?.code) ? failure.code : null;
                 if (name === "save_rl_global_leaderboard_preference") {
                     let providerCode = null;
                     try {
@@ -77,7 +80,7 @@ async function callRpc(env, name, parameters) {
         const normalized = error instanceof RocketLeagueLeaderboardError
             ? error
             : new RocketLeagueLeaderboardError(error?.code === "UPSTREAM_TIMEOUT" ? "RL_LEADERBOARD_TIMEOUT" : "RL_LEADERBOARD_UNAVAILABLE", error?.code === "UPSTREAM_TIMEOUT" ? 504 : 503);
-        logRpcFailure(name, normalized.code, upstreamStatus);
+        logRpcFailure(name, upstreamDiagnosticCode || normalized.code, upstreamStatus);
         throw normalized;
     }
 }

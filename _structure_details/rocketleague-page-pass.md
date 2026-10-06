@@ -163,6 +163,14 @@ The synthetic preview server was stopped and its temporary script removed.
 - _structure_details/request-frequency-inventory.md
 - _structure_details/rocketleague-page-pass.md (new)
 
+## October 6 Phase 1 diagnostics and chart repair
+
+Shared SVG styling applies to public Player and private homepage graphs. Public history displays today plus 13 previous UTC days using authoritative daily averages and null gaps. Rank guides default to 2v2; bottom buttons select 1v1/2v2/3v3 while preserving all history series and retaining selection during refresh. `public/Tabs/RocketLeague/shared/mmrRankReferences.js` centralizes configurable Tracker observed Division I minimums with source/date. These are references, not official promotion guarantees; callers can supply validated `rankReferences` overrides.
+
+The hourly due-aware refresh cycle remains the automatic MMR collector/Supabase writer. Account activity and registration retain `refreshStatsWithGate` but no longer trigger competing daily collection. Latest private MMR reads check Supabase on each read; KV is outage fallback. Authorized Admin force refresh remains available.
+
+`scripts/debug-data-readiness.mjs` performs fixed read-only FAQ/leaderboard RPC checks and prints only safe diagnostics. The live leaderboard check found SQL code 42883 for nonexistent `pg_catalog.greatest`; live definition correction remains manual. Admin FAQ also depends on User Management authorization; both live Admin paths still require verification. Private Match History remains blocked on independent PsyNet identity proof; no probe or persistence was enabled.
+
 # Manual MTX artwork diagnostic
 
 The local debugger accepts `catalog` to call the protected MMR Worker `/get-mtx-catalog` endpoint once. The Worker fixes the request to `Microtransaction/GetCatalog v1`, category `StarterPack`, with its server-owned authenticated Epic PlayerID. It shares existing API-key authorization and lookup rate limiting; no arbitrary RPC, player, category, purchase, persistence or scheduled call is added. The allowlisted response contains catalogue IDs, titles, HTTPS artwork locations (without queries/fragments), and contained ProductIDs only. Ownership/platform account details are excluded.

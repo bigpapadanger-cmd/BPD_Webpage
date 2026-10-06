@@ -1,6 +1,7 @@
 "use strict";
 
 import { formatRocketLeagueTimestamp } from "../../shared/profilePresentation.js";
+import { getMmrRankReferences, MMR_RANK_REFERENCE_SOURCE, MMR_RANK_REFERENCE_DATE } from "../../shared/mmrRankReferences.js";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 const HISTORY_LIMIT = 90;
@@ -96,6 +97,19 @@ export function normalizeMmrHistoryForChart(history, options = {}) {
         const now = Number.isFinite(options.now) ? options.now : Date.now();
         ordered = ordered.filter(row => Date.parse(row.capturedAt) >= cutoff && Date.parse(row.capturedAt) <= now);
     }
+    if (options.dailyAverages === true && Number.isSafeInteger(options.days) && options.days > 0) {
+        const today = new Date(Number.isFinite(options.now) ? options.now : Date.now());
+        today.setUTCHours(0, 0, 0, 0);
+        const byDate = new Map(ordered.map(row => [row.capturedAt.slice(0, 10), row]));
+        return Array.from({ length: options.days }, (_, index) => {
+            const date = new Date(today);
+            date.setUTCDate(date.getUTCDate() - options.days + 1 + index);
+            return byDate.get(date.toISOString().slice(0, 10)) || {
+                capturedAt: date.toISOString(), ones: { mmr: null, tier: null },
+                twos: { mmr: null, tier: null }, threes: { mmr: null, tier: null }
+            };
+        });
+    }
     if (options.averageByUtcDay !== true) return ordered;
 
     const days = new Map();
@@ -163,8 +177,9 @@ export function renderMmrHistory(history, documentRef = document, options = {}) 
         status.hidden = false;
         return;
     }
+    const observedDays = snapshots.filter(row => SERIES.some(series => row[series.key].mmr !== null)).length;
     status.textContent = options.dailyAverages === true
-        ? `${snapshots.length} UTC daily average${snapshots.length === 1 ? "" : "s"}; these are not match results.`
+        ? `${observedDays} UTC daily average${observedDays === 1 ? "" : "s"} in the ${options.days}-day window; these are not match results.`
         : options.averageByUtcDay === true
         ? `${snapshots.length} UTC daily average${snapshots.length === 1 ? "" : "s"} from saved captures; these are not match results.`
         : `${snapshots.length} saved capture${snapshots.length === 1 ? "" : "s"}; observations are not match results.`;
@@ -172,7 +187,7 @@ export function renderMmrHistory(history, documentRef = document, options = {}) 
 
     const width = 720;
     const height = 290;
-    const margin = { top: 20, right: 18, bottom: 38, left: 58 };
+    const margin = { top: 20, right: 156, bottom: 38, left: 58 };
     const minTime = Date.parse(snapshots[0].capturedAt);
     const maxTime = Date.parse(snapshots.at(-1).capturedAt);
     const minMmr = Math.min(...values);
@@ -204,6 +219,18 @@ export function renderMmrHistory(history, documentRef = document, options = {}) 
         svg.append(
             svgElement(documentRef, "line", { x1: margin.left, x2: width - margin.right, y1: yPosition, y2: yPosition, class: "rl-mmr-chart-gridline" }),
             svgElement(documentRef, "text", { x: margin.left - 10, y: yPosition + 4, "text-anchor": "end", class: "rl-mmr-chart-axis-label" }, String(Math.round(value)))
+        );
+    }
+
+    const referencePlaylist = SERIES.some(series => series.key === target.dataset.rankReferencePlaylist)
+        ? target.dataset.rankReferencePlaylist : "twos";
+    target.dataset.rankReferencePlaylist = referencePlaylist;
+    for (const reference of getMmrRankReferences(referencePlaylist, options.rankReferences)) {
+        if (reference.mmr < lower || reference.mmr > upper) continue;
+        const position = y(reference.mmr);
+        svg.append(
+            svgElement(documentRef, "line", { x1: margin.left, x2: width - margin.right, y1: position, y2: position, class: "rl-mmr-chart-rank-line" }),
+            svgElement(documentRef, "text", { x: width - margin.right + 8, y: position + 4, class: "rl-mmr-chart-rank-label" }, `${reference.rank} · ${reference.mmr}`)
         );
     }
 
@@ -251,4 +278,27 @@ export function renderMmrHistory(history, documentRef = document, options = {}) 
         legend.append(item);
     }
     target.append(legend);
+    const controls = documentRef.createElement("div");
+    controls.className = "rl-mmr-chart-reference-controls";
+    controls.setAttribute("role", "group");
+    controls.setAttribute("aria-label", "Rank reference playlist");
+    controls.append(textElement(documentRef, "span", "Rank references:"));
+    for (const series of SERIES) {
+        const button = textElement(documentRef, "button", series.label);
+        button.type = "button";
+        button.setAttribute("aria-pressed", String(series.key === referencePlaylist));
+        button.addEventListener("click", () => {
+            target.dataset.rankReferencePlaylist = series.key;
+            renderMmrHistory(history, documentRef, options);
+        });
+        controls.append(button);
+    }
+    target.append(controls);
+    const source = textElement(documentRef, "p", `Tracker observed Division I minimums · ${MMR_RANK_REFERENCE_DATE}. Reference only; promotion thresholds can vary.`, "rl-mmr-chart-reference-note");
+    const link = textElement(documentRef, "a", "Source");
+    link.href = MMR_RANK_REFERENCE_SOURCE;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    source.append(textElement(documentRef, "span", " "), link);
+    target.append(source);
 }

@@ -632,12 +632,19 @@ PLAYER PROFILE
     overflow: visible;
 }
 
-.rocket-league-page .rl-mmr-chart-gridline { stroke: rgba(181, 206, 242, 0.14); stroke-width: 1; }
-.rocket-league-page .rl-mmr-chart-axis-label { fill: var(--rl-text-muted); font-size: 11px; }
-.rocket-league-page .rl-mmr-chart-line { fill: none; stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
-.rocket-league-page .rl-mmr-chart-point { stroke: rgba(8, 10, 20, 0.9); stroke-width: 2; }
+.rl-mmr-chart-gridline { stroke: rgba(181, 206, 242, 0.14); stroke-width: 1; }
+.rl-mmr-chart-axis-label { fill: var(--rl-text-muted, #b9c7db); font-size: 12px; }
+.rl-mmr-chart-line { fill: none; stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+.rl-mmr-chart-rank-line { stroke: #9babc0; stroke-opacity: .35; stroke-dasharray: 4 5; }
+.rl-mmr-chart-rank-label { fill: #b9c7db; font-size: 11px; }
+.rl-mmr-chart-reference-controls { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin-top: .75rem; }
+.rl-mmr-chart-reference-controls button { color: #dce8fa; background: #111f32; border: 1px solid #435873; border-radius: .5rem; padding: .4rem .75rem; cursor: pointer; }
+.rl-mmr-chart-reference-controls button[aria-pressed="true"] { border-color: #68c5ff; background: #233d59; }
+.rl-mmr-chart-reference-controls button:focus-visible { outline: 2px solid #68c5ff; outline-offset: 3px; }
+.rl-mmr-chart-reference-note { font-size: .8rem; color: #b9c7db; }
+.rl-mmr-chart-point { stroke: rgba(8, 10, 20, 0.9); stroke-width: 2; }
 
-.rocket-league-page .rl-mmr-chart-legend {
+.rl-mmr-chart-legend {
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
@@ -645,12 +652,12 @@ PLAYER PROFILE
     margin-top: 4px;
 }
 
-.rocket-league-page .rl-mmr-chart-legend-item {
+.rl-mmr-chart-legend-item {
     color: #b9c5d8;
     font-size: 0.74rem;
 }
 
-.rocket-league-page .rl-mmr-chart-legend-item::before {
+.rl-mmr-chart-legend-item::before {
     display: inline-block;
     width: 8px;
     height: 8px;
@@ -661,9 +668,9 @@ PLAYER PROFILE
     vertical-align: 1px;
 }
 
-.rocket-league-page .rl-mmr-chart-legend-item[data-series="ones"] { --series-color: #b49aff; }
-.rocket-league-page .rl-mmr-chart-legend-item[data-series="twos"] { --series-color: #68c5ff; }
-.rocket-league-page .rl-mmr-chart-legend-item[data-series="threes"] { --series-color: #64e0b1; }
+.rl-mmr-chart-legend-item[data-series="ones"] { --series-color: #b49aff; }
+.rl-mmr-chart-legend-item[data-series="twos"] { --series-color: #68c5ff; }
+.rl-mmr-chart-legend-item[data-series="threes"] { --series-color: #64e0b1; }
 
 .rocket-league-page .rl-privacy-summary {
     display: flex;

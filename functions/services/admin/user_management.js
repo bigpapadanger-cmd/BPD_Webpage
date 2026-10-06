@@ -264,8 +264,12 @@ function sanitizeMetadata(value, depth = 0) {
 async function callRpc(env, name, parameters) {
     if (!ALLOWED_RPCS.has(name)) fail("USER_MANAGEMENT_RPC_NOT_ALLOWED", 500);
     const base = String(env?.SUPABASE_URL || "").trim().replace(/\/+$/, "").replace(/\/rest\/v1$/i, "");
-    const key = String(env?.SUPABASE_SERVICE_ROLE_KEY || "").trim();
-    if (!base || !key) fail("USER_MANAGEMENT_UNAVAILABLE", 503);
+    const key = String(env?.SUPABASE_SERVICE_ROLE_KEY || "").trim() || String(env?.SUPABASE_AUTH || "").trim();
+    if (!base || !key) {
+        console.warn("User Management RPC unavailable.", { rpc: name, stage: "configuration" });
+        fail("USER_MANAGEMENT_UNAVAILABLE", 503);
+    }
+    try { if (new URL(base).protocol !== "https:") fail(); } catch { fail(); }
     try {
         const response = await withUpstreamDeadline(async signal => {
             const bounded = await fetchBoundedResponse(`${base}/rest/v1/rpc/${name}`, {
@@ -277,6 +281,8 @@ async function callRpc(env, name, parameters) {
             let body = null;
             if (text) { try { body = JSON.parse(text); } catch { fail("USER_MANAGEMENT_RESPONSE_INVALID", 503); } }
             if (!bounded.ok) {
+                console.warn("User Management RPC unavailable.", { rpc: name, stage: "upstream", status: bounded.status,
+                    code: ["PGRST202", "PGRST301", "42501", "42883"].includes(body?.code) ? body.code : "UPSTREAM_REJECTED" });
                 const candidates = [body?.message, body?.details, body?.code];
                 const code = [...ERROR_CODES].find(candidate => candidates.some(item => typeof item === "string"
                     && new RegExp(`(?:^|[^A-Z0-9_])${candidate}(?:$|[^A-Z0-9_])`, "u").test(item)));

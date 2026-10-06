@@ -191,13 +191,13 @@ test("KV/database failures are unavailable, never confirmed logout", async () =>
     assert.equal((await response.json()).authenticated, null);
 });
 
-test("account activity uses the existing MMR service and does not record successful login", async () => {
+test("account activity defers MMR collection to the hourly scheduler and does not record successful login", async () => {
     const { env, records, request, calls } = fixture();
     const before = structuredClone(records.get("account_login_status:account-1"));
     const response = await lastLogin({ request, env });
     assert.equal(response.status, 200);
     assert.equal((await response.json()).statsRefresh.refreshed, false);
-    assert.ok(calls.some(url => url.endsWith("get_stats_refresh_state")));
+    assert.ok(!calls.some(url => url.endsWith("get_stats_refresh_state")));
     assert.deepEqual(records.get("account_login_status:account-1"), before);
 });
 
