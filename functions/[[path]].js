@@ -1,5 +1,6 @@
 import {
-    resolveHumanPageRoute
+    resolveHumanPageRoute,
+    getPageMetadata
 } from "../public/routes.js";
 
 const PAGE_SHELL_PATH = "/";
@@ -29,10 +30,16 @@ export async function onRequest(context) {
         return Response.redirect(url, 308);
     }
 
-    if (route.canonicalPath === "/") {
-        return context.next();
-    }
-
+    const metadata = getPageMetadata(route.canonicalPath, url.search);
+    if (url.hostname.endsWith(".pages.dev")) metadata.robots = "noindex, nofollow";
     url.pathname = PAGE_SHELL_PATH;
-    return context.next(new Request(url, request));
+    const shell = await context.next(new Request(url, request));
+    const escape = value => value.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+    const headers = new Headers(shell.headers);
+    headers.set("X-Robots-Tag", metadata.robots);
+    if (metadata.robots.startsWith("noindex")) headers.set("Cache-Control", "no-store");
+    if (request.method === "HEAD") return new Response(null, { status: shell.status, headers });
+    return new HTMLRewriter().on("title", { element(element) { element.setInnerContent(metadata.title); } })
+        .on("head", { element(element) { element.append(`<meta name="description" content="${escape(metadata.description)}"><meta name="robots" content="${metadata.robots}"><link rel="canonical" href="${escape(metadata.canonical)}"><meta property="og:title" content="${escape(metadata.title)}"><meta property="og:description" content="${escape(metadata.description)}"><meta property="og:url" content="${escape(metadata.canonical)}"><meta property="og:type" content="website"><meta name="twitter:card" content="summary"><meta name="twitter:title" content="${escape(metadata.title)}"><meta name="twitter:description" content="${escape(metadata.description)}">`, { html: true }); } })
+        .transform(new Response(shell.body, { status: shell.status, headers }));
 }

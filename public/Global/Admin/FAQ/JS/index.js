@@ -32,7 +32,7 @@ export async function initializePage() {
     }
     async function load() {
         if (state.busy) return;
-        busy(true); state.list = null; state.published = null;
+        busy(true); state.list = null;
         byId("adminFaqList").replaceChildren();
         status("Loading questions…");
         try {
@@ -42,10 +42,12 @@ export async function initializePage() {
             state.list = result;
             let publishedError = false;
             try {
-                const published = await faqRequest("/api/faq");
-                if (!Array.isArray(published.faqs)) throw new Error("Invalid answers");
-                if (!current()) return;
-                state.published = published.faqs;
+                if (!state.published) {
+                    const published = await faqRequest("/api/faq");
+                    if (!Array.isArray(published.faqs)) throw new Error("Invalid answers");
+                    if (!current()) return;
+                    state.published = published.faqs;
+                }
             } catch { publishedError = true; }
             if (!current()) return;
             render();
@@ -105,7 +107,7 @@ export async function initializePage() {
                             answer: action === "answer" ? answer.value.trim() : null, duplicateFaqId: action === "duplicate" ? duplicate.value : null,
                             reviewNote: note.value.trim() || null, expectedRevision: row.revision })
                     });
-                    reload = true;
+                    reload = true; state.published = null;
                     if (current()) status("Review saved.", "success", button);
                 } catch (error) {
                     if (current()) status(error.message, "error", button);

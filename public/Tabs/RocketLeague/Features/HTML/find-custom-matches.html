@@ -1,12 +1,52 @@
-<main class="rl-feature-page" aria-labelledby="rlCustomMatchesTitle">
+<section class="rl-custom-page" id="customMatchesPage" aria-labelledby="rlCustomMatchesTitle">
     <header class="rl-feature-heading">
         <p class="rl-feature-eyebrow">ROCKET LEAGUE · PLAY</p>
         <h1 id="rlCustomMatchesTitle">Find Custom Matches</h1>
-        <p>A dedicated place to discover custom Rocket League matches.</p>
+        <p>Find a lobby, bring your team, and arrange a custom Rocket League match.</p>
     </header>
-    <section class="rl-feature-card" aria-labelledby="rlCustomMatchesStatus">
-        <h2 id="rlCustomMatchesStatus">Coming soon</h2>
-        <p>Custom match discovery is not available yet. No live match listings are being fetched or displayed.</p>
-        <a class="rl-feature-link" href="/RocketLeague" data-router-link>Rocket League Home</a>
+    <section class="cm-panel cm-access" aria-label="Custom Match access">
+        <p id="cmAccessStatus" role="status">Checking Rocket League access…</p>
+        <div class="cm-actions"><button type="button" id="cmCheckAccess">Recheck access</button><a href="/RocketLeague" data-router-link>Player Hub</a></div>
     </section>
-</main>
+    <p class="cm-notice" id="cmNotice" role="status" aria-live="polite"></p>
+    <button type="button" id="cmRetryMutation" hidden>Retry the same request</button>
+    <section class="cm-panel" aria-labelledby="cmBrowseTitle">
+        <div class="cm-heading"><h2 id="cmBrowseTitle">Public matches</h2><button type="button" id="cmRefreshBrowse">Refresh</button></div>
+        <form id="cmBrowseForm" class="cm-actions"><label>Match state<select name="state"><option value="">All states</option><option value="open">Open</option><option value="lobby">Lobby</option><option value="pregame">Pregame</option><option value="active">Active</option><option value="results">Results</option><option value="archived">Archived</option></select></label><button>Apply filter</button></form>
+        <p id="cmBrowseStatus" role="status">Loading public matches…</p>
+        <div id="cmMatches" class="cm-cards"></div>
+        <nav class="cm-pagination" aria-label="Match pages"><button type="button" id="cmPrevious" disabled>Previous</button><span id="cmPageNumber">Page 1</span><button type="button" id="cmNext" disabled>Next</button></nav>
+    </section>
+    <details class="cm-panel" open>
+        <summary>Create a match</summary>
+        <p>Rocket League lobbies are created manually by the host. Current members can explicitly reveal the private credentials. Invite and approval management awaits its read contract.</p>
+        <form id="cmCreateForm">
+            <fieldset id="cmCreateFields" disabled>
+                <div class="cm-form-grid">
+                    <label>Match title<input name="title" maxlength="120" required autocomplete="off"></label>
+                    <label>Mode<select name="modeKey" id="cmMode" required></select></label>
+                    <label>Visibility<select name="visibility"><option value="public">Public</option><option value="private">Private</option></select></label>
+                    <label>Join policy<select name="joinPolicy"><option value="open">Open</option><option value="invite_only">Invite only (tools later)</option><option value="approval">Approval (tools later)</option></select></label>
+                    <label>Team A capacity<input name="teamACapacity" type="number" min="1" step="1" value="2" required></label>
+                    <label>Team B capacity<input name="teamBCapacity" type="number" min="1" step="1" value="2" required></label>
+                    <label>Region (optional)<input name="region" maxlength="50"></label>
+                    <label>Map (optional)<input name="mapName" maxlength="120"></label>
+                </div>
+                <div class="cm-actions" id="cmPresets" aria-label="Team capacity presets"><button type="button" data-capacity="1">1v1</button><button type="button" data-capacity="2">2v2</button><button type="button" data-capacity="3">3v3</button><button type="button" data-capacity="4">4v4</button><span>Or enter separate capacities for custom teams.</span></div>
+                <label class="cm-check"><input name="allowJoinAfterStart" type="checkbox">Allow joins after start</label>
+                <p id="cmLimitsNote">Loading configured limits…</p>
+                <button type="submit">Create match</button>
+            </fieldset>
+        </form>
+        <button type="button" id="cmReloadLimits">Reload modes / limits</button>
+    </details>
+    <section class="cm-panel" id="cmLobbyPanel" hidden aria-labelledby="cmLobbyTitle">
+        <div class="cm-heading"><h2 id="cmLobbyTitle">Match detail</h2><button type="button" id="cmRefreshDetail">Refresh match</button></div>
+        <p id="cmLobbyStatus" role="status"></p>
+        <div id="cmLobby"></div>
+<section id="cmCredentials" aria-live="polite" aria-label="Private lobby credentials"></section>
+        <section id="cmHostManagement" aria-live="polite" aria-label="Host invites and membership"></section>
+        <section id="cmRounds" aria-label="Match rounds"></section>
+        <section id="cmResults" aria-label="Player results"></section>
+    </section>
+</section>

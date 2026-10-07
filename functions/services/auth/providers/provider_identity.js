@@ -468,3 +468,39 @@ export function isProviderIdentityVerificationError(
 export function verifyAccountProviderIdentity(env, accountId, provider) {
     return withUpstreamDeadline(signal => verifyProviderIdentity(env, accountId, provider, signal));
 }
+
+// Read-only inverse lookup for an authenticated Discord interaction subject.
+export async function resolveBpdAccountFromDiscordSubject(env, discordUserId) {
+    const subject = normalizeString(discordUserId);
+    if (!/^[1-9][0-9]{16,19}$/.test(subject) || BigInt(subject) > 18446744073709551615n) {
+        throw Object.assign(new Error("Discord identity is invalid."), { code: "DISCORD_SUBJECT_INVALID", status: 400 });
+    }
+    const key = normalizeString(env?.SUPABASE_SERVICE_ROLE_KEY);
+    const base = normalizeString(env?.SUPABASE_URL).replace(/\/+$/, "").replace(/\/rest\/v1$/i, "");
+    const unavailable = () => Object.assign(new Error("Account lookup is temporarily unavailable."), { code: "DISCORD_ACCOUNT_LOOKUP_UNAVAILABLE", status: 503 });
+    let url;
+    try {
+        url = new URL(base);
+        if (!key || url.protocol !== "https:" || url.username || url.password || url.search || url.hash) throw unavailable();
+        url = new URL("/rest/v1/rpc/get_account_by_discord_subject", url);
+    } catch { throw unavailable(); }
+    try {
+        return await withUpstreamDeadline(async signal => {
+            const response = await fetchBoundedResponse(url, { method: "POST", redirect: "error", signal,
+                headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json",
+                    Accept: "application/json", "Content-Profile": "api", "Accept-Profile": "api" },
+                body: JSON.stringify({ p_provider_subject: subject }) }, 16 * 1024);
+            if (!response.ok) {
+                console.warn("Discord account lookup unavailable.", { rpc: "get_account_by_discord_subject", status: response.status, code: "UPSTREAM_REJECTED" });
+                throw unavailable();
+            }
+            const result = await response.json();
+            if (result?.success === false && result.code === "DISCORD_ACCOUNT_NOT_FOUND") return null;
+            const account = result?.account;
+            if (result?.success !== true || !account || Array.isArray(account)
+                || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(account.accountId || "")
+                || account.active !== true || !["player", "staff", "moderator", "admin", "owner"].includes(account.role)) throw unavailable();
+            return { accountId: account.accountId, role: account.role, active: true };
+        }, 10000);
+    } catch { throw unavailable(); }
+}

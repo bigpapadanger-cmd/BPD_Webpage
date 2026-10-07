@@ -180,7 +180,8 @@ test("chart renders a single capture, preserves null gaps, and has safe unavaila
         capturedAt: "2026-01-01T00:00:00.000Z",
         ones: { mmr: 0, tier: "Gold" }, twos: { mmr: null, tier: null }, threes: { mmr: 200, tier: "Diamond" }
     }], documentRef);
-    assert.equal(graph.children.length, 4);
+    assert.equal(graph.children.length, 5);
+    assert.equal(graph.children.at(-1).tagName, "details");
     assert.equal(graph.children[0].tagName, "svg");
     assert.match(status.textContent, /1 saved capture/);
     renderMmrHistory([{ capturedAt: "bad" }], documentRef);
@@ -211,7 +212,7 @@ test("chart displays no more than the newest 90 captures", () => {
     assert.match(graph.children[0].children.find(node => node.tagName === "title").textContent, /history/i);
 });
 
-test("rank guides default to doubles, switch without losing series and retain selection on refresh", () => {
+test("chart defaults to all with doubles guides, filters playlists and retains selection on refresh", () => {
     const graph = fakeElement("div"), status = fakeElement("p");
     const documentRef = { getElementById: id => id === "rocketLeagueMmrHistoryGraph" ? graph : status,
         createElement: fakeElement, createElementNS: (_ns, tag) => fakeElement(tag) };
@@ -219,16 +220,24 @@ test("rank guides default to doubles, switch without losing series and retain se
     const labels = () => graph.children[0].children.filter(node => node.attributes.class === "rl-mmr-chart-rank-label").map(node => node.textContent);
     renderMmrHistory(history, documentRef);
     assert.equal(graph.dataset.rankReferencePlaylist, "twos");
+    assert.equal(graph.dataset.chartPlaylist, "all");
     assert.ok(labels().includes("Champion I · 1075"));
     const controls = graph.children[2];
-    assert.equal(controls.children[2].attributes["aria-pressed"], "true");
+    assert.equal(controls.children.length, 4);
+    assert.equal(controls.children[0].attributes["aria-pressed"], "true");
     controls.children[1].click();
     assert.equal(graph.dataset.rankReferencePlaylist, "ones");
     assert.ok(labels().includes("Champion I · 995"));
-    assert.equal(graph.children[0].children.filter(node => node.tagName === "circle").length, 3);
+    assert.equal(graph.children[0].children.filter(node => node.tagName === "circle").length, 1);
     renderMmrHistory(history, documentRef);
     assert.equal(graph.dataset.rankReferencePlaylist, "ones");
     graph.children[2].children[3].click();
     assert.equal(graph.dataset.rankReferencePlaylist, "threes");
     assert.ok(labels().includes("Diamond III · 980"));
+    graph.children[2].children[0].click();
+    assert.equal(graph.dataset.chartPlaylist, "all");
+    assert.equal(graph.dataset.rankReferencePlaylist, "twos");
+    assert.equal(graph.children[0].children.filter(node => node.tagName === "circle").length, 3);
+    assert.ok(graph.children[0].children.some(node => node.attributes.class === "rl-mmr-chart-rank-box" && node.attributes.rx === "6"));
+    assert.equal(graph.children[3].children[0].textContent, "Estimates · 2v2");
 });

@@ -46,6 +46,43 @@ MASTER CSS CALLERS
 export const MASTER_CSS_PATH =
     "/Framework/Shell/CSS/Callers/master.css";
 
+export function getRouteStyles(pathname) {
+    const path = normalizeRoutePath(pathname);
+    const styles = {
+        "/": ["/Global/Index/CSS/index.css", "/Tabs/RocketLeague/Features/CSS/index.css"],
+        "/Dashboard": ["/Global/Index/CSS/dashboard.css"],
+        "/Account": ["/Global/Account/CSS/index.css"], "/Login": ["/Global/Login/CSS/index.css"],
+        "/Settings": ["/Global/Settings/CSS/settings-page.css"], "/Suggestions": ["/Global/Suggestions/CSS/index.css"],
+        "/About": ["/Required/About/CSS/index.css"], "/FAQ": ["/Required/FAQ/CSS/index.css"],
+        "/Privacy": ["/Required/PrivacyPolicy/CSS/index.css"], "/TOS": ["/Required/TOS/CSS/index.css"], "/Error": ["/Global/404/CSS/404.css"],
+        "/RocketLeague/Profile": ["/Tabs/RocketLeague/Registration/CSS/index.css"],
+        "/RocketLeague/MyProfile": ["/Tabs/RocketLeague/Registration/CSS/index.css", "/Tabs/RocketLeague/MyProfile/CSS/index.css"],
+        "/RocketLeague/FindPlayers": ["/Tabs/RocketLeague/FindPlayers/CSS/index.css"],
+        "/RocketLeague/Player": ["/Tabs/RocketLeague/FindPlayers/CSS/index.css", "/Tabs/RocketLeague/PublicProfile/CSS/index.css"],
+        "/RocketLeague/FindCustomMatches": ["/Tabs/RocketLeague/CustomMatches/CSS/index.css"]
+    };
+    const result = styles[path] ?? [];
+    if (path.startsWith("/RocketLeague") && !["/RocketLeague", "/RocketLeague/Profile", "/RocketLeague/MyProfile", "/RocketLeague/FindPlayers", "/RocketLeague/Player", "/RocketLeague/FindCustomMatches"].includes(path)) {
+        return [...result, "/Tabs/RocketLeague/Features/CSS/index.css", ...( /SubmitMatchResults|ImageScanning|MatchResults|PrivateMatches|WeeklyMatches/.test(path) ? ["/ocr/CSS/disputes.css", "/ocr/CSS/submitimg.css"] : [])];
+    }
+    return result;
+}
+
+export function getPageMetadata(pathname, search = "") {
+    const path = normalizeRoutePath(pathname);
+    const config = ROUTES[path] ?? {};
+    const privatePage = Boolean(config.auth?.required || config.requiresAuth || /^\/(Admin|Account|Settings|Login|Error)(\/|$)/i.test(path)
+        || path === "/RocketLeague/Player" || (path === "/RocketLeague/FindCustomMatches" && new URLSearchParams(search).has("match")));
+    const title = path === "/Account" ? "Account | BPD Gaming Network" : config.title || "BPD Gaming Network";
+    const description = privatePage ? "Manage your BPD Gaming Network account and authorized features."
+        : path === "/RocketLeague/FindPlayers" ? "Find Rocket League players who have opted into public profile discovery."
+        : path === "/FAQ" ? "Answers to common questions about BPD Gaming Network."
+        : path.startsWith("/RocketLeague") ? `${title.split(" | ")[0]}: Rocket League player tools and community features on BPD Gaming Network.`
+        : `${title.split(" | ")[0]}: explore BPD Gaming Network game hubs, community resources and player tools.`;
+    return { title, description, canonical: new URL(path, "https://bpd-gaming-network.com").href,
+        robots: privatePage ? "noindex, nofollow" : "index, follow" };
+}
+
 export const MASTER_CSS_MAP =
     Object.freeze({
         RocketLeague:
@@ -454,7 +491,7 @@ export const ROUTES = {
         header: "/Framework/Shell/HTML/Header/header.html",
         sidebar: "/Framework/Shell/HTML/Sidebar/rl_menu.html",
         footer: "/Framework/Shell/HTML/Footer/footer.html",
-        module: null,
+        module: "/Tabs/RocketLeague/CustomMatches/JS/index.js",
         sitemap: false
     },
 

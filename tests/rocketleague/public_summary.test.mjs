@@ -87,7 +87,7 @@ test("public lookup rejects internal ID query parameters and unsupported methods
 function node(tagName = "div") {
     return { tagName, children: [], attributes: {}, dataset: {}, textContent: "", hidden: false, isConnected: true,
         append(...children) { this.children.push(...children); }, replaceChildren(...children) { this.children = children; },
-        setAttribute(key, value) { this.attributes[key] = value; }, addEventListener() {} };
+        setAttribute(key, value) { this.attributes[key] = value; }, addEventListener() {}, closest() { return { parentNode: {} }; } };
 }
 
 test("Player lifecycle renders daily graph, polls without overlap, skips hidden tabs, preserves data on failure and cleans up", async () => {

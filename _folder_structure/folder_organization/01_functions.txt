@@ -1,5 +1,5 @@
 FUNCTIONS/: CLOUDFLARE PAGES API AND SERVICES
-Snapshot: 2026-10-05
+Snapshot: 2026-10-07
 
 ROLE
 
@@ -12,6 +12,7 @@ HIERARCHY
 
 functions/
 +-- api/
+|   +-- internal/discord/task-summary.js Signed, replay-protected read-only scheduler aggregate.
 |   +-- auth/
 |   |   +-- link.js, logout.js, session.js, unlink.js
 |   |   +-- _oauth/callback.js
@@ -36,6 +37,9 @@ functions/
 |   |   +-- steam/callback.js, login.js
 |   +-- rocketleague/players/search.js, players/profile/[publicProfileId].js
 |   +-- rocketleague/players/featured.js, network-statistics.js (public-safe persisted RPC reads)
+|   +-- rocketleague/custom-matches/index.js, limits.js, access.js, [matchCode].js, [matchCode]/actions.js, [matchCode]/credentials.js, [matchCode]/runtime.js
+|   |   +-- [matchCode]/rounds.js, rounds/begin.js, rounds/[roundCode]/{open-vote,vote,resolve,result}.js
+|   |   +-- [matchCode]/results.js, results/submit.js, results/[resultCode]/confirm.js
 |   +-- admin/page-settings/route-health.js, system-status.js, suggestions/index.js
 |   |   +-- suggestions/[suggestionId]/review.js
 |   +-- admin/user-management/index.js, history.js, [targetAccountId].js
@@ -54,8 +58,11 @@ functions/
 |           +-- process_job.js, progress.js, submit_job.js
 |
 +-- services/
+    +-- rl/custom_matches/contracts.js, service.js, http.js, runtime_client.js (fixed Custom Match contracts, authorization, and private runtime client)
+    +-- supabase/rocketleague/custom_matches.js (fixed Custom Match RPC transport; no provider ingestion)
     +-- admin/
     |   +-- permissions.js, system_status.js, taskboard_discord.js, taskboard_roles.js
+    |   +-- discord_communications.js HMAC envelopes and bounded private Worker calls.
     |   +-- user_management.js, user_management_http.js
     |       system_status.js includes manual, read-only Discord bot connection checks; page reads use saved status.
     +-- auth/
@@ -219,4 +226,8 @@ KEY CROSS-FOLDER CONNECTIONS
 
     functions/services/supabase/*
         -> Supabase REST/RPC persistence boundary
+
+    functions/services/auth/providers/provider_identity.js
+        -> read-only get_account_by_discord_subject for signed MatchBot commands
+        -> existing verify_account_provider_identity for account-to-provider checks
 

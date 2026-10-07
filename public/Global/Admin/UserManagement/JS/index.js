@@ -1,4 +1,5 @@
 "use strict";
+import { boundedJson } from "/scripts/boundedRequest.js";
 import { initializeAdminAccordions } from "../../Shared/JS/accordion.js";
 const initializedPages = new WeakSet();
 
@@ -6,6 +7,8 @@ const PAGE_SIZE = 30;
 const STATUS_LABELS = { active: "Active", inactive: "Inactive", suspended: "Suspended", banned: "Banned", removed: "Removed" };
 const PROVIDER_LABELS = { epic: "Epic", discord: "Discord", google: "Google", steam: "Steam" };
 const state = { tab: "users", page: 1, busy: false, openId: null, list: null, detail: null, notes: [], detailHistory: [], instance: 0 };
+let listGeneration = 0;
+let pageLifetime;
 
 const byId = id => document.getElementById(id);
 const el = (tag, className, text) => { const node = document.createElement(tag); if (className) node.className = className; if (text !== undefined && text !== null) node.textContent = String(text); return node; };
@@ -20,9 +23,7 @@ async function request(path, options = {}) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 12000);
     try {
-        const response = await fetch(path, { credentials: "same-origin", cache: "no-store", ...options, signal: controller.signal });
-        let payload;
-        try { payload = await response.json(); } catch { throw new Error("The server returned an unreadable response."); }
+        const { response, payload } = await boundedJson(path, { credentials: "same-origin", cache: "no-store", ...options, signal: pageLifetime?.signal ?? controller.signal });
         if (!response.ok || payload?.success !== true) throw new Error(payload?.message || "The request could not be completed.");
         return payload;
     } catch (error) {
@@ -42,16 +43,18 @@ function queryString() {
 
 async function loadList() {
     const instance = state.instance;
+    const generation = ++listGeneration;
     state.page = Math.max(1, state.page);
     status("Loading accounts…");
     byId("umUsers").hidden = false;
     byId("umHistory").hidden = true;
     try {
-        state.list = await request(`/api/admin/user-management?${queryString()}`);
-        if (instance !== state.instance) return;
+        const list = await request(`/api/admin/user-management?${queryString()}`);
+        if (instance !== state.instance || generation !== listGeneration) return;
+        state.list = list;
         renderList();
         status(`${state.list.pagination.total.toLocaleString()} accounts · ${state.list.permissions.role ? state.list.permissions.role.toUpperCase() : "No management role"}`, "success");
-    } catch (error) { if (instance === state.instance) { byId("umUsers").replaceChildren(el("p", "um-empty", error.message)); status(error.message, "error"); } }
+    } catch (error) { if (instance === state.instance && generation === listGeneration) { byId("umUsers").replaceChildren(el("p", "um-empty", error.message)); status(error.message, "error"); } }
 }
 
 function renderList() {
@@ -103,9 +106,9 @@ function renderUser(user) {
 
 async function toggleDetails(accountId) {
     if (state.busy) return;
-    if (state.openId === accountId) { state.openId = null; state.detail = null; renderList(); return; }
+    if (state.openId === accountId) { state.openId = null; state.detail = null; updateDetails(); return; }
     const instance = state.instance;
-    state.openId = accountId; state.detail = null; state.notes = []; state.detailHistory = []; renderList();
+    state.openId = accountId; state.detail = null; state.notes = []; state.detailHistory = []; updateDetails();
     try {
         const [detail, notes, history] = await Promise.all([
             request(`/api/admin/user-management/${encodeURIComponent(accountId)}`),
@@ -113,8 +116,20 @@ async function toggleDetails(accountId) {
             request(`/api/admin/user-management/history?targetAccountId=${encodeURIComponent(accountId)}&page=1`)
         ]);
         if (instance !== state.instance || state.openId !== accountId) return;
-        state.detail = detail; state.notes = notes.notes; state.detailHistory = history.events; renderList();
-    } catch (error) { if (instance === state.instance && state.openId === accountId) { state.detail = { error: error.message }; renderList(); } }
+        state.detail = detail; state.notes = notes.notes; state.detailHistory = history.events; updateDetails();
+    } catch (error) { if (instance === state.instance && state.openId === accountId) { state.detail = { error: error.message }; updateDetails(); } }
+}
+
+function updateDetails() {
+    for (const [index, card] of [...byId("umUsers").children].entries()) {
+        const open = state.list?.users[index]?.accountId === state.openId;
+        const summary = card.querySelector(".um-card-summary");
+        if (!summary) continue;
+        summary.setAttribute("aria-expanded", String(open));
+        card.querySelector(".um-card-toggle").textContent = open ? "Close details" : "View details";
+        card.querySelector(".um-detail")?.remove();
+        if (open) { const box = el("div", "um-detail"); box.append(state.detail ? renderDetail(state.detail) : el("p", "um-muted", "Loading account details…")); card.append(box); }
+    }
 }
 
 function section(title, entries) {
@@ -225,10 +240,11 @@ async function toggleDetailsAfterMutation(accountId) {
 
 async function loadHistory() {
     const instance = state.instance;
+    const generation = ++listGeneration;
     status("Loading management history…"); byId("umHistory").hidden = false; byId("umUsers").hidden = true; byId("umPagination").hidden = true;
     try {
         const result = await request(`/api/admin/user-management/history?page=${state.page}`);
-        if (instance !== state.instance) return;
+        if (instance !== state.instance || generation !== listGeneration) return;
         const list = byId("umHistory"); list.replaceChildren();
         if (!result.events.length) list.append(el("p", "um-empty", "No management history yet."));
         result.events.forEach(event => {
@@ -239,7 +255,7 @@ async function loadHistory() {
         });
         byId("umPagination").hidden = false; byId("umPrevious").disabled = state.page <= 1; byId("umNext").disabled = !result.pagination.hasMore; byId("umPageLabel").textContent = `Page ${state.page} · ${result.pagination.total.toLocaleString()} events`;
         status(`${result.pagination.total.toLocaleString()} history events`, "success");
-    } catch (error) { if (instance === state.instance) { byId("umHistory").replaceChildren(el("p", "um-empty", error.message)); status(error.message, "error"); } }
+    } catch (error) { if (instance === state.instance && generation === listGeneration) { byId("umHistory").replaceChildren(el("p", "um-empty", error.message)); status(error.message, "error"); } }
 }
 
 async function loadCurrent() { if (state.tab === "history") return loadHistory(); return loadList(); }
@@ -247,6 +263,11 @@ async function loadCurrent() { if (state.tab === "history") return loadHistory()
 export async function initializePage() {
     const root = document.querySelector(".admin-user-management");
     if (!root) return;
+    pageLifetime?.abort();
+    pageLifetime = new AbortController();
+    const lifetime = pageLifetime;
+    document.addEventListener("bpd:page-loaded", () => { if (!root.isConnected) { lifetime.abort(); state.instance++; listGeneration++; } }, { signal: lifetime.signal });
+    window.addEventListener("pagehide", () => lifetime.abort(), { signal: lifetime.signal });
     initializeAdminAccordions(root);
     if (initializedPages.has(root)) { await loadCurrent(); return; }
     initializedPages.add(root);
@@ -256,7 +277,7 @@ export async function initializePage() {
     byId("umTabs").addEventListener("click", event => {
         const button = event.target.closest("[data-tab]"); if (!button || state.busy) return;
         state.tab = button.dataset.tab; state.page = 1;
-        root.querySelectorAll("[data-tab]").forEach(tab => tab.setAttribute("aria-selected", String(tab === button)));
+        root.querySelectorAll("[data-tab]").forEach(tab => tab.setAttribute("aria-pressed", String(tab === button)));
         byId("umFilters").hidden = state.tab === "history";
         byId("umFilterSection").hidden = state.tab === "history";
         const statusFilter = byId("umFilters").elements.namedItem("status");

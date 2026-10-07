@@ -4,7 +4,7 @@ import {
     getPublicPresenceLabel,
     getPlatformDisplayName,
     getPublicProfilePageUrl
-} from "../../shared/profileView.js";
+} from "../../shared/profileView.js?v=20261006-platform";
 import { getRocketLeagueRankClass } from "../../shared/profilePresentation.js";
 
 const PLAYLISTS = [

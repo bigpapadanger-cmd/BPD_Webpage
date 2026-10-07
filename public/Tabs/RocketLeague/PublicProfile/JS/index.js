@@ -4,7 +4,7 @@ import { apiFetch } from "/scripts/apiConnection.js";
 import { getRocketLeaguePublicProfileUrl } from "/scripts/apiRoutes.js";
 import { getRocketLeagueRankClass } from "../../shared/profilePresentation.js";
 import { renderMmrHistory } from "../../Index/JS/mmr_dashboard.js";
-import { getPlatformDisplayName } from "../../shared/profileView.js";
+import { getPlatformDisplayName } from "../../shared/profileView.js?v=20261006-platform";
 
 const REFRESH_MS = 300000;
 let cleanup = () => {};
@@ -164,7 +164,7 @@ export async function initializePage() {
     };
     const timer = setInterval(refresh, REFRESH_MS);
     const observer = new MutationObserver(() => { if (!status.isConnected) cleanup(); });
-    observer.observe(document.body, { childList: true, subtree: true });
+    if (status.closest(".public-profile-page")?.parentNode) observer.observe(status.closest(".public-profile-page").parentNode, { childList: true });
     cleanup = () => {
         stopped = true;
         clearInterval(timer);

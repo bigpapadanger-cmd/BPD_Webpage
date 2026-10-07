@@ -64,7 +64,7 @@ test("MMR persistence reports the confirmed changed-only RPC result without addi
 test("Taskboard schedule is noon UTC in code and Wrangler config", async () => {
     const source = await readFile(new URL("../src/index.js", import.meta.url), "utf8");
     const config = await readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8");
-    assert.match(source, /TASKBOARD_SUMMARY_CRON\s*=\s*"0 12 \* \* \*"/);
+    assert.match(source, /LEADERBOARD_REFRESH_CRON\s*=\s*"0 12 \* \* \*"/);
     assert.match(config, /"0 12 \* \* \*"/);
     assert.doesNotMatch(config, /"0 0 \* \* \*"/);
 });
@@ -86,7 +86,7 @@ test("all Worker call schedules are bounded and diagnostic Worker is manual-only
     assert.equal(diagnosticConfig.preview_urls, false);
 });
 
-test("protected manual route returns a safe Taskboard summary and makes only required calls", async () => {
+test("retired manual Taskboard runner makes no external calls", async () => {
     const calls = [];
     const log = [];
     console.info = (...args) => log.push(args);
@@ -101,8 +101,8 @@ test("protected manual route returns a safe Taskboard summary and makes only req
     const result = await response.json();
     assert.equal(response.status, 200);
     assert.equal(result.job, "taskboard");
-    assert.equal(result.summary.summary.totalTasks, 12);
-    assert.equal(calls.length, 2);
+    assert.equal(result.summary.success, false);
+    assert.equal(calls.length, 0);
     assert.equal(JSON.stringify(result).includes("test-service-role-secret"), false);
     assert.equal(JSON.stringify(log).includes("test-service-role-secret"), false);
 });
@@ -132,7 +132,7 @@ test("detailed health is protected, reports unknown before first run, and never 
     assert.equal(calls, 0);
 });
 
-test("manual route rejects a duplicate same-isolate run instead of duplicating outbound calls", async () => {
+test("retired Taskboard runner never duplicates Discord delivery", async () => {
     let releaseRpc;
     let rpcStarted;
     const started = new Promise(resolve => { rpcStarted = resolve; });
@@ -149,12 +149,11 @@ test("manual route rejects a duplicate same-isolate run instead of duplicating o
     };
 
     const first = handleFetch(adminRequest({ job: "taskboard" }), env());
-    await started;
     const duplicate = await handleFetch(adminRequest({ job: "taskboard" }), env());
-    assert.equal(duplicate.status, 409);
+    assert.ok([200, 409].includes(duplicate.status));
     releaseRpc();
     assert.equal((await first).status, 200);
-    assert.equal(calls, 2);
+    assert.equal(calls, 0);
 });
 
 test("unknown scheduled trigger performs no work, and Worker has no queue handler", async () => {
@@ -278,7 +277,7 @@ test("daily noon UTC schedule refreshes each leaderboard playlist once", async (
 
     assert.deepEqual(calls.filter(call => call.type === "provider").map(call => call.playlistId), [10, 11, 13]);
     assert.equal(calls.filter(call => call.rpc === "complete_rl_global_leaderboard_snapshot").length, 3);
-    assert.equal(calls.filter(call => call.rpc === "admin_taskboard_summary").length, 1);
+    assert.equal(calls.filter(call => call.rpc === "admin_taskboard_summary").length, 0);
     assert.equal(JSON.parse(kv.get("admin:service-status:rl-leaderboards")).lastSummary.succeeded, 3);
 });
 

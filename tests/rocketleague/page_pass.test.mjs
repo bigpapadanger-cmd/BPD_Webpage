@@ -146,10 +146,13 @@ test("shop images use HTTPS only and never substitute placeholder artwork", () =
     const image = shopImage("https://image.test/item.png", "Item", "image");
     assert.equal(image.src, "https://image.test/item.png");
     let removed = false;
+    image.style = {};
     image.closest = () => null;
     image.remove = () => { removed = true; };
     image.listeners.error();
-    assert.equal(removed, true);
+    assert.equal(removed, false);
+    assert.equal(image.style.visibility, "hidden");
+    assert.equal(image.decoding, "async");
 });
 
 test("shop renders section logos without any browser provider request", async () => {

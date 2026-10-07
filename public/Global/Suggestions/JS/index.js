@@ -1,4 +1,5 @@
 "use strict";
+import { boundedJson } from "/scripts/boundedRequest.js";
 
 import { getAuthState, hasActiveAccount, isAuthenticated } from "/Framework/Auth/auth.js";
 import { SUGGESTIONS_API_URL, suggestionVoteApiUrl } from "/scripts/apiRoutes.js";
@@ -29,10 +30,15 @@ export async function initializePage() {
     const authNotice = document.getElementById("suggestionAuthNotice");
     const refreshButton = document.getElementById("refreshSuggestions");
     if (!form || !list || !listStatus) return;
+    form.bpdDispose?.();
+    const lifetime = new AbortController();
+    form.bpdDispose = () => lifetime.abort();
+    document.addEventListener("bpd:page-loaded", () => { if (!form.isConnected) lifetime.abort(); }, { signal: lifetime.signal });
+    window.addEventListener("pagehide", form.bpdDispose, { signal: lifetime.signal });
 
     let auth = null;
     try {
-        auth = await getAuthState({ force: true });
+        auth = await getAuthState();
     } catch {
         // Public browsing does not depend on an available login service.
     }
@@ -56,13 +62,13 @@ export async function initializePage() {
         submitButton.disabled = true;
         formStatus.textContent = "Submitting for staff review…";
         try {
-            const response = await fetch(SUGGESTIONS_API_URL, {
+            const { response, payload: result } = await boundedJson(SUGGESTIONS_API_URL, {
                 method: "POST",
                 credentials: "same-origin",
                 headers: { "Content-Type": "application/json", Accept: "application/json" },
-                body: JSON.stringify({ title, description })
+                body: JSON.stringify({ title, description }), signal: lifetime.signal
             });
-            const result = await response.json();
+            if (lifetime.signal.aborted) return;
             if (response.status === 401 || response.status === 403) {
                 window.location.assign(loginUrl());
                 return;
@@ -75,19 +81,19 @@ export async function initializePage() {
         } finally {
             submitButton.disabled = false;
         }
-    });
+    }, { signal: lifetime.signal });
 
     async function loadSuggestions() {
         refreshButton.disabled = true;
         listStatus.textContent = "Loading approved suggestions…";
         list.replaceChildren();
         try {
-            const response = await fetch(SUGGESTIONS_API_URL, {
+            const { response, payload: result } = await boundedJson(SUGGESTIONS_API_URL, {
                 credentials: "same-origin",
                 headers: { Accept: "application/json" },
-                cache: "no-store"
+                cache: "no-store", signal: lifetime.signal
             });
-            const result = await response.json();
+            if (lifetime.signal.aborted || !list.isConnected) return;
             if (!response.ok || result.success !== true) throw new Error("LIST_FAILED");
             const suggestions = Array.isArray(result.suggestions) ? result.suggestions : [];
             if (!suggestions.length) {
@@ -103,7 +109,7 @@ export async function initializePage() {
         }
     }
 
-    refreshButton.addEventListener("click", loadSuggestions);
+    refreshButton.addEventListener("click", loadSuggestions, { signal: lifetime.signal });
     await loadSuggestions();
 }
 
@@ -124,12 +130,11 @@ function createSuggestionCard(suggestion, authenticated, refresh) {
         }
         vote.disabled = true;
         try {
-            const response = await fetch(suggestionVoteApiUrl(suggestion.id), {
+            const { response, payload: result } = await boundedJson(suggestionVoteApiUrl(suggestion.id), {
                 method: "POST",
                 credentials: "same-origin",
                 headers: { Accept: "application/json" }
             });
-            const result = await response.json();
             if (response.status === 401 || response.status === 403) {
                 window.location.assign(loginUrl());
                 return;

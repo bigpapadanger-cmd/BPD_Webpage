@@ -1,4 +1,11 @@
 "use strict";
+import { resolveBpdAccountFromDiscordSubject } from "../provider_identity.js";
+import { assertAccountCanPerform } from "../../account/access.js";
+import { getDiscordGuildMember } from "../discord/guild_roles.js";
+import { ADMIN_PERMISSIONS, getPermissionsForDiscordRoles, requireAdminPermission } from "../../../admin/permissions.js";
+import { requireTaskboardMembership } from "../../../admin/taskboard_roles.js";
+import { callDiscordCommunications } from "../../../admin/discord_communications.js";
+import { completeTaskFromDiscordAuthorization } from "../../../supabase/admin/tasks/lifecycle.js";
 
 /* =========================================================
 BPD GAMING NETWORK
@@ -360,6 +367,9 @@ export async function verifyDiscordMatchBotInteraction(
     ) {
         return false;
     }
+    const signedAt = Number(timestamp) * 1000;
+    if (!/^[0-9]{10,13}$/.test(timestamp) || !Number.isFinite(signedAt)
+        || signedAt < Date.now() - 300000 || signedAt > Date.now() + 15000) return false;
 
     let signature;
 
@@ -669,33 +679,45 @@ APPLICATION COMMAND
 ========================================================= */
 
 async function handleApplicationCommand(
-    interaction
+    interaction,
+    env
 ) {
     const commandName =
         normalizeString(
             interaction.data?.name
         ).toLowerCase();
 
-    console.log(
-        "MATCHBOT INTERACTIONS: Application command received.",
-        {
-            commandName:
-                commandName
-                || null,
-
-            guildId:
-                interaction.guildId,
-
-            channelId:
-                interaction.channelId,
-
-            userId:
-                normalizeString(
-                    interaction.user?.id
-                )
-                || null
+    if (commandName === "complete") {
+        try {
+            const account = await resolveBpdAccountFromDiscordSubject(env, interaction.user?.id);
+            if (!account) return createDiscordMatchBotEphemeralMessage("Your Discord account is not linked to an active BPD account.");
+            await assertAccountCanPerform(env, account.accountId, "manage_account");
+            if (!env.DISCORD_AUTHZ_GUILD_ID || interaction.guildId !== env.DISCORD_AUTHZ_GUILD_ID) {
+                return createDiscordMatchBotEphemeralMessage("Use this command in the configured BPD staff server.");
+            }
+            const member = await getDiscordGuildMember(interaction.user.id, env);
+            if (member.pending || !member.isStaff) return createDiscordMatchBotEphemeralMessage("You do not have permission to complete tasks.");
+            const authorization = { accountId: account.accountId, account: { id: account.accountId, active: true },
+                discord: member, admin: { permissions: getPermissionsForDiscordRoles(member) } };
+            requireAdminPermission(authorization, ADMIN_PERMISSIONS.TASKS_UPDATE);
+            await requireTaskboardMembership(env, authorization);
+            if (env.DISCORD_COMMUNICATIONS_ENABLED !== "true") return createDiscordMatchBotEphemeralMessage("Account and staff access verified. Task completion is not enabled yet.");
+            const options = interaction.data?.options;
+            if (!Array.isArray(options) || options.length !== 1 || options[0]?.name !== "tasknumber" || options[0]?.type !== 3
+                || typeof options[0]?.value !== "string" || !/^TASK-[A-HJ-NP-Z2-9]{6}$/.test(options[0].value)) {
+                return createDiscordMatchBotEphemeralMessage("Provide a valid Taskboard code, such as the TASK- code shown on the website.");
+            }
+            const result = await completeTaskFromDiscordAuthorization(env, authorization, options[0].value);
+            return createDiscordMatchBotEphemeralMessage(result?.alreadyCompleted ? "This task is already completed." : "Task completed successfully.");
+        } catch (error) {
+            const denied = error?.status === 403;
+            return createDiscordMatchBotEphemeralMessage(error?.status === 404 ? "That task was not found." : denied ? "You do not have permission to complete tasks."
+                : error?.code === "DISCORD_SUBJECT_INVALID" ? "Your Discord identity could not be verified."
+                    : "Account verification is temporarily unavailable. Please try again later.");
         }
-    );
+    }
+
+    console.info("MatchBot interaction received.", { code: "UNCONFIGURED_INTERACTION" });
 
     /*
      * Future command dispatch belongs here or in:
@@ -728,23 +750,7 @@ async function handleMessageComponent(
             interaction.data?.custom_id
         );
 
-    console.log(
-        "MATCHBOT INTERACTIONS: Component received.",
-        {
-            customId:
-                customId
-                || null,
-
-            guildId:
-                interaction.guildId,
-
-            userId:
-                normalizeString(
-                    interaction.user?.id
-                )
-                || null
-        }
-    );
+    console.info("MatchBot interaction received.", { code: "UNCONFIGURED_INTERACTION" });
 
     /*
      * Future component dispatch belongs under:
@@ -779,23 +785,7 @@ async function handleModalSubmit(
             interaction.data?.custom_id
         );
 
-    console.log(
-        "MATCHBOT INTERACTIONS: Modal submitted.",
-        {
-            customId:
-                customId
-                || null,
-
-            guildId:
-                interaction.guildId,
-
-            userId:
-                normalizeString(
-                    interaction.user?.id
-                )
-                || null
-        }
-    );
+    console.info("MatchBot interaction received.", { code: "UNCONFIGURED_INTERACTION" });
 
     /*
      * Future modal dispatch belongs under:
@@ -813,7 +803,8 @@ INTERACTION DISPATCH
 ========================================================= */
 
 export async function handleDiscordMatchBotInteraction(
-    interaction
+    interaction,
+    env
 ) {
     switch (
         interaction.type
@@ -823,7 +814,8 @@ export async function handleDiscordMatchBotInteraction(
 
         case DISCORD_INTERACTION_TYPE.APPLICATION_COMMAND:
             return handleApplicationCommand(
-                interaction
+                interaction,
+                env
             );
 
         case DISCORD_INTERACTION_TYPE.MESSAGE_COMPONENT:
@@ -858,47 +850,22 @@ Primary entry point for the API layer.
 export async function processDiscordMatchBotInteraction(
     request,
     env,
-    rawBody
+    rawBody,
+    { waitUntil, deadline = Infinity } = {}
 ) {
-    const verified =
-        await verifyDiscordMatchBotInteraction(
-            request,
-            env,
-            rawBody
-        );
-
-    if (
-        !verified
-    ) {
-        throw new DiscordMatchBotInteractionError(
-            "Discord interaction signature is invalid.",
-            {
-                code:
-                    "DISCORD_INTERACTION_SIGNATURE_INVALID",
-
-                status:
-                    401
-            }
-        );
+    const result = await callDiscordCommunications(env, "/internal/verify", { rawBody,
+        signature: request.headers.get("X-Signature-Ed25519") || "",
+        timestamp: request.headers.get("X-Signature-Timestamp") || "" });
+    if (Date.now() >= deadline) throw new DiscordMatchBotInteractionError("Command unavailable.", { code: "DISCORD_COMMAND_TIMEOUT", status: 503 });
+    if (result.response) return { response: result.response };
+    const interaction = result.interaction;
+    if (!interaction || interaction.type !== 2 || interaction.data?.name !== "complete" || typeof waitUntil !== "function") {
+        throw new DiscordMatchBotInteractionError("Command unavailable.", { code: "DISCORD_COMMAND_UNAVAILABLE", status: 503 });
     }
-
-    /*
-     * Parsing happens only after Discord's signature has
-     * been verified.
-     */
-    const interaction =
-        parseDiscordMatchBotInteraction(
-            rawBody
-        );
-
-    const response =
-        await handleDiscordMatchBotInteraction(
-            interaction
-        );
-
-    return {
-        interaction,
-
-        response
-    };
+    waitUntil((async () => {
+        const response = await handleDiscordMatchBotInteraction(interaction, env);
+        await callDiscordCommunications(env, "/internal/reply", { applicationId: interaction.applicationId,
+            interactionId: interaction.id, token: interaction.token, content: response.data.content });
+    })().catch(() => console.warn("Discord command unavailable.", { code: "DISCORD_COMMAND_UNAVAILABLE" })));
+    return { response: { type: 5, data: { flags: 64 } } };
 }

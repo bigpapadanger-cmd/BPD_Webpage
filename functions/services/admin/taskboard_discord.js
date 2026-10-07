@@ -1,4 +1,5 @@
 "use strict";
+import { callDiscordCommunications } from "./discord_communications.js";
 
 /* =========================================================
 BPD GAMING NETWORK
@@ -1171,6 +1172,11 @@ async function sendDiscordWebhook(
     environmentName,
     payload
 ) {
+    if (env.DISCORD_COMMUNICATIONS_ENABLED === "true") {
+        const destination = environmentName === "NEW_TASKBOARD_REPORT_DISCORD" ? "created" : "summary";
+        await callDiscordCommunications(env, "/internal/notify", { destination, payload });
+        return true;
+    }
     const webhookUrl =
         requireWebhookUrl(
             env,

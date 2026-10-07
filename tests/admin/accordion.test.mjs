@@ -81,8 +81,14 @@ test("suggestion accordion preserves permissions, pending counts, review actions
         await buttons[0].listeners.get("click")[0]();
         assert.equal(buttons[0].disabled, false); assert.equal(buttons[1].disabled, false);
         assert.match(nodes.suggestionReviewStatus.textContent, /could not be reviewed/);
-        globalThis.fetch = async () => Response.json({ success: true });
-        await buttons[0].listeners.get("click")[0]();
+        let resolveReview, mutationCalls = 0;
+        globalThis.fetch = async () => { mutationCalls++; return new Promise(resolve => { resolveReview = resolve; }); };
+        const pendingReview = buttons[0].listeners.get("click")[0]();
+        await buttons[1].listeners.get("click")[0]();
+        assert.equal(mutationCalls, 1);
+        assert.equal(buttons[0].disabled, true);
+        resolveReview(Response.json({ success: true }));
+        await pendingReview;
         assert.equal(nodes.suggestionReviewList.children.length, 0);
         assert.equal(nodes.suggestionReviewCount.textContent, "0 pending loaded");
         globalThis.fetch = async () => { throw new Error("failed load"); };
@@ -90,6 +96,46 @@ test("suggestion accordion preserves permissions, pending counts, review actions
         assert.match(nodes.suggestionReviewStatus.textContent, /could not be loaded/);
         assert.equal(nodes.suggestionReviewCount.textContent, "Pending list unavailable");
     } finally { globalThis.document = previous.document; globalThis.fetch = previous.fetch; delete globalThis.suggestionTestAllowed; }
+});
+
+test("Suggestions timeout covers fetch and body decode, and malformed lists fail closed", async () => {
+    const saved = { fetch: globalThis.fetch, setTimeout: globalThis.setTimeout, clearTimeout: globalThis.clearTimeout };
+    const module = await suggestionModule();
+    let deadline, cleared = 0;
+    globalThis.setTimeout = callback => { deadline = callback; return 1; };
+    globalThis.clearTimeout = () => { cleared++; };
+    try {
+        globalThis.fetch = async (_, { signal }) => new Promise((resolve, reject) => {
+            signal.addEventListener("abort", () => reject(new DOMException("Timed out", "AbortError")));
+            queueMicrotask(() => deadline());
+        });
+        await assert.rejects(module.requestSuggestionReview("/pending"), { name: "AbortError" });
+        globalThis.fetch = async (_, { signal }) => ({ ok: true, json: async () => {
+            deadline();
+            if (signal.aborted) throw new DOMException("Body timed out", "AbortError");
+        } });
+        await assert.rejects(module.requestSuggestionReview("/pending"), { name: "AbortError" });
+        globalThis.fetch = async () => Response.json({ success: false, message: "private" });
+        await assert.rejects(module.requestSuggestionReview("/pending"), /REVIEW_UNAVAILABLE/);
+        assert.equal(cleared, 3);
+    } finally { Object.assign(globalThis, saved); }
+});
+
+test("Admin navigation reuses shared controlled submenus and keeps all existing destinations", async () => {
+    const html = await readFile(new URL("../../public/Framework/Shell/HTML/Sidebar/admin.html", import.meta.url), "utf8");
+    for (const [id, labels] of [["adminOperationsSubmenu", ["Taskboard", "User Management", "Match Management"]],
+        ["adminReviewSubmenu", ["FAQ", "Suggestions"]], ["adminSystemSubmenu", ["System Status"]]]) {
+        assert.ok(html.includes(`aria-controls="${id}"`));
+        const body = html.match(new RegExp(`<div[^>]*id="${id}"[^>]*hidden>([\\s\\S]*?)</div>`))?.[1];
+        assert.ok(body);
+        for (const label of labels) assert.ok(body.includes(label));
+    }
+    assert.match(html, /data-nav-route="\/Admin"[^>]*data-nav-exact/);
+    for (const destination of ["/Dashboard", "/Settings", "/TOS", "/Privacy", "/Admin/FAQReview"]) assert.ok(html.includes(`href="${destination}"`));
+    assert.doesNotMatch(html, /onclick|<script|fetch\(/);
+    const shared = await readFile(new URL("../../public/Framework/Shell/JS/Sidebar/submenu.js", import.meta.url), "utf8");
+    assert.match(shared, /submenuInitialized/);
+    assert.match(shared, /event.key === "Escape"/);
 });
 
 test("Admin integrations keep critical status outside disclosures and activate the FAQ review link", async () => {

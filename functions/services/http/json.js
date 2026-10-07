@@ -1,6 +1,6 @@
 "use strict";
 
-export async function readJsonBody(request, maxBytes) {
+export async function readJsonBody(request, maxBytes, signal) {
     if (!request?.body || !Number.isSafeInteger(maxBytes) || maxBytes < 1) {
         return { success: false, data: null, tooLarge: false };
     }
@@ -11,10 +11,13 @@ export async function readJsonBody(request, maxBytes) {
     }
 
     const reader = request.body.getReader();
+    const cancel = () => { void reader.cancel().catch(() => {}); };
+    signal?.addEventListener("abort", cancel, { once: true });
     const chunks = [];
     let totalBytes = 0;
     try {
         while (true) {
+            if (signal?.aborted) return { success: false, data: null, tooLarge: false };
             const { done, value } = await reader.read();
             if (done) break;
             totalBytes += value.byteLength;
@@ -38,6 +41,7 @@ export async function readJsonBody(request, maxBytes) {
     } catch {
         return { success: false, data: null, tooLarge: false };
     } finally {
+        signal?.removeEventListener("abort", cancel);
         reader.releaseLock();
     }
 }

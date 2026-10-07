@@ -6,6 +6,18 @@ import { initializeAdminAccordions, setAdminAccordionSummary } from "../../Share
 const REQUIRED_PERMISSION = "admin.suggestions.manage";
 const loadGenerations = new WeakMap();
 
+export async function requestSuggestionReview(path, options = {}) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 12000);
+    try {
+        const response = await fetch(path, { credentials: "same-origin", cache: "no-store", ...options,
+            headers: { Accept: "application/json", ...options.headers }, signal: controller.signal });
+        const result = await response.json();
+        if (!response.ok || result?.success !== true) throw new Error("REVIEW_UNAVAILABLE");
+        return result;
+    } finally { clearTimeout(timer); }
+}
+
 function node(tag, text, className) {
     const element = document.createElement(tag);
     if (text !== undefined) element.textContent = String(text ?? "");
@@ -24,11 +36,13 @@ export async function initializePage() {
     if (!status || !list) return;
     const section = document.getElementById("suggestionReviewSection");
     const count = document.getElementById("suggestionReviewCount");
+    const refresh = document.getElementById("suggestionReviewRefresh");
     const generation = (loadGenerations.get(list) || 0) + 1;
     loadGenerations.set(list, generation);
     initializeAdminAccordions();
     section.hidden = true;
     list.hidden = true;
+    if (refresh) { refresh.hidden = true; refresh.onclick = null; }
 
     try {
         const auth = await getAuthState({ force: true });
@@ -38,6 +52,10 @@ export async function initializePage() {
             return;
         }
         section.hidden = false;
+        if (refresh) {
+            refresh.hidden = false;
+            refresh.onclick = () => { if (!refresh.disabled) void loadPending(status, list, count, generation); };
+        }
         await loadPending(status, list, count, generation);
     } catch {
         if (loadGenerations.get(list) !== generation) return;
@@ -46,31 +64,29 @@ export async function initializePage() {
 }
 
 async function loadPending(status, list, count, generation) {
+    const refresh = document.getElementById("suggestionReviewRefresh");
+    if (refresh) refresh.disabled = true;
     status.textContent = "Loading pending suggestions…";
     list.replaceChildren();
     try {
-        const response = await fetch(ADMIN_SUGGESTIONS_API_URL, {
-            credentials: "same-origin",
-            headers: { Accept: "application/json" },
-            cache: "no-store"
-        });
-        const result = await response.json();
+        const result = await requestSuggestionReview(ADMIN_SUGGESTIONS_API_URL);
         if (loadGenerations.get(list) !== generation) return;
-        if (!response.ok || result.success !== true) throw new Error("PENDING_LOAD_FAILED");
-        const suggestions = Array.isArray(result.suggestions) ? result.suggestions : [];
+        if (!Array.isArray(result.suggestions)) throw new Error("PENDING_RESPONSE_INVALID");
+        const suggestions = result.suggestions;
         status.textContent = suggestions.length ? "" : "There are no suggestions awaiting review.";
         list.hidden = false;
-        for (const suggestion of suggestions) list.append(createReviewCard(suggestion, status, list, count));
+        for (const suggestion of suggestions) list.append(createReviewCard(suggestion, status, list, count, generation));
         setAdminAccordionSummary(count, `${suggestions.length} pending loaded`);
     } catch {
         if (loadGenerations.get(list) !== generation) return;
         status.textContent = "Pending suggestions could not be loaded. Please retry later.";
         setAdminAccordionSummary(count, "Pending list unavailable");
-    }
+    } finally { if (refresh && loadGenerations.get(list) === generation) refresh.disabled = false; }
 }
 
-function createReviewCard(suggestion, status, list, count) {
+function createReviewCard(suggestion, status, list, count, generation) {
     const card = node("article", undefined, "admin-suggestion-card");
+    let pending = false;
     const title = node("h2", suggestion.title);
     const meta = node("p", `${suggestion.creator_display_name || "BPD member"} · Submitted ${formatDate(suggestion.created_at)} · ${Number(suggestion.upvotes) || 0} votes`, "admin-suggestion-meta");
     const description = node("p", suggestion.description);
@@ -85,25 +101,27 @@ function createReviewCard(suggestion, status, list, count) {
         button.type = "button";
         button.dataset.review = action;
         button.addEventListener("click", async () => {
+            if (pending || loadGenerations.get(list) !== generation) return;
+            pending = true;
             for (const item of actions.querySelectorAll("button")) item.disabled = true;
             status.textContent = action === "approved" ? "Approving suggestion…" : "Rejecting suggestion…";
             try {
-                const response = await fetch(adminSuggestionReviewApiUrl(suggestion.id), {
+                await requestSuggestionReview(adminSuggestionReviewApiUrl(suggestion.id), {
                     method: "POST",
                     credentials: "same-origin",
                     headers: { "Content-Type": "application/json", Accept: "application/json" },
                     body: JSON.stringify({ status: action, reviewNote: note.value.trim() })
                 });
-                const result = await response.json();
-                if (!response.ok || result.success !== true) throw new Error("REVIEW_FAILED");
+                if (loadGenerations.get(list) !== generation) return;
                 card.remove();
                 setAdminAccordionSummary(count, `${list.children.length} pending loaded`);
                 status.textContent = "Suggestion reviewed.";
                 if (!list.children.length) status.textContent = "There are no suggestions awaiting review.";
             } catch {
+                if (loadGenerations.get(list) !== generation) return;
                 status.textContent = "The suggestion could not be reviewed. Refresh and try again.";
                 for (const item of actions.querySelectorAll("button")) item.disabled = false;
-            }
+            } finally { pending = false; }
         });
         actions.append(button);
     }

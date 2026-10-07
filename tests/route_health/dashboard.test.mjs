@@ -36,7 +36,9 @@ test("dashboard stylesheet is included only as scoped dashboard styling", async 
     const master = await readFile(new URL("../../public/Framework/Shell/CSS/Callers/master.css", import.meta.url), "utf8");
     const dashboardCss = await readFile(new URL("../../public/Global/Index/CSS/dashboard.css", import.meta.url), "utf8");
 
-    assert.match(master, /\/Global\/Index\/CSS\/dashboard\.css/);
+    assert.doesNotMatch(master, /\/Global\/Index\/CSS\/dashboard\.css/);
+    const routes = await readFile(new URL("../../public/routes.js", import.meta.url), "utf8");
+    assert.match(routes, /\/Global\/Index\/CSS\/dashboard\.css/);
     assert.match(dashboardCss, /\.user-dashboard/);
     assert.doesNotMatch(dashboardCss, /\.home-page\s*\{/);
 });

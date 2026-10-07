@@ -81,11 +81,12 @@ test("homepage has one network statistics card with honest unavailable counters"
 test("approved RL groups and bot link use the shared shell without eligibility side effects", () => {
     const menu = readFileSync(resolve(publicRoot, "Framework/Shell/HTML/Sidebar/rl_menu.html"), "utf8");
     for (const [group, labels] of [["player", ["My Profile", "Match History"]],
-        ["play", ["Find Players", "Find Custom Matches", "Private Matches"]],
-        ["community", ["Shop", "Add Discord Bot"]]]) {
+        ["play", ["Find Custom Matches", "Private Matches"]],
+        ["community", ["Find Players", "Shop", "Add Discord Bot"]]]) {
         const submenu = menu.match(new RegExp(`<div[^>]*id="${group}Submenu"[^>]*>([\\s\\S]*?)</div>`))?.[1];
         assert.ok(submenu);
         for (const label of labels) assert.ok(submenu.includes(label));
+        if (group === "play") assert.ok(!submenu.includes("Find Players"));
     }
     const bot = menu.match(/<a[^>]*href="https:\/\/discord.com\/oauth2\/authorize\?client_id=1549606323249877034"[^>]*>Add Discord Bot<\/a>/)?.[0];
     assert.ok(bot);
@@ -100,12 +101,13 @@ test("approved RL groups and bot link use the shared shell without eligibility s
     }
 });
 
-test("Find Custom Matches is an independent shared-shell Coming soon page without provider calls", () => {
+test("Find Custom Matches retains the shared shell with its scoped durable lobby module", () => {
     const route = resolveHumanPageRoute("/RocketLeague/FindCustomMatches");
     assert.ok(route);
-    assert.equal(ROUTES["/RocketLeague/FindCustomMatches"].module, null);
+    assert.equal(ROUTES["/RocketLeague/FindCustomMatches"].module, "/Tabs/RocketLeague/CustomMatches/JS/index.js");
     const page = readFileSync(resolve(publicRoot, "Tabs/RocketLeague/Features/HTML/find-custom-matches.html"), "utf8");
-    assert.match(page, /Coming soon/);
+    assert.match(page, /Public matches/);
+    assert.match(page, /id="cmCreateFields" disabled/);
     assert.doesNotMatch(page, /<script|fetch\(|<iframe/);
 });
 
@@ -124,7 +126,8 @@ test("Settings RL context is explicit, survives direct loads and rejects unsafe 
     const menu = readFileSync(resolve(publicRoot, "Framework/Shell/HTML/Sidebar/rl_menu.html"), "utf8");
     assert.match(menu, /data-settings-context="rocketleague"/);
     const caller = readFileSync(resolve(publicRoot, "Framework/Shell/CSS/Callers/master_rl.css"), "utf8");
-    assert.match(caller, /@import url\("\/Global\/Settings\/CSS\/settings-page.css"\)/);
+    assert.doesNotMatch(caller, /@import url\("\/Global\/Settings\/CSS\/settings-page.css"\)/);
+    assert.match(readFileSync(resolve(publicRoot, "routes.js"), "utf8"), /\/Global\/Settings\/CSS\/settings-page.css/);
 });
 
 test("Home is exact-only and non-clickable on the hub; submenu active state follows direct and SPA routes", () => {
@@ -142,7 +145,10 @@ test("Home is exact-only and non-clickable on the hub; submenu active state foll
     items.at(-1).dataset.settingsContext = "rocketleague";
     items.forEach(element => { element.classList.owner = element; });
     try {
-        globalThis.document = { querySelectorAll(selector) { assert.ok(selector.includes(".submenu-item[data-nav-route]")); return items; } };
+        globalThis.document = { querySelectorAll(selector) {
+            if (selector === "#sidebar [data-sidebar-menu]") return [];
+            assert.ok(selector.includes(".submenu-item[data-nav-route]")); return items;
+        } };
         for (const selected of items) {
             globalThis.window = { location: { pathname: selected.dataset.navRoute,
                 search: selected.dataset.navRoute === "/Settings" ? "?context=rocketleague&returnTo=%2FRocketLeague%2FShop" : "" } };
@@ -175,7 +181,7 @@ test("Rocket League fragment styles resolve through the master CSS caller", () =
         "/Tabs/RocketLeague/PublicProfile/CSS/index.css",
         "/Tabs/RocketLeague/MyProfile/CSS/index.css",
         "/Tabs/RocketLeague/Features/CSS/index.css"
-    ]) assert.ok(caller.includes(path), `${path} is not loaded by master_rl.css`);
+    ]) assert.ok(readFileSync(resolve(publicRoot, "routes.js"), "utf8").includes(path), `${path} is not available through route-scoped styling`);
 
     for (const path of [
         "Tabs/RocketLeague/FindPlayers/HTML/index.html",

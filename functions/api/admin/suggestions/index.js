@@ -22,7 +22,8 @@ export async function onRequestGet(context) {
     try {
         await authorize(context.request, context.env);
         const suggestions = await callSuggestionsRpc(context.env, SUGGESTIONS_RPCS.LIST_PENDING);
-        return json({ success: true, suggestions: Array.isArray(suggestions) ? suggestions : [] });
+        if (!Array.isArray(suggestions)) throw new Error("SUGGESTIONS_RESPONSE_INVALID");
+        return json({ success: true, suggestions });
     } catch (error) {
         const status = Number(error?.status);
         if ([401, 403].includes(status)) {

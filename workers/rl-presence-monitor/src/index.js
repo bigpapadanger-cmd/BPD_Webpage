@@ -44,9 +44,6 @@ import {
 import { refreshGlobalRocketLeagueLeaderboards } from "./rl_global_leaderboards.js";
 import { runScheduledAdminHealthChecks } from "../../../functions/services/admin/system_status.js";
 
-import {
-    runTaskboardSummary
-} from "./taskboard_summary.js";
 
 const activeJobs = new Set();
 const PRESENCE_STATUS_KEY = "admin:service-status:rl-presence";
@@ -104,7 +101,7 @@ Example:
     "0 12 * * *"
         12:00 UTC daily.
 */
-const TASKBOARD_SUMMARY_CRON =
+const LEADERBOARD_REFRESH_CRON =
     "0 12 * * *";
 
 /* =========================================================
@@ -162,7 +159,7 @@ function getJobRunner(job, env, { forceDiscordInventory = false, reconcileDiscor
     }
     if (job === "leaderboards") return () => refreshGlobalRocketLeagueLeaderboards(env);
     if (job === "taskboard") {
-        return () => runTaskboardSummary(env);
+        return () => ({ success: false, skipped: true, reason: "MOVED_TO_DISCORD_COMMUNICATIONS" });
     }
     if (job === "health") return () => runScheduledAdminHealthChecks(env);
     return null;
@@ -424,9 +421,8 @@ async function handleScheduled(
 
     if (
         controller.cron ===
-        TASKBOARD_SUMMARY_CRON
+        LEADERBOARD_REFRESH_CRON
     ) {
-        runInBackground("taskboard", env, ctx);
         runInBackground("leaderboards", env, ctx);
 
         return;

@@ -67,7 +67,9 @@ Security:
 
 import {
     authorizeTaskUpdate,
-    authorizeTaskDelete
+    authorizeTaskDelete,
+    ADMIN_PERMISSIONS,
+    requireAdminPermission
 } from "../../../admin/permissions.js";
 
 import {
@@ -775,8 +777,8 @@ async function notifyLifecycleDiscord(
 EXECUTE LIFECYCLE ACTION
 ========================================================= */
 
-export async function performAdminTaskLifecycleAction(
-    request,
+async function performAuthorizedTaskLifecycleAction(
+    authorization,
     env,
     {
         action,
@@ -823,13 +825,6 @@ export async function performAdminTaskLifecycleAction(
     /* -----------------------------------------------------
     OPERATION PERMISSION
     ----------------------------------------------------- */
-
-    const authorization =
-        await authorizeLifecycleAction(
-            request,
-            env,
-            definition
-        );
 
     /* -----------------------------------------------------
     AUTHORITATIVE TASK + RESPONSIBILITY
@@ -899,6 +894,30 @@ export async function performAdminTaskLifecycleAction(
     RESPONSE
     ----------------------------------------------------- */
 
+    return result;
+}
+
+export async function performAdminTaskLifecycleAction(request, env, input = {}) {
+    const { definition } = requireLifecycleAction(input.action);
+    const authorization = await authorizeLifecycleAction(request, env, definition);
+    return performAuthorizedTaskLifecycleAction(authorization, env, input);
+}
+
+// Server-only adapter. The signed interaction path derives this authorization
+// from current BPD access and a fresh Discord guild-role lookup, never the browser.
+export async function completeTaskFromDiscordAuthorization(env, authorization, taskCode) {
+    requireAdminPermission(authorization, ADMIN_PERMISSIONS.TASKS_UPDATE);
+    const code = requireTaskCode(taskCode);
+    const { definition } = requireLifecycleAction("complete");
+    const { task } = await authorizeTaskLifecycleResponsibility(env, authorization, code, definition);
+    if (task.status === "Completed") return { alreadyCompleted: true };
+    const result = await performAuthorizedTaskLifecycleAction(authorization, env, {
+        action: "complete", taskCode: code, expectedVersion: requireExpectedVersion(task.version)
+    });
+    const updated = extractUpdatedTask(result) || result;
+    if (updated?.task_code !== code || updated?.status !== "Completed") {
+        throw new AdminTaskLifecycleError("Task completion could not be confirmed.", { code: "TASK_COMPLETION_UNAVAILABLE", status: 503 });
+    }
     return result;
 }
 

@@ -1,5 +1,10 @@
 # Rocket League Presence Monitor
 
+Taskboard summaries moved to the private `bpd-discord-communications` Worker.
+The daily noon UTC trigger now refreshes leaderboards only; manual
+`job=taskboard` is a non-delivering compatibility response. Friday reports run
+at 6 PM America/New_York in the communication Worker, with transactional receipts.
+
 This Worker owns the scheduled refresh of Rocket League public-presence state.
 It is not a persistent PsyNet connection and does not query PsyNet directly.
 

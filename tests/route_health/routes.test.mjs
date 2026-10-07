@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import test from "node:test";
+import test, { before, after } from "node:test";
+const previousRewriter = globalThis.HTMLRewriter;
+before(() => { globalThis.HTMLRewriter = class { on() { return this; } transform(response) { return response; } }; });
+after(() => { globalThis.HTMLRewriter = previousRewriter; });
 
 import { ROUTES, buildHumanPageRouteIndex, resolveHumanPageRoute } from "../../public/routes.js";
 import {
@@ -77,7 +80,8 @@ test("generated API inventory is complete, exact-case, and points to real handle
 test("Worker endpoints, schedules, and queue consumers are inventoried from their Wrangler configs", () => {
     assert.ok(WORKER_ROUTE_INVENTORY.some((route) => route.path === "https://status.bpd-gaming-network.com/health"));
     assert.ok(WORKER_ROUTE_INVENTORY.some((route) => route.path === "https://status.bpd-gaming-network.com/wake" && route.authRequired === true));
-    assert.equal(WORKER_SCHEDULE_INVENTORY.length, 4);
+    assert.equal(WORKER_SCHEDULE_INVENTORY.length, 5);
+    assert.ok(WORKER_SCHEDULE_INVENTORY.some(surface => surface.handler.includes("bpd-discord-communications")));
     assert.deepEqual(WORKER_QUEUE_INVENTORY.map((queue) => queue.path), ["queue: bpd-ocr-jobs"]);
     for (const surface of [...WORKER_ROUTE_INVENTORY, ...WORKER_SCHEDULE_INVENTORY, ...WORKER_QUEUE_INVENTORY]) {
         assert.ok(existsSync(resolve(repoRoot, surface.handler)), `${surface.handler} is missing`);
@@ -164,7 +168,7 @@ test("Page Settings API is protected and returns generic auth failure", async ()
 
 test("public Suggestions is indexable while Admin review remains out of the sitemap", () => {
     const sitemap = readFileSync(resolve(repoRoot, "public/sitemap.xml"), "utf8");
-    assert.match(sitemap, /https:\/\/bpd-gaming-network\.com\/Settings/);
+    assert.doesNotMatch(sitemap, /https:\/\/bpd-gaming-network\.com\/Settings/);
     assert.match(sitemap, /https:\/\/bpd-gaming-network\.com\/Suggestions/);
     assert.doesNotMatch(sitemap, /Admin\/SuggestionReview|Admin\/PageSettings/);
 });

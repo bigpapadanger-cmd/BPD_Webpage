@@ -635,9 +635,17 @@ PLAYER PROFILE
 .rl-mmr-chart-gridline { stroke: rgba(181, 206, 242, 0.14); stroke-width: 1; }
 .rl-mmr-chart-axis-label { fill: var(--rl-text-muted, #b9c7db); font-size: 12px; }
 .rl-mmr-chart-line { fill: none; stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
-.rl-mmr-chart-rank-line { stroke: #9babc0; stroke-opacity: .35; stroke-dasharray: 4 5; }
-.rl-mmr-chart-rank-label { fill: #b9c7db; font-size: 11px; }
-.rl-mmr-chart-reference-controls { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin-top: .75rem; }
+.rl-mmr-chart-surface { display: block; width: 100%; height: auto; }
+.rl-mmr-chart-data { margin-top: 1rem; overflow-x: auto; }
+.rl-mmr-chart-data table { width: 100%; border-collapse: collapse; }
+.rl-mmr-chart-data th,.rl-mmr-chart-data td { text-align: left; padding: .5rem; border-bottom: 1px solid #35465f; }
+@media (max-width: 600px) {
+    :is(.rl-public-mmr-history, #rocketLeagueMmrHistoryGraph) { overflow-x: auto; }
+    .rl-mmr-chart-surface { min-width: 600px; }
+}
+.rl-mmr-chart-rank-line { stroke-width: .5; }
+.rl-mmr-chart-rank-label { fill: #dce8fa; font-size: 10px; }
+.rl-mmr-chart-reference-controls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; max-width: 280px; margin: .75rem auto 0; }
 .rl-mmr-chart-reference-controls button { color: #dce8fa; background: #111f32; border: 1px solid #435873; border-radius: .5rem; padding: .4rem .75rem; cursor: pointer; }
 .rl-mmr-chart-reference-controls button[aria-pressed="true"] { border-color: #68c5ff; background: #233d59; }
 .rl-mmr-chart-reference-controls button:focus-visible { outline: 2px solid #68c5ff; outline-offset: 3px; }

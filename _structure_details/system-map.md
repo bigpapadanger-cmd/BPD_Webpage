@@ -1,6 +1,6 @@
 # DomainData System Map
 
-Snapshot: 2026-10-05
+Snapshot: 2026-10-07
 
 ## Runtime overview
 
@@ -62,6 +62,29 @@ admin-only `/api/ocr/debug/mtls-probe` remains a diagnostic-only direct binding
 probe and is not used for normal processing.
 
 ## Rocket League provider data
+
+### Custom Matches
+
+Custom Match pages use the same-origin Pages API and fixed service-role RPC
+transport. Pages derives the BPD account from the authenticated session for every
+mutation; Supabase remains the durable match, round, vote, and result authority.
+Live lobby presence/readiness and serialized Start/vote-window transitions run in
+the private `bpd-custom-match-runtime` Worker, bound from Pages as
+`CUSTOM_MATCH_RUNTIME`. One `CustomMatchSession` Durable Object is selected per
+match code. The browser WebSocket is established only through the authenticated
+same-origin Pages route; Worker events contain external match/member codes and
+public lobby fields, not internal account UUIDs or provider data. Worker
+execution remains disabled until matching caller secrets, the Supabase service
+role secret, the binding, and the DO namespace migration are deliberately
+provisioned. No deployment/live configuration has been performed for this
+implementation.
+
+Phase C host invite/request/former-member views use the verified fixed read RPCs
+and current server-derived actor. General invite, approve/reject and rejoin actions
+retain Supabase authorization, versions and idempotency. Targeted invites await
+an approved recipient resolver. Non-null `modeResult` remains fail-closed. See
+[Custom Match contract boundary](custom-match-contract-boundary.md) for current
+Phase D/E routes, tests, deployment prerequisites, and remaining gates.
 
 ### Rocket League pages and Discord notification eligibility
 

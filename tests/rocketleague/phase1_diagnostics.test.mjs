@@ -77,6 +77,14 @@ test("shared SVG rules apply outside the homepage, with no polygon fill and read
     assert.match(css, /\n\.rl-mmr-chart-line \{ fill: none/);
     assert.match(css, /\.rl-mmr-chart-axis-label \{ fill: var\(--rl-text-muted, #b9c7db\)/);
     assert.match(css, /\n\.rl-mmr-chart-legend \{\s*display: flex/);
+    assert.match(css, /\.rl-mmr-chart-reference-controls \{ display: grid; grid-template-columns: repeat\(2,/);
+});
+
+test("public platform consumers share the versioned dependency that exports the formatter", async () => {
+    for (const file of ["PublicProfile/JS/index.js", "FindPlayers/JS/view.js"]) {
+        const source = await readFile(new URL(`../../public/Tabs/RocketLeague/${file}`, import.meta.url), "utf8");
+        assert.match(source, /shared\/profileView\.js\?v=20261006-platform/);
+    }
 });
 
 test("readiness caller tests both configured credentials using fixed read-only RPCs and redacts provider errors", async () => {

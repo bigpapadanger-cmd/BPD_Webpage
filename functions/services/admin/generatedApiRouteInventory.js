@@ -617,6 +617,10 @@ export const PAGE_ROUTE_INVENTORY = Object.freeze([
       {
         "path": "/Framework/Shell/HTML/Footer/footer.html",
         "exists": true
+      },
+      {
+        "path": "/Tabs/RocketLeague/CustomMatches/JS/index.js",
+        "exists": true
       }
     ]
   },
@@ -2116,11 +2120,8 @@ export const API_ROUTE_INVENTORY = Object.freeze([
     ],
     "handler": "functions/api/auth/discord/matchbot/interactions.js",
     "methods": [
-      "DELETE",
-      "GET",
-      "PATCH",
-      "POST",
-      "PUT"
+      "ALL",
+      "POST"
     ],
     "authRequired": "handler-defined",
     "healthStatus": "valid",
@@ -2448,6 +2449,22 @@ export const API_ROUTE_INVENTORY = Object.freeze([
     "deepLinkSupported": false
   },
   {
+    "path": "/api/internal/discord/task-summary",
+    "lookupKey": null,
+    "routeType": "api",
+    "casePolicy": "exact",
+    "sourceFiles": [
+      "functions/api/internal/discord/task-summary.js"
+    ],
+    "handler": "functions/api/internal/discord/task-summary.js",
+    "methods": [
+      "ALL"
+    ],
+    "authRequired": "handler-defined",
+    "healthStatus": "valid",
+    "deepLinkSupported": false
+  },
+  {
     "path": "/api/ocr/compare",
     "lookupKey": null,
     "routeType": "api",
@@ -2665,6 +2682,310 @@ export const API_ROUTE_INVENTORY = Object.freeze([
       "functions/api/ocr/training.js"
     ],
     "handler": "functions/api/ocr/training.js",
+    "methods": [
+      "ALL"
+    ],
+    "authRequired": "handler-defined",
+    "healthStatus": "valid",
+    "deepLinkSupported": false
+  },
+  {
+    "path": "/api/rocketleague/custom-matches/:matchCode",
+    "lookupKey": null,
+    "routeType": "api",
+    "casePolicy": "exact",
+    "sourceFiles": [
+      "functions/api/rocketleague/custom-matches/[matchCode].js"
+    ],
+    "handler": "functions/api/rocketleague/custom-matches/[matchCode].js",
+    "methods": [
+      "ALL"
+    ],
+    "authRequired": "handler-defined",
+    "healthStatus": "valid",
+    "deepLinkSupported": false
+  },
+  {
+    "path": "/api/rocketleague/custom-matches/:matchCode/actions",
+    "lookupKey": null,
+    "routeType": "api",
+    "casePolicy": "exact",
+    "sourceFiles": [
+      "functions/api/rocketleague/custom-matches/[matchCode]/actions.js"
+    ],
+    "handler": "functions/api/rocketleague/custom-matches/[matchCode]/actions.js",
+    "methods": [
+      "ALL"
+    ],
+    "authRequired": "handler-defined",
+    "healthStatus": "valid",
+    "deepLinkSupported": false
+  },
+  {
+    "path": "/api/rocketleague/custom-matches/:matchCode/credentials",
+    "lookupKey": null,
+    "routeType": "api",
+    "casePolicy": "exact",
+    "sourceFiles": [
+      "functions/api/rocketleague/custom-matches/[matchCode]/credentials.js"
+    ],
+    "handler": "functions/api/rocketleague/custom-matches/[matchCode]/credentials.js",
+    "methods": [
+      "ALL"
+    ],
+    "authRequired": "handler-defined",
+    "healthStatus": "valid",
+    "deepLinkSupported": false
+  },
+  {
+    "path": "/api/rocketleague/custom-matches/:matchCode/invites",
+    "lookupKey": null,
+    "routeType": "api",
+    "casePolicy": "exact",
+    "sourceFiles": [
+      "functions/api/rocketleague/custom-matches/[matchCode]/invites.js"
+    ],
+    "handler": "functions/api/rocketleague/custom-matches/[matchCode]/invites.js",
+    "methods": [
+      "ALL"
+    ],
+    "authRequired": "handler-defined",
+    "healthStatus": "valid",
+    "deepLinkSupported": false
+  },
+  {
+    "path": "/api/rocketleague/custom-matches/:matchCode/join-requests",
+    "lookupKey": null,
+    "routeType": "api",
+    "casePolicy": "exact",
+    "sourceFiles": [
+      "functions/api/rocketleague/custom-matches/[matchCode]/join-requests.js"
+    ],
+    "handler": "functions/api/rocketleague/custom-matches/[matchCode]/join-requests.js",
+    "methods": [
+      "ALL"
+    ],
+    "authRequired": "handler-defined",
+    "healthStatus": "valid",
+    "deepLinkSupported": false
+  },
+  {
+    "path": "/api/rocketleague/custom-matches/:matchCode/member-history",
+    "lookupKey": null,
+    "routeType": "api",
+    "casePolicy": "exact",
+    "sourceFiles": [
+      "functions/api/rocketleague/custom-matches/[matchCode]/member-history.js"
+    ],
+    "handler": "functions/api/rocketleague/custom-matches/[matchCode]/member-history.js",
+    "methods": [
+      "ALL"
+    ],
+    "authRequired": "handler-defined",
+    "healthStatus": "valid",
+    "deepLinkSupported": false
+  },
+  {
+    "path": "/api/rocketleague/custom-matches/:matchCode/results",
+    "lookupKey": null,
+    "routeType": "api",
+    "casePolicy": "exact",
+    "sourceFiles": [
+      "functions/api/rocketleague/custom-matches/[matchCode]/results.js"
+    ],
+    "handler": "functions/api/rocketleague/custom-matches/[matchCode]/results.js",
+    "methods": [
+      "ALL"
+    ],
+    "authRequired": "handler-defined",
+    "healthStatus": "valid",
+    "deepLinkSupported": false
+  },
+  {
+    "path": "/api/rocketleague/custom-matches/:matchCode/results/:resultCode/confirm",
+    "lookupKey": null,
+    "routeType": "api",
+    "casePolicy": "exact",
+    "sourceFiles": [
+      "functions/api/rocketleague/custom-matches/[matchCode]/results/[resultCode]/confirm.js"
+    ],
+    "handler": "functions/api/rocketleague/custom-matches/[matchCode]/results/[resultCode]/confirm.js",
+    "methods": [
+      "ALL"
+    ],
+    "authRequired": "handler-defined",
+    "healthStatus": "valid",
+    "deepLinkSupported": false
+  },
+  {
+    "path": "/api/rocketleague/custom-matches/:matchCode/results/submit",
+    "lookupKey": null,
+    "routeType": "api",
+    "casePolicy": "exact",
+    "sourceFiles": [
+      "functions/api/rocketleague/custom-matches/[matchCode]/results/submit.js"
+    ],
+    "handler": "functions/api/rocketleague/custom-matches/[matchCode]/results/submit.js",
+    "methods": [
+      "ALL"
+    ],
+    "authRequired": "handler-defined",
+    "healthStatus": "valid",
+    "deepLinkSupported": false
+  },
+  {
+    "path": "/api/rocketleague/custom-matches/:matchCode/rounds",
+    "lookupKey": null,
+    "routeType": "api",
+    "casePolicy": "exact",
+    "sourceFiles": [
+      "functions/api/rocketleague/custom-matches/[matchCode]/rounds.js"
+    ],
+    "handler": "functions/api/rocketleague/custom-matches/[matchCode]/rounds.js",
+    "methods": [
+      "ALL"
+    ],
+    "authRequired": "handler-defined",
+    "healthStatus": "valid",
+    "deepLinkSupported": false
+  },
+  {
+    "path": "/api/rocketleague/custom-matches/:matchCode/rounds/:roundCode/open-vote",
+    "lookupKey": null,
+    "routeType": "api",
+    "casePolicy": "exact",
+    "sourceFiles": [
+      "functions/api/rocketleague/custom-matches/[matchCode]/rounds/[roundCode]/open-vote.js"
+    ],
+    "handler": "functions/api/rocketleague/custom-matches/[matchCode]/rounds/[roundCode]/open-vote.js",
+    "methods": [
+      "ALL"
+    ],
+    "authRequired": "handler-defined",
+    "healthStatus": "valid",
+    "deepLinkSupported": false
+  },
+  {
+    "path": "/api/rocketleague/custom-matches/:matchCode/rounds/:roundCode/resolve",
+    "lookupKey": null,
+    "routeType": "api",
+    "casePolicy": "exact",
+    "sourceFiles": [
+      "functions/api/rocketleague/custom-matches/[matchCode]/rounds/[roundCode]/resolve.js"
+    ],
+    "handler": "functions/api/rocketleague/custom-matches/[matchCode]/rounds/[roundCode]/resolve.js",
+    "methods": [
+      "ALL"
+    ],
+    "authRequired": "handler-defined",
+    "healthStatus": "valid",
+    "deepLinkSupported": false
+  },
+  {
+    "path": "/api/rocketleague/custom-matches/:matchCode/rounds/:roundCode/result",
+    "lookupKey": null,
+    "routeType": "api",
+    "casePolicy": "exact",
+    "sourceFiles": [
+      "functions/api/rocketleague/custom-matches/[matchCode]/rounds/[roundCode]/result.js"
+    ],
+    "handler": "functions/api/rocketleague/custom-matches/[matchCode]/rounds/[roundCode]/result.js",
+    "methods": [
+      "ALL"
+    ],
+    "authRequired": "handler-defined",
+    "healthStatus": "valid",
+    "deepLinkSupported": false
+  },
+  {
+    "path": "/api/rocketleague/custom-matches/:matchCode/rounds/:roundCode/vote",
+    "lookupKey": null,
+    "routeType": "api",
+    "casePolicy": "exact",
+    "sourceFiles": [
+      "functions/api/rocketleague/custom-matches/[matchCode]/rounds/[roundCode]/vote.js"
+    ],
+    "handler": "functions/api/rocketleague/custom-matches/[matchCode]/rounds/[roundCode]/vote.js",
+    "methods": [
+      "ALL"
+    ],
+    "authRequired": "handler-defined",
+    "healthStatus": "valid",
+    "deepLinkSupported": false
+  },
+  {
+    "path": "/api/rocketleague/custom-matches/:matchCode/rounds/begin",
+    "lookupKey": null,
+    "routeType": "api",
+    "casePolicy": "exact",
+    "sourceFiles": [
+      "functions/api/rocketleague/custom-matches/[matchCode]/rounds/begin.js"
+    ],
+    "handler": "functions/api/rocketleague/custom-matches/[matchCode]/rounds/begin.js",
+    "methods": [
+      "ALL"
+    ],
+    "authRequired": "handler-defined",
+    "healthStatus": "valid",
+    "deepLinkSupported": false
+  },
+  {
+    "path": "/api/rocketleague/custom-matches/:matchCode/runtime",
+    "lookupKey": null,
+    "routeType": "api",
+    "casePolicy": "exact",
+    "sourceFiles": [
+      "functions/api/rocketleague/custom-matches/[matchCode]/runtime.js"
+    ],
+    "handler": "functions/api/rocketleague/custom-matches/[matchCode]/runtime.js",
+    "methods": [
+      "ALL"
+    ],
+    "authRequired": "handler-defined",
+    "healthStatus": "valid",
+    "deepLinkSupported": false
+  },
+  {
+    "path": "/api/rocketleague/custom-matches/access",
+    "lookupKey": null,
+    "routeType": "api",
+    "casePolicy": "exact",
+    "sourceFiles": [
+      "functions/api/rocketleague/custom-matches/access.js"
+    ],
+    "handler": "functions/api/rocketleague/custom-matches/access.js",
+    "methods": [
+      "ALL"
+    ],
+    "authRequired": "handler-defined",
+    "healthStatus": "valid",
+    "deepLinkSupported": false
+  },
+  {
+    "path": "/api/rocketleague/custom-matches",
+    "lookupKey": null,
+    "routeType": "api",
+    "casePolicy": "exact",
+    "sourceFiles": [
+      "functions/api/rocketleague/custom-matches/index.js"
+    ],
+    "handler": "functions/api/rocketleague/custom-matches/index.js",
+    "methods": [
+      "ALL"
+    ],
+    "authRequired": "handler-defined",
+    "healthStatus": "valid",
+    "deepLinkSupported": false
+  },
+  {
+    "path": "/api/rocketleague/custom-matches/limits",
+    "lookupKey": null,
+    "routeType": "api",
+    "casePolicy": "exact",
+    "sourceFiles": [
+      "functions/api/rocketleague/custom-matches/limits.js"
+    ],
+    "handler": "functions/api/rocketleague/custom-matches/limits.js",
     "methods": [
       "ALL"
     ],
@@ -2925,6 +3246,21 @@ export const WORKER_ROUTE_INVENTORY = Object.freeze([
   }
 ]);
 export const WORKER_SCHEDULE_INVENTORY = Object.freeze([
+  {
+    "path": "cron: 0 22,23 * * 5",
+    "routeType": "schedule",
+    "casePolicy": "not-applicable",
+    "sourceFiles": [
+      "workers/bpd-discord-communications/wrangler.jsonc"
+    ],
+    "handler": "workers/bpd-discord-communications/src/index.js",
+    "methods": [
+      "SCHEDULE"
+    ],
+    "authRequired": "platform-triggered",
+    "healthStatus": "configured",
+    "ownerSystem": "bpd-discord-communications"
+  },
   {
     "path": "cron: */30 * * * *",
     "routeType": "schedule",

@@ -81,6 +81,9 @@ const TASK_RPC_NAMES =
         SUMMARY:
             "admin_get_task_summary",
 
+        WEEKLY_SUMMARY:
+            "admin_taskboard_summary",
+
         ASSIGNEES:
             "admin_get_task_assignees",
 

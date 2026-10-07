@@ -170,7 +170,7 @@ test("User Management route and page use authenticated route shell without Disco
     assert.equal(route.module, "/Global/Admin/UserManagement/JS/index.js");
     const source = await readFile(new URL("../../public/Global/Admin/UserManagement/JS/index.js", import.meta.url), "utf8");
     assert.doesNotMatch(source, /hasAdminAccess|getAuthState/);
-    assert.match(source, /aria-selected/);
+    assert.match(source, /aria-pressed/);
     assert.match(source, /textContent/);
     assert.match(source, /durationDays/);
     assert.match(source, /creates identity restrictions/);

@@ -30,22 +30,11 @@ Used for all valid /RocketLeague routes.
    ========================================================= */
 
 @import url("/Global/Links/links.css");
-@import url("/Global/Settings/CSS/settings-page.css");
 
 /* =========================================================
    ROCKET LEAGUE
    ========================================================= */
 
 @import url("/Tabs/RocketLeague/Index/CSS/index.css");
-@import url("/Tabs/RocketLeague/Registration/CSS/index.css");
-@import url("/Tabs/RocketLeague/FindPlayers/CSS/index.css");
-@import url("/Tabs/RocketLeague/PublicProfile/CSS/index.css");
-@import url("/Tabs/RocketLeague/MyProfile/CSS/index.css");
-@import url("/Tabs/RocketLeague/Features/CSS/index.css");
 
-/* =========================================================
-   OCR / MATCH RESULTS
-   ========================================================= */
-
-@import url("/ocr/CSS/disputes.css");
-@import url("/ocr/CSS/submitimg.css");
+/* Page-specific styles are loaded by routes.js:getRouteStyles. */

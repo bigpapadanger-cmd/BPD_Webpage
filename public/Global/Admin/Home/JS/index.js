@@ -583,6 +583,12 @@ function createAdminApiError(
 ADMIN API REQUEST
 ========================================================= */
 
+async function boundedAdminResponse(url, options) {
+    const { boundedJson } = await import("/scripts/boundedRequest.js");
+    const { response, payload } = await boundedJson(url, options);
+    return new Response(JSON.stringify(payload), { status: response.status, headers: response.headers });
+}
+
 async function requestAdminApi(
     url
 ) {
@@ -590,7 +596,7 @@ async function requestAdminApi(
 
     try {
         response =
-            await fetch(
+            await boundedAdminResponse(
                 url,
                 {
                     method:
@@ -804,7 +810,7 @@ async function loadSystemHealth() {
 
     try {
         response =
-            await fetch(
+            await boundedAdminResponse(
                 SYSTEM_HEALTH_URL,
                 {
                     method:

@@ -65,13 +65,13 @@ import {
     HEADER_MAP,
     getMasterCssForRoute,
     resolveHumanPageRoute,
-    getRocketLeagueSettingsContext
+    getRocketLeagueSettingsContext,
+    getPageMetadata,
+    getRouteStyles
 } from "/routes.js";
 
-import {
-    initializeOcrRuntime,
-    resumeOcrRuntime
-} from "./ocr_runtime.js";
+let ocrRuntimePromise;
+const loadOcrRuntime = () => ocrRuntimePromise ||= import("./ocr_runtime.js").catch(error => { ocrRuntimePromise = null; throw error; });
 
 import {
     loadSidebarHover,
@@ -230,8 +230,9 @@ function scheduleIdleTask(
 OCR RUNTIME
 ========================================================= */
 
-function initializeGlobalOcr() {
+async function initializeGlobalOcr() {
     try {
+        const { initializeOcrRuntime } = await loadOcrRuntime();
         if (
             !initializeOcrRuntime()
         ) {
@@ -250,8 +251,10 @@ function initializeGlobalOcr() {
     }
 }
 
-function resumeGlobalOcr() {
+async function resumeGlobalOcr() {
+    if (!ocrRuntimePromise && !needsOcrRuntime()) return;
     try {
+        const { resumeOcrRuntime } = await loadOcrRuntime();
         resumeOcrRuntime();
     }
     catch (
@@ -589,10 +592,12 @@ function createPendingStylesheet(
 
             link.dataset.masterCss =
                 "pending";
+            const deadline = window.setTimeout(() => { link.remove(); reject(new Error("Stylesheet request timed out.")); }, 12000);
 
             link.addEventListener(
                 "load",
                 function() {
+                    window.clearTimeout(deadline);
                     resolve(
                         link
                     );
@@ -606,6 +611,7 @@ function createPendingStylesheet(
             link.addEventListener(
                 "error",
                 function() {
+                    window.clearTimeout(deadline);
                     link.remove();
 
                     reject(
@@ -2215,9 +2221,32 @@ async function loadShell() {
             showHeader
         );
 
-        document.title =
-            routeConfig.title
-            || "BPD Gaming Network";
+        const metadata = getPageMetadata(route.routePath, window.location.search);
+        if (window.location.hostname.endsWith(".pages.dev")) metadata.robots = "noindex, nofollow";
+        // Keep old route styles until new ones finish loading; no unstyled shell.
+        const oldStyles = [...document.head.querySelectorAll("link[data-route-style]")];
+        const styleResults = await Promise.allSettled(getRouteStyles(route.routePath).map(async path => {
+            const link = await createPendingStylesheet(createAssetUrl(path));
+            link.dataset.routeStyle = "true"; return link;
+        }));
+        const newStyles = styleResults.filter(result => result.status === "fulfilled").map(result => result.value);
+        if (styleResults.some(result => result.status === "rejected")) {
+            newStyles.forEach(link => link.remove()); throw new Error("Page styling is temporarily unavailable.");
+        }
+        if (!isCurrentNavigation(currentNavigationId)) { newStyles.forEach(link => link.remove()); return; }
+        oldStyles.forEach(link => link.remove());
+        document.title = metadata.title;
+        for (const [name, content] of Object.entries({ description: metadata.description, robots: metadata.robots,
+            "og:title": metadata.title, "og:description": metadata.description, "og:url": metadata.canonical,
+            "og:type": "website", "twitter:card": "summary", "twitter:title": metadata.title, "twitter:description": metadata.description })) {
+            const property = name.startsWith("og:") ? "property" : "name";
+            let tag = document.head.querySelector(`meta[${property}="${name}"]`);
+            if (!tag) { tag = document.createElement("meta"); tag.setAttribute(property, name); document.head.append(tag); }
+            tag.content = content;
+        }
+        let canonical = document.head.querySelector('link[rel="canonical"]');
+        if (!canonical) { canonical = document.createElement("link"); canonical.rel = "canonical"; document.head.append(canonical); }
+        canonical.href = metadata.canonical;
 
         /* -------------------------------------------------
         4. LOAD ROUTE FRAGMENTS IN PARALLEL
@@ -2536,7 +2565,14 @@ applyInitialSidebarLayoutState();
  * OCR runtime initialization establishes persistent runtime
  * state once. Per-navigation OCR resume is deferred.
  */
-initializeGlobalOcr();
+function needsOcrRuntime() {
+    if (/submit|matchresults|privatematches|weeklymatches/i.test(window.location.pathname)) return true;
+    try { return ["rocketLeagueOcrActiveJobV1", "rocketLeagueOcrPendingReviewsV1", "rocketLeagueOcrPendingFailuresV1"].some(key => {
+        const value = localStorage.getItem(key); return value && value !== "[]" && value !== "{}";
+    }); } catch { return true; }
+}
+scheduleIdleTask(() => { if (needsOcrRuntime()) void initializeGlobalOcr(); }, 1000);
+window.addEventListener("storage", () => { if (needsOcrRuntime()) void resumeGlobalOcr(); });
 
 /* =========================================================
 STARTUP — BACKGROUND SERVICES

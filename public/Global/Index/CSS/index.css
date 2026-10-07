@@ -74,6 +74,9 @@
     top: 38%;
     animation-delay: -4s;
 }
+@media (prefers-reduced-motion: reduce) {
+    .home-background-waves::before, .home-background-waves::after { animation: none; }
+}
 @keyframes homeWavePulse {
     0%,
     100% {

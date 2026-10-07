@@ -67,9 +67,10 @@ export function shopImage(value, alt, className) {
     image.src = url;
     image.alt = alt;
     image.loading = "lazy";
+    image.decoding = "async";
     image.referrerPolicy = "no-referrer";
     image.addEventListener("error", () => {
-        image.remove();
+        image.style.visibility = "hidden";
     }, { once: true });
     return image;
 }

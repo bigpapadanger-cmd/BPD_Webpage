@@ -121,11 +121,12 @@ its single card follows the authorized MMR history panel in the homepage markup.
 |   +-- shared/          notificationsV2.js (shared channel/reminder validation), profile visibility/presence (normalized online/offline only), timestamp and rank-color presentation helpers.
 |   +-- MatchResults/, PrivateMatches/, WeeklyMatches/ Legacy full-page sources; routes use shell fragments below
 |   +-- FindPlayers/     Public opt-in search and UTC daily featured player; CSS/index.css, HTML/index.html, JS/index.js, view.js; responsive cards
+|   +-- CustomMatches/   CSS/index.css, JS/index.js, client.js, view.js; Phase B browse/create/durable lobby controls
 |   +-- Features/
 |       +-- CSS/index.css; shared Rocket League destination/status card styling
 |       +-- JS/leaderboards.js; reads cached public snapshots and private current position
 |       +-- HTML/shop.html, match-history.html, leaderboards.html, match-results.html,
-|                  weekly-matches.html, my-matches.html, private-matches.html, find-custom-matches.html (Coming soon route)
+|                  weekly-matches.html, my-matches.html, private-matches.html, find-custom-matches.html (CustomMatches module)
 +-- Future/              Present empty placeholder directory.
 
 OCR PAGE
@@ -142,6 +143,7 @@ public/ocr/
 SHARED SCRIPTS
 
 public/scripts/
++-- boundedRequest.js         Page request deadline covering fetch and JSON decoding.
 +-- apiConnection.js          Global API connection monitoring.
 +-- apiRoutes.js              Browser API route definitions/helpers, including suggestions.
 +-- cacheHandler.js           Client cache/version handling.

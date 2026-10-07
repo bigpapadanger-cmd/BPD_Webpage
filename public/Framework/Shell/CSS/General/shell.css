@@ -1,4 +1,6 @@
 /* BPD GAMING NETWORK - GLOBAL SHELL */
+.skip-navigation { position: fixed; top: 8px; left: 8px; z-index: 10000; padding: 12px; background: #101b2a; color: #fff; transform: translateY(-200%); }
+.skip-navigation:focus { transform: none; }
 
 :root {
     --site-accent: #4da3ff;

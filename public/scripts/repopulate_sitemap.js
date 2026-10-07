@@ -76,7 +76,7 @@ EXCLUDED SYSTEM ROUTES
 
 const EXCLUDED_ROUTES =
     new Set([
-        "/Error"
+        "/Error", "/Settings", "/Account", "/Login", "/RocketLeague/Player"
     ]);
 
 /* =========================================================

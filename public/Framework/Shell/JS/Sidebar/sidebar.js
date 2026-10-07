@@ -713,7 +713,8 @@ function setupActiveNavigation() {
 
             const exactMatch =
                 currentPath ===
-                route;
+                route || String(item.dataset.navAliases || "").split(",").filter(Boolean)
+                    .some(alias => normalizePath(alias) === currentPath);
 
             if (item.dataset.settingsContext === "rocketleague") {
                 const current = resolveHumanPageRoute(currentPath);
@@ -752,6 +753,10 @@ function setupActiveNavigation() {
             }
         }
     );
+    document.querySelectorAll("#sidebar [data-sidebar-menu]").forEach(group => {
+        const toggle = group.querySelector?.(".sidebar-menu-toggle");
+        toggle?.classList.toggle("active", Boolean(group.querySelector?.(".submenu-item.active")));
+    });
 }
 
 /* =========================================================
