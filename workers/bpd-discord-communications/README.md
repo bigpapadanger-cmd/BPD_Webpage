@@ -61,8 +61,11 @@ bot/guild configuration. Public app ID/key are configured, not secrets.
 Pages binding: `DISCORD_COMMUNICATIONS -> bpd-discord-communications`.
 Worker namespace: `DISCORD_COMMUNICATION_RECEIPTS`, class
 `DiscordCommunicationReceipts`; first SQLite DO migration is in Wrangler config.
-Both configs ship `DISCORD_COMMUNICATIONS_ENABLED="false"`. After approved
-provisioning/cutover, enable both together. This is not a deployment instruction.
+Both local configs currently set `DISCORD_COMMUNICATIONS_ENABLED="true"` for the
+authorized test release. The production flags change only when these configs are
+deployed; confirm the Pages binding, Worker secret names and applied Durable
+Object migration before testing. Set both flags back to `false` after the test
+window if delivery should stop.
 
 Register `/complete` separately in Discord with one required string option:
 `tasknumber`. Use the existing displayed code (`TASK-ABC234` format), not an

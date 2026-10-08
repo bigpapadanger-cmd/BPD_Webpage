@@ -177,8 +177,11 @@ test("Discord ingress verifies signature and replay before account work and priv
 });
 test("Worker has no public routes Supabase bindings or provider credentials", async () => {
     const config = JSON.parse(await readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8"));
+    const pagesConfig = JSON.parse(await readFile(new URL("../../../wrangler.jsonc", import.meta.url), "utf8"));
     assert.equal(config.workers_dev, false); assert.equal(config.preview_urls, false);
     assert.equal(config.routes, undefined); assert.equal(config.services, undefined);
+    assert.equal(config.vars.DISCORD_COMMUNICATIONS_ENABLED, "true");
+    assert.equal(pagesConfig.vars.DISCORD_COMMUNICATIONS_ENABLED, "true");
     assert.deepEqual(config.triggers.crons, ["0 22,23 * * 5"]);
     assert.equal(JSON.stringify(config).includes("SUPABASE"), false);
 });

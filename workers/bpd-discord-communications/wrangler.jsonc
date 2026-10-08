@@ -9,7 +9,7 @@
         "BPD_SITE_URL": "https://bpd-gaming-network.com",
         "DISCORD_MATCHBOT_CLIENT_ID": "1549606323249877034",
         "DISCORD_MATCHBOT_PUBLIC_KEY": "6a1a6c317812b984de29ed9dc09c3dc9d5e83c81accd5e710a7d68737f666097",
-        "DISCORD_COMMUNICATIONS_ENABLED": "false"
+        "DISCORD_COMMUNICATIONS_ENABLED": "true"
     },
     "durable_objects": { "bindings": [
         { "name": "DISCORD_COMMUNICATION_RECEIPTS", "class_name": "DiscordCommunicationReceipts" }
