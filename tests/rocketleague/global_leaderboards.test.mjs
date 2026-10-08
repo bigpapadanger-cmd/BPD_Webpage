@@ -223,8 +223,8 @@ test("completed daily snapshots skip provider calls on duplicate scheduled or ma
 });
 
 test("page and profile expose only the intended cached leaderboard path", async () => {
-    const page = await readFile(new URL("../../public/Tabs/RocketLeague/Features/HTML/leaderboards.html", import.meta.url), "utf8");
-    const client = await readFile(new URL("../../public/Tabs/RocketLeague/Features/JS/leaderboards.js", import.meta.url), "utf8");
+    const page = await readFile(new URL("../../public/Tabs/RocketLeague/Leaderboards/HTML/index.html", import.meta.url), "utf8");
+    const client = await readFile(new URL("../../public/Tabs/RocketLeague/Leaderboards/JS/index.js", import.meta.url), "utf8");
     const myProfile = await readFile(new URL("../../public/Tabs/RocketLeague/MyProfile/HTML/index.html", import.meta.url), "utf8");
     const architecture = await readFile(new URL("../../_structure_details/rocketleague-leaderboards.md", import.meta.url), "utf8");
     assert.match(page, /data-rl-leaderboards/);

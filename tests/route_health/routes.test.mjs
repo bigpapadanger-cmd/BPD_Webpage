@@ -80,7 +80,7 @@ test("generated API inventory is complete, exact-case, and points to real handle
 test("Worker endpoints, schedules, and queue consumers are inventoried from their Wrangler configs", () => {
     assert.ok(WORKER_ROUTE_INVENTORY.some((route) => route.path === "https://status.bpd-gaming-network.com/health"));
     assert.ok(WORKER_ROUTE_INVENTORY.some((route) => route.path === "https://status.bpd-gaming-network.com/wake" && route.authRequired === true));
-    assert.equal(WORKER_SCHEDULE_INVENTORY.length, 5);
+    assert.equal(WORKER_SCHEDULE_INVENTORY.length, 4);
     assert.ok(WORKER_SCHEDULE_INVENTORY.some(surface => surface.handler.includes("bpd-discord-communications")));
     assert.deepEqual(WORKER_QUEUE_INVENTORY.map((queue) => queue.path), ["queue: bpd-ocr-jobs"]);
     for (const surface of [...WORKER_ROUTE_INVENTORY, ...WORKER_SCHEDULE_INVENTORY, ...WORKER_QUEUE_INVENTORY]) {

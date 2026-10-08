@@ -125,11 +125,13 @@ Rocket League routes
     /RocketLeague/FindPlayers Public opt-in search through Pages API; styled responsive cards, three compact ranks, neutral unknown presence.
     /RocketLeague/Player      Public-safe profile by public_profile_id; hidden profiles unavailable.
     /RocketLeague/Shop        Public cached shop carousel through the DomainData API; no provider call on page view.
-    /RocketLeague/MatchHistory Auth-gated status page; match-by-match history for arbitrary linked players is unsupported; MMR captures are not matches.
-    /RocketLeague/Leaderboards, /MatchResults
-                              Public shell status pages; no fabricated standings or results.
+    /RocketLeague/MatchHistory Auth-gated MatchHistory shell page; match-by-match history for arbitrary linked players is unsupported; MMR captures are not matches.
+    /RocketLeague/Leaderboards Leaderboards-owned HTML/JS/CSS; public cached snapshots.
+    /RocketLeague/MatchResults MatchResults-owned shell status page; no fabricated results.
+    /RocketLeague/FindCustomMatches CustomMatches-owned HTML/CSS/JS; public browse and gated mutations.
     /RocketLeague/WeeklyMatches, /MyMatches, /PrivateMatches
-                              Auth-gated shell status pages until verified scheduling/participant records are available.
+                              Page-owned shell status pages; authenticated routes until verified scheduling/participant records are available.
+    /RocketLeague/UE6          UE6-owned public opinion page; no new third-party links.
     /RocketLeague/SubmitMatchResults
                               Auth-gated public/ocr submission workflow.
     /RocketLeague/ImageScanning

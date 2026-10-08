@@ -49,7 +49,7 @@ export const MASTER_CSS_PATH =
 export function getRouteStyles(pathname) {
     const path = normalizeRoutePath(pathname);
     const styles = {
-        "/": ["/Global/Index/CSS/index.css", "/Tabs/RocketLeague/Features/CSS/index.css"],
+        "/": ["/Global/Index/CSS/index.css"],
         "/Dashboard": ["/Global/Index/CSS/dashboard.css"],
         "/Account": ["/Global/Account/CSS/index.css"], "/Login": ["/Global/Login/CSS/index.css"],
         "/Settings": ["/Global/Settings/CSS/settings-page.css"], "/Suggestions": ["/Global/Suggestions/CSS/index.css"],
@@ -59,11 +59,19 @@ export function getRouteStyles(pathname) {
         "/RocketLeague/MyProfile": ["/Tabs/RocketLeague/Registration/CSS/index.css", "/Tabs/RocketLeague/MyProfile/CSS/index.css"],
         "/RocketLeague/FindPlayers": ["/Tabs/RocketLeague/FindPlayers/CSS/index.css"],
         "/RocketLeague/Player": ["/Tabs/RocketLeague/FindPlayers/CSS/index.css", "/Tabs/RocketLeague/PublicProfile/CSS/index.css"],
-        "/RocketLeague/FindCustomMatches": ["/Tabs/RocketLeague/CustomMatches/CSS/index.css"]
+        "/RocketLeague/Shop": ["/Tabs/RocketLeague/shared/featurePage.css", "/Tabs/RocketLeague/Shop/CSS/index.css"],
+        "/RocketLeague/FindCustomMatches": ["/Tabs/RocketLeague/shared/featurePage.css", "/Tabs/RocketLeague/CustomMatches/CSS/index.css"],
+        "/RocketLeague/Leaderboards": ["/Tabs/RocketLeague/shared/featurePage.css", "/Tabs/RocketLeague/Leaderboards/CSS/index.css"],
+        "/RocketLeague/MatchHistory": ["/Tabs/RocketLeague/shared/featurePage.css"],
+        "/RocketLeague/MatchResults": ["/Tabs/RocketLeague/shared/featurePage.css"],
+        "/RocketLeague/MyMatches": ["/Tabs/RocketLeague/shared/featurePage.css"],
+        "/RocketLeague/PrivateMatches": ["/Tabs/RocketLeague/shared/featurePage.css"],
+        "/RocketLeague/UE6": ["/Tabs/RocketLeague/shared/featurePage.css"],
+        "/RocketLeague/WeeklyMatches": ["/Tabs/RocketLeague/shared/featurePage.css"]
     };
     const result = styles[path] ?? [];
-    if (path.startsWith("/RocketLeague") && !["/RocketLeague", "/RocketLeague/Profile", "/RocketLeague/MyProfile", "/RocketLeague/FindPlayers", "/RocketLeague/Player", "/RocketLeague/FindCustomMatches"].includes(path)) {
-        return [...result, "/Tabs/RocketLeague/Features/CSS/index.css", ...( /SubmitMatchResults|ImageScanning|MatchResults|PrivateMatches|WeeklyMatches/.test(path) ? ["/ocr/CSS/disputes.css", "/ocr/CSS/submitimg.css"] : [])];
+    if (path.startsWith("/RocketLeague") && !["/RocketLeague", "/RocketLeague/Profile", "/RocketLeague/MyProfile", "/RocketLeague/FindPlayers", "/RocketLeague/Player", "/RocketLeague/Shop", "/RocketLeague/FindCustomMatches", "/RocketLeague/Leaderboards", "/RocketLeague/MatchHistory", "/RocketLeague/MatchResults", "/RocketLeague/MyMatches", "/RocketLeague/PrivateMatches", "/RocketLeague/UE6", "/RocketLeague/WeeklyMatches"].includes(path)) {
+        return [...result, ...( /SubmitMatchResults|ImageScanning/.test(path) ? ["/ocr/CSS/disputes.css", "/ocr/CSS/submitimg.css"] : [])];
     }
     return result;
 }
@@ -126,7 +134,7 @@ export const ROUTES = {
             "/Framework/Shell/HTML/Footer/footer.html",
 
         module:
-            "/Tabs/RocketLeague/Features/JS/shop.js",
+            null,
 
         sitemap:
             true
@@ -295,7 +303,7 @@ export const ROUTES = {
             "Rocket League Match History | BPD Gaming Network",
 
         body:
-            "/Tabs/RocketLeague/Features/HTML/match-history.html",
+            "/Tabs/RocketLeague/MatchHistory/HTML/index.html",
 
         header:
             "/Framework/Shell/HTML/Header/header.html",
@@ -321,7 +329,7 @@ export const ROUTES = {
             "Rocket League Shop | BPD Gaming Network",
 
         body:
-            "/Tabs/RocketLeague/Features/HTML/shop.html",
+            "/Tabs/RocketLeague/Shop/HTML/index.html",
 
         header:
             "/Framework/Shell/HTML/Header/header.html",
@@ -333,7 +341,7 @@ export const ROUTES = {
             "/Framework/Shell/HTML/Footer/footer.html",
 
         module:
-            "/Tabs/RocketLeague/Features/JS/shop.js",
+            "/Tabs/RocketLeague/Shop/JS/index.js",
 
         sitemap:
             true
@@ -341,7 +349,7 @@ export const ROUTES = {
 
     "/RocketLeague/UE6": {
         title: "Rocket League on Unreal Engine 6 | BPD Gaming Network",
-        body: "/Tabs/RocketLeague/Features/HTML/ue6.html",
+        body: "/Tabs/RocketLeague/UE6/HTML/index.html",
         header: "/Framework/Shell/HTML/Header/header.html",
         sidebar: "/Framework/Shell/HTML/Sidebar/rl_menu.html",
         footer: "/Framework/Shell/HTML/Footer/footer.html",
@@ -455,7 +463,7 @@ export const ROUTES = {
             "Rocket League Leaderboards | BPD Gaming Network",
 
         body:
-            "/Tabs/RocketLeague/Features/HTML/leaderboards.html",
+            "/Tabs/RocketLeague/Leaderboards/HTML/index.html",
 
         header:
             "/Framework/Shell/HTML/Header/header.html",
@@ -467,7 +475,7 @@ export const ROUTES = {
             "/Framework/Shell/HTML/Footer/footer.html",
 
         module:
-            "/Tabs/RocketLeague/Features/JS/leaderboards.js",
+            "/Tabs/RocketLeague/Leaderboards/JS/index.js",
 
         sitemap:
             false
@@ -478,7 +486,7 @@ export const ROUTES = {
             "Match Results | BPD Gaming Network",
 
         body:
-            "/Tabs/RocketLeague/Features/HTML/match-results.html",
+            "/Tabs/RocketLeague/MatchResults/HTML/index.html",
 
         header:
             "/Framework/Shell/HTML/Header/header.html",
@@ -498,7 +506,7 @@ export const ROUTES = {
 
     "/RocketLeague/FindCustomMatches": {
         title: "Find Custom Matches | BPD Gaming Network",
-        body: "/Tabs/RocketLeague/Features/HTML/find-custom-matches.html",
+        body: "/Tabs/RocketLeague/CustomMatches/HTML/index.html",
         header: "/Framework/Shell/HTML/Header/header.html",
         sidebar: "/Framework/Shell/HTML/Sidebar/rl_menu.html",
         footer: "/Framework/Shell/HTML/Footer/footer.html",
@@ -512,7 +520,7 @@ export const ROUTES = {
             "Rocket League Weekly Matches | BPD Gaming Network",
 
         body:
-            "/Tabs/RocketLeague/Features/HTML/weekly-matches.html",
+            "/Tabs/RocketLeague/WeeklyMatches/HTML/index.html",
 
         header:
             "/Framework/Shell/HTML/Header/header.html",
@@ -539,7 +547,7 @@ export const ROUTES = {
             "My Rocket League Matches | BPD Gaming Network",
 
         body:
-            "/Tabs/RocketLeague/Features/HTML/my-matches.html",
+            "/Tabs/RocketLeague/MyMatches/HTML/index.html",
 
         header:
             "/Framework/Shell/HTML/Header/header.html",
@@ -566,7 +574,7 @@ export const ROUTES = {
             "Rocket League Private Matches | BPD Gaming Network",
 
         body:
-            "/Tabs/RocketLeague/Features/HTML/private-matches.html",
+            "/Tabs/RocketLeague/PrivateMatches/HTML/index.html",
 
         header:
             "/Framework/Shell/HTML/Header/header.html",

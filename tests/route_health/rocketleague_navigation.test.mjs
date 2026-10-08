@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import test from "node:test";
 
-import { ROUTES, resolveHumanPageRoute, getRocketLeagueSettingsContext } from "../../public/routes.js";
+import { ROUTES, resolveHumanPageRoute, getRocketLeagueSettingsContext, getRouteStyles } from "../../public/routes.js";
 
 const repoRoot = resolve(import.meta.dirname, "../..");
 const publicRoot = resolve(repoRoot, "public");
@@ -58,6 +58,8 @@ test("Rocket League destinations use the shared shell and route-specific access 
     assert.equal(ROUTES["/RocketLeague/Shop"].sitemap, true);
     assert.equal(ROUTES["/RocketLeague/MatchHistory"].requiresAuth, true);
     assert.deepEqual(ROUTES["/RocketLeague/MatchHistory"].auth, { required: true, provider: "epic", rocketLeague: true });
+    assert.equal(ROUTES["/RocketLeague/WeeklyMatches"].requiresAuth, true);
+    assert.match(menu, /href="\/RocketLeague\/WeeklyMatches"[^>]*[\s\S]*?data-auth="authenticated" data-rl-access="required" hidden/);
 });
 
 test("all three Rocket League dropdown groups use real controlled submenus", () => {
@@ -89,9 +91,9 @@ test("homepage has one network statistics card with honest unavailable counters"
 
 test("approved RL groups and bot link use the shared shell without eligibility side effects", () => {
     const menu = readFileSync(resolve(publicRoot, "Framework/Shell/HTML/Sidebar/rl_menu.html"), "utf8");
-    for (const [group, labels] of [["player", ["My Profile", "Match History"]],
-        ["play", ["Find Custom Matches", "Private Matches"]],
-        ["community", ["Find Players", "Shop", "Add Discord Bot"]]]) {
+    for (const [group, labels] of [["player", ["My Profile", "Match History", "My Matches"]],
+        ["play", ["Find Custom Matches", "Private Matches", "Weekly Matches"]],
+        ["community", ["Find Players", "Shop", "Global Leaderboards", "Match Results", "Add Discord Bot"]]]) {
         const submenu = menu.match(new RegExp(`<div[^>]*id="${group}Submenu"[^>]*>([\\s\\S]*?)</div>`))?.[1];
         assert.ok(submenu);
         for (const label of labels) assert.ok(submenu.includes(label));
@@ -114,7 +116,7 @@ test("Find Custom Matches retains the shared shell with its scoped durable lobby
     const route = resolveHumanPageRoute("/RocketLeague/FindCustomMatches");
     assert.ok(route);
     assert.equal(ROUTES["/RocketLeague/FindCustomMatches"].module, "/Tabs/RocketLeague/CustomMatches/JS/index.js");
-    const page = readFileSync(resolve(publicRoot, "Tabs/RocketLeague/Features/HTML/find-custom-matches.html"), "utf8");
+    const page = readFileSync(resolve(publicRoot, "Tabs/RocketLeague/CustomMatches/HTML/index.html"), "utf8");
     assert.match(page, /Public matches/);
     assert.match(page, /id="cmCreateFields" disabled/);
     assert.doesNotMatch(page, /<script|fetch\(|<iframe/);
@@ -189,7 +191,9 @@ test("Rocket League fragment styles resolve through the master CSS caller", () =
         "/Tabs/RocketLeague/FindPlayers/CSS/index.css",
         "/Tabs/RocketLeague/PublicProfile/CSS/index.css",
         "/Tabs/RocketLeague/MyProfile/CSS/index.css",
-        "/Tabs/RocketLeague/Features/CSS/index.css"
+        "/Tabs/RocketLeague/Leaderboards/CSS/index.css",
+        "/Tabs/RocketLeague/shared/featurePage.css",
+        "/Tabs/RocketLeague/Shop/CSS/index.css"
     ]) assert.ok(readFileSync(resolve(publicRoot, "routes.js"), "utf8").includes(path), `${path} is not available through route-scoped styling`);
 
     for (const path of [
@@ -203,16 +207,35 @@ test("Rocket League fragment styles resolve through the master CSS caller", () =
     }
 });
 
+test("Rocket League feature routes use page-owned shell fragments and existing route-scoped styles", () => {
+    const paths = [["/RocketLeague/Shop", "Shop"], ["/RocketLeague/UE6", "UE6"], ["/RocketLeague/Leaderboards", "Leaderboards"],
+        ["/RocketLeague/MatchHistory", "MatchHistory"], ["/RocketLeague/MatchResults", "MatchResults"],
+        ["/RocketLeague/FindCustomMatches", "CustomMatches"], ["/RocketLeague/WeeklyMatches", "WeeklyMatches"],
+        ["/RocketLeague/MyMatches", "MyMatches"], ["/RocketLeague/PrivateMatches", "PrivateMatches"]];
+    for (const [routePath, pageFolder] of paths) {
+        const route = ROUTES[routePath];
+        const body = readFileSync(resolve(publicRoot, route.body.slice(1)), "utf8");
+        assert.equal(route.body, `/Tabs/RocketLeague/${pageFolder}/HTML/index.html`, routePath);
+        assert.doesNotMatch(body, /<!doctype|<html\b|<head\b|<body\b|<link\b|<script\b/i, `${routePath} must be a shell fragment`);
+        const styles = getRouteStyles(routePath);
+        assert.ok(styles.length > 0, `${routePath} has no route-scoped styling`);
+        for (const style of styles) assert.ok(existsSync(resolve(publicRoot, style.slice(1))), `${routePath} missing ${style}`);
+    }
+    assert.equal(ROUTES["/RocketLeague/Leaderboards"].module, "/Tabs/RocketLeague/Leaderboards/JS/index.js");
+    assert.equal(ROUTES["/RocketLeague/FindCustomMatches"].module, "/Tabs/RocketLeague/CustomMatches/JS/index.js");
+});
+
 test("Shop reads cached public data and Match History does not invent matches", () => {
-    const shop = readFileSync(resolve(publicRoot, "Tabs/RocketLeague/Features/HTML/shop.html"), "utf8");
-    const shopModule = readFileSync(resolve(publicRoot, "Tabs/RocketLeague/Features/JS/shop.js"), "utf8");
-    const history = readFileSync(resolve(publicRoot, "Tabs/RocketLeague/Features/HTML/match-history.html"), "utf8");
+    const shop = readFileSync(resolve(publicRoot, "Tabs/RocketLeague/Shop/HTML/index.html"), "utf8");
+    const shopModule = readFileSync(resolve(publicRoot, "Tabs/RocketLeague/Shop/JS/index.js"), "utf8");
+    const history = readFileSync(resolve(publicRoot, "Tabs/RocketLeague/MatchHistory/HTML/index.html"), "utf8");
     assert.match(shop, /data-shop-items/);
     assert.match(shop, /does not sell items or make purchases/i);
     assert.match(shopModule, /boundedJson\("\/api\/rocketleague\/shop"/);
     assert.doesNotMatch(shopModule, /SUPABASE_AUTH|\/get-shop-data|Shops\/Get/);
     assert.match(history, /periodic snapshots, not individual matches/i);
-    assert.equal(ROUTES["/RocketLeague/Shop"].module, "/Tabs/RocketLeague/Features/JS/shop.js");
+    assert.equal(ROUTES["/RocketLeague/Shop"].body, "/Tabs/RocketLeague/Shop/HTML/index.html");
+    assert.equal(ROUTES["/RocketLeague/Shop"].module, "/Tabs/RocketLeague/Shop/JS/index.js");
     assert.equal(ROUTES["/RocketLeague/MatchHistory"].module, null);
 });
 
@@ -239,7 +262,7 @@ test("Match History remains capability-gated and cannot reinterpret MMR captures
     assert.equal(route.requiresAuth, true);
     assert.deepEqual(route.auth, { required: true, provider: "epic", rocketLeague: true });
     assert.equal(route.module, null); assert.equal(route.sitemap, false);
-    const html = readFileSync(resolve(publicRoot, "Tabs/RocketLeague/Features/HTML/match-history.html"), "utf8");
+    const html = readFileSync(resolve(publicRoot, "Tabs/RocketLeague/MatchHistory/HTML/index.html"), "utf8");
     assert.match(html, /does not have authoritative match-by-match history/);
     assert.match(html, /periodic snapshots, not individual matches/);
     assert.doesNotMatch(html, /<script|data-match-id|data-match-timestamp/);

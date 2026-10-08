@@ -96,7 +96,7 @@ an operator check; no live mutation was performed during local tests.
 - public/Tabs/RocketLeague/CustomMatches/JS/client.js
 - public/Tabs/RocketLeague/CustomMatches/JS/view.js
 - public/Tabs/RocketLeague/CustomMatches/CSS/index.css
-- public/Tabs/RocketLeague/Features/HTML/find-custom-matches.html
+- public/Tabs/RocketLeague/CustomMatches/HTML/index.html
 - public/Framework/Shell/CSS/Callers/master_rl.css
 - public/routes.js
 - tests/rocketleague/custom_match_api.test.mjs
@@ -156,7 +156,7 @@ functions/services/rl/custom_matches/contracts.js;
 functions/api/rocketleague/custom-matches/[matchCode]/{invites,join-requests,member-history}.js;
 functions/api/rocketleague/custom-matches/[matchCode]/credentials.js;
 public/Tabs/RocketLeague/CustomMatches/JS/{client,view,index}.js;
-public/Tabs/RocketLeague/Features/HTML/find-custom-matches.html;
+public/Tabs/RocketLeague/CustomMatches/HTML/index.html;
 tests/rocketleague/custom_match_{api,ui}.test.mjs;
 _folder_structure/folder_organization/01_functions.txt;
 _structure_details/{custom-match-contract-boundary,request-frequency-inventory}.md;
@@ -178,7 +178,7 @@ no live Supabase or provider call was executed.
 - public/Tabs/RocketLeague/CustomMatches/JS/client.js
 - public/Tabs/RocketLeague/CustomMatches/JS/view.js
 - public/Tabs/RocketLeague/CustomMatches/JS/index.js
-- public/Tabs/RocketLeague/Features/HTML/find-custom-matches.html
+- public/Tabs/RocketLeague/CustomMatches/HTML/index.html
 - tests/rocketleague/custom_match_api.test.mjs
 - tests/rocketleague/custom_match_ui.test.mjs
 - functions/services/admin/generatedApiRouteInventory.js (generated)
@@ -262,7 +262,7 @@ resolution remains deferred independently of these implemented host lists.
 - functions/services/rl/custom_matches/contracts.js
 - functions/services/rl/custom_matches/service.js
 - public/Tabs/RocketLeague/CustomMatches/JS/{client,index,view}.js
-- public/Tabs/RocketLeague/Features/HTML/find-custom-matches.html
+- public/Tabs/RocketLeague/CustomMatches/HTML/index.html
 - wrangler.jsonc
 - tests/rocketleague/custom_match_api.test.mjs
 - tests/rocketleague/custom_match_ui.test.mjs

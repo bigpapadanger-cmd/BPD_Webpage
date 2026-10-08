@@ -1,7 +1,7 @@
 # Rocket League Presence Monitor
 
 Taskboard summaries moved to the private `bpd-discord-communications` Worker.
-The daily noon UTC trigger now refreshes leaderboards only; manual
+The existing hourly UTC trigger also refreshes leaderboards at 12:00 UTC; manual
 `job=taskboard` is a non-delivering compatibility response. Friday reports run
 at 6 PM America/New_York in the communication Worker, with transactional receipts.
 

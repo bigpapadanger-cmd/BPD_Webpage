@@ -93,16 +93,7 @@ const PRESENCE_CRON =
 const ROCKET_LEAGUE_REFRESH_CRON =
     "0 * * * *";
 
-/*
-Set this to the single UTC time for the daily Taskboard
-summary and Global Leaderboard collection.
-
-Example:
-    "0 12 * * *"
-        12:00 UTC daily.
-*/
-const LEADERBOARD_REFRESH_CRON =
-    "0 12 * * *";
+const LEADERBOARD_REFRESH_UTC_HOUR = 12;
 
 /* =========================================================
 NORMALIZATION
@@ -416,14 +407,10 @@ async function handleScheduled(
         runInBackground("shop", env, ctx);
         runInBackground("health", env, ctx);
 
-        return;
-    }
-
-    if (
-        controller.cron ===
-        LEADERBOARD_REFRESH_CRON
-    ) {
-        runInBackground("leaderboards", env, ctx);
+        const scheduledAt = Number(controller.scheduledTime);
+        if (Number.isFinite(scheduledAt) && new Date(scheduledAt).getUTCHours() === LEADERBOARD_REFRESH_UTC_HOUR) {
+            runInBackground("leaderboards", env, ctx);
+        }
 
         return;
     }

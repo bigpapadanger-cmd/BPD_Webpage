@@ -5,7 +5,7 @@ import { onRequest as networkRoute } from "../../functions/api/rocketleague/netw
 import { onRequest as featuredRoute } from "../../functions/api/rocketleague/players/featured.js";
 import { renderNetworkStatistics, initializeNetworkStatistics } from "../../public/Tabs/RocketLeague/Index/JS/networkStatistics.js";
 import { createPlayerCard } from "../../public/Tabs/RocketLeague/FindPlayers/JS/view.js";
-import { shopImage } from "../../public/Tabs/RocketLeague/Features/JS/shop.js";
+import { shopImage } from "../../public/Tabs/RocketLeague/Shop/JS/index.js";
 
 const originalFetch = globalThis.fetch;
 const originalDocument = globalThis.document;
@@ -156,7 +156,7 @@ test("shop images use HTTPS only and never substitute placeholder artwork", () =
 });
 
 test("shop renders section logos without any browser provider request", async () => {
-    const js = await source("public/Tabs/RocketLeague/Features/JS/shop.js");
+    const js = await source("public/Tabs/RocketLeague/Shop/JS/index.js");
     assert.match(js, /shopImage\(shop\?\.logo_url/);
     assert.match(js, /shopImage\(item.image_url/);
     assert.doesNotMatch(js, /get-shop-data|Shops\/Get|SUPABASE_AUTH/);

@@ -10,7 +10,7 @@ It is a client-rendered site shell: index.html starts the application, routes.js
 describes pages, and Framework/Shell/JS/router.js loads shared and page-specific
 fragments/modules without separate full-page HTML documents.
 Public static routes also include their body in the Pages server response.
-Continuation surfaces: Features/HTML/ue6.html and Admin Home
+Continuation surfaces: RocketLeague/UE6 and Admin Home
 JS/custom_match_recovery.js. UE6 is public/static commentary; Admin recovery
 is server-authorized; its live RPC acceptance passed. Real runtime transport remains pending.
 
@@ -124,14 +124,13 @@ its single card follows the authorized MMR history panel in the homepage markup.
 |   +-- MyProfile/       CSS/index.css, HTML/index.html, JS/index.js, settings_view.js; private settings plus acknowledged three-second Rocket League profile deletion
 |   +-- PublicProfile/   Public-safe profile by public_profile_id; 30-day daily-average MMR graph; shared rank coloring; no presence-check timestamp display
 |   +-- shared/          notificationsV2.js (shared channel/reminder validation), profile visibility/presence (normalized online/offline only), timestamp and rank-color presentation helpers.
-|   +-- MatchResults/, PrivateMatches/, WeeklyMatches/ Legacy full-page sources; routes use shell fragments below
 |   +-- FindPlayers/     Public opt-in search and UTC daily featured player; CSS/index.css, HTML/index.html, JS/index.js, view.js; responsive cards
-|   +-- CustomMatches/   CSS/index.css, JS/index.js, client.js, view.js; Phase B browse/create/durable lobby controls
-|   +-- Features/
-|       +-- CSS/index.css; shared Rocket League destination/status card styling
-|       +-- JS/leaderboards.js; reads cached public snapshots and private current position
-|       +-- HTML/shop.html, match-history.html, leaderboards.html, match-results.html,
-|                  weekly-matches.html, my-matches.html, private-matches.html, find-custom-matches.html (CustomMatches module)
+|   +-- CustomMatches/   CSS/index.css, HTML/index.html, JS/index.js, client.js, view.js; browse/create/durable lobby controls
+|   +-- Leaderboards/    CSS/index.css, HTML/index.html, JS/index.js; cached public snapshots and private current position
+|   +-- Shop/            CSS/index.css, HTML/index.html, JS/index.js; cached public rotation and paused countdown carousel
+|   +-- MatchHistory/, MatchResults/, MyMatches/, PrivateMatches/, UE6/, WeeklyMatches/
+|   |                   Each owns HTML/index.html; static status/opinion pages use shared/featurePage.css and no page module
+|   +-- shared/          featurePage.css plus shared profile/rank/notification helpers
 +-- Future/              Present empty placeholder directory.
 
 OCR PAGE

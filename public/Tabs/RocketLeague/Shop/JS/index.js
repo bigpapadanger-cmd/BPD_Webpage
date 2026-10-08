@@ -5,6 +5,7 @@ import { boundedJson } from "../../../../scripts/boundedRequest.js";
 let root = null;
 let stopCarousel = () => {};
 const SHOP_STALE_AFTER_MS = 2 * 60 * 60 * 1000;
+const CYCLE_SECONDS = 8;
 
 function element(tag, className, text) {
     const node = document.createElement(tag);
@@ -26,7 +27,7 @@ function dateLabel(value) {
     if (typeof value !== "string" || !value) return null;
     const date = new Date(value);
     return Number.isFinite(date.getTime())
-        ? new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(date)
+        ? new Intl.DateTimeFormat(undefined, { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(date)
         : null;
 }
 
@@ -77,9 +78,10 @@ export function shopImage(value, alt, className) {
     return image;
 }
 
-export function itemCard(item) {
+export function itemCard(item, { entering = false } = {}) {
     const card = element("article", "rl-shop-item");
     if (typeof item?.title !== "string" || !item.title.trim()) return null;
+    if (entering) card.classList?.add("rl-shop-item--entering");
     // Multi-product offers are the confirmed bundle discriminator.
     const products = Array.isArray(item.products) ? item.products : [];
     if (products.length > 1) {
@@ -132,12 +134,7 @@ export function shopPages(snapshot, now = Date.now()) {
         if (!shopCategoryName(shop) || !isActive(shop, now)) return [];
         const items = Array.isArray(catalogue.items) ? catalogue.items.filter(item =>
             typeof item.title === "string" && item.title.trim() && isActive(item, now)) : [];
-        const pages = [];
-        for (let offset = 0; offset < items.length; offset += 3) {
-            pages.push({ shop, shopId: String(catalogue.shop_id),
-                items: items.slice(offset, offset + 3), first: offset + 1, total: items.length });
-        }
-        return pages;
+        return items.length ? [{ shop, shopId: String(catalogue.shop_id), items, first: 1, total: items.length }] : [];
     });
 }
 
@@ -152,6 +149,7 @@ function initializeCarousel(snapshot, saved = {}) {
     const sectionTitle = root.querySelector("[data-shop-section-title]");
     const sectionTiming = root.querySelector("[data-shop-section-timing]");
     const items = root.querySelector("[data-shop-items]");
+    const countdown = root.querySelector("[data-shop-countdown]");
 
     const lastSavedFallback = canShowLastSavedShop(snapshot);
     if ((!snapshot.available && !lastSavedFallback) || !pages.length) {
@@ -165,9 +163,9 @@ function initializeCarousel(snapshot, saved = {}) {
 
     const captured = dateLabel(snapshot.capturedAt);
     const stale = isSnapshotStale(snapshot) || lastSavedFallback;
-    status.textContent = lastSavedFallback
-        ? "Showing the last saved shop rotation · refresh unavailable"
-        : stale ? "Saved shop rotation may be out of date" : "Current saved shop rotation";
+    status.textContent = stale
+        ? `Rotation flagged out of date on ${dateLabel(new Date().toISOString()) || "an unknown date"}${lastSavedFallback ? " · latest refresh unavailable" : ""}`
+        : "Current saved shop rotation";
     root.querySelector("[data-shop-capture]").textContent = captured ? `Data captured ${captured}` : "Showing the latest saved shop data.";
     panel.hidden = false;
     const pause = root.querySelector("[data-shop-pause]");
@@ -177,10 +175,10 @@ function initializeCarousel(snapshot, saved = {}) {
     let interacting = false;
     let index = Math.max(0, pages.findIndex(page => page.shopId === saved.shopId && page.first === saved.first));
     let elapsed = 0;
-    const progress = root.querySelector("[data-shop-progress]");
+    const updateCountdown = () => { if (countdown) countdown.textContent = `${Math.max(0, CYCLE_SECONDS - elapsed)}s`; };
     pause.textContent = paused ? "Resume cycling" : "Pause cycling";
     pause.setAttribute("aria-pressed", String(paused));
-    const render = () => {
+    const render = (entering = false) => {
         const entry = pages[index];
         const shop = entry.shop;
         sectionTitle.textContent = shopCategoryName(shop);
@@ -190,15 +188,25 @@ function initializeCarousel(snapshot, saved = {}) {
             logo.replaceChildren(...(image ? [image] : []));
         }
         sectionTiming.textContent = timingLabel(shop?.starts_at, shop?.ends_at) || "Shop dates unavailable";
-        position.textContent = `Items ${entry.first}–${entry.first + entry.items.length - 1} of ${entry.total} · ${index + 1}/${pages.length}`;
-        items.replaceChildren(...entry.items.map(itemCard).filter(Boolean));
+        position.textContent = `Page ${index + 1} of ${pages.length} · Items ${entry.first}–${entry.first + entry.items.length - 1} of ${entry.total}`;
+        items.replaceChildren(...entry.items.map(item => itemCard(item, { entering })).filter(Boolean));
         previous.disabled = pages.length < 2;
         next.disabled = pages.length < 2;
         pause.disabled = pages.length < 2;
         previous.setAttribute("aria-label", "Previous shop items");
         next.setAttribute("aria-label", "Next shop items");
     };
-    const advance = direction => { elapsed = 0; if (progress) progress.value = 0; index = (index + direction + pages.length) % pages.length; render(); };
+    const advance = (direction, automatic = false) => {
+        elapsed = 0;
+        updateCountdown();
+        if (automatic && items.classList) {
+            items.classList.remove("rl-shop-items--cycling");
+            void items.offsetWidth;
+            items.classList.add("rl-shop-items--cycling");
+        }
+        index = (index + direction + pages.length) % pages.length;
+        render(true);
+    };
     previous.addEventListener("click", () => advance(-1), { signal: listeners.signal });
     next.addEventListener("click", () => advance(1), { signal: listeners.signal });
     pause.addEventListener("click", () => {
@@ -219,11 +227,13 @@ function initializeCarousel(snapshot, saved = {}) {
         if (!paused && !interacting && !document.hidden && !carouselRoot.contains(document.activeElement)
             && document.body.dataset.animations !== "off"
             && !window.matchMedia("(prefers-reduced-motion: reduce)").matches && pages.length > 1) {
-                elapsed++; if (progress) progress.value = elapsed;
-                if (elapsed >= 8) advance(1);
+                elapsed++;
+                updateCountdown();
+                if (elapsed >= CYCLE_SECONDS) advance(1, true);
             }
     }, 1000);
-    stopCarousel = () => { clearInterval(timer); listeners.abort(); };
+    stopCarousel = () => { clearInterval(timer); listeners.abort(); items.classList?.remove("rl-shop-items--cycling"); };
+    updateCountdown();
     render();
 }
 

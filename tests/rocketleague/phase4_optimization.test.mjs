@@ -35,7 +35,7 @@ test("route styles exist and unrelated registration/custom styles are not loaded
 test("Settings has unique IDs and fragments do not introduce nested main landmarks", () => {
     const source = readFileSync(new URL("../../public/Global/Settings/HTML/settings.html", import.meta.url), "utf8");
     const ids = [...source.matchAll(/\bid="([^"]+)"/g)].map(match => match[1]); assert.equal(new Set(ids).size, ids.length);
-    for (const path of ["Framework/Shell/HTML/Body/body.html", "Tabs/RocketLeague/PublicProfile/HTML/index.html", "Tabs/RocketLeague/Features/HTML/find-custom-matches.html", "Global/Suggestions/HTML/index.html", "Required/FAQ/HTML/index.html"]) {
+    for (const path of ["Framework/Shell/HTML/Body/body.html", "Tabs/RocketLeague/PublicProfile/HTML/index.html", "Tabs/RocketLeague/CustomMatches/HTML/index.html", "Global/Suggestions/HTML/index.html", "Required/FAQ/HTML/index.html"]) {
         assert.doesNotMatch(readFileSync(new URL(`../../public/${path}`, import.meta.url), "utf8"), /<main\b/);
     }
 });

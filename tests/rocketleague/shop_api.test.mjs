@@ -3,7 +3,7 @@ import test, { afterEach } from "node:test";
 
 import { onRequestGet } from "../../functions/api/rocketleague/shop.js";
 import { getCurrentRocketLeagueShop } from "../../functions/services/supabase/rocketleague/current_shop.js";
-import { isSnapshotStale, shopPages, initializePage, itemCard } from "../../public/Tabs/RocketLeague/Features/JS/shop.js";
+import { isSnapshotStale, shopPages, initializePage, itemCard } from "../../public/Tabs/RocketLeague/Shop/JS/index.js";
 
 const originalFetch = globalThis.fetch;
 afterEach(() => { globalThis.fetch = originalFetch; });
@@ -13,15 +13,15 @@ const env = {
     SUPABASE_AUTH: "service-role-secret"
 };
 
-test("shop pages finish each active category in three-item groups without placeholders", () => {
+test("shop shows every active category on one carousel page without placeholders", () => {
     const items = Array.from({ length: 12 }, (_, id) => ({ id, title: `Item ${id}`, image_url: "https://images.test/item.png" }));
     const snapshot = { shops: [{ id: 7, name: "Featured", type: "Daily" }, { id: 8, title: "Bundles" }],
         catalogues: [{ shop_id: 7, items }, { shop_id: 8, items: [{ ...items[0], id: 20 }] }, { shop_id: 9, items: [] }] };
     const pages = shopPages(snapshot);
-    assert.deepEqual(pages.map(page => page.items.length), [3, 3, 3, 3, 1]);
+    assert.deepEqual(pages.map(page => page.items.length), [12, 1]);
     assert.deepEqual(pages.flatMap(page => page.items.map(item => item.id)), [...items.map(item => item.id), 20]);
     assert.equal(pages[0].shop.name, "Featured");
-    assert.equal(pages[4].shop.title, "Bundles");
+    assert.equal(pages[1].shop.title, "Bundles");
     assert.deepEqual(shopPages({ shops: [], catalogues: [] }), []);
 });
 
@@ -91,7 +91,7 @@ test("multi-product bundles receive distinct cards without fabricated prices, ar
     } finally { globalThis.document = savedDocument; }
 });
 
-test("carousel cycles cached three-item groups, pauses, honors preferences and cleans up on navigation", async () => {
+test("carousel cycles full shop categories, pauses its countdown, honors preferences and cleans up", async () => {
     const saved = { document: globalThis.document, window: globalThis.window, setInterval: globalThis.setInterval, clearInterval: globalThis.clearInterval };
     const node = () => ({ children: [], handlers: {}, attributes: {},
         append(...children) { this.children.push(...children); },
@@ -113,19 +113,24 @@ test("carousel cycles cached three-item groups, pauses, honors preferences and c
     try {
         await initializePage();
         const items = slots.get("[data-shop-items]");
-        assert.equal(items.children.length, 3);
-        for (let i = 0; i < 8; i++) tick(); assert.equal(items.children.length, 1);
+        const countdown = slots.get("[data-shop-countdown]");
+        assert.equal(items.children.length, 4);
+        tick(); assert.equal(countdown.textContent, "7s");
+        for (let i = 0; i < 7; i++) tick(); assert.equal(items.children.length, 1);
         slots.get("[data-shop-next]").handlers.click();
-        assert.equal(slots.get("[data-shop-section-title]").textContent, "Bundles");
+        assert.equal(slots.get("[data-shop-section-title]").textContent, "Featured");
+        assert.equal(items.children.length, 4);
         slots.get("[data-shop-next]").handlers.click();
-        assert.equal(items.children.length, 3);
-        slots.get("[data-shop-pause]").handlers.click(); tick(); assert.equal(items.children.length, 3);
+        assert.equal(items.children.length, 1);
         slots.get("[data-shop-pause]").handlers.click();
-        document.body.dataset.animations = "off"; tick(); assert.equal(items.children.length, 3);
-        document.body.dataset.animations = "on"; reduced = true; tick(); assert.equal(items.children.length, 3);
-        reduced = false; root.handlers.pointerenter(); tick(); assert.equal(items.children.length, 3);
-        root.handlers.pointerleave(); document.hidden = true; tick(); assert.equal(items.children.length, 3);
-        document.hidden = false; for (let i = 0; i < 8; i++) tick(); assert.equal(items.children.length, 1);
+        const pausedAt = countdown.textContent;
+        tick(); assert.equal(items.children.length, 1); assert.equal(countdown.textContent, pausedAt);
+        slots.get("[data-shop-pause]").handlers.click();
+        document.body.dataset.animations = "off"; tick(); assert.equal(items.children.length, 1);
+        document.body.dataset.animations = "on"; reduced = true; tick(); assert.equal(items.children.length, 1);
+        reduced = false; root.handlers.pointerenter(); tick(); assert.equal(items.children.length, 1);
+        root.handlers.pointerleave(); document.hidden = true; tick(); assert.equal(items.children.length, 1);
+        document.hidden = false; for (let i = 0; i < 8; i++) tick(); assert.equal(items.children.length, 4);
         assert.equal(requests, 1);
         root.isConnected = false; tick(); assert.equal(cleared, true);
         root.isConnected = true;
@@ -223,7 +228,7 @@ test("missing configuration is rejected without making a request", async () => {
 
 test("Shop browser module reads the DomainData cache endpoint only", async () => {
     const { readFile } = await import("node:fs/promises");
-    const source = await readFile(new URL("../../public/Tabs/RocketLeague/Features/JS/shop.js", import.meta.url), "utf8");
+    const source = await readFile(new URL("../../public/Tabs/RocketLeague/Shop/JS/index.js", import.meta.url), "utf8");
     assert.match(source, /boundedJson\("\/api\/rocketleague\/shop"/);
     assert.match(source, /export async function initializePage\(\)/);
     assert.doesNotMatch(source, /^loadShop\(\);/m);
@@ -244,7 +249,7 @@ test("Shop freshness becomes stale after one missed hourly refresh or an expired
 });
 
 test("Shop can show an active last-saved snapshot when the latest refresh is unavailable", async () => {
-    const { canShowLastSavedShop } = await import("../../public/Tabs/RocketLeague/Features/JS/shop.js");
+    const { canShowLastSavedShop } = await import("../../public/Tabs/RocketLeague/Shop/JS/index.js");
     const snapshot = {
         available: false,
         snapshotId: 42,
@@ -257,11 +262,15 @@ test("Shop can show an active last-saved snapshot when the latest refresh is una
     assert.equal(canShowLastSavedShop({ ...snapshot, shops: [{ ...snapshot.shops[0], ends_at: "2026-10-05T10:00:00Z" }] }, Date.parse("2026-10-05T12:00:00Z")), false);
 });
 
-test("Shop page exposes section and item start/end timing with an explicit stale label", async () => {
+test("Shop page gives a dated stale notice, per-item timing and a paused cycling countdown", async () => {
     const { readFile } = await import("node:fs/promises");
-    const source = await readFile(new URL("../../public/Tabs/RocketLeague/Features/JS/shop.js", import.meta.url), "utf8");
-    const html = await readFile(new URL("../../public/Tabs/RocketLeague/Features/HTML/shop.html", import.meta.url), "utf8");
-    assert.match(source, /Saved shop rotation may be out of date/);
+    const source = await readFile(new URL("../../public/Tabs/RocketLeague/Shop/JS/index.js", import.meta.url), "utf8");
+    const html = await readFile(new URL("../../public/Tabs/RocketLeague/Shop/HTML/index.html", import.meta.url), "utf8");
+    assert.match(source, /Rotation flagged out of date on/);
+    assert.doesNotMatch(source, /Saved shop rotation may be out of date/);
+    assert.match(html, /data-shop-countdown/);
+    assert.match(html, /data-shop-position/);
+    assert.match(source, /items\.classList\.add\("rl-shop-items--cycling"\)/);
     assert.match(source, /timingLabel\(shop\?\.starts_at, shop\?\.ends_at\)/);
     assert.match(source, /Available \$\{start\} – \$\{end\}/);
     assert.match(html, /data-shop-section-timing/);

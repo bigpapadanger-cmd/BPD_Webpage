@@ -1,4 +1,13 @@
 {
+  "account_level_cron_constraint": {
+    "status": "FAILED_PARTIAL_UPDATE",
+    "worker": "bpd-discord-communications",
+    "plan_error_code": 10072,
+    "reported_limit": 5,
+    "successful_trigger_changes_rolled_back": false,
+    "currently_applied_schedule_state": "UNVERIFIED — inspect account-wide Worker Triggers before any retry",
+    "read_only_verification": "No schedule mutation performed by this preflight"
+  },
   "bpd-webpage": {
     "repository_path": ".",
     "selected_login_account": "19f0487e1a0cbe5cd63c85ef4cbd7e83",

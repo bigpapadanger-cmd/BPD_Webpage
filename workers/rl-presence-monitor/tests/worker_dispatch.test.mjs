@@ -61,11 +61,12 @@ test("MMR persistence reports the confirmed changed-only RPC result without addi
     assert.equal(requests[0].body.p_source, "mmr-api-v2");
 });
 
-test("Taskboard schedule is noon UTC in code and Wrangler config", async () => {
+test("leaderboard schedule shares the hourly trigger and runs at noon UTC", async () => {
     const source = await readFile(new URL("../src/index.js", import.meta.url), "utf8");
     const config = await readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8");
-    assert.match(source, /LEADERBOARD_REFRESH_CRON\s*=\s*"0 12 \* \* \*"/);
-    assert.match(config, /"0 12 \* \* \*"/);
+    assert.match(source, /LEADERBOARD_REFRESH_UTC_HOUR\s*=\s*12/);
+    assert.match(config, /"0 \* \* \* \*"/);
+    assert.doesNotMatch(config, /"0 12 \* \* \*"/);
     assert.doesNotMatch(config, /"0 0 \* \* \*"/);
 });
 
@@ -74,7 +75,7 @@ test("all Worker call schedules are bounded and diagnostic Worker is manual-only
     const ocrConfig = JSON.parse(await readFile(new URL("../../ocr-job-consumer/wrangler.jsonc", import.meta.url), "utf8"));
     const diagnosticConfig = JSON.parse(await readFile(new URL("../../google-mtls-diagnostic/wrangler.jsonc", import.meta.url), "utf8"));
 
-    assert.deepEqual(rlConfig.triggers.crons, ["*/15 * * * *", "0 * * * *", "0 12 * * *"]);
+    assert.deepEqual(rlConfig.triggers.crons, ["*/15 * * * *", "0 * * * *"]);
     assert.deepEqual(rlConfig.services, [{ binding: "PROVIDER_RUNTIME", service: "bpd-provider-runtime" }]);
     assert.deepEqual(ocrConfig.triggers.crons, ["*/30 * * * *"]);
     assert.deepEqual(ocrConfig.queues.consumers.map(({ max_batch_size, max_retries, max_concurrency }) => ({ max_batch_size, max_retries, max_concurrency })), [
@@ -164,7 +165,7 @@ test("unknown scheduled trigger performs no work, and Worker has no queue handle
     assert.equal("queue" in worker, false);
 });
 
-test("hourly Rocket League schedule pages due candidates and refreshes Shop, not daily leaderboards", async () => {
+test("hourly Rocket League schedule pages due candidates and refreshes Shop, not leaderboards outside noon UTC", async () => {
     const calls = [];
     const kv = new Map();
     const tasks = [];
@@ -212,7 +213,7 @@ test("hourly Rocket League schedule pages due candidates and refreshes Shop, not
         }
     };
 
-    await handleScheduled({ cron: "0 * * * *" }, scheduledEnv, { waitUntil: task => tasks.push(task) });
+    await handleScheduled({ cron: "0 * * * *", scheduledTime: Date.UTC(2026, 9, 5, 11) }, scheduledEnv, { waitUntil: task => tasks.push(task) });
     await Promise.all(tasks);
 
     const callsByRpc = new Map();
@@ -241,7 +242,7 @@ test("hourly Rocket League schedule pages due candidates and refreshes Shop, not
     }
 });
 
-test("daily noon UTC schedule refreshes each leaderboard playlist once", async () => {
+test("hourly noon UTC schedule refreshes each leaderboard playlist once", async () => {
     const calls = [];
     const kv = new Map();
     const tasks = [];
@@ -272,7 +273,7 @@ test("daily noon UTC schedule refreshes each leaderboard playlist once", async (
         SERVICE_STATUS: { async get(key) { return kv.get(key) ?? null; }, async put(key, value) { kv.set(key, value); } }
     };
 
-    await handleScheduled({ cron: "0 12 * * *" }, scheduledEnv, { waitUntil: task => tasks.push(task) });
+    await handleScheduled({ cron: "0 * * * *", scheduledTime: Date.UTC(2026, 9, 5, 12) }, scheduledEnv, { waitUntil: task => tasks.push(task) });
     await Promise.all(tasks);
 
     assert.deepEqual(calls.filter(call => call.type === "provider").map(call => call.playlistId), [10, 11, 13]);

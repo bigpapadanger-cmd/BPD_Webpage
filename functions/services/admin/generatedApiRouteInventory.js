@@ -33,10 +33,6 @@ export const PAGE_ROUTE_INVENTORY = Object.freeze([
       {
         "path": "/Framework/Shell/HTML/Footer/footer.html",
         "exists": true
-      },
-      {
-        "path": "/Tabs/RocketLeague/Features/JS/shop.js",
-        "exists": true
       }
     ]
   },
@@ -291,7 +287,7 @@ export const PAGE_ROUTE_INVENTORY = Object.freeze([
     "deepLinkSupported": true,
     "targets": [
       {
-        "path": "/Tabs/RocketLeague/Features/HTML/match-history.html",
+        "path": "/Tabs/RocketLeague/MatchHistory/HTML/index.html",
         "exists": true
       },
       {
@@ -327,7 +323,7 @@ export const PAGE_ROUTE_INVENTORY = Object.freeze([
     "deepLinkSupported": true,
     "targets": [
       {
-        "path": "/Tabs/RocketLeague/Features/HTML/shop.html",
+        "path": "/Tabs/RocketLeague/Shop/HTML/index.html",
         "exists": true
       },
       {
@@ -343,7 +339,7 @@ export const PAGE_ROUTE_INVENTORY = Object.freeze([
         "exists": true
       },
       {
-        "path": "/Tabs/RocketLeague/Features/JS/shop.js",
+        "path": "/Tabs/RocketLeague/Shop/JS/index.js",
         "exists": true
       }
     ]
@@ -367,7 +363,7 @@ export const PAGE_ROUTE_INVENTORY = Object.freeze([
     "deepLinkSupported": true,
     "targets": [
       {
-        "path": "/Tabs/RocketLeague/Features/HTML/ue6.html",
+        "path": "/Tabs/RocketLeague/UE6/HTML/index.html",
         "exists": true
       },
       {
@@ -563,7 +559,7 @@ export const PAGE_ROUTE_INVENTORY = Object.freeze([
     "deepLinkSupported": true,
     "targets": [
       {
-        "path": "/Tabs/RocketLeague/Features/HTML/leaderboards.html",
+        "path": "/Tabs/RocketLeague/Leaderboards/HTML/index.html",
         "exists": true
       },
       {
@@ -579,7 +575,7 @@ export const PAGE_ROUTE_INVENTORY = Object.freeze([
         "exists": true
       },
       {
-        "path": "/Tabs/RocketLeague/Features/JS/leaderboards.js",
+        "path": "/Tabs/RocketLeague/Leaderboards/JS/index.js",
         "exists": true
       }
     ]
@@ -603,7 +599,7 @@ export const PAGE_ROUTE_INVENTORY = Object.freeze([
     "deepLinkSupported": true,
     "targets": [
       {
-        "path": "/Tabs/RocketLeague/Features/HTML/match-results.html",
+        "path": "/Tabs/RocketLeague/MatchResults/HTML/index.html",
         "exists": true
       },
       {
@@ -639,7 +635,7 @@ export const PAGE_ROUTE_INVENTORY = Object.freeze([
     "deepLinkSupported": true,
     "targets": [
       {
-        "path": "/Tabs/RocketLeague/Features/HTML/find-custom-matches.html",
+        "path": "/Tabs/RocketLeague/CustomMatches/HTML/index.html",
         "exists": true
       },
       {
@@ -679,7 +675,7 @@ export const PAGE_ROUTE_INVENTORY = Object.freeze([
     "deepLinkSupported": true,
     "targets": [
       {
-        "path": "/Tabs/RocketLeague/Features/HTML/weekly-matches.html",
+        "path": "/Tabs/RocketLeague/WeeklyMatches/HTML/index.html",
         "exists": true
       },
       {
@@ -715,7 +711,7 @@ export const PAGE_ROUTE_INVENTORY = Object.freeze([
     "deepLinkSupported": true,
     "targets": [
       {
-        "path": "/Tabs/RocketLeague/Features/HTML/my-matches.html",
+        "path": "/Tabs/RocketLeague/MyMatches/HTML/index.html",
         "exists": true
       },
       {
@@ -751,7 +747,7 @@ export const PAGE_ROUTE_INVENTORY = Object.freeze([
     "deepLinkSupported": true,
     "targets": [
       {
-        "path": "/Tabs/RocketLeague/Features/HTML/private-matches.html",
+        "path": "/Tabs/RocketLeague/PrivateMatches/HTML/index.html",
         "exists": true
       },
       {
@@ -3363,21 +3359,6 @@ export const WORKER_SCHEDULE_INVENTORY = Object.freeze([
   },
   {
     "path": "cron: 0 * * * *",
-    "routeType": "schedule",
-    "casePolicy": "not-applicable",
-    "sourceFiles": [
-      "workers/rl-presence-monitor/wrangler.jsonc"
-    ],
-    "handler": "workers/rl-presence-monitor/src/index.js",
-    "methods": [
-      "SCHEDULE"
-    ],
-    "authRequired": "platform-triggered",
-    "healthStatus": "configured",
-    "ownerSystem": "bpd-rl-presence-monitor"
-  },
-  {
-    "path": "cron: 0 12 * * *",
     "routeType": "schedule",
     "casePolicy": "not-applicable",
     "sourceFiles": [

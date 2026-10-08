@@ -77,7 +77,7 @@ MMR Worker `worker/services/provider-data.ts`: normalizes to `image_url` and
 `api.get_rl_current_shop` returns persisted `catalogues[].items[].image_url`
 and `shops[].logo_url`. `current_shop.js` revalidates HTTPS URLs and strips
 ownership/purchase fields. `/api/rocketleague/shop` exposes that allowlist.
-`Features/JS/shop.js` renders item images and section logos; failed images are
+`Shop/JS/index.js` renders item images and section logos; failed images are
 removed while their item cards remain visible.
 No wallet/purchase calls, notification-image calls or page-triggered provider
 refreshes were introduced.
@@ -149,9 +149,9 @@ The synthetic preview server was stopped and its temporary script removed.
 - public/Tabs/RocketLeague/FindPlayers/CSS/index.css
 - public/Tabs/RocketLeague/FindPlayers/JS/index.js
 - public/Tabs/RocketLeague/FindPlayers/JS/view.js
-- public/Tabs/RocketLeague/Features/HTML/shop.html
-- public/Tabs/RocketLeague/Features/CSS/index.css
-- public/Tabs/RocketLeague/Features/JS/shop.js
+- public/Tabs/RocketLeague/Shop/HTML/index.html
+- public/Tabs/RocketLeague/Shop/CSS/index.css
+- public/Tabs/RocketLeague/Shop/JS/index.js
 - tests/rocketleague/page_pass.test.mjs (new)
 - tests/rocketleague/public_discovery.test.mjs
 - tests/rocketleague/shop_api.test.mjs
