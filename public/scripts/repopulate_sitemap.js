@@ -38,7 +38,8 @@ import {
 } from "node:url";
 
 import {
-    ROUTES
+    ROUTES,
+    getPageMetadata
 } from "../routes.js";
 
 /* =========================================================
@@ -183,6 +184,7 @@ function shouldIncludeRoute(
         normalizeRoute(
             route
         );
+    if (routeConfig.redirectTo || getPageMetadata(normalizedRoute).robots !== "index, follow") return false;
 
     if (
         !normalizedRoute

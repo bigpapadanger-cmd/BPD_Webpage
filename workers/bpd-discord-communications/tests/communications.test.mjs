@@ -11,6 +11,22 @@ const savedFetch = globalThis.fetch;
 const savedTimer = globalThis.setTimeout;
 afterEach(() => { globalThis.fetch = savedFetch; globalThis.setTimeout = savedTimer; });
 const secret = "test-communication-secret-not-a-production-secret";
+
+test("signed health is read-only and distinguishes disabled from missing enablement", async () => {
+    const trap = () => { assert.fail("Health must not select a receipt instance or call Discord"); };
+    globalThis.fetch = trap;
+    const env = { DISCORD_COMMUNICATIONS_SECRET: secret, DISCORD_COMMUNICATION_RECEIPTS: { idFromName: trap, get: trap } };
+    const invalid = await worker.fetch(new Request("https://communications/internal/health", { method: "POST", body: "{}" }), env);
+    assert.equal(invalid.status, 401); assert.equal(invalid.headers.get("Cache-Control"), "no-store");
+    for (const [flag, expected] of [[undefined, "unknown"], ["invalid", "unknown"], ["false", "disabled"], ["true", "healthy"]]) {
+        env.DISCORD_COMMUNICATIONS_ENABLED = flag;
+        const request = await signedCommunicationRequest(env, "https://communications/internal/health", {});
+        const response = await worker.fetch(request, env), body = await response.json();
+        assert.equal(response.headers.get("Cache-Control"), "no-store");
+        assert.equal(body.status, expected); assert.equal(body.deliveryChecked, false);
+        assert.equal(JSON.stringify(body).includes(secret), false);
+    }
+});
 function storage() {
     const values = new Map(); let alarm = null, tail = Promise.resolve();
     const store = { async get(k) { return values.get(k); }, async put(k, v) { values.set(k, v); },
@@ -108,6 +124,21 @@ test("malformed summaries fail closed instead of fabricating zero and failed sen
     await runWeeklySummary(env, Date.parse("2026-10-09T22:00:00Z"));
     assert.equal(calls, 1);
 });
+test("weekly failure diagnostics identify the boundary without webhook, token or payload leakage", async () => {
+    const logs = [], original = console.info;
+    console.info = (...args) => logs.push(args);
+    const env = environment();
+    globalThis.fetch = async () => Response.json({ private: "sensitive-account-email-token" }, { status: 503 });
+    try {
+        await assert.rejects(runWeeklySummary(env, Date.parse("2026-10-09T22:00:00Z")));
+        const record = logs.find(([label]) => label === "[DISCORD WEEKLY DIAGNOSTIC]")[1];
+        assert.equal(record.stage, "summary_fetch_body"); assert.equal(record.rpc, "admin_taskboard_summary");
+        assert.equal(record.upstreamStatus, 503); assert.equal(typeof record.debugId, "string");
+        assert.equal(typeof record.elapsedMs, "number");
+        assert.doesNotMatch(JSON.stringify(logs), /sensitive|discord.com|webhooks|test-communication-secret|private-service/);
+    } finally { console.info = original; }
+});
+
 test("signed summary endpoint is read-only, replay protected and unavailable to browsers", async () => {
     const env = { ...environment(), SUPABASE_URL: "https://database.example/rest/v1/", SUPABASE_SERVICE_ROLE_KEY: "private-service-key" };
     env.DISCORD_COMMUNICATIONS = { fetch: request => worker.fetch(request, env) };

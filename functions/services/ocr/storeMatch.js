@@ -1,3 +1,4 @@
+import { sanitizeLogMetadata } from "../http/diagnostics.js";
 // ============================================================
 // BPD GAMING NETWORK
 // OCR MATCH - INTERNAL STORAGE SERVICE
@@ -850,7 +851,7 @@ export async function handleStoreMatch(
     ) {
         console.error(
             "OCR STORE MATCH failed:",
-            error
+            sanitizeLogMetadata(error)
         );
 
         return jsonResponse(

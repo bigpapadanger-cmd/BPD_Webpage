@@ -1,3 +1,4 @@
+import { sanitizeLogMetadata } from "../../../../services/http/diagnostics.js";
 "use strict";
 
 /* =========================================================
@@ -467,7 +468,7 @@ export async function onRequestGet(
     ) {
         console.error(
             "MATCHBOT EVENTS API GET: Request failed.",
-            {
+            sanitizeLogMetadata({
                 debugId,
 
                 code:
@@ -481,7 +482,7 @@ export async function onRequestGet(
                 message:
                     error?.message
                     || "Unknown error"
-            }
+            })
         );
 
         if (
@@ -645,7 +646,7 @@ export async function onRequestPost(
     ) {
         console.error(
             "MATCHBOT EVENTS API POST: Request failed.",
-            {
+            sanitizeLogMetadata({
                 debugId,
 
                 code:
@@ -659,7 +660,7 @@ export async function onRequestPost(
                 message:
                     error?.message
                     || "Unknown error"
-            }
+            })
         );
 
         if (
@@ -927,7 +928,7 @@ export async function onRequestPatch(
     ) {
         console.error(
             "MATCHBOT EVENTS API PATCH: Request failed.",
-            {
+            sanitizeLogMetadata({
                 debugId,
 
                 code:
@@ -941,7 +942,7 @@ export async function onRequestPatch(
                 message:
                     error?.message
                     || "Unknown error"
-            }
+            })
         );
 
         if (

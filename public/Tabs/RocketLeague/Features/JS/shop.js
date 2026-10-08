@@ -1,5 +1,7 @@
 "use strict";
 
+import { boundedJson } from "../../../../scripts/boundedRequest.js";
+
 let root = null;
 let stopCarousel = () => {};
 const SHOP_STALE_AFTER_MS = 2 * 60 * 60 * 1000;
@@ -139,7 +141,7 @@ export function shopPages(snapshot, now = Date.now()) {
     });
 }
 
-function initializeCarousel(snapshot) {
+function initializeCarousel(snapshot, saved = {}) {
     stopCarousel();
     const pages = shopPages(snapshot);
     const status = root.querySelector("[data-shop-status]");
@@ -171,9 +173,13 @@ function initializeCarousel(snapshot) {
     const pause = root.querySelector("[data-shop-pause]");
     const carouselRoot = root;
     const listeners = new AbortController();
-    let paused = false;
+    let paused = saved.paused === true;
     let interacting = false;
-    let index = 0;
+    let index = Math.max(0, pages.findIndex(page => page.shopId === saved.shopId && page.first === saved.first));
+    let elapsed = 0;
+    const progress = root.querySelector("[data-shop-progress]");
+    pause.textContent = paused ? "Resume cycling" : "Pause cycling";
+    pause.setAttribute("aria-pressed", String(paused));
     const render = () => {
         const entry = pages[index];
         const shop = entry.shop;
@@ -192,7 +198,7 @@ function initializeCarousel(snapshot) {
         previous.setAttribute("aria-label", "Previous shop items");
         next.setAttribute("aria-label", "Next shop items");
     };
-    const advance = direction => { index = (index + direction + pages.length) % pages.length; render(); };
+    const advance = direction => { elapsed = 0; if (progress) progress.value = 0; index = (index + direction + pages.length) % pages.length; render(); };
     previous.addEventListener("click", () => advance(-1), { signal: listeners.signal });
     next.addEventListener("click", () => advance(1), { signal: listeners.signal });
     pause.addEventListener("click", () => {
@@ -203,16 +209,20 @@ function initializeCarousel(snapshot) {
     carouselRoot.addEventListener("pointerenter", () => { interacting = true; }, { signal: listeners.signal });
     carouselRoot.addEventListener("pointerleave", () => { interacting = false; }, { signal: listeners.signal });
     // Cycling only changes the displayed cached items; it never fetches data.
-    const timer = pages.length > 1 ? setInterval(() => {
+    // Expiry continues to be checked even when only one page remains.
+    const timer = setInterval(() => {
         if (!carouselRoot.isConnected) { stopCarousel(); return; }
         if (pages.some(page => !isActive(page.shop, Date.now()) || page.items.some(item => !isActive(item, Date.now())))) {
-            initializeCarousel(snapshot);
+            initializeCarousel(snapshot, { paused, shopId: pages[index].shopId, first: pages[index].first });
             return;
         }
         if (!paused && !interacting && !document.hidden && !carouselRoot.contains(document.activeElement)
             && document.body.dataset.animations !== "off"
-            && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) advance(1);
-    }, 8000) : null;
+            && !window.matchMedia("(prefers-reduced-motion: reduce)").matches && pages.length > 1) {
+                elapsed++; if (progress) progress.value = elapsed;
+                if (elapsed >= 8) advance(1);
+            }
+    }, 1000);
     stopCarousel = () => { clearInterval(timer); listeners.abort(); };
     render();
 }
@@ -222,9 +232,8 @@ async function loadShop() {
     const loadingRoot = root;
     const status = root.querySelector("[data-shop-status]");
     try {
-        const response = await fetch("/api/rocketleague/shop", { headers: { Accept: "application/json" } });
+        const { response, payload } = await boundedJson("/api/rocketleague/shop", { headers: { Accept: "application/json" } });
         if (!response.ok) throw new Error("shop unavailable");
-        const payload = await response.json();
         if (root !== loadingRoot || !loadingRoot.isConnected) return;
         if (!payload || payload.success !== true || !Array.isArray(payload.shops) || !Array.isArray(payload.catalogues)) throw new Error("invalid shop response");
         initializeCarousel(payload);

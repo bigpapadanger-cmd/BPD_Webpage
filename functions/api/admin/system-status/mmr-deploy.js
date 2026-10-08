@@ -1,3 +1,4 @@
+import { sanitizeLogMetadata } from "../../../services/http/diagnostics.js";
 "use strict";
 
 import { ADMIN_PERMISSIONS, authorizeAdminPermission } from "../../../services/admin/permissions.js";
@@ -32,10 +33,10 @@ export async function onRequestPost({ request, env }) {
     const startedAt = Date.now();
     try {
         const deployment = await startMmrDeployment(env, authorization.accountId);
-        console.info("ADMIN DEPLOYMENT ACTION", { action: "mmr_worker_deploy", accountId: authorization.accountId, target: deployment.target, deploymentId: deployment.deploymentId, timestamp: new Date().toISOString(), result: "MMR_DEPLOY_STARTED" });
+        console.info("ADMIN DEPLOYMENT ACTION", sanitizeLogMetadata({ action: "mmr_worker_deploy", accountId: authorization.accountId, target: deployment.target, deploymentId: deployment.deploymentId, timestamp: new Date().toISOString(), result: "MMR_DEPLOY_STARTED" }));
         return json({ success: true, deployment }, 202);
     } catch (error) {
-        console.warn("ADMIN DEPLOYMENT ACTION", { action: "mmr_worker_deploy", accountId: authorization.accountId, target: "bpd-mmr-api", timestamp: new Date().toISOString(), result: error?.code || "MMR_DEPLOY_TRIGGER_FAILED", durationMs: Date.now() - startedAt });
+        console.warn("ADMIN DEPLOYMENT ACTION", sanitizeLogMetadata({ action: "mmr_worker_deploy", accountId: authorization.accountId, target: "bpd-mmr-api", timestamp: new Date().toISOString(), result: error?.code || "MMR_DEPLOY_TRIGGER_FAILED", durationMs: Date.now() - startedAt }));
         return json({ success: false, error: error?.code || "MMR_DEPLOY_TRIGGER_FAILED", retryAfterSeconds: error?.retryAfterSeconds || null }, Number(error?.status) || 503, error?.retryAfterSeconds ? { "Retry-After": String(error.retryAfterSeconds) } : {});
     }
 }

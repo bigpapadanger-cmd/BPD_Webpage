@@ -239,3 +239,220 @@ test("page and profile expose only the intended cached leaderboard path", async 
     assert.match(architecture, /90-day retention/i);
     assert.match(architecture, /stale after 30 hours/i);
 });
+
+
+test("collector diagnostics isolate playlist failures and redact every logged record", async () => {
+    const runtime = { SUPABASE_URL: "https://supabase.example", SUPABASE_AUTH: "service-credential", MMR_API_URL: "https://mmr.example.test", MMR_API_KEY: "provider-token" };
+    const privateText = "private@example.test Authorization secret " + accountId + " " + providerId;
+    const cases = [
+        ["provider_configuration", "MMR_CONFIGURATION_MISSING", null, "config"],
+        ["provider_rejected", "PROVIDER_LEADERBOARD_UNAVAILABLE", 503, "http"],
+        ["provider_fetch", "UPSTREAM_UNAVAILABLE", null, "network"],
+        ["provider_decode", "RL_LEADERBOARD_RESPONSE_INVALID", 200, "json"],
+        ["provider_schema_validation", "RL_LEADERBOARD_RESPONSE_INVALID", 200, "schema"],
+        ["provider_row_validation", "RL_LEADERBOARD_ENTRY_INVALID", 200, "row"],
+        ["provider_normalization", "RL_LEADERBOARD_EMPTY", 200, "empty"],
+        ["begin_snapshot_rejected", "42501", 403, "begin"],
+        ["begin_snapshot_validation", "RL_LEADERBOARD_BEGIN_INVALID", 200, "begin-shape"],
+        ["persist_finalize_rejected", "57014", 500, "persist"],
+        ["persist_finalize_validation", "RL_LEADERBOARD_PERSISTENCE_INVALID", 200, "finalize"],
+        ["provider_body_read", "UPSTREAM_RESPONSE_TOO_LARGE", 200, "oversize"]
+    ];
+    const original = globalThis.fetch, originalInfo = console.info;
+    let records = [], calls = [], activePlaylist;
+    console.info = (label, row) => { assert.equal(label, "[LEADERBOARD DIAGNOSTIC]"); records.push(row); };
+    try {
+        for (const [stage, code, status, failure] of cases) {
+            records = []; calls = [];
+            const local = { ...runtime };
+            if (failure === "config") local.MMR_API_KEY = "";
+            globalThis.fetch = async (url, init) => {
+                const parsed = new URL(url), rpc = parsed.pathname.split("/").at(-1);
+                if (parsed.hostname === "mmr.example.test") {
+                    const playlistId = Number(parsed.searchParams.get("playlistId"));
+                    calls.push({ rpc, playlistId });
+                    if (playlistId === 11) {
+                        if (failure === "http") return Response.json({ code: privateText, payload: privateText }, { status: 503 });
+                        if (failure === "network") throw new Error(privateText);
+                        if (failure === "json") return new Response(privateText);
+                        if (failure === "schema") return Response.json({ success: true, playlistId: 10, entries: [] });
+                        if (failure === "row") return Response.json({ success: true, playlistId, entries: [{ email: privateText }] });
+                        if (failure === "empty") return Response.json({ success: true, playlistId, entries: [] });
+                        if (failure === "oversize") return new Response(privateText, { headers: { "Content-Length": "5000000" } });
+                    }
+                    return Response.json({ success: true, playlistId, entries: [{ providerAccountId: providerId, platform: "Epic", displayName: "Player", mmr: 1000 }] });
+                }
+                const args = JSON.parse(init.body);
+                if (rpc.startsWith("begin_")) activePlaylist = args.p_playlist_id;
+                calls.push({ rpc, playlistId: activePlaylist, args });
+                if (activePlaylist === 11) {
+                    if (failure === "begin" && rpc.startsWith("begin_")) return Response.json({ code: "42501", message: privateText }, { status: 403 });
+                    if (failure === "begin-shape" && rpc.startsWith("begin_")) return Response.json({ started: true, snapshotId: { privateText } });
+                    if (failure === "persist" && rpc.startsWith("complete_")) return Response.json({ code: "57014", message: privateText }, { status: 500 });
+                    if (failure === "finalize" && rpc.startsWith("complete_")) return Response.json({ success: false, entryCount: 1, payload: privateText });
+                }
+                if (rpc.startsWith("begin_")) return Response.json({ started: true, snapshotId: `00000000-0000-4000-8000-0000000000${activePlaylist}` });
+                return Response.json({ success: true, entryCount: 1 });
+            };
+            const result = await refreshGlobalRocketLeagueLeaderboards(local);
+            assert.equal(result.failed, failure === "config" ? 3 : 1);
+            assert.deepEqual(calls.filter(call => call.rpc.startsWith("begin_")).map(call => call.playlistId), [10, 11, 13]);
+            const record = records.find(row => row.playlistId === 11 && row.stage === stage);
+            assert.ok(record, failure); assert.equal(record.code, code); assert.equal(record.upstreamStatus, status);
+            assert.equal(record.gameMode, "2v2"); assert.ok(record.elapsedMs >= 0); assert.equal(record.timeout, false);
+            assert.match(record.debugId, /^[0-9a-f-]{36}$/);
+            if (failure !== "config") assert.deepEqual(result.results.map(row => row.success), [true, false, true]);
+            for (const forbidden of [privateText, accountId, providerId, "private@example.test", "service-credential", "provider-token", "00000000-0000-4000-8000-"]) assert.equal(JSON.stringify(records).includes(forbidden), false);
+            const failureWrites = calls.filter(call => call.rpc.startsWith("fail_"));
+            if (["begin", "begin-shape"].includes(failure)) assert.equal(failureWrites.length, 0);
+            else {
+                const recording = records.find(row => row.playlistId === 11 && row.snapshotStatus === "failed");
+                assert.equal(recording.debugId, record.debugId);
+                assert.equal(failureWrites.find(call => call.playlistId === 11).args.p_snapshot_id, "00000000-0000-4000-8000-000000000011");
+            }
+        }
+        const result = await refreshGlobalRocketLeagueLeaderboards({});
+        assert.equal(result.failed, 3);
+        assert.ok(records.slice(-3).every(row => row.stage === "begin_snapshot_configuration" && row.code === "SUPABASE_CONFIGURATION_MISSING"));
+    } finally { globalThis.fetch = original; console.info = originalInfo; }
+});
+
+test("collector reports failure recording errors separately without changing completed pointers", async () => {
+    const original = globalThis.fetch, originalInfo = console.info;
+    const records = [], priorCompleted = new Map([[10, "prior10"], [11, "prior11"], [13, "prior13"]]);
+    const current = new Map(priorCompleted);
+    let playlist;
+    console.info = (_, row) => records.push(row);
+    globalThis.fetch = async (url, init) => {
+        const rpc = new URL(url).pathname.split("/").at(-1);
+        if (rpc === "get-global-leaderboard") return Response.json({ error: providerId }, { status: 503 });
+        const args = JSON.parse(init.body);
+        if (rpc.startsWith("begin_")) {
+            playlist = args.p_playlist_id;
+            return Response.json({ started: true, snapshotId: `00000000-0000-4000-8000-0000000000${playlist}` });
+        }
+        if (rpc.startsWith("complete_")) { current.set(playlist, args.p_snapshot_id); throw new Error("Must not complete after provider failure"); }
+        assert.equal(args.p_snapshot_id, `00000000-0000-4000-8000-0000000000${playlist}`);
+        return playlist === 11 ? Response.json({ code: "42501", message: providerId }, { status: 403 }) : Response.json({ success: false });
+    };
+    try {
+        const result = await refreshGlobalRocketLeagueLeaderboards({ SUPABASE_URL: "https://supabase.example", SUPABASE_AUTH: "secret", MMR_API_URL: "https://mmr.example.test", MMR_API_KEY: "key" });
+        assert.equal(result.failed, 3); assert.deepEqual(current, priorCompleted);
+        for (const id of [10, 11, 13]) {
+            const rows = records.filter(row => row.playlistId === id);
+            assert.equal(rows.length, 2); assert.equal(rows[0].stage, "provider_rejected");
+            assert.equal(rows[1].snapshotStatus, "recording_failed"); assert.equal(rows[1].debugId, rows[0].debugId);
+        }
+        assert.equal(records.find(row => row.playlistId === 11 && row.snapshotStatus === "recording_failed").code, "42501");
+    } finally { globalThis.fetch = original; console.info = originalInfo; }
+});
+
+test("provider fetch/body deadlines diagnose each playlist and continue later playlists", async t => {
+    const original = globalThis.fetch, originalInfo = console.info;
+    try {
+        for (const stallBody of [false, true]) {
+            t.mock.timers.enable({ apis: ["setTimeout"] });
+            const records = [];
+            console.info = (_, row) => records.push(row);
+            globalThis.fetch = async (url, init) => {
+                const parsed = new URL(url), rpc = parsed.pathname.split("/").at(-1);
+                if (rpc === "get-global-leaderboard") {
+                    const playlistId = Number(parsed.searchParams.get("playlistId"));
+                    if (playlistId === 10) return stallBody ? new Response(new ReadableStream({ start() {} })) : new Promise(() => {});
+                    return Response.json({ success: true, playlistId, entries: [{ providerAccountId: providerId, platform: "Epic", displayName: "ok", mmr: 10 }] });
+                }
+                const args = JSON.parse(init.body);
+                if (rpc.startsWith("begin_")) return Response.json({ started: true, snapshotId: `00000000-0000-4000-8000-0000000000${args.p_playlist_id}` });
+                return Response.json({ success: true, entryCount: 1 });
+            };
+            try {
+                const pending = refreshGlobalRocketLeagueLeaderboards({ SUPABASE_URL: "https://supabase.example", SUPABASE_AUTH: "secret", MMR_API_URL: "https://mmr.example.test", MMR_API_KEY: "key" });
+                await new Promise(resolve => setImmediate(resolve));
+                t.mock.timers.tick(30001);
+                const result = await pending;
+                assert.deepEqual(result.results.map(row => row.success), [false, true, true]);
+                assert.equal(records[0].stage, stallBody ? "provider_body_read" : "provider_fetch");
+                assert.equal(records[0].timeout, true); assert.equal(records[0].deadlineState, "expired");
+                assert.equal(records[0].upstreamStatus, stallBody ? 200 : null);
+            } finally { t.mock.timers.reset(); }
+        }
+    } finally { globalThis.fetch = original; console.info = originalInfo; }
+});
+
+
+test("public read preserves HTTP 200 failed/ready snapshot semantics without invoking collector", async () => {
+    const original = globalThis.fetch;
+    try {
+        for (const playlistId of [10, 11, 13]) {
+            for (const status of ["failed", "ready"]) {
+                const board = status === "failed" ? { ...publicBoard, playlistId, gameMode: { 10: "1v1", 11: "2v2", 13: "3v3" }[playlistId], status,
+                    snapshotDate: null, capturedAt: null, stale: true, availableDepth: 0, totalEntries: 0, rows: [] } : { ...publicBoard, playlistId, status };
+                globalThis.fetch = async (url) => { assert.ok(String(url).endsWith("/get_rl_global_leaderboard")); return Response.json(board); };
+                const response = await onRequestGet({ request: new Request(`https://site.test/api/rocketleague/leaderboards?playlist=${playlistId}`), env: { SUPABASE_URL: "https://supabase.example", SUPABASE_AUTH: "secret" } });
+                assert.equal(response.status, 200); assert.equal(response.headers.get("Cache-Control"), "no-store");
+                const result = await response.json(); assert.equal(result.status, status); assert.equal(result.playlistId, playlistId);
+                if (status === "failed") { assert.equal(result.snapshotDate, null); assert.equal(result.availableDepth, 0); assert.deepEqual(result.rows, []); }
+            }
+        }
+    } finally { globalThis.fetch = original; }
+});
+
+test("successful/duplicate collectors emit safe playlist/count/snapshot status", async () => {
+    const original = globalThis.fetch, originalInfo = console.info;
+    const records = [];
+    let alreadyComplete = false;
+    console.info = (_, row) => records.push(row);
+    globalThis.fetch = async (url, init) => {
+        const parsed = new URL(url), rpc = parsed.pathname.split("/").at(-1);
+        if (rpc === "get-global-leaderboard") return Response.json({ success: true, playlistId: Number(parsed.searchParams.get("playlistId")), entries: [{ providerAccountId: providerId, platform: "Epic", displayName: "ok", mmr: 10 }] });
+        const args = JSON.parse(init.body);
+        if (rpc.startsWith("begin_")) return Response.json(alreadyComplete ? { started: false, reason: "ALREADY_COMPLETE" } : { started: true, snapshotId: `00000000-0000-4000-8000-0000000000${args.p_playlist_id}` });
+        assert.ok(rpc.startsWith("complete_"));
+        return Response.json({ success: true, entryCount: 1 });
+    };
+    try {
+        const runtime = { SUPABASE_URL: "https://supabase.example", SUPABASE_AUTH: "secret", MMR_API_URL: "https://mmr.example.test", MMR_API_KEY: "key" };
+        await refreshGlobalRocketLeagueLeaderboards(runtime);
+        assert.deepEqual(records.map(row => [row.playlistId, row.gameMode, row.rowCount, row.snapshotStatus]), [[10, "1v1", 1, "completed"], [11, "2v2", 1, "completed"], [13, "3v3", 1, "completed"]]);
+        assert.equal(new Set(records.map(row => row.debugId)).size, 3);
+        alreadyComplete = true;
+        await refreshGlobalRocketLeagueLeaderboards(runtime);
+        assert.ok(records.slice(-3).every(row => row.snapshotStatus === "already_complete" && row.rowCount === null));
+    } finally { globalThis.fetch = original; console.info = originalInfo; }
+});
+
+
+test("snapshot RPC stalled bodies retain stage/status and playlist isolation", async t => {
+    const original = globalThis.fetch, originalInfo = console.info;
+    try {
+        for (const operation of ["begin", "complete", "fail"]) {
+            t.mock.timers.enable({ apis: ["setTimeout"] });
+            let playlist;
+            const records = [];
+            console.info = (_, row) => records.push(row);
+            globalThis.fetch = async (url, init) => {
+                const parsed = new URL(url), rpc = parsed.pathname.split("/").at(-1);
+                if (rpc === "get-global-leaderboard") {
+                    const playlistId = Number(parsed.searchParams.get("playlistId"));
+                    if (operation === "fail" && playlistId === 10) return new Response("", { status: 503 });
+                    return Response.json({ success: true, playlistId, entries: [{ providerAccountId: providerId, platform: "Epic", displayName: "ok", mmr: 10 }] });
+                }
+                const args = JSON.parse(init.body);
+                if (rpc.startsWith("begin_")) playlist = args.p_playlist_id;
+                if (playlist === 10 && rpc.startsWith(operation + "_")) return new Response(new ReadableStream({ start() {} }));
+                if (rpc.startsWith("begin_")) return Response.json({ started: true, snapshotId: `00000000-0000-4000-8000-0000000000${playlist}` });
+                return Response.json({ success: true, entryCount: 1 });
+            };
+            try {
+                const pending = refreshGlobalRocketLeagueLeaderboards({ SUPABASE_URL: "https://supabase.example", SUPABASE_AUTH: "secret", MMR_API_URL: "https://mmr.example.test", MMR_API_KEY: "key" });
+                await new Promise(resolve => setImmediate(resolve));
+                t.mock.timers.tick(30001);
+                const result = await pending;
+                assert.deepEqual(result.results.map(row => row.success), [false, true, true]);
+                const timeout = records.find(row => row.timeout);
+                assert.equal(timeout.stage, { begin: "begin_snapshot_body_read", complete: "persist_finalize_body_read", fail: "failure_recording_body_read" }[operation]);
+                assert.equal(timeout.upstreamStatus, 200); assert.equal(timeout.code, "UPSTREAM_TIMEOUT");
+            } finally { t.mock.timers.reset(); }
+        }
+    } finally { globalThis.fetch = original; console.info = originalInfo; }
+});

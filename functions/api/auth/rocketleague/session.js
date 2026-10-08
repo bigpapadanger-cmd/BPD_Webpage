@@ -1,3 +1,4 @@
+import { sanitizeLogMetadata } from "../../../services/http/diagnostics.js";
 "use strict";
 
 /* =========================================================
@@ -97,7 +98,7 @@ export async function onRequestGet(
     ) {
         console.error(
             "RL SESSION ROUTE: Unexpected failure.",
-            {
+            sanitizeLogMetadata({
                 debugId,
 
                 pathname:
@@ -118,7 +119,7 @@ export async function onRequestGet(
                 stack:
                     error?.stack
                     || null
-            }
+            })
         );
 
         return Response.json(

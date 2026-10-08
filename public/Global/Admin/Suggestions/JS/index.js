@@ -1,4 +1,5 @@
 "use strict";
+import { boundedJson } from "../../../../scripts/boundedRequest.js";
 
 import { getAuthState, hasAdminPermission } from "/Framework/Auth/auth.js";
 import { ADMIN_SUGGESTIONS_API_URL, adminSuggestionReviewApiUrl } from "/scripts/apiRoutes.js";
@@ -7,15 +8,10 @@ const REQUIRED_PERMISSION = "admin.suggestions.manage";
 const loadGenerations = new WeakMap();
 
 export async function requestSuggestionReview(path, options = {}) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 12000);
-    try {
-        const response = await fetch(path, { credentials: "same-origin", cache: "no-store", ...options,
-            headers: { Accept: "application/json", ...options.headers }, signal: controller.signal });
-        const result = await response.json();
-        if (!response.ok || result?.success !== true) throw new Error("REVIEW_UNAVAILABLE");
-        return result;
-    } finally { clearTimeout(timer); }
+    const { response, payload: result } = await boundedJson(path, { credentials: "same-origin", cache: "no-store", ...options,
+        headers: { Accept: "application/json", ...options.headers } });
+    if (!response.ok || result?.success !== true) throw new Error("REVIEW_UNAVAILABLE");
+    return result;
 }
 
 function node(tag, text, className) {

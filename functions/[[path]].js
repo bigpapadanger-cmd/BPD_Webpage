@@ -1,6 +1,7 @@
 import {
     resolveHumanPageRoute,
-    getPageMetadata
+    getPageMetadata,
+    ROUTES
 } from "../public/routes.js";
 
 const PAGE_SHELL_PATH = "/";
@@ -39,7 +40,14 @@ export async function onRequest(context) {
     headers.set("X-Robots-Tag", metadata.robots);
     if (metadata.robots.startsWith("noindex")) headers.set("Cache-Control", "no-store");
     if (request.method === "HEAD") return new Response(null, { status: shell.status, headers });
+    const config = ROUTES[route.canonicalPath];
+    let staticContent = null;
+    if (metadata.robots === "index, follow" && config?.module === null && config.body) {
+        const fragment = await context.next(new Request(new URL(config.body, request.url)));
+        if (fragment.ok) staticContent = (await fragment.text()).replace(/<(\/?)(main)\b/gi, "<$1section");
+    }
     return new HTMLRewriter().on("title", { element(element) { element.setInnerContent(metadata.title); } })
+        .on("#siteContent", { element(element) { if (staticContent !== null) element.setInnerContent(staticContent, { html: true }); } })
         .on("head", { element(element) { element.append(`<meta name="description" content="${escape(metadata.description)}"><meta name="robots" content="${metadata.robots}"><link rel="canonical" href="${escape(metadata.canonical)}"><meta property="og:title" content="${escape(metadata.title)}"><meta property="og:description" content="${escape(metadata.description)}"><meta property="og:url" content="${escape(metadata.canonical)}"><meta property="og:type" content="website"><meta name="twitter:card" content="summary"><meta name="twitter:title" content="${escape(metadata.title)}"><meta name="twitter:description" content="${escape(metadata.description)}">`, { html: true }); } })
         .transform(new Response(shell.body, { status: shell.status, headers }));
 }

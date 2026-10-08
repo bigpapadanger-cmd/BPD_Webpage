@@ -1,3 +1,4 @@
+import { sanitizeLogMetadata } from "../../../http/diagnostics.js";
 "use strict";
 
 /* =========================================================
@@ -703,7 +704,7 @@ async function notifyLifecycleDiscord(
     ) {
         console.error(
             "[TASKBOARD DISCORD LIFECYCLE NOTIFICATION SKIPPED]",
-            {
+            sanitizeLogMetadata({
                 action,
 
                 code:
@@ -711,7 +712,7 @@ async function notifyLifecycleDiscord(
 
                 message:
                     "The authoritative updated task could not be extracted from the lifecycle RPC response."
-            }
+            }, ["TASKBOARD_UPDATED_TASK_MISSING"])
         );
 
         return;
@@ -746,7 +747,7 @@ async function notifyLifecycleDiscord(
     ) {
         console.error(
             "[TASKBOARD DISCORD LIFECYCLE NOTIFICATION FAILED]",
-            {
+            sanitizeLogMetadata({
                 action,
 
                 name:
@@ -768,7 +769,7 @@ async function notifyLifecycleDiscord(
                 details:
                     error?.details
                     || null
-            }
+            })
         );
     }
 }

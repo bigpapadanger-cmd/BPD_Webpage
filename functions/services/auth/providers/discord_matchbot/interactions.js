@@ -34,7 +34,7 @@ Does NOT:
     - Read HTTP request bodies.
     - Return Cloudflare Response objects.
     - Require BPD browser sessions.
-    - Use DISCORD_AUTHZ_* configuration.
+    - Authorize task completion from browser-supplied roles or identities.
 
 Environment:
     DISCORD_MATCHBOT_PUBLIC_KEY

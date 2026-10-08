@@ -1,3 +1,4 @@
+import { sanitizeLogMetadata } from "../../../../services/http/diagnostics.js";
 "use strict";
 
 /* =========================================================
@@ -606,7 +607,7 @@ function handleApiError(
     ) {
         console.error(
             "[ADMIN TASKS API]",
-            {
+            sanitizeLogMetadata({
                 name:
                     error?.name
                     ?? null,
@@ -628,7 +629,7 @@ function handleApiError(
                 hint:
                     error?.hint
                     ?? null
-            }
+            })
         );
     }
 

@@ -1,9 +1,13 @@
 "use strict";
+import { createRequestDiagnostics } from "../http/diagnostics.js";
 import { authorizeRequest } from "../auth/authorization.js";
 import { listUsers, parseListInput } from "../admin/user_management.js";
 import { readJsonBody } from "../http/json.js";
 import { fetchBoundedResponse, withUpstreamDeadline } from "../http/upstream.js";
 
+const DIAGNOSTIC_CODES = new Set(["PGRST202", "PGRST301", "42501", "42883", "57014", "53300", "08006",
+    "UPSTREAM_TIMEOUT", "UPSTREAM_UNAVAILABLE", "UPSTREAM_RESPONSE_TOO_LARGE", "UPSTREAM_RESPONSE_INVALID",
+    "FAQ_RESPONSE_INVALID", "FAQ_UNAVAILABLE"]);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const STATUSES = new Set(["pending", "approved", "answered", "duplicate", "rejected"]);
 const ACTIONS = new Set(["approve", "answer", "duplicate", "reject", "publish"]);
@@ -27,29 +31,40 @@ const nullableId = value => value === null || UUID.test(value || "");
 function fail(code = "FAQ_RESPONSE_INVALID", status = 503) { throw Object.assign(new Error(code), { code, status }); }
 function requireShape(condition) { if (!condition) fail(); }
 
-async function rpc(env, name, args, normalize, fetcher = fetch) {
+async function rpc(env, name, args, normalize, fetcher = fetch, diagnostics = null) {
     if (!RPCS.has(name)) fail("FAQ_UNAVAILABLE");
+    diagnostics?.mark("configuration", name);
     const base = typeof env.SUPABASE_URL === "string" ? env.SUPABASE_URL.trim().replace(/\/+$/, "").replace(/\/rest\/v1$/i, "") : "";
     const key = (typeof env.SUPABASE_SERVICE_ROLE_KEY === "string" ? env.SUPABASE_SERVICE_ROLE_KEY.trim() : "")
         || (typeof env.SUPABASE_AUTH === "string" ? env.SUPABASE_AUTH.trim() : "");
     if (!base || !key) {
-        console.warn("FAQ RPC unavailable.", { rpc: name, stage: "configuration" });
+        if (!diagnostics) console.warn("FAQ RPC unavailable.", { rpc: name, stage: "configuration" });
         fail("FAQ_UNAVAILABLE");
     }
     try { if (new URL(base).protocol !== "https:") fail("FAQ_UNAVAILABLE"); } catch { fail("FAQ_UNAVAILABLE"); }
     return withUpstreamDeadline(async signal => {
+        diagnostics?.mark("rpc_fetch", name);
         const response = await fetchBoundedResponse(`${base}/rest/v1/rpc/${name}`, {
             method: "POST", signal, redirect: "error", headers: { apikey: key, Authorization: `Bearer ${key}`,
                 "Content-Type": "application/json", "Content-Profile": "api", "Accept-Profile": "api" },
             body: JSON.stringify(args)
-        }, 2 * 1024 * 1024, fetcher);
+        }, 2 * 1024 * 1024, async (url, init) => {
+            const upstream = await fetcher(url, init);
+            diagnostics?.mark("body_read", name);
+            diagnostics?.upstream(upstream.status);
+            return upstream;
+        });
+        diagnostics?.mark("response_decode", name);
         const body = await response.json();
         if (!response.ok) {
-            console.warn("FAQ RPC unavailable.", { rpc: name, stage: "upstream", status: response.status,
+            if (!diagnostics) console.warn("FAQ RPC unavailable.", { rpc: name, stage: "upstream", status: response.status,
                 code: ["PGRST202", "PGRST301", "42501", "42883"].includes(body?.code) ? body.code : "UPSTREAM_REJECTED" });
+            diagnostics?.mark("rpc_rejected", name);
+            diagnostics?.upstream(response.status, body?.code);
             const code = [body?.message, body?.code, body?.error].find(value => Object.hasOwn(ERRORS, value || ""));
             fail(code || "FAQ_UNAVAILABLE", ERRORS[code] || 503);
         }
+        diagnostics?.mark("response_normalization", name);
         requireShape(record(body) && body.success === true && timestamp(body.capturedAt));
         return normalize(body);
     });
@@ -115,6 +130,13 @@ function errorResponse(error) {
 }
 
 export async function handleFaq(request, env, operation, questionId = null, dependencies = {}) {
+    const diagnostics = operation === "public" && request.method === "GET"
+        ? createRequestDiagnostics({ label: "[FAQ DIAGNOSTIC]", operation: "published_faqs", codes: DIAGNOSTIC_CODES }) : null;
+    let diagnosticError = null;
+    const correlated = response => {
+        if (diagnostics) response.headers.set("X-Debug-ID", diagnostics.debugId);
+        return response;
+    };
     const auth = dependencies.authorize || authorizeRequest;
     const fetcher = dependencies.fetcher || fetch;
     const permissions = dependencies.permissions || (async () => {
@@ -124,7 +146,10 @@ export async function handleFaq(request, env, operation, questionId = null, depe
     const expectedMethod = operation === "submit" || operation === "review" ? "POST" : "GET";
     if (request.method !== expectedMethod) return json({ success: false, error: "METHOD_NOT_ALLOWED" }, 405);
     try {
-        if (operation === "public") return json(await rpc(env, "list_published_faqs", {}, publicList, fetcher));
+        if (operation === "public") {
+            diagnostics?.mark("faq_service");
+            return correlated(json(await rpc(env, "list_published_faqs", {}, publicList, fetcher, diagnostics)));
+        }
         const authorization = await auth(request, env, { account: true, action: ["submit", "review"].includes(operation) ? "post" : "view_account" });
         if (!UUID.test(authorization?.accountId || "")) fail("AUTHENTICATION_REQUIRED", 401);
         if (operation === "submit") {
@@ -159,5 +184,9 @@ export async function handleFaq(request, env, operation, questionId = null, depe
             p_question_id: questionId, p_action: body.action, p_answer: body.answer?.trim() || null,
             p_duplicate_faq_id: body.duplicateFaqId || null, p_review_note: body.reviewNote?.trim() || null,
             p_expected_revision: body.expectedRevision }, reviewResult, fetcher));
-    } catch (error) { return errorResponse(error); }
+    } catch (error) {
+        diagnosticError = error;
+        if (error?.code?.startsWith("UPSTREAM_")) diagnostics?.upstream(undefined, error.code);
+        return correlated(errorResponse(error));
+    } finally { diagnostics?.finish(diagnosticError); }
 }

@@ -88,8 +88,15 @@ import {
     getLatestMmr
 } from "./stats/latest_mmr.js";
 import {
-    json
+    json as responseJson
 } from "../common_helpers/responses.js";
+
+import { omitInternalIdentifiers as projectProfileResponse } from "../http/responses.js";
+export { projectProfileResponse };
+function json(value, ...options) {
+    return responseJson(projectProfileResponse(value), ...options);
+}
+
 
 import {
     authorizeRequest,
@@ -2822,6 +2829,11 @@ export async function handleRocketLeagueProfile(
     request,
     env
 ) {
+    if (["POST", "PATCH"].includes(request.method)
+        && (request.headers.get("Origin") !== new URL(request.url).origin
+            || request.headers.get("Sec-Fetch-Site") === "cross-site")) {
+        return json({ success: false, code: "ORIGIN_REQUIRED", message: "Profile changes must be made from this website." }, 403);
+    }
     const debugId =
         crypto.randomUUID();
 

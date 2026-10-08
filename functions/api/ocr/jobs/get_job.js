@@ -1,3 +1,4 @@
+import { sanitizeLogMetadata } from "../../../services/http/diagnostics.js";
 import { authorizeRocketLeagueRequest, authorizationErrorResponse } from "../../../services/rl/authorization.js";
 "use strict";
 
@@ -322,7 +323,7 @@ export async function onRequestGet(
             !statusData
         ) {
             console.error(
-                `[OCR GET JOB] Invalid status metadata for ${jobId}.`
+                `[OCR GET JOB] Invalid status metadata for request.`
             );
 
             return jsonResponse(
@@ -354,7 +355,7 @@ export async function onRequestGet(
             jobId
         ) {
             console.error(
-                `[OCR GET JOB] Job metadata mismatch for ${jobId}.`
+                `[OCR GET JOB] Job metadata mismatch for request.`
             );
 
             return jsonResponse(
@@ -395,7 +396,7 @@ export async function onRequestGet(
             !ownership
         ) {
             console.error(
-                `[OCR GET JOB] Missing or invalid owner for ${jobId}.`
+                `[OCR GET JOB] Missing or invalid owner for request.`
             );
 
             return jsonResponse(
@@ -515,7 +516,7 @@ export async function onRequestGet(
     ) {
         console.error(
             "OCR get job failed:",
-            error
+            sanitizeLogMetadata(error)
         );
 
         return jsonResponse(
@@ -585,7 +586,7 @@ async function resolveStoredOwnership(
         !requestObject
     ) {
         console.error(
-            `[OCR GET JOB] Legacy request metadata missing for ${jobId}.`
+            `[OCR GET JOB] Legacy request metadata missing for request.`
         );
 
         return null;
@@ -600,7 +601,7 @@ async function resolveStoredOwnership(
         !requestData
     ) {
         console.error(
-            `[OCR GET JOB] Legacy request metadata invalid for ${jobId}.`
+            `[OCR GET JOB] Legacy request metadata invalid for request.`
         );
 
         return null;
@@ -616,7 +617,7 @@ async function resolveStoredOwnership(
         jobId
     ) {
         console.error(
-            `[OCR GET JOB] Legacy request job mismatch for ${jobId}.`
+            `[OCR GET JOB] Legacy request job mismatch for request.`
         );
 
         return null;
@@ -847,8 +848,8 @@ async function mergeCloudProgress(
         error
     ) {
         console.warn(
-            `[OCR GET JOB] Progress read failed for ${jobId}.`,
-            error
+            `[OCR GET JOB] Progress read failed for request.`,
+            sanitizeLogMetadata(error)
         );
 
         return statusData;

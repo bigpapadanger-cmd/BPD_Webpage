@@ -404,7 +404,7 @@ function createUnknownAuthState() {
         authenticated:
             null,
 
-        userId:
+        accountScope:
             null,
 
         displayName:
@@ -472,7 +472,7 @@ function createSignedOutAuthState() {
         authenticated:
             false,
 
-        userId:
+        accountScope:
             null,
 
         displayName:
@@ -532,7 +532,7 @@ function createUnavailableAuthState(
         authenticated:
             null,
 
-        userId:
+        accountScope:
             null,
 
         displayName:
@@ -650,12 +650,6 @@ function normalizeProvider(
             normalizeNullableString(
                 providerData
                     ?.reauthorizationReason
-            ),
-
-        accountId:
-            normalizeNullableString(
-                providerData
-                    ?.accountId
             ),
 
         displayName:
@@ -825,9 +819,9 @@ function normalizeAuthenticatedResponse(
         authenticated:
             true,
 
-        userId:
+        accountScope:
             normalizeNullableString(
-                data?.user?.userId
+                data?.user?.accountScope
             ),
 
         displayName:
@@ -1613,7 +1607,7 @@ export async function refreshAuthState(
                         && nextState.active ===
                             true
                         && normalizeString(
-                            nextState.userId
+                            nextState.accountScope
                         )
                     ) {
                         void recordAuthenticatedPageActivity();
@@ -1790,7 +1784,7 @@ export function hasActiveAccount(
         )
         && Boolean(
             normalizeString(
-                state?.userId
+                state?.accountScope
             )
         )
         && state?.active ===

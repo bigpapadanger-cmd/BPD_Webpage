@@ -1,3 +1,4 @@
+import { sanitizeLogMetadata } from "../../../../services/http/diagnostics.js";
 "use strict";
 
 /* =========================================================
@@ -457,7 +458,7 @@ export async function onRequestPost(
     ) {
         console.error(
             "MATCHBOT TEST MESSAGE API: Request failed.",
-            {
+            sanitizeLogMetadata({
                 debugId,
 
                 code:
@@ -471,7 +472,7 @@ export async function onRequestPost(
                 message:
                     error?.message
                     || "Unknown error"
-            }
+            })
         );
 
         if (

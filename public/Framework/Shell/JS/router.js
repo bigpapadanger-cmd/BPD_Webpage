@@ -2019,6 +2019,14 @@ function injectRouteFragments(
     ) {
         elements.content.innerHTML =
             fragments.pageHTML;
+        // The persistent shell owns the single main landmark. Route fragments
+        // retain their labels, classes and IDs as sections inside that landmark.
+        for (const nestedMain of elements.content.querySelectorAll("main")) {
+            const section = document.createElement("section");
+            for (const attribute of nestedMain.attributes) section.setAttribute(attribute.name, attribute.value);
+            section.append(...nestedMain.childNodes);
+            nestedMain.replaceWith(section);
+        }
     }
 
     if (

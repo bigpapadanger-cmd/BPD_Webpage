@@ -1,5 +1,7 @@
 "use strict";
 
+import { fetchBoundedResponse, withUpstreamDeadline } from "../../http/upstream.js";
+
 const REQUEST_TIMEOUT_MS = 5000;
 // Provider diagnostic confirmed 35 shops and 33 catalogues in one current
 // response. Keep bounded parsing while preserving that complete inventory.
@@ -148,16 +150,15 @@ export async function getCurrentRocketLeagueShop(env) {
     let root;
     try {
         const parsed = new URL(base);
-        if (parsed.protocol !== "https:" || !key) throw new Error("configuration");
+        if (parsed.protocol !== "https:" || parsed.username || parsed.password || parsed.search || parsed.hash || !key) throw new Error("configuration");
         root = /\/rest\/v1$/i.test(parsed.href) ? `${parsed.href}/` : `${parsed.href.replace(/\/$/, "")}/rest/v1/`;
     } catch {
         throw new RocketLeagueShopReadError();
     }
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     try {
-        const response = await fetch(new URL("rpc/get_rl_current_shop", root), {
+        return await withUpstreamDeadline(async signal => {
+        const response = await fetchBoundedResponse(new URL("rpc/get_rl_current_shop", root), {
             method: "POST",
             headers: {
                 apikey: key,
@@ -168,16 +169,15 @@ export async function getCurrentRocketLeagueShop(env) {
                 "Accept-Profile": "api"
             },
             body: "{}",
-            signal: controller.signal
-        });
+            signal
+        }, 2 * 1024 * 1024);
         if (!response.ok) throw new RocketLeagueShopReadError();
         let payload;
         try { payload = await response.json(); } catch { throw new RocketLeagueShopReadError(502); }
         return cleanSnapshot(payload);
+        }, REQUEST_TIMEOUT_MS);
     } catch (error) {
         if (error instanceof RocketLeagueShopReadError) throw error;
-        throw new RocketLeagueShopReadError(error?.name === "AbortError" ? 504 : 503);
-    } finally {
-        clearTimeout(timeout);
+        throw new RocketLeagueShopReadError(error?.name === "AbortError" || error?.code === "UPSTREAM_TIMEOUT" ? 504 : 503);
     }
 }

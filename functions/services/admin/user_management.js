@@ -1,5 +1,6 @@
 "use strict";
 
+import { createRequestDiagnostics } from "../http/diagnostics.js";
 import { authorizeRequest } from "../auth/authorization.js";
 import { fetchBoundedResponse, withUpstreamDeadline } from "../http/upstream.js";
 
@@ -36,6 +37,15 @@ const ERROR_CODES = new Set([
     "BAN_REASON_TOO_LONG", "ACCOUNT_ALREADY_REMOVED", "REMOVAL_REASON_REQUIRED", "REMOVAL_REASON_TOO_LONG",
     "REINSTATEMENT_REASON_REQUIRED", "REINSTATEMENT_REASON_TOO_LONG"
 ]);
+
+export function createUserManagementDiagnostics() {
+    const codes = new Set(["PGRST202", "PGRST301", "42501", "42883", "57014", "53300", "08006",
+        "UPSTREAM_TIMEOUT", "UPSTREAM_UNAVAILABLE", "UPSTREAM_RESPONSE_TOO_LARGE", "UPSTREAM_RESPONSE_INVALID",
+        "USER_MANAGEMENT_RESPONSE_INVALID", "USER_MANAGEMENT_UNAVAILABLE", "AUTH_REQUIRED", "ACCOUNT_IDENTITY_MISSING",
+        "ACCOUNT_ACCESS_UNAVAILABLE", "ACCOUNT_ACCESS_RESTRICTED", "ACCOUNT_SUSPENDED", "AUTHENTICATION_REQUIRED",
+        "USER_MANAGEMENT_FORBIDDEN", "USER_MANAGEMENT_QUERY_INVALID"]);
+    return createRequestDiagnostics({ label: "[USER MANAGEMENT DIAGNOSTIC]", operation: "list_users", codes, timeoutCode: "USER_MANAGEMENT_TIMEOUT" });
+}
 
 export class UserManagementError extends Error {
     constructor(code, status = 503) {
@@ -127,11 +137,13 @@ function normalizeSummary(value) {
     return user;
 }
 
-function normalizeList(value) {
+function normalizeList(value, diagnostics = null) {
     requireSuccess(value);
     if (!Array.isArray(value.users) || !isTimestamp(value.capturedAt)) fail("USER_MANAGEMENT_RESPONSE_INVALID");
+    diagnostics?.mark("admin_authorization", RPCS.list);
     const permissions = normalizePermissions(value.permissions);
     if (!permissions.view) fail("USER_MANAGEMENT_FORBIDDEN", 403);
+    diagnostics?.mark("response_normalization", RPCS.list);
     return { success: true, permissions, pagination: normalizePagination(value.pagination), users: value.users.map(normalizeSummary), capturedAt: value.capturedAt };
 }
 
@@ -261,28 +273,38 @@ function sanitizeMetadata(value, depth = 0) {
         .slice(0, 50).map(([key, item]) => [key, sanitizeMetadata(item, depth + 1)]));
 }
 
-async function callRpc(env, name, parameters) {
+async function callRpc(env, name, parameters, diagnostics = null) {
     if (!ALLOWED_RPCS.has(name)) fail("USER_MANAGEMENT_RPC_NOT_ALLOWED", 500);
+    diagnostics?.mark("configuration", name);
     const base = String(env?.SUPABASE_URL || "").trim().replace(/\/+$/, "").replace(/\/rest\/v1$/i, "");
     const key = String(env?.SUPABASE_SERVICE_ROLE_KEY || "").trim() || String(env?.SUPABASE_AUTH || "").trim();
     if (!base || !key) {
-        console.warn("User Management RPC unavailable.", { rpc: name, stage: "configuration" });
+        if (!diagnostics) console.warn("User Management RPC unavailable.", { rpc: name, stage: "configuration" });
         fail("USER_MANAGEMENT_UNAVAILABLE", 503);
     }
     try { if (new URL(base).protocol !== "https:") fail(); } catch { fail(); }
     try {
         const response = await withUpstreamDeadline(async signal => {
+            diagnostics?.mark("rpc_fetch_body", name);
             const bounded = await fetchBoundedResponse(`${base}/rest/v1/rpc/${name}`, {
                 method: "POST", signal, redirect: "error",
                 headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json", Accept: "application/json", "Content-Profile": "api", "Accept-Profile": "api" },
                 body: JSON.stringify(parameters)
-            }, 512 * 1024);
+            }, 512 * 1024, async (url, init) => {
+                const upstream = await fetch(url, init);
+                diagnostics?.upstream(upstream.status);
+                return upstream;
+            });
+            diagnostics?.mark("response_decode", name);
+            diagnostics?.upstream(bounded.status);
             const text = await bounded.text();
             let body = null;
             if (text) { try { body = JSON.parse(text); } catch { fail("USER_MANAGEMENT_RESPONSE_INVALID", 503); } }
             if (!bounded.ok) {
-                console.warn("User Management RPC unavailable.", { rpc: name, stage: "upstream", status: bounded.status,
+                if (!diagnostics) console.warn("User Management RPC unavailable.", { rpc: name, stage: "upstream", status: bounded.status,
                     code: ["PGRST202", "PGRST301", "42501", "42883"].includes(body?.code) ? body.code : "UPSTREAM_REJECTED" });
+                diagnostics?.mark("rpc_rejected", name);
+                diagnostics?.upstream(bounded.status, body?.code);
                 const candidates = [body?.message, body?.details, body?.code];
                 const code = [...ERROR_CODES].find(candidate => candidates.some(item => typeof item === "string"
                     && new RegExp(`(?:^|[^A-Z0-9_])${candidate}(?:$|[^A-Z0-9_])`, "u").test(item)));
@@ -294,6 +316,7 @@ async function callRpc(env, name, parameters) {
         return response;
     } catch (error) {
         if (error instanceof UserManagementError) throw error;
+        diagnostics?.upstream(undefined, error?.code);
         fail(error?.code === "UPSTREAM_TIMEOUT" ? "USER_MANAGEMENT_TIMEOUT" : "USER_MANAGEMENT_UNAVAILABLE", 503);
     }
 }
@@ -307,8 +330,8 @@ function statusForError(code) {
     return 400;
 }
 
-async function getActor(request, env) {
-    const authorization = await authorizeRequest(request, env, { account: true, action: "view_account" });
+async function getActor(request, env, diagnostics = null) {
+    const authorization = await authorizeRequest(request, env, { account: true, action: "view_account", diagnostics });
     const actorAccountId = authorization?.accountId;
     if (typeof actorAccountId !== "string" || !UUID.test(actorAccountId)) fail("AUTHENTICATION_REQUIRED", 401);
     return actorAccountId;
@@ -316,12 +339,13 @@ async function getActor(request, env) {
 
 function targetId(value) { if (typeof value !== "string" || !UUID.test(value)) fail("TARGET_ACCOUNT_REQUIRED", 400); return value; }
 
-export async function listUsers(request, env, input) {
-    const actor = await getActor(request, env);
+export async function listUsers(request, env, input, diagnostics = null) {
+    const actor = await getActor(request, env, diagnostics);
     const result = await callRpc(env, RPCS.list, { p_actor_account_id: actor, p_query: input.query, p_status: input.status,
         p_role: input.role, p_provider: input.provider, p_has_rocket_league: input.hasRocketLeague,
-        p_rl_active: input.rlActive, p_limit: 30, p_offset: input.offset, p_sort: input.sort });
-    return normalizeList(result);
+        p_rl_active: input.rlActive, p_limit: 30, p_offset: input.offset, p_sort: input.sort }, diagnostics);
+    diagnostics?.mark("response_normalization", RPCS.list);
+    return normalizeList(result, diagnostics);
 }
 
 export async function getUserDetails(request, env, target) {

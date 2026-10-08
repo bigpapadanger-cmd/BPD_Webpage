@@ -1,3 +1,4 @@
+import { sanitizeLogMetadata } from "../../../services/http/diagnostics.js";
 "use strict";
 
 /* =========================================================
@@ -107,7 +108,7 @@ export async function onRequestPost(
     ) {
         console.error(
             "LAST LOGIN API: Failed.",
-            {
+            sanitizeLogMetadata({
                 debugId,
 
                 status:
@@ -121,7 +122,7 @@ export async function onRequestPost(
                 message:
                     error?.message
                     || "Unknown error"
-            }
+            })
         );
 
         return authorizationErrorResponse(error);

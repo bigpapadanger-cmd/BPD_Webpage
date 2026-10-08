@@ -96,9 +96,9 @@ refresh respectively.
 
 | Capability | PsyNet requests per player / refresh | Batch support | Local-only? | Cache / recommended interval | Page safe? | Scheduled? | Admin force? |
 | --- | ---: | --- | --- | --- | --- | --- | --- |
-| MMR / Skills | 1 current skill request | Upstream batch method exists; current Worker path is one target | No | Existing persisted MMR and 24-hour refresh gate | No provider call on render | Yes, preserve existing cadence | Yes, existing bounded action |
-| Provider display profile | 1 | `PlayerIDs[]` upstream; current Worker call targets one ID | No | Existing 24-hour provider success gate; 15-minute failure retry gate | No | Yes, only with due refresh | Yes, existing bounded action |
-| Career stats | 6 | No batch path used by Worker | No | Existing 24-hour success / 15-minute failure gate; do not refresh on reads | No | Only with due refresh | Yes, explicit admin action |
+| MMR / Skills | 1 current skill request | Upstream batch method exists; current Worker path is one target | No | Persisted MMR; Supabase mmr_due after 3 hours, checked by hourly scanner | No provider call on render | Yes, preserve existing cadence | Yes, existing bounded action |
+| Provider display profile | 1 | `PlayerIDs[]` upstream; current Worker call targets one ID | No | Supabase provider_due after 60 minutes; legacy page gate is not reached by normal activity | No | Yes, only with due refresh | Yes, existing bounded action |
+| Career stats | 6 | No batch path used by Worker | No | Supabase career_stats_due after 24 hours; do not refresh on reads | No | Only with due refresh | Yes, explicit admin action |
 | Presence state | 1 `/get-player-data?capabilities=presence` call per eligible player | One target per request; max concurrency 5; 15-second delay between batches | No | 15-minute monitor; 30-minute public freshness threshold | No; persisted row only | Existing monitor only; explicit protected Run Now | No separate force action recommended |
 | Party | 1 empty-request call, limited to caller invitations | No arbitrary player batch | Yes / limited | Do not poll; if product-approved for the local account, cache at least 60 seconds and use an explicit view/action | No | No | No |
 | Club profile/details | 1 per due player | No current Worker batch | Player-club lookup supports arbitrary ID; club stats do not | Live Supabase `club_due` flag; no page-triggered fetch | No | Yes, existing hourly due-aware scheduler only | Not separately forced |
@@ -128,3 +128,46 @@ capacity and shared Worker rate-limit headroom.
 - Snapshot progression is supplied by the confirmed live service-role-only RPC `api.get_rl_player_mmr_progression(uuid)`. DomainData calls it only for the authenticated Rocket League home page, through the existing server-side Supabase credential; no direct-table read, browser RPC, provider call, or schema change is involved. Its `current` and `previous` snapshots support independent 1v1/2v2/3v3 deltas. Missing playlist values remain unavailable; absent previous capture is not represented as zero change.
 - The home page's history chart requests and displays up to 90 captures from `api.get_rl_player_mmr_history(uuid)` through the server-side profile path. It reads persisted snapshots only and never triggers the MMR Worker; the live RPC must be installed and return at least 90 rows for the full history to appear. That production contract has not been verified by this local code change.
 - The separate MMR Worker protocol file `mmr-api-v2/docs/rocket-league-protocol.md` still describes the legacy capability state and was not edited from this DomainData-only writable workspace. It should be updated in the Worker checkout to document the confirmed legacy coarse presence field separately from normalized `/get-player-data` capabilities.
+
+## 3F Match History current-state reconciliation (2026-10-07)
+
+The registered /RocketLeague/MatchHistory route is authenticated, Epic/RL gated,
+noindex/out of sitemap, and points to the explanatory HTML with module=null.
+There is no dedicated Pages match-history endpoint, UI fetch, DTO or per-user
+history query in this repository. Its unsupported wording is accurate; it does
+not present an outage or promise matches after a retry. No integration is missing
+for a currently supported per-user history source.
+
+Provider ownership: the audited Matches/GetMatchHistory v1 contract uses the
+PsyNet session localPlayerID. The existing shared MMR service-account session is
+not a linked BPD user's independently verified session. The separate disabled
+RL_USER_SESSION security foundation has no provider executor, and identity proof
+remains blocked. This is a capability/ownership limitation, not evidence of a
+transient provider outage. The collector does not request history; a due history
+flag independently records RL_MATCH_HISTORY_AUTHENTICATED_PLAYER_ONLY. Admin
+force refresh and activity provider data also explicitly return unsupported.
+
+Available data distinctions:
+- Private MMR: capture timestamp, ones/twos/threes MMR and tiers; latest 90
+  captures loaded by default. Public summary: 14 UTC daily averages. Neither
+  supplies individual match timestamps, opponents, match scores or outcomes.
+- Career totals: wins/goals/assists/saves/shots/MVPs, aggregate rather than matches.
+- BPD Custom Matches: scoped match/round/result RPCs with public matchCode,
+  roundCode/resultCode, round state/start/end timestamps, team scores, winning
+  team, result source and verification status. These are BPD-managed results,
+  not general provider matchmaking history; they remain in their own feature.
+
+No authoritative general linked-player match DTO, history depth, retention or
+match fields can currently be reported. The Admin capability registry mentions
+retained historical rows, but this source audit does not establish their live
+contents, ownership, completeness or provenance. No live Supabase definitions or
+stored records were read for 3F; absence of a repository consumer is not proof
+that no database table exists. Historical rows must not be exposed by assumption.
+No snapshots were converted, no identities fabricated, and no provider behavior
+or replacement database contract was added. Current capability-gated page remains.
+
+3F reconciliation: PASS locally; real linked-player Match History remains
+unsupported pending an authoritative safe source/identity contract. No required
+Supabase change for this reconciliation. 3B graph is PASS locally with browser
+checks deferred to final release validation; production UM/FAQ/leaderboard causes
+remain blocked pending their deployed diagnostic evidence.

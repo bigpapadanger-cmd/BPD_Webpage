@@ -117,3 +117,13 @@ export function methodNotAllowedResponse(
         headers
     );
 }
+// HTTP projection only: retain canonical identifiers inside the server pipeline.
+// Opt in only where consumers use explicit access flags, not database keys.
+const INTERNAL_IDENTIFIER_KEYS = new Set(["accountid", "userid", "rlplayerid", "playerid", "snapshotid", "epicuniqueid", "epicaccountid", "providersubject", "provideraccountid"]);
+export function omitInternalIdentifiers(value) {
+    if (Array.isArray(value)) return value.map(omitInternalIdentifiers);
+    if (!value || typeof value !== "object") return value;
+    return Object.fromEntries(Object.entries(value)
+        .filter(([key]) => !INTERNAL_IDENTIFIER_KEYS.has(key.replaceAll("_", "").toLowerCase()))
+        .map(([key, item]) => [key, omitInternalIdentifiers(item)]));
+}

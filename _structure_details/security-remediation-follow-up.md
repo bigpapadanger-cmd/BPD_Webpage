@@ -1,5 +1,7 @@
 # Security remediation follow-up
 
+> Superseded for current local completion by [deep-clean-final-local.md](deep-clean-final-local.md), 2026-10-07. Counts and deferred browser identity/header descriptions below are historical checkpoint evidence.
+
 Local changes only. No deployment, push, live Supabase change, provider probe,
 Developer Portal configuration, or Cloudflare resource deletion.
 

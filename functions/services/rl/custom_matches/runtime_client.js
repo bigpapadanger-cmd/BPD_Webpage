@@ -6,6 +6,9 @@ export const isCustomMatchRuntimeCallerConfigured = env => validSecret(env?.CUST
     && typeof env?.CUSTOM_MATCH_RUNTIME?.fetch === "function";
 
 export async function callCustomMatchRuntime(env, path, accountId, body) {
+    if (env?.CUSTOM_MATCH_RUNTIME_ENABLED === "false") {
+        return Response.json({ success: false, code: "CUSTOM_MATCH_RUNTIME_DISABLED" }, { status: 503, headers: { "Cache-Control": "no-store" } });
+    }
     if (!isCustomMatchRuntimeCallerConfigured(env) || typeof accountId !== "string") {
         return Response.json({ success: false, code: "CUSTOM_MATCH_RUNTIME_UNAVAILABLE" }, { status: 503, headers: { "Cache-Control": "no-store" } });
     }

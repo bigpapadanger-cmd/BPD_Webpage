@@ -683,3 +683,51 @@ test("Find Players and public profile are routed, while leaderboard visibility r
     assert.equal(ROUTES["/RocketLeague/Leaderboards"].requiresAuth, undefined);
     assert.equal(ROUTES["/RocketLeague/Leaderboards"].auth?.required, undefined);
 });
+
+
+test("BPD fuzzy RPC fixtures survive the full search route with score/order intact", async () => {
+    // Fixed results supplied by the authoritative SQL contract; no JS scorer.
+    const cases = [
+        ["Bruck Danger", 100], ["BRUCK DANGER", 100], ["  Bruck   Danger  ", 100],
+        ["bruck dager", 91.67], ["bruck dnger", 91.67], ["bruc dager", 83.33], ["Danger Bruck", 80]
+    ];
+    for (const [query, score] of cases) {
+        const rows = [{ public_profile_id: PROFILE_ID, display_name: "Bruck Danger", epic_display_name: "Unrelated Epic", match_percent: score },
+            { public_profile_id: "38c395e6-cac4-4f27-86c0-f88f7304c619", display_name: "Second result", match_percent: 79 }];
+        await withFetch(async (url, init) => {
+            assert.ok(String(url).endsWith("/search_rocketleague_players"));
+            assert.deepEqual(JSON.parse(init.body), { p_query: query.trim(), p_limit: 20 });
+            return response(rows);
+        }, async () => {
+            const result = await searchRoute({ request: new Request(`https://site.test/api/rocketleague/players/search?q=${encodeURIComponent(query)}`), env: ENV });
+            assert.equal(result.status, 200); assert.equal(result.headers.get("Cache-Control"), "no-store");
+            const body = await result.json();
+            assert.deepEqual(body.players.map(row => [row.display_name, row.match_percent]), [["Bruck Danger", score], ["Second result", 79]]);
+        });
+    }
+    // The database excludes privacy opt-outs/inactive records and provider-only
+    // queries. Integration must not supplement its empty results from other data.
+    for (const query of ["No match", "Unrelated Epic", "Epic|provider-only|0", "11111111-1111-4111-8111-111111111111", "Private player", "Inactive account", "Inactive RL player"]) {
+        await withFetch(async () => response([]), async () => {
+            const result = await searchRoute({ request: new Request(`https://site.test/api/rocketleague/players/search?q=${encodeURIComponent(query)}`), env: ENV });
+            assert.deepEqual((await result.json()).players, []);
+        });
+    }
+});
+
+test("match percentage preserves fractional scores and renders a compact rounded badge", async () => {
+    for (const score of [91.67, 79, 0, 100, null, -1, 101, "91.67"]) {
+        await withFetch(async () => response([{ public_profile_id: PROFILE_ID, display_name: "Pilot", match_percent: score, raw_trigram_score: 0.9, edit_distance: 1 }]), async () => {
+            const [player] = await searchPublicRocketLeaguePlayers(ENV, "Pilot");
+            const valid = typeof score === "number" && score >= 0 && score <= 100;
+            assert.equal(player.match_percent, valid ? score : undefined);
+            assert.equal("edit_distance" in player, false); assert.equal("raw_trigram_score" in player, false);
+            const card = createPlayerCard(fakeDocument(), player);
+            const flatten = node => [node, ...(node.children || []).flatMap(flatten)];
+            const badges = flatten(card).filter(node => node.className?.includes("rl-player-match"));
+            assert.equal(badges.length, valid && score < 100 ? 1 : 0);
+            if (badges.length) assert.equal(badges[0].textContent, `${Math.round(score)}% match`);
+            assert.equal(flatten(createPlayerCard(fakeDocument(), player, { featured: true })).some(node => node.className?.includes("rl-player-match")), false);
+        });
+    }
+});

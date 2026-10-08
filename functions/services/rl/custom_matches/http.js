@@ -10,7 +10,7 @@ import { CustomMatchError, validateCustomMatchRequest } from "./contracts.js";
 import { executeCustomMatchOperation } from "./service.js";
 
 const BASIC_ACTIONS = new Set(["open", "join", "leave", "assign_team", "resize", "set_join_policy", "set_allow_join_after_start", "begin_pregame", "start", "cancel", "close", "archive", "kick_member", "transfer_host",
-    "create_invite", "revoke_invite", "join_with_invite", "request_join", "approve_join", "reject_join", "allow_rejoin"]);
+    "create_invite", "revoke_invite", "join_with_invite", "request_join", "approve_join", "reject_join", "allow_rejoin", "set_spectator_settings"]);
 const GET_OPERATIONS = new Set(["access", "limits", "list", "detail", "credentials", "rounds", "voteResult", "playerResults", "invites", "joinRequests", "memberHistory"]);
 const HEADERS = { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", "Content-Type": "application/json; charset=utf-8" };
 export function customMatchJson(value, status = 200, headers = {}) {

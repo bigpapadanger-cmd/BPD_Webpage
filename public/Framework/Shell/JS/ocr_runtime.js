@@ -1,4 +1,5 @@
 "use strict";
+import "./ocr_review_policy.js";
 
 /* =========================================================
    BPD GAMING NETWORK

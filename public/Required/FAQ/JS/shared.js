@@ -1,3 +1,4 @@
+import { boundedJson } from "../../../scripts/boundedRequest.js";
 "use strict";
 const STOP = new Set("a an and are as at be by can do does for from how i in is it my of on or the to what when where why with your".split(" "));
 export function normalizeQuestion(value) {
@@ -27,16 +28,13 @@ export function answerCard(faq) {
     return card;
 }
 export async function faqRequest(path, options = {}) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 12000);
     try {
-        const response = await fetch(path, { credentials: "same-origin", cache: "no-store", ...options, signal: controller.signal });
-        const result = await response.json();
+        const { response, payload: result } = await boundedJson(path, { credentials: "same-origin", cache: "no-store", ...options });
         if (!response.ok || result?.success !== true) throw Object.assign(new Error(result?.message || "FAQ services are unavailable. Please retry."), { code: result?.error });
         return result;
     } catch (error) {
         if (error?.name === "AbortError") throw new Error("The request timed out. Please retry.");
         if (error instanceof SyntaxError) throw new Error("The FAQ response could not be read. Please retry.");
         throw error;
-    } finally { clearTimeout(timer); }
+    }
 }

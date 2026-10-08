@@ -1303,3 +1303,8 @@ body[data-animations="off"]
 .auth-login-button {
     animation: none;
 }
+
+.rl-mmr-chart-reference-controls label { grid-column: 1 / -1; display: grid; gap: .4rem; color: #dce8fa; }
+.rl-mmr-chart-reference-controls select { width: 100%; min-width: 0; padding: .5rem; color: #dce8fa; background: #111f32; border: 1px solid #435873; border-radius: .5rem; }
+.rl-mmr-chart-reference-controls select:focus-visible { outline: 2px solid #68c5ff; outline-offset: 3px; }
+:is(.rl-public-mmr-history, #rocketLeagueMmrHistoryGraph) { min-width: 0; max-width: 100%; }

@@ -1,16 +1,16 @@
 "use strict";
 
 import { formatRocketLeagueTimestamp } from "../../shared/profilePresentation.js";
-import { getMmrRankReferences, MMR_RANK_REFERENCE_SOURCE, MMR_RANK_REFERENCE_DATE } from "../../shared/mmrRankReferences.js";
+import { getMmrRankReferences, MMR_RANK_REFERENCE_DATE } from "../../shared/mmrRankReferences.js";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 const historyRenders = new WeakMap();
 const HISTORY_LIMIT = 90;
 const WINDOW_HISTORY_LIMIT = 1000;
 const SERIES = [
-    { key: "ones", label: "1v1", color: "#b49aff" },
-    { key: "twos", label: "2v2", color: "#68c5ff" },
-    { key: "threes", label: "3v3", color: "#64e0b1" }
+    { key: "ones", label: "1v1", color: "#b49aff", pattern: "solid", dash: "none" },
+    { key: "twos", label: "2v2", color: "#68c5ff", pattern: "dashed", dash: "8 4" },
+    { key: "threes", label: "3v3", color: "#64e0b1", pattern: "dotted", dash: "2 5" }
 ];
 
 function textElement(documentRef, tag, text, className) {
@@ -158,6 +158,49 @@ export function renderMmrHistory(history, documentRef = document, options = {}) 
     const target = documentRef.getElementById(options.graphId || "rocketLeagueMmrHistoryGraph");
     const status = documentRef.getElementById(options.statusId || "rocketLeagueMmrHistoryStatus");
     if (!target || !status) return;
+    const baseOptions = options;
+    const ranges = options.dailyAverages === true
+        ? [{ value: "all", label: `All ${options.days} days`, days: options.days }, { value: "7", label: "7 Days", days: 7 }]
+        : [{ value: "all", label: "All loaded captures" }, { value: "1", label: "24 Hours", days: 1 }, { value: "7", label: "7 Days", days: 7 }];
+    const range = ranges.find(item => item.value === target.dataset.chartRange) || ranges[0];
+    target.dataset.chartRange = range.value;
+    options = { ...options, ...(range.days ? { days: range.days } : {}) };
+    const selectedSeries = ["all", ...SERIES.map(series => series.key)].includes(target.dataset.chartPlaylist)
+        ? target.dataset.chartPlaylist : "all";
+    target.dataset.chartPlaylist = selectedSeries;
+    const visibleSeries = SERIES.filter(series => selectedSeries === "all" || selectedSeries === series.key);
+    const controls = documentRef.createElement("div");
+    controls.className = "rl-mmr-chart-reference-controls";
+    controls.setAttribute("role", "group");
+    controls.setAttribute("aria-label", "MMR playlist display");
+    for (const series of [{ key: "all", label: "All" }, ...SERIES]) {
+        const button = textElement(documentRef, "button", series.label);
+        button.type = "button";
+        button.setAttribute("aria-pressed", String(series.key === selectedSeries));
+        button.addEventListener("click", () => {
+            target.dataset.chartPlaylist = series.key;
+            target.dataset.rankReferencePlaylist = series.key === "all" ? "twos" : series.key;
+            renderMmrHistory(history, documentRef, baseOptions);
+            target.querySelector?.('button[aria-pressed="true"]')?.focus();
+        });
+        controls.append(button);
+    }
+    const rangeLabel = textElement(documentRef, "label", "History range");
+    const select = documentRef.createElement("select");
+    select.setAttribute("aria-label", "MMR history range");
+    for (const item of ranges) {
+        const option = textElement(documentRef, "option", item.label);
+        option.value = item.value;
+        select.append(option);
+    }
+    select.value = range.value;
+    select.addEventListener("change", () => {
+        target.dataset.chartRange = select.value;
+        renderMmrHistory(history, documentRef, baseOptions);
+        target.querySelector?.('select')?.focus();
+    });
+    rangeLabel.append(select);
+    controls.append(rangeLabel);
     const snapshots = normalizeMmrHistoryForChart(history, options);
     const renderKey = JSON.stringify([snapshots, options, target.dataset.chartPlaylist, target.dataset.rankReferencePlaylist]);
     if (historyRenders.get(target) === renderKey) return;
@@ -169,18 +212,20 @@ export function renderMmrHistory(history, documentRef = document, options = {}) 
         return;
     }
     if (!snapshots.length) {
+        target.append(controls);
         status.textContent = options.days ? `No saved MMR captures from the last ${options.days} days.` : "No saved MMR captures yet.";
         status.hidden = false;
         return;
     }
 
-    const values = snapshots.flatMap(row => SERIES.map(series => row[series.key].mmr).filter(Number.isSafeInteger));
+    const values = snapshots.flatMap(row => visibleSeries.map(series => row[series.key].mmr).filter(Number.isSafeInteger));
     if (!values.length) {
+        target.append(controls);
         status.textContent = "No playlist MMR values are available in these captures.";
         status.hidden = false;
         return;
     }
-    const observedDays = snapshots.filter(row => SERIES.some(series => row[series.key].mmr !== null)).length;
+    const observedDays = snapshots.filter(row => visibleSeries.some(series => row[series.key].mmr !== null)).length;
     status.textContent = options.dailyAverages === true
         ? `${observedDays} UTC daily average${observedDays === 1 ? "" : "s"} in the ${options.days}-day window; these are not match results.`
         : options.averageByUtcDay === true
@@ -195,9 +240,9 @@ export function renderMmrHistory(history, documentRef = document, options = {}) 
     const maxTime = Date.parse(snapshots.at(-1).capturedAt);
     const minMmr = Math.min(...values);
     const maxMmr = Math.max(...values);
-    const range = Math.max(maxMmr - minMmr, 100);
-    const lower = minMmr - range * 0.1;
-    const upper = maxMmr + range * 0.1;
+    const mmrRange = Math.max(maxMmr - minMmr, 100);
+    const lower = minMmr - mmrRange * 0.1;
+    const upper = maxMmr + mmrRange * 0.1;
     const plotWidth = width - margin.left - margin.right;
     const plotHeight = height - margin.top - margin.bottom;
     const x = time => margin.left + (maxTime === minTime ? plotWidth / 2 : ((time - minTime) / (maxTime - minTime)) * plotWidth);
@@ -206,13 +251,13 @@ export function renderMmrHistory(history, documentRef = document, options = {}) 
     const svg = svgElement(documentRef, "svg", {
         viewBox: `0 0 ${width} ${height}`,
         role: "img",
-        "aria-labelledby": "rocketLeagueMmrHistorySvgTitle rocketLeagueMmrHistorySvgDescription",
+        "aria-labelledby": `${target.id || options.graphId || "rocketLeagueMmrHistoryGraph"}-title ${target.id || options.graphId || "rocketLeagueMmrHistoryGraph"}-description`,
         preserveAspectRatio: "xMidYMid meet",
         class: "rl-mmr-chart-surface"
     });
     svg.append(
-        svgElement(documentRef, "title", { id: "rocketLeagueMmrHistorySvgTitle" }, "Rocket League MMR history"),
-        svgElement(documentRef, "desc", { id: "rocketLeagueMmrHistorySvgDescription" }, options.averageByUtcDay === true || options.dailyAverages === true
+        svgElement(documentRef, "title", { id: `${target.id || options.graphId || "rocketLeagueMmrHistoryGraph"}-title` }, "Rocket League MMR history"),
+        svgElement(documentRef, "desc", { id: `${target.id || options.graphId || "rocketLeagueMmrHistoryGraph"}-description` }, options.averageByUtcDay === true || options.dailyAverages === true
             ? "Per-playlist average MMR for each UTC day in the selected period."
             : "Playlist MMR values across saved captures, positioned by capture time.")
     );
@@ -231,9 +276,6 @@ export function renderMmrHistory(history, documentRef = document, options = {}) 
     const referencePlaylist = SERIES.some(series => series.key === target.dataset.rankReferencePlaylist)
         ? target.dataset.rankReferencePlaylist : "twos";
     target.dataset.rankReferencePlaylist = referencePlaylist;
-    const selectedSeries = ["all", ...SERIES.map(series => series.key)].includes(target.dataset.chartPlaylist)
-        ? target.dataset.chartPlaylist : "all";
-    target.dataset.chartPlaylist = selectedSeries;
     const references = getMmrRankReferences(referencePlaylist, options.rankReferences);
     for (const [index, reference] of references.entries()) {
         if (reference.mmr < lower || reference.mmr > upper) continue;
@@ -272,7 +314,7 @@ export function renderMmrHistory(history, documentRef = document, options = {}) 
         for (const points of segments) {
             if (points.length > 1) {
                 const path = points.map((point, index) => `${index ? "L" : "M"}${point.x.toFixed(2)},${point.y.toFixed(2)}`).join(" ");
-                svg.append(svgElement(documentRef, "path", { d: path, class: "rl-mmr-chart-line", stroke: series.color }));
+                svg.append(svgElement(documentRef, "path", { d: path, class: "rl-mmr-chart-line", stroke: series.color, "stroke-dasharray": series.dash }));
             }
             for (const point of points) {
                 const circle = svgElement(documentRef, "circle", { cx: point.x, cy: point.y, r: 4.5, class: "rl-mmr-chart-point", fill: series.color });
@@ -287,54 +329,33 @@ export function renderMmrHistory(history, documentRef = document, options = {}) 
     target.append(svg);
     const legend = documentRef.createElement("div");
     legend.className = "rl-mmr-chart-legend";
-    for (const series of SERIES) {
+    for (const series of visibleSeries) {
         const item = documentRef.createElement("span");
         item.className = "rl-mmr-chart-legend-item";
         item.dataset.series = series.key;
-        item.textContent = series.label;
+        item.textContent = `${series.label} · ${series.pattern}`;
         legend.append(item);
     }
     target.append(legend);
-    const controls = documentRef.createElement("div");
-    controls.className = "rl-mmr-chart-reference-controls";
-    controls.setAttribute("role", "group");
-    controls.setAttribute("aria-label", "MMR playlist display");
-    for (const series of [{ key: "all", label: "All" }, ...SERIES]) {
-        const button = textElement(documentRef, "button", series.label);
-        button.type = "button";
-        button.setAttribute("aria-pressed", String(series.key === selectedSeries));
-        button.addEventListener("click", () => {
-            target.dataset.chartPlaylist = series.key;
-            target.dataset.rankReferencePlaylist = series.key === "all" ? "twos" : series.key;
-            renderMmrHistory(history, documentRef, options);
-            target.querySelector?.('button[aria-pressed="true"]')?.focus();
-        });
-        controls.append(button);
-    }
     target.append(controls);
     const source = textElement(documentRef, "p", "", "rl-mmr-chart-reference-note");
-    source.title = `Tracker observed Division I minimums · ${MMR_RANK_REFERENCE_DATE}. Reference only; promotion thresholds can vary.`;
     const referenceLabel = SERIES.find(series => series.key === referencePlaylist).label;
-    const link = textElement(documentRef, "a", `Estimates · ${referenceLabel}`);
-    link.href = MMR_RANK_REFERENCE_SOURCE;
-    link.target = "_blank";
-    link.rel = "noopener noreferrer";
-    source.append(link);
+    source.textContent = `Ranking estimates · ${referenceLabel}. Based on data available when the rank references were last adjusted (${MMR_RANK_REFERENCE_DATE}; adjustment time not recorded). MMR values use the saved update dates and times shown.`;
     target.append(source);
     const disclosure = textElement(documentRef, "details", "", "rl-mmr-chart-data");
     disclosure.append(textElement(documentRef, "summary", "View MMR values"));
     const table = documentRef.createElement("table");
     table.append(textElement(documentRef, "caption", "Saved MMR observations; missing values are unavailable."));
     const header = documentRef.createElement("tr");
-    for (const label of ["UTC date", "1v1", "2v2", "3v3"]) {
+    for (const label of [options.dailyAverages || options.averageByUtcDay ? "UTC date" : "Capture time (UTC)", ...visibleSeries.map(series => series.label)]) {
         const cell = textElement(documentRef, "th", label); cell.setAttribute("scope", "col"); header.append(cell);
     }
     const head = documentRef.createElement("thead"); head.append(header); table.append(head);
     const body = documentRef.createElement("tbody");
     for (const row of snapshots) {
         const line = documentRef.createElement("tr");
-        line.append(textElement(documentRef, "td", row.capturedAt.slice(0, 10)));
-        for (const series of SERIES) line.append(textElement(documentRef, "td", row[series.key].mmr === null ? "—" : String(row[series.key].mmr)));
+        line.append(textElement(documentRef, "td", options.dailyAverages || options.averageByUtcDay ? row.capturedAt.slice(0, 10) : new Date(row.capturedAt).toISOString()));
+        for (const series of visibleSeries) line.append(textElement(documentRef, "td", row[series.key].mmr === null ? "—" : String(row[series.key].mmr)));
         body.append(line);
     }
     table.append(body); disclosure.append(table); target.append(disclosure);

@@ -1,3 +1,4 @@
+import { sanitizeLogMetadata } from "../../../http/diagnostics.js";
 "use strict";
 
 /* =========================================================
@@ -613,11 +614,11 @@ export async function handleGoogleLogin(
     ) {
         console.error(
             "GOOGLE LOGIN: Failed to create OAuth request.",
-            {
+            sanitizeLogMetadata({
                 message:
                     error?.message
                     || "Unknown error"
-            }
+            })
         );
 
         return jsonResponse(

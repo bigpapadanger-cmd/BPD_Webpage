@@ -1,3 +1,4 @@
+import { sanitizeLogMetadata } from "../../http/diagnostics.js";
 "use strict";
 
 /* =========================================================
@@ -1005,7 +1006,7 @@ export async function handleLinkProvider(
         ) {
             console.error(
                 "PROVIDER AUTH: Existing provider verification failed.",
-                {
+                sanitizeLogMetadata({
                     debugId,
 
                     provider,
@@ -1021,7 +1022,7 @@ export async function handleLinkProvider(
                     message:
                         error?.message
                         || "Unknown error"
-                }
+                })
             );
 
             return json(
@@ -1097,7 +1098,7 @@ export async function handleLinkProvider(
     ) {
         console.error(
             "PROVIDER AUTH: Unexpected failure.",
-            {
+            sanitizeLogMetadata({
                 debugId,
 
                 name:
@@ -1111,7 +1112,7 @@ export async function handleLinkProvider(
                 stack:
                     error?.stack
                     || null
-            }
+            })
         );
 
         let code =

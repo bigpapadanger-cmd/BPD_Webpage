@@ -114,7 +114,7 @@ test("carousel cycles cached three-item groups, pauses, honors preferences and c
         await initializePage();
         const items = slots.get("[data-shop-items]");
         assert.equal(items.children.length, 3);
-        tick(); assert.equal(items.children.length, 1);
+        for (let i = 0; i < 8; i++) tick(); assert.equal(items.children.length, 1);
         slots.get("[data-shop-next]").handlers.click();
         assert.equal(slots.get("[data-shop-section-title]").textContent, "Bundles");
         slots.get("[data-shop-next]").handlers.click();
@@ -125,9 +125,19 @@ test("carousel cycles cached three-item groups, pauses, honors preferences and c
         document.body.dataset.animations = "on"; reduced = true; tick(); assert.equal(items.children.length, 3);
         reduced = false; root.handlers.pointerenter(); tick(); assert.equal(items.children.length, 3);
         root.handlers.pointerleave(); document.hidden = true; tick(); assert.equal(items.children.length, 3);
-        document.hidden = false; tick(); assert.equal(items.children.length, 1);
+        document.hidden = false; for (let i = 0; i < 8; i++) tick(); assert.equal(items.children.length, 1);
         assert.equal(requests, 1);
         root.isConnected = false; tick(); assert.equal(cleared, true);
+        root.isConnected = true;
+        const expires = Date.now() - 1000;
+        globalThis.fetch = async () => Response.json({ success: true, available: true, capturedAt: new Date().toISOString(), shops: [{ id: 1, name: "Only section", ends_at: new Date(expires + 100000).toISOString() }], catalogues: [{ shop_id: 1, items: [{ title: "Only item" }] }] });
+        await initializePage();
+        const originalNow = Date.now;
+        try {
+            Date.now = () => expires + 100001;
+            tick(); assert.equal(slots.get("[data-shop-panel]").hidden, true);
+            assert.equal(slots.get("[data-shop-status]").textContent, "No active shop items available");
+        } finally { Date.now = originalNow; }
     } finally { Object.assign(globalThis, saved); }
 });
 
@@ -189,6 +199,21 @@ test("bad RPC response is not exposed or cached", async () => {
     assert.deepEqual(await response.json(), { success: false, error: "SHOP_UNAVAILABLE" });
 });
 
+for (const stage of ["fetch", "body"]) test(`Shop deadline includes stalled ${stage}, with sanitized no-store failure`, async t => {
+    t.mock.timers.enable({ apis: ["setTimeout"] });
+    let began;
+    const started = new Promise(resolve => { began = resolve; });
+    globalThis.fetch = async () => {
+        began();
+        return stage === "fetch" ? new Promise(() => {}) : new Response(new ReadableStream({ start(controller) { controller.enqueue(new TextEncoder().encode("{")); } }));
+    };
+    const pending = onRequestGet({ env }); await started; await new Promise(resolve => setImmediate(resolve));
+    t.mock.timers.tick(5000);
+    const response = await pending;
+    assert.equal(response.status, 504); assert.equal(response.headers.get("Cache-Control"), "no-store");
+    assert.deepEqual(await response.json(), { success: false, error: "SHOP_UNAVAILABLE" });
+});
+
 test("missing configuration is rejected without making a request", async () => {
     let requested = false;
     globalThis.fetch = async () => { requested = true; throw new Error("unexpected"); };
@@ -199,7 +224,7 @@ test("missing configuration is rejected without making a request", async () => {
 test("Shop browser module reads the DomainData cache endpoint only", async () => {
     const { readFile } = await import("node:fs/promises");
     const source = await readFile(new URL("../../public/Tabs/RocketLeague/Features/JS/shop.js", import.meta.url), "utf8");
-    assert.match(source, /fetch\("\/api\/rocketleague\/shop"/);
+    assert.match(source, /boundedJson\("\/api\/rocketleague\/shop"/);
     assert.match(source, /export async function initializePage\(\)/);
     assert.doesNotMatch(source, /^loadShop\(\);/m);
     assert.doesNotMatch(source, /MMR_API_URL|SUPABASE_AUTH|\/get-shop-data|Shops\/Get/);

@@ -1,3 +1,4 @@
+import { sanitizeLogMetadata } from "../../../services/http/diagnostics.js";
 "use strict";
 
 /* =========================================================
@@ -210,7 +211,7 @@ function handleApiError(
     ) {
         console.error(
             "[ADMIN ACCESS API]",
-            {
+            sanitizeLogMetadata({
                 name:
                     error?.name
                     ?? null,
@@ -234,7 +235,7 @@ function handleApiError(
                 hint:
                     error?.hint
                     ?? null
-            }
+            })
         );
     }
 
@@ -460,7 +461,7 @@ export async function onRequestGet(
         ) {
             console.error(
                 "[ADMIN ACCESS API] Responsibility role synchronization mismatch.",
-                {
+                sanitizeLogMetadata({
                     accountId:
                         authorization?.accountId
                         ?? null,
@@ -468,7 +469,7 @@ export async function onRequestGet(
                     synchronizedRoles,
 
                     responsibilityRoles
-                }
+                })
             );
 
             return jsonResponse(

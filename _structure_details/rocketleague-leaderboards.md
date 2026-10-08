@@ -17,7 +17,8 @@ top-1,000 coverage. Cross-platform identities are not deduplicated because the
 provider data does not prove a safe merge.
 
 The Worker refreshes all three playlists from the existing protected MMR Worker
-once per UTC day at noon, alongside the daily Taskboard summary. This matches
+once per UTC day at noon. Taskboard summaries now run in the separate Discord
+communications Worker. This matches
 the verified Supabase contract of one snapshot per playlist per UTC day. That is
 three fixed PsyNet leaderboard reads per daily run, without page-view calls or
 retries. Each playlist is isolated: a failed refresh is recorded, and the
@@ -52,3 +53,47 @@ is normalized to `RL_PROFILE_REQUIRED` rather than an unavailable error.
 - A service/API failure does not erase the last completed snapshot; its
   metadata reports the refresh failure/staleness.
 - No leaderboard history, match history, or BPD Series ranking is implied.
+
+## Collector diagnostics and release validation
+
+Each playlist gets a server-generated debug ID and fixed playlist/game-mode
+metadata using the shared `functions/services/http/diagnostics.js` helper.
+`[LEADERBOARD DIAGNOSTIC]` records identify configuration, begin snapshot,
+provider fetch/body/decode/schema/row validation/normalization, combined
+persistence/finalization, and failure recording. Counts are bounded source-row
+counts, not player records. Error codes are allowlisted; no snapshot UUID,
+provider subject, credentials, environment value, payload or request body is logged.
+
+The original failure is logged before failure recording. A second record with
+the same debug ID reports the failure-recording outcome, including a separate
+recording failure. Successful/already-complete playlists produce their own record.
+The existing 30-second per-operation deadline covers body/decode/validation;
+RPC completion validation is also inside that deadline. Cadence and limits remain
+unchanged. `complete_rl_global_leaderboard_snapshot` combines persistence and
+finalization: caller logs cannot prove the internal database substage.
+
+Failure recording sends only the newly begun snapshot ID, never a prior completed
+ID. Local contract-model tests verify that failed attempts leave the previous
+completed pointer unchanged and duplicate completed days skip collection.
+This is repository/contract evidence; this work does not independently verify
+live RPC definitions or database writes. Deployed root cause remains blocked
+pending release plus collector evidence, just like User Management and FAQ.
+
+After a separately authorized release of the presence-monitor Worker, capture
+Worker logs around the existing `0 12 * * *` scheduled run (12:00 UTC), filtering
+for `[LEADERBOARD DIAGNOSTIC]`. Collect records for playlists 10, 11 and 13;
+group by debug ID, keeping both original-failure and failure-recording records.
+The configured persisted-log sampling rate is 0.25, so missing records are not
+proof that a playlist did not run. Use an authorized live log stream around the
+scheduled run if retained logs omit it; do not change logging settings here.
+
+An existing operator-only alternative is POST `/admin/run-scheduled` on this
+Worker's configured origin with JSON `{"job":"leaderboards"}`, authenticated
+using the existing `PRESENCE_TRIGGER_KEY` bearer credential via approved operator
+tooling. Do not put that credential in browser scripts, chat, logs or shared
+commands. This is a production write trigger and needs separate authorization;
+it is not executed by this workstream. `ALREADY_COMPLETE` may skip the current
+UTC day; wait for the next scheduled day rather than resetting snapshots.
+Public GET `/api/rocketleague/leaderboards?playlist=10` (also 11/13) only reads
+snapshot state and cannot reproduce a collector failure. It remains HTTP 200
+with sanitized failed-state data when the read RPC returns that state.

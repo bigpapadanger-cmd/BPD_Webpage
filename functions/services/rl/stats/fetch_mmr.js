@@ -1,3 +1,4 @@
+import { sanitizeLogMetadata } from "../../http/diagnostics.js";
 "use strict";
 
 /* =========================================================
@@ -365,7 +366,7 @@ export async function fetchMmrStats(
 
         console.error(
             "MMR FETCH: Request failed.",
-            {
+            sanitizeLogMetadata({
                 playerId,
 
                 name:
@@ -375,7 +376,7 @@ export async function fetchMmrStats(
                 message:
                     error?.message
                     || "Unknown error"
-            }
+            })
         );
 
         const unavailableError =
@@ -422,7 +423,7 @@ export async function fetchMmrStats(
     ) {
         console.error(
             "MMR FETCH: Response JSON invalid.",
-            {
+            sanitizeLogMetadata({
                 playerId,
 
                 status:
@@ -435,7 +436,7 @@ export async function fetchMmrStats(
                 message:
                     error?.message
                     || "Unknown error"
-            }
+            })
         );
 
         payload =

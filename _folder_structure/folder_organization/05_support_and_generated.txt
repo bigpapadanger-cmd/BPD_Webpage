@@ -1,5 +1,10 @@
 SUPPORT, DATA, DEPENDENCIES, CACHES, AND GENERATED TREES
-Snapshot: 2026-10-05
+Snapshot: 2026-10-07
+
+Continuation build: scripts/build-public-assets.mjs minifies JS/CSS and bundles
+the five CSS callers into ignored .wrangler/public-build. The generated
+.wrangler/public-build-report.json records raw source/output sizes and caller
+dependencies. Route inventory generation also synchronizes the public sitemap.
 
 ROLE
 
@@ -172,3 +177,13 @@ package-lock.backup.json
 These files were present in the current working directory but were not returned
 by the current Git tracked-file listing.
 
+
+1B/1C support additions (2026-10-07):
+- tests/route_health/security_hardening.test.mjs: origin/logout/cookies/privacy/headers.
+- _structure_details/deep-clean-hardening.md: acceptance, audit and release checkpoint.
+
+1B/1C support additions (2026-10-07):
+- tests/route_health/security_hardening.test.mjs: origin/logout/cookies/privacy/headers.
+- _structure_details/deep-clean-hardening.md: acceptance, audit and release checkpoint.
+
+Final local verification includes tests/auth/account_scope.test.mjs, tests/admin/modal_focus.test.mjs and tests/route_health/final_local.test.mjs. Final report: _structure_details/deep-clean-final-local.md.

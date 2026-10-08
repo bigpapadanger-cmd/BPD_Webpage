@@ -1,3 +1,4 @@
+import { createAccountScope } from "../../../../public/scripts/accountScope.js";
 "use strict";
 
 /* =========================================================
@@ -48,7 +49,7 @@ Authority:
         Temporary provider authentication freshness.
 
 Identity:
-    user.userId
+    user.accountScope
         = identity.accounts.id
 
     user.displayName
@@ -229,11 +230,6 @@ function sanitizeProvider(
         reauthorizationReason:
             normalizeNullableString(
                 provider.reauthorizationReason
-            ),
-
-        accountId:
-            normalizeNullableString(
-                provider.accountId
             ),
 
         displayName:
@@ -471,27 +467,9 @@ export async function getCanonicalAccount(
     if (
         !response.ok
     ) {
-        const responseText =
-            await response.text();
-
-        console.error(
-            "AUTH SESSION SERVICE: Canonical account lookup failed.",
-            {
-                status:
-                    response.status,
-
-                response:
-                    responseText
-                        .replace(
-                            /\s+/g,
-                            " "
-                        )
-                        .slice(
-                            0,
-                            300
-                        )
-            }
-        );
+        console.error("AUTH SESSION SERVICE: Canonical account lookup failed.", {
+            status: response.status, code: "ACCOUNT_LOOKUP_REJECTED"
+        });
 
         const error =
             new Error(
@@ -1072,8 +1050,8 @@ export async function handleAuthSession(
                     true,
 
                 user: {
-                    userId:
-                        account.userId,
+                    accountScope:
+                        await createAccountScope(account.userId),
 
                     displayName:
                         account.displayName,
@@ -1144,22 +1122,8 @@ export async function handleAuthSession(
             {
                 debugId,
 
-                name:
-                    error?.name
-                    || "Error",
-
-                status:
-                    error?.status
-                    || null,
-
-                code:
-                    error?.code
-                    || error?.upstreamCode
-                    || null,
-
-                message:
-                    error?.message
-                    || "Unknown error"
+                code: "AUTH_SESSION_FAILED",
+                status: Number.isInteger(error?.status) && error.status >= 400 && error.status <= 599 ? error.status : null
             }
         );
 

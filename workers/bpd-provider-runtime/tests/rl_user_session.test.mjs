@@ -56,7 +56,8 @@ test("ES256 handoff consumes first jti and rejects concurrent replay before prov
     const results = await Promise.all(Array.from({ length: 5 }, () => call(object, "consume", { assertion: signed, credential: "temporary-test-credential" })));
     assert.equal(results.filter(result => result.status === 200).length, 1);
     assert.equal(results.filter(result => result.code === "RL_PROBE_REPLAY_REJECTED").length, 4);
-    assert.equal(results[0].probeExecutionEnabled, false);
+    // Signature verification may finish out of order; only the successful claimant owns this field.
+    assert.equal(results.find(result => result.status === 200).probeExecutionEnabled, false);
     const saved = JSON.stringify(await storage.get("security"));
     assert.equal(saved.includes("temporary-test-credential"), false);
     assert.equal(saved.includes(signed), false);

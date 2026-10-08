@@ -230,8 +230,6 @@ export async function getLatestMmr(
     console.info(
         "LATEST MMR: Supabase verification required.",
         {
-            accountId:
-                normalizedAccountId,
 
             cacheExists:
                 Boolean(
@@ -272,8 +270,6 @@ export async function getLatestMmr(
                 console.warn(
                     "LATEST MMR: Supabase returned no snapshot; preserving KV fallback.",
                     {
-                        accountId:
-                            normalizedAccountId,
 
                         capturedAt:
                             cached.capturedAt
@@ -353,11 +349,6 @@ export async function getLatestMmr(
         console.info(
             "LATEST MMR: Supabase snapshot verified and cached.",
             {
-                accountId:
-                    normalizedAccountId,
-
-                snapshotId:
-                    snapshot.snapshotId,
 
                 capturedAt:
                     snapshot.capturedAt,
@@ -386,24 +377,12 @@ export async function getLatestMmr(
         console.error(
             "LATEST MMR: Supabase verification failed.",
             {
-                accountId:
-                    normalizedAccountId,
 
-                name:
-                    error?.name
-                    || "Error",
-
-                code:
-                    error?.code
-                    || null,
+                code: "MMR_READ_UNAVAILABLE",
 
                 status:
                     error?.status
                     || null,
-
-                message:
-                    error?.message
-                    || "Unknown error"
             }
         );
 
@@ -417,8 +396,6 @@ export async function getLatestMmr(
             console.warn(
                 "LATEST MMR: Returning stale KV fallback.",
                 {
-                    accountId:
-                        normalizedAccountId,
 
                     capturedAt:
                         cached.capturedAt,

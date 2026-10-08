@@ -53,23 +53,24 @@ const array = validator => value => Array.isArray(value) && value.length <= 1000
 const projection = fields => value => shape(value, fields, false);
 const empty = {};
 const actionFields = Object.freeze({
-    open: empty, join: { team: playingTeam }, leave: empty,
+    open: empty, join: { team }, leave: empty,
     kick_member: { memberCode: code("CMM"), reason: optional(text(500)) },
     transfer_host: { memberCode: code("CMM") }, assign_team: { memberCode: code("CMM"), team },
     resize: { teamACapacity: integer(1), teamBCapacity: integer(1) },
     set_join_policy: { joinPolicy }, set_allow_join_after_start: { allowJoinAfterStart: boolean },
+    set_spectator_settings: { allowSpectators: boolean, spectatorCapacity: value => value <= 8 ? integer(1)(value) : invalid() },
     begin_pregame: empty, start: empty, cancel: empty, close: empty, archive: empty,
     // targetAccountId deliberately has no browser schema. Targeted invites need a server resolver.
     create_invite: { maxUses: optional(value => value <= 100 ? integer(1)(value) : invalid()), expiresAt: optional(timestamp), team: optional(team) },
-    revoke_invite: { inviteCode: code("CMI") }, join_with_invite: { inviteCode: code("CMI"), team: optional(playingTeam) },
-    request_join: { team: optional(playingTeam) }, cancel_join_request: { requestCode: code("CMJ") },
-    approve_join: { requestCode: code("CMJ"), team: optional(playingTeam), reason: optional(text(500)) },
+    revoke_invite: { inviteCode: code("CMI") }, join_with_invite: { inviteCode: code("CMI"), team: optional(team) },
+    request_join: { team: optional(team) }, cancel_join_request: { requestCode: code("CMJ") },
+    approve_join: { requestCode: code("CMJ"), team: optional(team), reason: optional(text(500)) },
     reject_join: { requestCode: code("CMJ"), reason: optional(text(500)) }, allow_rejoin: { memberCode: code("CMM") }
 });
 const createFields = {
     gameKey: optional(enumOf(["rocketleague"])), modeKey: optional(text(120)), title: text(120), visibility: optional(visibility),
     joinPolicy: optional(joinPolicy), teamACapacity: optional(integer(1)), teamBCapacity: optional(integer(1)),
-    allowJoinAfterStart: optional(boolean), region: optional(nullable(boundedText(50))), mapName: optional(nullable(boundedText(120)))
+    allowJoinAfterStart: optional(boolean), allowSpectators: optional(boolean), spectatorCapacity: optional(value => value <= 8 ? integer(1)(value) : invalid()), region: optional(nullable(boundedText(50))), mapName: optional(nullable(boundedText(120)))
 };
 const versioned = { matchCode: code("CM"), expectedVersion: integer(1), idempotencyKey: uuid };
 const roundVersioned = { ...versioned, roundCode: code("CMRD"), expectedRoundVersion: integer(1) };
@@ -79,7 +80,7 @@ export const OPERATIONS = Object.freeze({
     rounds: "list_custom_match_rounds", voteResult: "get_custom_match_vote_result", playerResults: "get_custom_match_player_results",
     create: "create_custom_match", action: "apply_custom_match_action", beginRound: "begin_custom_match_round",
     openVote: "open_custom_match_vote", castVote: "cast_custom_match_vote", resolveVote: "resolve_custom_match_vote",
-    submitResult: "submit_custom_match_result", confirmResult: "confirm_custom_match_result"
+    submitResult: "submit_custom_match_result", confirmResult: "confirm_custom_match_result", adminTransferHost: "admin_transfer_custom_match_host"
 });
 
 export function validateCustomMatchRequest(operation, input, now = Date.now()) {
@@ -97,6 +98,7 @@ export function validateCustomMatchRequest(operation, input, now = Date.now()) {
         case "castVote": fields = { matchCode: code("CM"), roundCode: code("CMRD"), idempotencyKey: uuid, vote: object }; break;
         case "submitResult": fields = { ...versioned, teamAScore: integer(0), teamBScore: integer(0) }; break;
         case "confirmResult": fields = { ...versioned, resultCode: code("CMR") }; break;
+        case "adminTransferHost": fields = { ...versioned, targetMemberCode: code("CMM"), reason: text(500) }; break;
     }
     const result = shape(input, fields);
     if (operation === "action") {
@@ -104,8 +106,7 @@ export function validateCustomMatchRequest(operation, input, now = Date.now()) {
         if (result.payload.expiresAt && Date.parse(result.payload.expiresAt) <= now) invalid();
     }
     if (operation === "castVote") {
-        const votes = { player_target: { voteType: enumOf(["player_target"]), targetMemberCode: code("CMM") }, skip: { voteType: enumOf(["skip"]) },
-            yes_no: { voteType: enumOf(["yes_no"]), choiceKey: enumOf(["yes", "no"]) }, option: { voteType: enumOf(["option"]), choiceKey: value => text(200)(value).toLowerCase() } };
+        const votes = { player_target: { voteType: enumOf(["player_target"]), targetMemberCode: code("CMM") }, skip: { voteType: enumOf(["skip"]) } };
         if (!Object.hasOwn(votes, result.vote.voteType)) invalid();
         result.vote = shape(result.vote, votes[result.vote.voteType]);
     }
@@ -116,6 +117,7 @@ export function toCustomMatchRpcParameters(operation, input, accountId) {
     const actor = uuid(accountId);
     const p = {};
     if (["limits", "list"].includes(operation)) p.p_game_key = input.gameKey ?? "rocketleague";
+    else if (operation === "adminTransferHost") p.p_admin_account_id = actor;
     else p.p_actor_account_id = actor;
     if (input.matchCode) p.p_match_code = input.matchCode;
     if (input.roundCode) p.p_round_code = input.roundCode;
@@ -128,11 +130,12 @@ export function toCustomMatchRpcParameters(operation, input, accountId) {
     if (operation === "castVote") p.p_vote = input.vote;
     if (operation === "submitResult") Object.assign(p, { p_team_a_score: input.teamAScore, p_team_b_score: input.teamBScore });
     if (operation === "confirmResult") p.p_result_code = input.resultCode;
+    if (operation === "adminTransferHost") Object.assign(p, { p_target_member_code: input.targetMemberCode, p_expected_version: input.expectedVersion, p_reason: input.reason });
     return p;
 }
 
 const identityFields = { matchCode: code("CM"), title: text(120), gameKey: enumOf(["rocketleague"]), modeKey: text(120), modeVersion: integer(1), visibility, joinPolicy,
-    teamACapacity: integer(1), teamBCapacity: integer(1), allowJoinAfterStart: boolean, state, region: nullable(boundedText(50)), mapName: nullable(boundedText(120)) };
+    teamACapacity: integer(1), teamBCapacity: integer(1), allowJoinAfterStart: boolean, allowSpectators: optional(boolean), spectatorCapacity: optional(integer(1)), state, region: nullable(boundedText(50)), mapName: nullable(boundedText(120)) };
 const countFields = { teamACount: integer(0), teamBCount: integer(0), spectatorCount: integer(0), playerCount: integer(0) };
 const activityFields = { openedAt: nullable(timestamp), startedAt: nullable(timestamp), lastActivityAt: nullable(timestamp) };
 const scores = { teamAScore: nullable(integer(0)), teamBScore: nullable(integer(0)), winningTeam, resultSource, verificationStatus };
@@ -150,6 +153,7 @@ export function sanitizeCustomMatchResponse(operation, raw) {
         let fields;
         switch (operation) {
             case "limits": fields = { gameKey: enumOf(["rocketleague"]), maxTeamCapacity: integer(1), defaultTeamCapacity: integer(1), maxTotalParticipants: integer(2), defaultAllowJoinAfterStart: boolean,
+                defaultAllowSpectators: optional(boolean), defaultSpectatorCapacity: optional(integer(1)), maxSpectatorCapacity: optional(integer(1)),
                 modes: array(projection({ modeKey: text(120), displayName: text(120), modeVersion: integer(1), usesTeams: boolean, usesRounds: boolean, usesVoting: boolean,
                     defaultTeamACapacity: integer(1), defaultTeamBCapacity: integer(1), maxRounds: nullable(integer(1)) })) }; break;
             case "list": fields = { page: integer(1), pageSize: integer(1), total: integer(0), hasMore: boolean,
@@ -157,17 +161,18 @@ export function sanitizeCustomMatchResponse(operation, raw) {
             case "detail": fields = { match: projection({ ...identityFields, ...countFields, ...activityFields, ...roundCounts, ...scores, version: integer(1), gameMode: nullable(text(120)), hostDisplayName: text(120), createdAt: timestamp, closedAt: nullable(timestamp) }),
                 actor: nullable(projection({ isHost: boolean, isMember: boolean, memberCode: nullable(code("CMM")), team: nullable(team), memberRole: nullable(enumOf(["host", "player", "spectator"])), eligible: boolean, canJoin: boolean })),
                 members: array(projection({ memberCode: code("CMM"), displayName: text(120), team, memberRole: enumOf(["host", "player", "spectator"]), joinedAt: timestamp, joinedMatchState: state, joinedRoundNumber: nullable(integer(0)) })), capturedAt: timestamp }; break;
-            case "create": fields = { match: projection({ ...identityFields, version: integer(1), roundBased: boolean, usesVoting: boolean, hostMemberCode: code("CMM") }), credentials, capturedAt: timestamp }; break;
+            case "create": fields = { match: projection({ ...identityFields, version: integer(1), roundBased: boolean, usesVoting: boolean, hostMemberCode: code("CMM") }), capturedAt: timestamp }; break;
             case "credentials": fields = { matchCode: code("CM"), credentials, capturedAt: timestamp }; break;
+            case "adminTransferHost": fields = { matchCode: code("CM"), version: integer(1) }; break;
             case "invites": fields = { matchCode: code("CM"), invites: array(projection({ inviteCode: code("CMI"), targetDisplayName: nullable(boundedText(120)),
                 intendedTeam: nullable(team), maxUses: nullable(integer(1)), useCount: integer(0), remainingUses: nullable(integer(0)),
                 expiresAt: nullable(timestamp), createdAt: timestamp })), capturedAt: timestamp }; break;
             case "joinRequests": fields = { matchCode: code("CM"), requests: array(projection({ requestCode: code("CMJ"), displayName: nullable(boundedText(120)),
-                requestedTeam: nullable(playingTeam), status: enumOf(["pending"]), requestedAt: timestamp })), capturedAt: timestamp }; break;
+                requestedTeam: nullable(team), status: enumOf(["pending"]), requestedAt: timestamp })), capturedAt: timestamp }; break;
             case "memberHistory": fields = { matchCode: code("CM"), members: array(projection({ memberCode: code("CMM"), displayName: nullable(boundedText(120)),
                 team: nullable(team), memberRole: enumOf(["host", "player", "spectator"]), joinedAt: timestamp, leftAt: timestamp, joinedMatchState: state,
                 joinedRoundNumber: nullable(integer(0)), departureReason: nullable(enumOf(["left", "kicked", "match_closed", "disconnected", "removed_by_admin"])),
-                kickedByDisplayName: nullable(boundedText(120)), canAllowRejoin: boolean })), capturedAt: timestamp }; break;
+                kickedByDisplayName: nullable(boundedText(120)), rejoinAllowedAt: optional(nullable(timestamp)), canAllowRejoin: boolean })), capturedAt: timestamp }; break;
             case "action": fields = { matchCode: code("CM"), action: enumOf(Object.keys(actionFields)), previousVersion: integer(1), version: integer(1), memberCode: nullable(code("CMM")), inviteCode: nullable(code("CMI")), requestCode: nullable(code("CMJ")), capturedAt: timestamp }; break;
             case "rounds": fields = { matchCode: code("CM"), rounds: array(projection({ roundCode: code("CMRD"), roundNumber: integer(1), roundVersion: optional(integer(1)), state: text(40), startedAt: nullable(timestamp), votingOpenedAt: nullable(timestamp), votingClosedAt: nullable(timestamp), endedAt: nullable(timestamp), outcomeType: nullable(text(120)), outcomeKey: nullable(text(200)) })) }; break;
             case "beginRound": case "openVote": fields = { matchCode: code("CM"), roundCode: code("CMRD"), roundNumber: integer(1), roundState: enumOf([operation === "beginRound" ? "active" : "voting"]), matchVersion: integer(1), roundVersion: integer(1), [operation === "beginRound" ? "startedAt" : "votingOpenedAt"]: timestamp }; break;
@@ -200,6 +205,9 @@ const errors = {
     CUSTOM_MATCH_HOST_REQUIRED: 403, CUSTOM_MATCH_TEAM_FULL: 409, CUSTOM_MATCH_ALREADY_JOINED: 409,
     CUSTOM_MATCH_JOIN_FORBIDDEN: 403, CUSTOM_MATCH_JOIN_AUTHORIZATION_REQUIRED: 403, CUSTOM_MATCH_REJOIN_AFTER_KICK_FORBIDDEN: 403,
     CUSTOM_MATCH_HOST_TRANSFER_REQUIRED: 409, CUSTOM_MATCH_JOIN_AFTER_START_DISABLED: 409,
+    CUSTOM_MATCH_SPECTATORS_DISABLED: 403, CUSTOM_MATCH_SPECTATOR_CAPACITY_FULL: 409,
+    CUSTOM_MATCH_SPECTATOR_CAPACITY_BELOW_OCCUPANCY: 409, CUSTOM_MATCH_SPECTATORS_STILL_PRESENT: 409,
+    CUSTOM_MATCH_SETTINGS_LOCKED: 409, CUSTOM_MATCH_INVALID_SPECTATOR_CAPACITY: 400,
     CUSTOM_MATCH_CREDENTIALS_FORBIDDEN: 403, CUSTOM_MATCH_CREDENTIALS_UNAVAILABLE: 409,
     CUSTOM_MATCH_RESULT_ALREADY_EXISTS: 409, CUSTOM_MATCH_RESULT_SELF_CONFIRMATION_FORBIDDEN: 403, ACCOUNT_ACCESS_RESTRICTED: 403
 };

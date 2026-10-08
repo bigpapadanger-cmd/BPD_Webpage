@@ -20,7 +20,8 @@ async function authorize(request, env, permission = ADMIN_PERMISSIONS.ADMIN_SETT
 export async function onRequestGet({ request, env }) {
     try { await authorize(request, env); }
     catch (error) { return json({ success: false, error: error.code }, error.status); }
-    return json(await getSystemStatus(env));
+    try { return json(await getSystemStatus(env)); }
+    catch { return json({ success: false, error: "SYSTEM_STATUS_UNAVAILABLE" }, 503); }
 }
 
 export async function onRequestPost({ request, env }) {

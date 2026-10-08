@@ -77,6 +77,7 @@ export function getPageMetadata(pathname, search = "") {
     const description = privatePage ? "Manage your BPD Gaming Network account and authorized features."
         : path === "/RocketLeague/FindPlayers" ? "Find Rocket League players who have opted into public profile discovery."
         : path === "/FAQ" ? "Answers to common questions about BPD Gaming Network."
+        : path === "/RocketLeague/UE6" ? "Personal BPD opinions and comments about Rocket League's Unreal Engine 6 update."
         : path.startsWith("/RocketLeague") ? `${title.split(" | ")[0]}: Rocket League player tools and community features on BPD Gaming Network.`
         : `${title.split(" | ")[0]}: explore BPD Gaming Network game hubs, community resources and player tools.`;
     return { title, description, canonical: new URL(path, "https://bpd-gaming-network.com").href,
@@ -336,6 +337,16 @@ export const ROUTES = {
 
         sitemap:
             true
+    },
+
+    "/RocketLeague/UE6": {
+        title: "Rocket League on Unreal Engine 6 | BPD Gaming Network",
+        body: "/Tabs/RocketLeague/Features/HTML/ue6.html",
+        header: "/Framework/Shell/HTML/Header/header.html",
+        sidebar: "/Framework/Shell/HTML/Sidebar/rl_menu.html",
+        footer: "/Framework/Shell/HTML/Footer/footer.html",
+        module: null,
+        sitemap: true
     },
 
     "/RocketLeague/FindPlayers": {

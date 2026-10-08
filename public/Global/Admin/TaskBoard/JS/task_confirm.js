@@ -1,4 +1,5 @@
 "use strict";
+import { activateModalFocus, deactivateModalFocus } from "../../Shared/JS/modal_focus.js";
 
 /* =========================================================
 BPD GAMING NETWORK
@@ -612,6 +613,7 @@ function closeTaskConfirmInternal(
     ) {
         overlay.hidden =
             true;
+        deactivateModalFocus(overlay);
     }
 
     resetTaskConfirm();
@@ -943,6 +945,7 @@ export async function openTaskConfirm(
     ) {
         overlay.hidden =
             false;
+        activateModalFocus(overlay, () => closeTaskConfirmInternal());
     }
 
     synchronizeOverlayLock();

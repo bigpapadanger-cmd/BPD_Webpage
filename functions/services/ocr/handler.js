@@ -1,3 +1,4 @@
+import { sanitizeLogMetadata } from "../http/diagnostics.js";
 import { authorizeRocketLeagueRequest, authorizationErrorResponse } from "../rl/authorization.js";
 "use strict";
 
@@ -635,11 +636,11 @@ export async function handleOCRRequest(
     ) {
         console.error(
             "OCR request handler failed.",
-            {
+            sanitizeLogMetadata({
                 message:
                     error?.message
                     || "Unknown error"
-            }
+            })
         );
 
         return jsonResponse(

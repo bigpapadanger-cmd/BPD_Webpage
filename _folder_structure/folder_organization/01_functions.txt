@@ -1,6 +1,11 @@
 FUNCTIONS/: CLOUDFLARE PAGES API AND SERVICES
 Snapshot: 2026-10-07
 
+Continuation: api/admin/rocketleague/custom-match-host-recovery.js uses current
+Admin authorization and the fixed admin_transfer_custom_match_host RPC.
+The ordinary RL service refuses Admin recovery. Browser input has public
+match/member codes, version, idempotency and reason, never actor UUIDs.
+
 ROLE
 
 functions/ contains the Cloudflare Pages server-side layer. Files under api/
@@ -11,6 +16,7 @@ dependency direction is api/* -> services/* -> Cloudflare bindings/external APIs
 HIERARCHY
 
 functions/
++-- _middleware.js Function response security headers/API no-store; preserves WebSocket upgrades.
 +-- api/
 |   +-- internal/discord/task-summary.js Signed, replay-protected read-only scheduler aggregate.
 |   +-- auth/
@@ -65,6 +71,8 @@ functions/
     |   +-- discord_communications.js HMAC envelopes and bounded private Worker calls.
     |   +-- user_management.js, user_management_http.js
     |       system_status.js includes manual, read-only Discord bot connection checks; page reads use saved status.
+    |       Full server-estate health includes private Custom Match/communications reads, explicit disabled/unknown states,
+    |       bounded fetch/body/validation and isolated service failures; no health check creates a DO instance.
     +-- auth/
     |   +-- authentication.js, authorization.js
     |   +-- account/
@@ -92,6 +100,7 @@ functions/
     +-- config/api_vars.js
     +-- http/responses.js
     +-- http/json.js                Bounded request JSON reader.
+    +-- http/diagnostics.js         Request-local sanitized diagnostic projection shared by User Management, published FAQ and the leaderboard collector.
     +-- http/upstream.js            Full-operation deadlines and streamed provider response-size limits.
     +-- ocr/
     |   +-- confirm.js, handler.js, localize.js, storage.js
@@ -231,3 +240,37 @@ KEY CROSS-FOLDER CONNECTIONS
         -> read-only get_account_by_discord_subject for signed MatchBot commands
         -> existing verify_account_provider_identity for account-to-provider checks
 
+
+User Management list diagnostics (GET /api/admin/user-management): request-local,
+server-generated X-Debug-ID correlates one [USER MANAGEMENT DIAGNOSTIC] completion
+record. Optional diagnostic context follows existing session/account authorization
+and account-access RPCs, then admin_list_users decode/permissions/normalization.
+Only fixed stage/operation/RPC, allowlisted code, numeric upstream status, deadline
+state and elapsed time are logged. No request data, identity, credentials or raw
+error/payload is serialized. Other routes do not enable this context.
+Reproduce after an authorized release: sign in with an existing authorized User
+Management account, open /Admin/UserManagement, use Refresh once, capture the GET
+response X-Debug-ID in browser Network, and filter Pages server logs for that ID.
+Share only the diagnostic record and response status/error; do not export a HAR.
+No deployment or Supabase change is performed by this diagnostic implementation.
+
+Published FAQ diagnostics (GET /api/faq): server-generated X-Debug-ID correlates
+one [FAQ DIAGNOSTIC] completion record. Stages cover FAQ service/configuration,
+list_published_faqs fetch, bounded body read, decode, rejection and normalization.
+The existing complete-operation deadline and 2 MiB response cap remain unchanged.
+Success and failure remain no-store; browser JSON and curated static FAQ content
+are unchanged. Only operation/stage/RPC, allowlisted code, numeric upstream HTTP
+status, elapsed time and deadline/timeout state are logged, plus the debug ID.
+No credentials, environment values, request data or raw payload/error is logged.
+The shared http/diagnostics.js helper preserves the 2A logging/header contract.
+2A diagnostics: PASS locally. Production User Management root cause: BLOCKED
+pending authorized release and reproduction evidence; no speculative repair.
+2B production FAQ root cause likewise remains pending runtime evidence.
+Release validation: after a separately authorized release containing diagnostics,
+open /FAQ with browser Network tools active (or GET /api/faq directly), capture
+that response's X-Debug-ID, HTTP status and sanitized error, and filter Pages
+server logs for the matching [FAQ DIAGNOSTIC] record. Share that record only,
+not request headers, raw payloads or a HAR. Public GET requires no Admin session.
+No deployment, push or Supabase change is part of this workstream.
+
+HTTP shared utilities: diagnostics.js sanitizes operational metadata; responses.js offers opt-in internal-identifier projection. Auth session serializes accountScope using public/scripts/accountScope.js; canonical server identity remains internal.

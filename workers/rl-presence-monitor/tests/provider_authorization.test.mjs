@@ -23,7 +23,7 @@ test("registration API refuses missing consent, stale Epic, and inactive account
         const { env, records, calls } = fixture({ active: scenario !== "inactive", ageConsent: scenario !== "missing-consent" });
         if (scenario === "stale") records.delete("provider_auth_id:account-1:epic");
         const response = await handleRocketLeagueProfile(new Request("https://bpd.invalid/api/auth/rocketleague/profile", {
-            method: "POST", headers: { cookie: "bpd_session=test-session", "content-type": "application/json" },
+            method: "POST", headers: { Origin: "https://bpd.invalid", cookie: "bpd_session=test-session", "content-type": "application/json" },
             body: JSON.stringify({ accountId: "someone-else", EpicUniqueId: "forged-subject",
                 ageConsent: false, policyConsent: false })
         }), env);
@@ -315,7 +315,7 @@ test("browser policy distinguishes public, recovery, stale, and unavailable", as
         .replace(/import\s*\{[\s\S]*?\}\s*from\s*"\/scripts\/apiRoutes.js";/,
             'const BPD_AUTH_SESSION_URL="/api/auth/session", ROCKET_LEAGUE_SESSION_URL="/api/auth/rocketleague/session";');
     const client = await import(`data:text/javascript;base64,${Buffer.from(source).toString("base64")}`);
-    const state = { available: true, authenticated: true, userId: "account-1", active: true,
+    const state = { available: true, authenticated: true, accountScope: "bpd-v1-" + "a".repeat(64), active: true,
         providers: { epic: { linked: true, authorized: false } }, linkedProviders: ["epic"] };
     assert.equal(client.evaluateRouteAuth({}, state).allowed, true);
     assert.equal(client.evaluateRouteAuth({ required: true, recovery: true }, state).allowed, true);
@@ -365,7 +365,7 @@ test("registration saves draft before reauthorization and does not redirect on o
     source = source.replace(/import\s*\{[^}]*\}\s*from\s*"[^"]+";/g, "");
     const notificationsHelper = new URL("../../../public/Tabs/RocketLeague/shared/notificationsV2.js", import.meta.url).href;
     source = `import { isNotificationsV2 } from ${JSON.stringify(notificationsHelper)};\n` + source;
-    source += "\nregistrationDraftAccountId = 'account-1';\nexport { handleRegistrationAuthFailure };";
+    source += "\nregistrationDraftAccountScope = 'account-1';\nexport { handleRegistrationAuthFailure };";
     const oldDocument = globalThis.document, oldWindow = globalThis.window, oldStorage = globalThis.localStorage;
     const events = [];
     globalThis.document = { addEventListener() {}, getElementById() { return null; } };
@@ -402,4 +402,44 @@ test("RL homepage link endpoint redirects into Epic OAuth for unlinked and stale
         assert.ok(url.searchParams.get("state"));
         assert.match(response.headers.get("set-cookie"),new RegExp(linked?"reauthorize":"link"));
     }
+});
+
+test("profile read omits canonical IDs while preserving profile/access flags and server identity", async () => {
+    const { env, calls } = fixture();
+    const response = await handleRocketLeagueProfile(new Request("https://bpd.invalid/api/auth/rocketleague/profile", {
+        headers: { cookie: "bpd_session=test-session" }
+    }), env);
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.equal(body.profileExists, true);
+    assert.equal(body.authenticated, true);
+    for (const section of [body, body.user, body.profile]) {
+        for (const key of ["accountId", "userId", "rlPlayerId", "EpicUniqueId"]) assert.equal(Object.hasOwn(section, key), false);
+    }
+    assert.ok(calls.some(url => url.endsWith("get_rocketleague_profile_v2")));
+});
+
+test("RL session response preserves access flags without redundant canonical identifiers", async () => {
+    const { env, request } = fixture();
+    const response = await handleRocketLeagueSession(request, env);
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.equal(body.authenticated, true);
+    assert.equal(body.profileLoaded, true);
+    assert.equal(body.rocketLeagueAccess, true);
+    for (const section of [body, body.user]) for (const key of ["accountId", "userId", "rlPlayerId", "EpicUniqueId"]) assert.equal(Object.hasOwn(section, key), false);
+});
+
+test("global account session preserves draft scope and provider authorization without exposing provider subjects", async () => {
+    const { env, request } = fixture();
+    const response = await handleAuthSession(request, env);
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.equal(body.authenticated, true);
+    assert.equal(body.user.userId, undefined);
+    assert.match(body.user.accountScope, /^bpd-v1-[a-f0-9]{64}$/u);
+    assert.equal(body.providers.epic.linked, true);
+    assert.equal(body.providers.epic.authorized, true);
+    assert.equal(Object.hasOwn(body.providers.epic, "accountId"), false);
+    assert.equal(JSON.stringify(body.providers).includes("epic-subject"), false);
 });

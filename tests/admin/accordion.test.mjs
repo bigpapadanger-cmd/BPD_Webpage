@@ -59,6 +59,7 @@ async function suggestionModule() {
     source = source.replace(/import \{ ADMIN_SUGGESTIONS_API_URL, adminSuggestionReviewApiUrl \}[^;]+;/u,
         'const ADMIN_SUGGESTIONS_API_URL = "/pending"; const adminSuggestionReviewApiUrl = id => `/review/${id}`;');
     source = source.replace('"../../Shared/JS/accordion.js"', JSON.stringify(new URL("../../public/Global/Admin/Shared/JS/accordion.js", import.meta.url).href));
+    source = source.replace('"../../../../scripts/boundedRequest.js"', JSON.stringify(new URL("../../public/scripts/boundedRequest.js", import.meta.url).href));
     return import(`data:text/javascript;base64,${Buffer.from(source).toString("base64")}`);
 }
 
@@ -109,12 +110,12 @@ test("Suggestions timeout covers fetch and body decode, and malformed lists fail
             signal.addEventListener("abort", () => reject(new DOMException("Timed out", "AbortError")));
             queueMicrotask(() => deadline());
         });
-        await assert.rejects(module.requestSuggestionReview("/pending"), { name: "AbortError" });
+        await assert.rejects(module.requestSuggestionReview("/pending"), /The request timed out/);
         globalThis.fetch = async (_, { signal }) => ({ ok: true, json: async () => {
             deadline();
             if (signal.aborted) throw new DOMException("Body timed out", "AbortError");
         } });
-        await assert.rejects(module.requestSuggestionReview("/pending"), { name: "AbortError" });
+        await assert.rejects(module.requestSuggestionReview("/pending"), /The request timed out/);
         globalThis.fetch = async () => Response.json({ success: false, message: "private" });
         await assert.rejects(module.requestSuggestionReview("/pending"), /REVIEW_UNAVAILABLE/);
         assert.equal(cleared, 3);

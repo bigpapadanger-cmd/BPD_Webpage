@@ -5,6 +5,7 @@ import { initializeAdminAccordions } from "../../Shared/JS/accordion.js";
 import { beginVerificationNotice, finishVerificationNotice, showVerificationOutcome } from "/scripts/verificationNotice.js";
 import { getMmrControlModel } from "./mmr_controls.js";
 import { ROCKET_LEAGUE_CAPABILITIES, ROCKET_LEAGUE_CAPABILITY_CATEGORIES } from "./rocket_league_capabilities.js";
+import { boundedJson } from "/scripts/boundedRequest.js";
 
 const REQUIRED_PERMISSION = "admin.settings.manage";
 const DEPLOY_PERMISSION = "admin.mmr.deploy";
@@ -279,7 +280,7 @@ async function deployMmrWorker(button) {
 }
 
 function statusIcon(status) {
-    return ({ healthy: "✓", degraded: "!", down: "×", unknown: "?" })[String(status).toLowerCase()] || "?";
+    return ({ healthy: "✓", degraded: "!", down: "×", unavailable: "×", disabled: "—", unknown: "?" })[String(status).toLowerCase()] || "?";
 }
 
 function readableTime(value) {
@@ -307,7 +308,7 @@ async function forceRocketLeagueRefresh(event) {
     if (!canForceRocketLeagueRefresh || forceRefreshInFlight) return;
     const form = event.currentTarget;
     const accountId = String(form.elements.accountId.value || "").trim();
-    if (!form.reportValidity() || !window.confirm(`Refresh Rocket League data for BPD account ${accountId}? This calls the MMR Worker and may make six provider requests for career stats.`)) return;
+    if (!form.reportValidity() || !window.confirm(`Refresh Rocket League data for the selected BPD account? This calls the MMR Worker and may make six provider requests for career stats.`)) return;
     const button = document.getElementById("rlForceRefreshButton");
     const message = document.getElementById("rlForceRefreshMessage");
     forceRefreshInFlight = true;
@@ -323,7 +324,7 @@ async function forceRocketLeagueRefresh(event) {
         const result = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(result.error || "RL_FORCE_REFRESH_FAILED");
         renderForceRefreshResults(result);
-        message.textContent = result.success ? `Refresh finished for BPD account ${accountId}. Review each capability result below.` : `Refresh finished for BPD account ${accountId} without a capability update. Review individual results below.`;
+        message.textContent = result.success ? `Refresh finished for the selected BPD account. Review each capability result below.` : `Refresh finished for the selected BPD account without a capability update. Review individual results below.`;
     } catch (error) {
         message.textContent = `Refresh could not complete (${/^[A-Z0-9_]{3,80}$/.test(error.message) ? error.message : "RL_FORCE_REFRESH_FAILED"}).`;
     } finally {
@@ -605,12 +606,11 @@ async function loadRouteDiagnostics() {
 async function loadStatus() {
     if (requestInFlight) return requestInFlight;
     requestInFlight = (async () => {
-        const response = await fetch("/api/admin/system-status", { credentials: "same-origin", cache: "no-store", headers: { Accept: "application/json" } });
-        const payload = await response.json();
+        const { response, payload } = await boundedJson("/api/admin/system-status", { credentials: "same-origin", cache: "no-store", headers: { Accept: "application/json" } });
         if (!response.ok || payload.success !== true || !Array.isArray(payload.services)) throw new Error("Status unavailable");
         const groups = document.getElementById("workerStatusGroups");
         const previousGroups = new Map([...groups.querySelectorAll(".worker-status-group")].map(group => [group.dataset.status, { open: group.open, count: Number(group.dataset.count) || 0 }]));
-        const statusNames = { healthy: "Online", degraded: "Degraded", down: "Down", unknown: "Unknown" };
+        const statusNames = { healthy: "Healthy", degraded: "Degraded", unavailable: "Unavailable", disabled: "Disabled", unknown: "Unknown" };
         const groupedServices = new Map(Object.keys(statusNames).map(status => [status, []]));
         for (const service of payload.services) {
             const canonicalStatus = Object.hasOwn(statusNames, service.canonicalStatus) ? service.canonicalStatus : "unknown";
@@ -624,7 +624,7 @@ async function loadStatus() {
             group.setAttribute("data-admin-accordion", "");
             group.dataset.status = status;
             group.dataset.count = String(services.length);
-            const autoExpanded = ["degraded", "down"].includes(status) && services.length > 0;
+            const autoExpanded = ["degraded", "unavailable"].includes(status) && services.length > 0;
             group.open = previous
                 ? (autoExpanded && previous.count === 0 ? true : previous.open)
                 : autoExpanded;
@@ -634,7 +634,14 @@ async function loadStatus() {
             const list = document.createElement("ul");
             list.className = "worker-status-services";
             list.setAttribute("aria-label", `${statusNames[status]} services`);
-            for (const service of services) {
+            let family = null;
+            for (const service of [...services].sort((a, b) => (a.group || "Other").localeCompare(b.group || "Other"))) {
+            if (family !== (service.group || "Other")) {
+                family = service.group || "Other";
+                const heading = document.createElement("li");
+                heading.className = "worker-status-family";
+                heading.append(textElement("h3", family)); list.append(heading);
+            }
             const item = document.createElement("li");
             item.className = "worker-status-row";
             item.id = `worker-status-service-${service.id}`;
@@ -648,6 +655,11 @@ async function loadStatus() {
             identity.className = "worker-status-identity";
             const botService = service.id === "discord-matchbot" || service.id === "discord-authz-bot";
             identity.append(textElement("strong", service.name, "worker-status-name"), textElement("span", statusNames[rowStatus], `worker-status-label worker-status-${rowStatus}`));
+            if (service.checkedAt) {
+                const checked = textElement("time", `Checked ${readableTime(service.checkedAt)}`, "worker-status-checked");
+                checked.dateTime = service.checkedAt; identity.append(checked);
+            }
+            if (service.message || service.detail) identity.append(textElement("span", service.message || service.detail, "worker-status-reason"));
             primary.append(indicator, identity);
             const controls = getMmrControlModel(service, canDeployMmr);
             if (controls.actions.length) {
@@ -675,7 +687,7 @@ async function loadStatus() {
         initializeAdminAccordions(groups);
         const issues = document.getElementById("workerStatusIssues");
         if (issues) {
-            const attention = [...groupedServices.get("down"), ...groupedServices.get("degraded")];
+            const attention = [...groupedServices.get("unavailable"), ...groupedServices.get("degraded")];
             issues.textContent = attention.length ? `Needs attention: ${attention.map(service => `${service.name} (${statusNames[service.canonicalStatus]})`).join(", ")}` : "";
         }
         renderRocketLeagueCapabilities(payload.services);

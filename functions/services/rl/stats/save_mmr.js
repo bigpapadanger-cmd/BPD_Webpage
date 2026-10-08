@@ -1,3 +1,4 @@
+import { sanitizeLogMetadata } from "../../http/diagnostics.js";
 "use strict";
 
 /* =========================================================
@@ -387,7 +388,7 @@ export async function saveMmrStats(
 
     console.info(
         "MMR SNAPSHOT SAVE: Payload prepared.",
-        {
+        sanitizeLogMetadata({
             accountId:
                 normalizedAccountId,
 
@@ -416,7 +417,7 @@ export async function saveMmrStats(
 
             source:
                 payload.p_source
-        }
+        })
     );
 
     if (
@@ -429,13 +430,13 @@ export async function saveMmrStats(
     ) {
         console.error(
             "MMR SNAPSHOT SAVE: No supported competitive MMR found.",
-            {
+            sanitizeLogMetadata({
                 accountId:
                     normalizedAccountId,
 
                 epicAccountId:
                     normalizedEpicAccountId
-            }
+            })
         );
 
         const error =
@@ -468,13 +469,13 @@ export async function saveMmrStats(
 
     console.info(
         "MMR SNAPSHOT SAVE: Supabase RPC starting.",
-        {
+        sanitizeLogMetadata({
             accountId:
                 normalizedAccountId,
 
             endpoint:
                 url.href
-        }
+        })
     );
 
     const controller =
@@ -536,13 +537,13 @@ export async function saveMmrStats(
         ) {
             console.error(
                 "MMR SNAPSHOT SAVE: Supabase RPC timed out.",
-                {
+                sanitizeLogMetadata({
                     accountId:
                         normalizedAccountId,
 
                     timeoutMs:
                         REQUEST_TIMEOUT_MS
-                }
+                })
             );
 
             const timeoutError =
@@ -561,7 +562,7 @@ export async function saveMmrStats(
 
         console.error(
             "MMR SNAPSHOT SAVE: Supabase RPC unavailable.",
-            {
+            sanitizeLogMetadata({
                 accountId:
                     normalizedAccountId,
 
@@ -572,7 +573,7 @@ export async function saveMmrStats(
                 message:
                     error?.message
                     || "Unknown error"
-            }
+            })
         );
 
         const networkError =
@@ -596,7 +597,7 @@ export async function saveMmrStats(
 
     console.info(
         "MMR SNAPSHOT SAVE: Supabase RPC response received.",
-        {
+        sanitizeLogMetadata({
             accountId:
                 normalizedAccountId,
 
@@ -605,7 +606,7 @@ export async function saveMmrStats(
 
             ok:
                 response.ok
-        }
+        })
     );
 
     const responseText =
@@ -626,7 +627,7 @@ export async function saveMmrStats(
         catch {
             console.error(
                 "MMR SNAPSHOT SAVE: Supabase returned invalid JSON.",
-                {
+                sanitizeLogMetadata({
                     accountId:
                         normalizedAccountId,
 
@@ -643,7 +644,7 @@ export async function saveMmrStats(
                                 0,
                                 300
                             )
-                }
+                })
             );
 
             result =
@@ -656,7 +657,7 @@ export async function saveMmrStats(
     ) {
         console.error(
             "MMR SNAPSHOT SAVE: Supabase RPC failed.",
-            {
+            sanitizeLogMetadata({
                 accountId:
                     normalizedAccountId,
 
@@ -673,7 +674,7 @@ export async function saveMmrStats(
                             0,
                             300
                         )
-            }
+            })
         );
 
         const error =
@@ -713,7 +714,7 @@ export async function saveMmrStats(
     ) {
         console.error(
             "MMR SNAPSHOT SAVE: Invalid RPC result.",
-            {
+            sanitizeLogMetadata({
                 accountId:
                     normalizedAccountId,
 
@@ -729,7 +730,7 @@ export async function saveMmrStats(
                 playerId:
                     row?.player_id
                     || null
-            }
+            })
         );
 
         const error =
@@ -760,7 +761,7 @@ export async function saveMmrStats(
 
     console.info(
         "MMR SNAPSHOT SAVE: Snapshot saved successfully.",
-        {
+        sanitizeLogMetadata({
             accountId:
                 normalizedAccountId,
 
@@ -772,7 +773,7 @@ export async function saveMmrStats(
 
             refreshedAt:
                 saved.refreshedAt
-        }
+        })
     );
 
     /* =========================================================
@@ -842,7 +843,7 @@ export async function saveMmrStats(
 
         console.info(
             "MMR SNAPSHOT SAVE: Latest MMR cache updated.",
-            {
+            sanitizeLogMetadata({
                 accountId:
                     normalizedAccountId,
 
@@ -851,7 +852,7 @@ export async function saveMmrStats(
 
                 capturedAt:
                     saved.refreshedAt
-            }
+            })
         );
     }
     catch (
@@ -859,7 +860,7 @@ export async function saveMmrStats(
     ) {
         console.warn(
             "MMR SNAPSHOT SAVE: Latest MMR cache update failed.",
-            {
+            sanitizeLogMetadata({
                 accountId:
                     normalizedAccountId,
 
@@ -870,7 +871,7 @@ export async function saveMmrStats(
                 message:
                     error?.message
                     || "Unknown error"
-            }
+            })
         );
 
         latestCacheStored =

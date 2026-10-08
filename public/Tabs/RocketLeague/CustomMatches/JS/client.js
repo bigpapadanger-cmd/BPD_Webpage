@@ -6,16 +6,23 @@ const messages = {
     CUSTOM_MATCH_VERSION_CONFLICT: "This match changed. Its current state has been refreshed; review it before trying again.",
     CUSTOM_MATCH_NOT_FOUND: "This match was not found or is not available to you.",
     CUSTOM_MATCH_TEAM_FULL: "That team is full. Refresh the match to see available places.",
+    CUSTOM_MATCH_SPECTATORS_DISABLED: "Spectators are disabled for this match.",
+    CUSTOM_MATCH_SPECTATOR_CAPACITY_FULL: "All spectator places are occupied.",
+    CUSTOM_MATCH_SPECTATOR_CAPACITY_BELOW_OCCUPANCY: "Capacity cannot be reduced below the current spectator count.",
+    CUSTOM_MATCH_SPECTATORS_STILL_PRESENT: "Spectators must leave before spectators can be disabled.",
+    CUSTOM_MATCH_SETTINGS_LOCKED: "These settings are locked in the current match state.",
+    CUSTOM_MATCH_INVALID_SPECTATOR_CAPACITY: "Choose a valid spectator capacity within the configured limits.",
     CUSTOM_MATCH_ALREADY_JOINED: "You already joined this match.",
     CUSTOM_MATCH_HOST_REQUIRED: "Only the current host can do that.",
     CUSTOM_MATCH_HOST_TRANSFER_REQUIRED: "Transfer host ownership before leaving with other members present.",
     CUSTOM_MATCH_JOIN_AFTER_START_DISABLED: "This match does not allow joins after start.",
     CUSTOM_MATCH_JOIN_FORBIDDEN: "Joining this match is not allowed.",
-    CUSTOM_MATCH_JOIN_AUTHORIZATION_REQUIRED: "This match requires an invitation or approval. Those tools are not available yet.",
+    CUSTOM_MATCH_JOIN_AUTHORIZATION_REQUIRED: "This match requires an invitation code or host approval. Use the invitation or request-to-join controls.",
     CUSTOM_MATCH_SIGN_IN_REQUIRED: "Sign in to BPD to use Custom Matches.",
     CUSTOM_MATCH_ACCESS_DENIED: "An active, registered Rocket League account with required consent is needed.",
     ACCOUNT_ACCESS_RESTRICTED: "Account access is restricted.",
     CUSTOM_MATCH_INPUT_INVALID: "Check the fields and configured capacity limits.",
+    CUSTOM_MATCH_RUNTIME_DISABLED: "Live lobby readiness and voting are currently disabled.",
     CUSTOM_MATCH_RUNTIME_UNAVAILABLE: "The live lobby session is unavailable. Refresh the match or try again shortly.",
     CUSTOM_MATCH_NOT_READY: "Every player on both teams must be connected and ready before the host can start.",
     CUSTOM_MATCH_VOTE_TYPE_CONFLICT: "This voting window already uses a different vote type.",
@@ -107,7 +114,7 @@ export function createCustomMatchController({ call, publish, makeKey = () => cry
                     if (state.busy) { refreshAfterMutation = true; return; }
                     void detail(matchCode); return;
                 } else if (value.type === "vote_window" && typeof value.roundCode === "string"
-                    && (value.voteType === null || ["player_target", "skip", "yes_no", "option"].includes(value.voteType))) {
+                    && (value.voteType === null || ["player_target", "skip"].includes(value.voteType))) {
                     state.voteTypes = { ...state.voteTypes, [value.roundCode]: value.voteType };
                 } else if (value.type === "revoked") {
                     runtimeStopped = true; disconnectRuntime(); void detail(matchCode); return;
@@ -262,6 +269,7 @@ export function createCustomMatchController({ call, publish, makeKey = () => cry
     }
     async function sendMutation(transaction) {
         if (state.busy || state.credentialsPending || !state.access || disposed) return;
+        let created = false;
         clearCredentials();
         state.busy = true; state.retry = null; refreshAfterMutation = false; notice("Saving match change…");
         try {
@@ -273,6 +281,7 @@ export function createCustomMatchController({ call, publish, makeKey = () => cry
             if (detailFlight) await detailFlight.promise;
             refreshAfterMutation = false;
             await detail(matchCode);
+            created = !transaction.matchCode && state.detail?.match.matchCode === matchCode && state.detail?.actor?.isHost === true;
             notice(state.detail ? "Match change saved successfully." : "Match change saved, but the updated detail could not be loaded. Refresh match.", state.detail ? "success" : "error");
         } catch (error) {
             rejectAccess(error);
@@ -285,6 +294,7 @@ export function createCustomMatchController({ call, publish, makeKey = () => cry
                 notice(errorMessage(error), "error");
             }
         } finally { state.busy = false; refreshAfterMutation = false; emit(); }
+        if (created) await credentials();
     }
     async function create(options) {
         if (!state.access || !state.limits || state.busy || state.retry) return;

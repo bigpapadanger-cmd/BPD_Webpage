@@ -112,12 +112,7 @@ FOR UPLOADING GIT CHANGES:
         rel="stylesheet"
         href="/Global/404/CSS/404.css"
     >
-    <link
-        rel="stylesheet"
-        href="/Global/Links/links.css"
-    >
- 
-    <link
+<link
         rel="stylesheet"
         href="/Tabs/RocketLeague/Index/CSS/index.css"
     >

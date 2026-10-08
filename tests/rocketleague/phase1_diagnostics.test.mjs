@@ -21,7 +21,7 @@ test("rank reference configuration is playlist-specific, overridable and rejects
 
 test("normal activity does not collect MMR or consult old daily gates", async () => {
     globalThis.fetch = () => { throw new Error("no provider or database call"); };
-    const result = await refreshStatsWithGate({}, "server-account");
+    const result = await refreshStatsWithGate({ RL_STATS_CACHE: { get() { throw new Error("Old daily gate must not be read"); } } }, "server-account");
     assert.equal(result.scheduled, true);
     assert.equal(result.refreshed, false);
     assert.equal(result.reason, "HOURLY_SCHEDULER_OWNS_REFRESH");

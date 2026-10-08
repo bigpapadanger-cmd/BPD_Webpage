@@ -598,8 +598,7 @@ function getUnlinkErrorResponse(
                         false,
 
                     code:
-                        code
-                        || "PROVIDER_UNLINK_FAILED",
+                        "PROVIDER_UNLINK_FAILED",
 
                     message:
                         "The authentication provider could not be unlinked.",
@@ -619,6 +618,11 @@ export async function handleUnlinkProvider(
     request,
     env
 ) {
+    if (request.method !== "POST") return json({ success: false, code: "METHOD_NOT_ALLOWED" }, 405, { Allow: "POST" });
+    if (request.headers.get("Origin") !== new URL(request.url).origin
+        || request.headers.get("Sec-Fetch-Site") === "cross-site") {
+        return json({ success: false, code: "ORIGIN_REQUIRED", message: "Account changes must be made from this website." }, 403);
+    }
     const debugId =
         crypto.randomUUID();
 
@@ -801,10 +805,6 @@ export async function handleUnlinkProvider(
                         error?.upstreamStatus
                         || null,
 
-                    unlinkCode:
-                        error?.unlinkCode
-                        || null,
-
                     code: "UNLINK_RPC_FAILED"
                 }
             );
@@ -873,9 +873,7 @@ export async function handleUnlinkProvider(
 
                     provider,
 
-                    message:
-                        error?.message
-                        || "Unknown error"
+                    code: "SESSION_SYNCHRONIZATION_FAILED"
                 }
             );
 

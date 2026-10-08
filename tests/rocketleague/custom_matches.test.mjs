@@ -13,6 +13,25 @@ const savedFetch = globalThis.fetch;
 afterEach(() => { globalThis.fetch = savedFetch; });
 const env = { SUPABASE_URL: "https://db.example/rest/v1/", SUPABASE_SERVICE_ROLE_KEY: "test-service-only" };
 
+test("spectator requests preserve independent settings and reject invalid capacities", () => {
+    for (const capacity of [1, 4, 8]) assert.equal(validate("create", { idempotencyKey: nonce, options: { title: "Test", allowSpectators: true, spectatorCapacity: capacity } }).options.spectatorCapacity, capacity);
+    for (const capacity of [0, 9, 1.5, "4"]) assert.throws(() => validate("create", { idempotencyKey: nonce, options: { title: "Test", spectatorCapacity: capacity } }));
+    for (const action of ["join", "request_join", "approve_join", "join_with_invite"]) {
+        const payload = { team: "spectator", ...(action === "approve_join" ? { requestCode: "CMJabcdefghij" } : {}), ...(action === "join_with_invite" ? { inviteCode: "CMIabcdefghijkl" } : {}) };
+        assert.equal(validate("action", { ...versioned, action, payload }).payload.team, "spectator");
+    }
+    assert.deepEqual(validate("action", { ...versioned, action: "set_spectator_settings", payload: { allowSpectators: false, spectatorCapacity: 4 } }).payload, { allowSpectators: false, spectatorCapacity: 4 });
+});
+
+test("unsupported voting never reaches resolver and Admin recovery has strict public input", () => {
+    for (const voteType of ["yes_no", "option"]) assert.throws(() => validate("castVote", { matchCode, roundCode, idempotencyKey: nonce, vote: { voteType, choiceKey: "yes" } }));
+    const input = validate("adminTransferHost", { ...versioned, targetMemberCode: memberCode, reason: " Host abandoned match " });
+    assert.deepEqual(parameters("adminTransferHost", input, account), { p_admin_account_id: account, p_match_code: matchCode, p_idempotency_key: nonce, p_target_member_code: memberCode, p_expected_version: 5, p_reason: "Host abandoned match" });
+    assert.throws(() => validate("adminTransferHost", { ...input, reason: " " }));
+    assert.throws(() => validate("adminTransferHost", { ...input, role: "admin" }));
+    assert.deepEqual(sanitize("adminTransferHost", { success: true, matchCode, version: 6, accountId: account }), { success: true, matchCode, version: 6 });
+});
+
 test("strict create supports asymmetric capacities and leaves defaults to database", () => {
     assert.deepEqual(validate("create", { idempotencyKey: nonce, options: { title: " Test ", teamACapacity: 1, teamBCapacity: 15 } }),
         { idempotencyKey: nonce, options: { title: "Test", teamACapacity: 1, teamBCapacity: 15 } });
@@ -38,7 +57,7 @@ test("reject targeted UUID, unknown action, expired invite, wrong external IDs a
     }
 });
 test("vote schemas reject weights and mixed type fields", () => {
-    for (const vote of [{ voteType: "player_target", targetMemberCode: memberCode }, { voteType: "skip" }, { voteType: "yes_no", choiceKey: "yes" }, { voteType: "option", choiceKey: " TEST " }]) {
+    for (const vote of [{ voteType: "player_target", targetMemberCode: memberCode }, { voteType: "skip" }]) {
         assert.ok(validate("castVote", { matchCode, roundCode, idempotencyKey: nonce, vote }));
         assert.throws(() => validate("castVote", { matchCode, roundCode, idempotencyKey: nonce, vote: { ...vote, weight: 99 } }));
     }

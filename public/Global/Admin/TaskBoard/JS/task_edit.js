@@ -1,4 +1,5 @@
 "use strict";
+import { activateModalFocus, deactivateModalFocus } from "../../Shared/JS/modal_focus.js";
 
 /* =========================================================
 BPD GAMING NETWORK
@@ -1241,6 +1242,7 @@ export async function openTaskEdit(
     ) {
         overlay.hidden =
             false;
+        activateModalFocus(overlay, () => closeTaskEdit());
     }
 
     document.documentElement.classList.add(
@@ -1271,10 +1273,12 @@ export function closeTaskEdit() {
     ) {
         overlay.hidden =
             true;
+        deactivateModalFocus(overlay);
     }
 
-    document.documentElement.classList.remove(
-        "task-overlay-open"
+    document.documentElement.classList.toggle(
+        "task-overlay-open",
+        [...document.querySelectorAll(".task-overlay")].some(item => item.hidden === false)
     );
 
     taskEditState.taskCode =
@@ -1361,6 +1365,7 @@ async function handleTaskEditSubmit(
             );
         }
 
+        setSubmitting(false);
         closeTaskEdit();
     }
     catch (

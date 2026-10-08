@@ -1,3 +1,4 @@
+import { sanitizeLogMetadata } from "../../../functions/services/http/diagnostics.js";
 "use strict";
 
 
@@ -346,13 +347,13 @@ async function deleteProgressObject(
     ) {
         console.warn(
             "[OCR QUEUE] Temporary progress cleanup failed.",
-            {
+            sanitizeLogMetadata({
                 jobId,
                 message:
                     normalizeErrorMessage(
                         error
                     )
-            }
+            })
         );
     }
 }
@@ -533,13 +534,13 @@ async function markJobFailed(
     ) {
         console.warn(
             "[OCR QUEUE] Could not read status while marking failure.",
-            {
+            sanitizeLogMetadata({
                 jobId,
                 message:
                     normalizeErrorMessage(
                         statusError
                     )
-            }
+            })
         );
 
         return;
@@ -642,13 +643,13 @@ async function markJobFailed(
     ) {
         console.warn(
             "[OCR QUEUE] Could not mark job as failed.",
-            {
+            sanitizeLogMetadata({
                 jobId,
                 message:
                     normalizeErrorMessage(
                         writeError
                     )
-            }
+            })
         );
     }
 }
@@ -673,7 +674,7 @@ function scheduleDebugTrace(
                 ) {
                     console.warn(
                         "[OCR QUEUE] Debug trace failed.",
-                        {
+                        sanitizeLogMetadata({
                             jobId:
                                 trace?.jobId
                                 || null,
@@ -686,7 +687,7 @@ function scheduleDebugTrace(
                                 normalizeErrorMessage(
                                     error
                                 )
-                        }
+                        })
                     );
                 }
             );
@@ -1022,7 +1023,7 @@ async function processMessage(
         );
 
         console.log(
-            `[OCR QUEUE] Processor still active ${jobId}`
+            `[OCR QUEUE] Processor still active request`
         );
 
         /*
@@ -1224,7 +1225,7 @@ async function processMessage(
         );
 
         console.log(
-            `[OCR QUEUE] Processor still active ${jobId}`
+            `[OCR QUEUE] Processor still active request`
         );
 
         return {
@@ -1420,7 +1421,7 @@ async function processMessage(
     );
 
     console.log(
-        `[OCR QUEUE] Completed ${jobId}`
+        `[OCR QUEUE] Completed request`
     );
 
     return {
@@ -1557,7 +1558,7 @@ export async function handleQueueBatch(
             failures += 1;
             console.error(
                 "[OCR QUEUE] Job failed.",
-                {
+                sanitizeLogMetadata({
                     jobId:
                         jobId
                         || null,
@@ -1580,7 +1581,7 @@ export async function handleQueueBatch(
                             message?.attempts
                         )
                         || null
-                }
+                })
             );
 
             traceMessageFailure(
@@ -1651,12 +1652,12 @@ async function handleScheduledCleanup(
     ) {
         console.error(
             "[OCR CLEANUP] Scheduled cleanup failed.",
-            {
+            sanitizeLogMetadata({
                 message:
                     normalizeErrorMessage(
                         error
                     )
-            }
+            })
         );
 
         throw error;

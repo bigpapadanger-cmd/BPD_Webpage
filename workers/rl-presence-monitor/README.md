@@ -96,3 +96,7 @@ Worker cycle contract tests live under `tests/`. DomainData's public response
 sanitization and page behavior tests live under `../../tests/rocketleague/`.
 No migration, deployment, or Supabase change is performed by this Worker
 documentation.
+
+MMR eligibility is controlled by Supabase mmr_due: null prior success or >=3
+hours. The hourly scan is unchanged. Provider/history/club remain 60 minutes,
+career stats 24 hours and Discord 12 hours. KV never overrides mmr_due.

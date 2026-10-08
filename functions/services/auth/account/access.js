@@ -28,10 +28,12 @@ function getConfiguration(env) {
     return { base, key };
 }
 
-async function callRpc(env, name, args, fetcher = fetch) {
+async function callRpc(env, name, args, fetcher = fetch, diagnostics = null) {
+    diagnostics?.mark("account_access_configuration", name);
     const { base, key } = getConfiguration(env);
     try {
         return await withUpstreamDeadline(async signal => {
+            diagnostics?.mark("account_access_fetch_body", name);
             const response = await fetchBoundedResponse(`${base}/rest/v1/rpc/${name}`, {
                 method: "POST",
                 signal,
@@ -44,11 +46,24 @@ async function callRpc(env, name, args, fetcher = fetch) {
                     "Accept-Profile": "api"
                 },
                 body: JSON.stringify(args)
-            }, 16 * 1024, fetcher);
-            if (!response.ok) throw unavailable();
+            }, 16 * 1024, async (url, init) => {
+                const upstream = await fetcher(url, init);
+                diagnostics?.upstream(upstream.status);
+                return upstream;
+            });
+            diagnostics?.mark("account_access_decode", name);
+            diagnostics?.upstream(response.status);
+            if (!response.ok) {
+                let body;
+                if (diagnostics) { try { body = await response.json(); } catch {} }
+                diagnostics?.upstream(response.status, body?.code);
+                throw unavailable();
+            }
             return await response.json();
         });
-    } catch {
+    } catch (error) {
+        if (error?.code?.startsWith("UPSTREAM_")) diagnostics?.upstream(undefined, error.code);
+        if (error?.code === "UPSTREAM_TIMEOUT") diagnostics?.markTimeout?.();
         throw unavailable();
     }
 }
@@ -81,24 +96,27 @@ function normalizeAccessState(value) {
     };
 }
 
-export async function getAccountAccessState(env, accountId, fetcher = fetch) {
+export async function getAccountAccessState(env, accountId, fetcher = fetch, diagnostics = null) {
     if (typeof accountId !== "string" || !accountId.trim()) throw unavailable();
-    return normalizeAccessState(await callRpc(env, "get_account_access_state", { p_account_id: accountId.trim() }, fetcher));
+    const result = await callRpc(env, "get_account_access_state", { p_account_id: accountId.trim() }, fetcher, diagnostics);
+    diagnostics?.mark("account_access_normalization", "get_account_access_state");
+    return normalizeAccessState(result);
 }
 
-export async function canAccountPerform(env, accountId, action, fetcher = fetch) {
+export async function canAccountPerform(env, accountId, action, fetcher = fetch, diagnostics = null) {
     const normalized = typeof action === "string" ? action.trim().toLowerCase() : "";
     if (typeof accountId !== "string" || !accountId.trim() || !ACCOUNT_ACTIONS.has(normalized)) throw unavailable();
-    const allowed = await callRpc(env, "can_account_perform", { p_account_id: accountId.trim(), p_action: normalized }, fetcher);
+    const allowed = await callRpc(env, "can_account_perform", { p_account_id: accountId.trim(), p_action: normalized }, fetcher, diagnostics);
+    diagnostics?.mark("account_access_normalization", "can_account_perform");
     if (typeof allowed !== "boolean") throw unavailable();
     return allowed;
 }
 
-export async function assertAccountCanPerform(env, accountId, action, fetcher = fetch) {
+export async function assertAccountCanPerform(env, accountId, action, fetcher = fetch, diagnostics = null) {
     const normalized = typeof action === "string" ? action.trim().toLowerCase() : "";
-    const state = await getAccountAccessState(env, accountId, fetcher);
+    const state = await getAccountAccessState(env, accountId, fetcher, diagnostics);
     if (!state.exists) throw new AccountAccessError("ACCOUNT_ACCESS_RESTRICTED", 403, "Account access is restricted.", state);
-    if (await canAccountPerform(env, accountId, normalized, fetcher)) return state;
+    if (await canAccountPerform(env, accountId, normalized, fetcher, diagnostics)) return state;
     const code = state.state === "suspended" ? "ACCOUNT_SUSPENDED"
         : RL_ACTIONS.has(normalized) && state.rocketLeague.exists && !state.rocketLeague.active ? "ROCKET_LEAGUE_DISABLED"
             : "ACCOUNT_ACCESS_RESTRICTED";

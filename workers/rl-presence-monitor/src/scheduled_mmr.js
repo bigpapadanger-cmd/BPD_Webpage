@@ -1,3 +1,4 @@
+import { sanitizeLogMetadata } from "../../../functions/services/http/diagnostics.js";
 import { verifyBackgroundEpicAccount } from "../../../functions/services/rl/authorization.js";
 "use strict";
 
@@ -1053,7 +1054,7 @@ export async function runScheduledMmrRefresh(
 
             console.error(
                 "SCHEDULED MMR: Player refresh failed.",
-                {
+                sanitizeLogMetadata({
                     accountId:
                         candidate.accountId,
 
@@ -1071,7 +1072,7 @@ export async function runScheduledMmrRefresh(
                     message:
                         result.reason?.message
                         || "Unknown error"
-                }
+                })
             );
 
             results.push({

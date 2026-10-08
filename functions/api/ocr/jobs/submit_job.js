@@ -1,3 +1,4 @@
+import { sanitizeLogMetadata } from "../../../services/http/diagnostics.js";
 import { authorizeRocketLeagueRequest, authorizationErrorResponse } from "../../../services/rl/authorization.js";
 "use strict";
 
@@ -878,14 +879,14 @@ export async function onRequestPost(
 
             console.error(
                 "[OCR SUBMIT] Queue send failed.",
-                {
+                sanitizeLogMetadata({
                     jobId,
 
                     message:
                         failedStatus
                             .error
                             .message
-                }
+                })
             );
 
             return jsonResponse(
@@ -961,7 +962,7 @@ export async function onRequestPost(
     ) {
         console.error(
             "OCR job submission failed:",
-            error
+            sanitizeLogMetadata(error)
         );
 
         return jsonResponse(

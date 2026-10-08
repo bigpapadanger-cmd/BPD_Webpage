@@ -110,9 +110,9 @@ export function renderHeader({
                             ${eyebrow}
                         </span>
 
-                        <h1 class="header-title">
+                        <p class="header-title">
                             ${title}
-                        </h1>
+                        </p>
                     </div>
                 </div>
 

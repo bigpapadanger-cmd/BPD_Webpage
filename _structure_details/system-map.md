@@ -390,9 +390,15 @@ transport contract, boundaries, and operator sequence.
   Player RPC during the hourly health sweep and explicit Recheck. The hourly
   Rocket League monitor cron also runs the same Supabase, MMR readiness,
   provider-runtime, and MatchBot checkers, persisting normalized state to the
-  existing shared status KV. Backend canonical statuses drive Online,
-  Degraded, Down, and Unknown accordion groups; operational results older than
-  two hours become Unknown/stale without being reclassified as Down. The OCR
+  existing shared status KV. Backend canonical statuses drive Healthy,
+  Degraded, Unavailable, Disabled, and Unknown accordion groups; operational results older than
+  two hours become Unknown/stale without being reclassified as Unavailable. Private
+  read-only health routes cover the communications and Custom Match Workers;
+  explicit disablement skips those calls. CustomMatchSession availability is
+  reported separately without creating or probing a match instance. The temporary
+  Google diagnostic Worker is a diagnostic-only retirement candidate, not an
+  assumed healthy production dependency. Complete adapter deadlines include body
+  decoding and validation, and failed adapters remain isolated. The OCR
   queue is read from a per-invocation heartbeat. Service-specific actions use
   an explicit allowlist;
   only RL presence has `Run Now`, while MMR/PsyNet has `Reconnect` and
@@ -442,3 +448,61 @@ field keeps an existing name locked until the account contract is confirmed.
 Image fallback requests use the existing `/Assets/images/bad_image/fallback.png`;
 the unavailable Steam icon has no image request. See
 [Account Settings sub-map](system_sub_map/account-settings.md).
+
+## Applied 3A / 3E contracts (2026-10-07)
+
+The hourly scanner obeys Supabase due flags: MMR at/after 3 hours or no prior
+success; provider/history/club 60 minutes; career stats 24 hours; Discord 12 hours.
+Old daily KV gates have no automatic caller. Login/registration compatibility
+returns scheduler ownership, Admin force bypasses legacy timing, and latest-MMR
+KV verification is a read concern, not a collection gate. No cadence change is
+needed in the scanner and no database changes are pending.
+
+Find Players searches BPD account display name only through the applied SQL RPC.
+Case/whitespace normalization and scoring stay database-side: edit distance <=2
+OR max(trigram, normalized Levenshtein) >=0.80. DTOs retain match_percent (finite
+numeric 0..100) unchanged; non-exact cards round the display badge and exact
+matches omit it. Server ordering and empty results are preserved. Provider
+names/aliases/IDs are never used as local search keys. Active-account/player and
+find_profile_enabled eligibility remain database-side. Tests use fixed contract
+fixtures, including 91.67 for bruck dager; they do not reimplement SQL scoring.
+
+## 1B/1C response boundary update (2026-10-07)
+
+Pages functions/_middleware.js applies existing static security headers to
+Function responses and no-store to /api/ responses. Admin writes under /api/admin/
+and /api/auth/admin/ require exact same-origin Origin before route dispatch;
+route authorization remains mandatory. Signed /api/internal/ ingress retains its
+existing signature/replay controls. Status-101 upgrades preserve their transport.
+Logout is same-origin POST; GET returns 405. Profile writes and provider unlink
+check Origin before authorization/upstream work. RL profile HTTP projections omit
+canonical account/player/snapshot keys, retaining server RPC/cache identity.
+Session userId and Admin User Management/force-refresh targets remain required
+existing authorized contracts. Detailed audit: deep-clean-hardening.md.
+
+## Final local trust/UI boundaries (2026-10-07)
+
+Global session HTTP returns user.accountScope, a versioned SHA-256 UI namespace,
+instead of user.userId. Canonical server account resolution/RPC identities are
+unchanged. Scope is correlatable and is not authorization or anonymization.
+Account activity checks and RL adapters use this browser field. Registration
+awaits matching legacy UUID-key draft migration and invalidates ownership on
+account changes; unrelated/unscoped drafts and failed writes are preserved.
+No new storage service, resolver, network request or polling is introduced.
+
+HTTP responses.js owns opt-in recursive identifier projection used by RL profile
+and RL session. Existing diagnostics.js also sanitizes legacy server log fields
+with fixed operational allowlists; 2A/2B/2C diagnostics remain unchanged.
+
+Admin Shared modal_focus.js owns stacked focus containment, inert background,
+focus return and navigation cleanup for existing Task Board overlays. FAQ and
+Admin Suggestions reuse boundedRequest.js through body decoding. Shell title is
+a paragraph; route content supplies the primary heading. OCR runtime/review
+consumers import their policy when needed. Orphan Global/Links assets and unused
+master CSS imports were removed; no current route was removed.
+
+Static and Function boundaries stage report-only object/base/frame/form and
+Trusted Types restrictions; HTTPS HSTS lasts 300 seconds without subdomains or
+preload. CSP enforcement, reporting collection, COOP and production compatibility
+are acceptance gates, not locally proven production controls.
+See deep-clean-final-local.md for verification, retained contracts and release gates.

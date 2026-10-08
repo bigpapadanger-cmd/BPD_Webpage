@@ -61,7 +61,7 @@ body.page-loading .site-content {
 }
 
 @keyframes route-loading-shimmer {
-    to { background-position-x: -200%; }
+    50% { opacity: .5; }
 }
 
 .verification-action-result {
@@ -202,10 +202,7 @@ SITE CONTENT
         transparent;
     opacity: 1;
 
-    transition:
-        opacity 0.15s ease;
-    transition:
-        padding-left 0.25s ease;
+    transition: opacity 0.15s ease, padding-left 0.25s ease;
 }
 
 /* =========================================================
@@ -224,6 +221,15 @@ body.sidebar-collapsed
                 --sidebar-content-gap
             )
         );
+}
+
+/* Mobile navigation overlays the page instead of squeezing its reading area. */
+@media (max-width: 700px) {
+    body .site-content,
+    body.sidebar-collapsed .site-content {
+        padding-left: calc(var(--sidebar-collapsed-width) + var(--sidebar-content-gap));
+        transition: opacity .15s ease;
+    }
 }
 
 /* =========================================================

@@ -1,3 +1,4 @@
+import { sanitizeLogMetadata } from "../../../functions/services/http/diagnostics.js";
 "use strict";
 
 import {
@@ -120,14 +121,14 @@ async function cleanupDurableJobs(
             ) {
                 console.error(
                     "[OCR CLEANUP] Job cleanup failed.",
-                    {
+                    sanitizeLogMetadata({
                         key:
                             object.key,
                         message:
                             normalizeErrorMessage(
                                 error
                             )
-                    }
+                    })
                 );
             }
         }
@@ -900,7 +901,7 @@ async function cleanupOrphanedProgress(
             ) {
                 console.warn(
                     "[OCR CLEANUP] Progress sweep failed.",
-                    {
+                    sanitizeLogMetadata({
                         key:
                             object?.key
                             || null,
@@ -908,7 +909,7 @@ async function cleanupOrphanedProgress(
                             normalizeErrorMessage(
                                 error
                             )
-                    }
+                    })
                 );
             }
         }
@@ -1045,13 +1046,13 @@ async function deleteProgressObject(
     ) {
         console.warn(
             "[OCR CLEANUP] Could not delete temporary progress.",
-            {
+            sanitizeLogMetadata({
                 progressKey,
                 message:
                     normalizeErrorMessage(
                         error
                     )
-            }
+            })
         );
     }
 }
@@ -1227,7 +1228,7 @@ async function safeWriteOcrDebugTrace(
     ) {
         console.warn(
             "[OCR CLEANUP] Debug trace failed.",
-            {
+            sanitizeLogMetadata({
                 jobId:
                     trace?.jobId
                     || null,
@@ -1238,7 +1239,7 @@ async function safeWriteOcrDebugTrace(
                     normalizeErrorMessage(
                         error
                     )
-            }
+            })
         );
     }
 }

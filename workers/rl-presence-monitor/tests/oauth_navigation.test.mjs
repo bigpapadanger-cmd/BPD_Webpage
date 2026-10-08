@@ -117,7 +117,7 @@ test("Account rebinds new markup and does not redirect on an auth outage or off-
     context.pageApi.handleAuthStateChanged({ available: true, authenticated: false });
 });
 
-test("registration restores a draft after healthy reauthorization without overwriting a complete profile", async () => {
+test("registration restores a draft until authoritative registration and access are accepted", async () => {
     let source = await readFile(new URL("../../../public/Tabs/RocketLeague/Registration/JS/index.js", import.meta.url), "utf8");
     source = source.replace(/import\s*\{[\s\S]*?\}\s*from\s*"[^"]+";/g, "")
         .replace("export async function initializePage", "async function initializePage");
@@ -134,8 +134,9 @@ test("registration restores a draft after healthy reauthorization without overwr
     assert.equal(applied[0], draft);
     assert.match(messages[0], /confirm the required consent/);
     assert.equal(context.restore({ profileLoaded: false, profile: { profileComplete: false } }), true);
-    assert.equal(context.restore({ profileLoaded: true, profile: { profileComplete: true } }), false);
-    assert.equal(applied.length, 2);
+    assert.equal(context.restore({ profileLoaded: true, profile: { profileComplete: true } }), true);
+    assert.equal(context.restore({ profileLoaded: true, registrationAccepted: true, rocketLeagueAccess: true, profile: { profileComplete: false } }), false);
+    assert.equal(applied.length, 3);
 });
 
 test("unlink success followed by a session outage stays on Account; confirmed logout redirects", async () => {
@@ -192,7 +193,7 @@ test("registration drafts stay with their BPD account and never restore unowned 
     } };
     vm.runInNewContext(source + `
         this.drafts = { save: saveRegistrationDraft, read: readRegistrationDraft, clear: clearRegistrationDraft,
-            owner(value) { registrationDraftAccountId = value; } };
+            owner(value) { registrationDraftAccountScope = value; } };
     `, context);
     const { drafts } = context;
     drafts.owner("account-a");

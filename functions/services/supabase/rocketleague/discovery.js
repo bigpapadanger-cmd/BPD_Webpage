@@ -104,6 +104,8 @@ function sanitizeSearchResult(value) {
     if (!profile) return null;
     return {
         public_profile_id: profile.public_profile_id,
+        ...(typeof value.match_percent === "number" && Number.isFinite(value.match_percent) && value.match_percent >= 0 && value.match_percent <= 100
+            ? { match_percent: value.match_percent } : {}),
         display_name: profile.display_name,
         epic_display_name: profile.epic_display_name,
         rl_platform: profile.rl_platform,

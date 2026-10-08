@@ -328,3 +328,65 @@ test("FAQ provider malformed/oversized responses and header timeout fail closed"
     response = await pending; assert.equal(response.status, 503); assert.equal((await response.json()).error, "FAQ_UNAVAILABLE");
     t.mock.timers.reset();
 });
+
+
+test("published FAQ diagnostics correlate stages and redact upstream/request secrets", async () => {
+    const secret = "private@example.test Bearer private-token provider-subject " + actor;
+    const cases = [
+        [env, () => Response.json(published), 200, "response_normalization", 200, null],
+        [{}, () => { throw new Error("Must not fetch"); }, 503, "configuration", null, "FAQ_UNAVAILABLE"],
+        [{ ...env, SUPABASE_URL: "http://invalid.example" }, () => { throw new Error("Must not fetch"); }, 503, "configuration", null, "FAQ_UNAVAILABLE"],
+        [env, () => { throw new Error(secret); }, 503, "rpc_fetch", null, "UPSTREAM_UNAVAILABLE"],
+        [env, () => Response.json({ code: "PGRST202", message: secret, details: secret }, { status: 404 }), 503, "rpc_rejected", 404, "PGRST202"],
+        [env, () => Response.json({ code: secret, message: secret }, { status: 500 }), 503, "rpc_rejected", 500, "UPSTREAM_REJECTED"],
+        [env, () => new Response(secret), 503, "response_decode", 200, "UNRECOGNIZED_ERROR"],
+        [env, () => new Response(""), 503, "response_decode", 200, "UNRECOGNIZED_ERROR"],
+        [env, () => Response.json({ success: true, capturedAt: now, faqs: [{ ...faq, publicationState: "draft", email: secret }] }), 503, "response_normalization", 200, "FAQ_RESPONSE_INVALID"],
+        [env, () => new Response(secret, { headers: { "Content-Length": "3000000" } }), 503, "body_read", 200, "UPSTREAM_RESPONSE_TOO_LARGE"]
+    ];
+    const originalInfo = console.info, originalFetch = globalThis.fetch;
+    let log;
+    console.info = (label, value) => { assert.equal(label, "[FAQ DIAGNOSTIC]"); log = value; };
+    try {
+        for (const [runtime, fetcher, status, stage, upstreamStatus, code] of cases) {
+            globalThis.fetch = fetcher;
+            const response = await publicRoute({ request: request("/api/faq", undefined, { cookie: secret, authorization: secret, "X-Debug-ID": secret }), env: runtime });
+            assert.equal(response.status, status);
+            assert.equal(response.headers.get("Cache-Control"), "no-store");
+            assert.equal(response.headers.get("X-Debug-ID"), log.debugId);
+            assert.match(log.debugId, /^[0-9a-f-]{36}$/);
+            assert.equal(log.stage, stage); assert.equal(log.rpc, "list_published_faqs");
+            assert.equal(log.operation, "published_faqs"); assert.equal(log.upstreamStatus, upstreamStatus);
+            assert.equal(log.code, code); assert.equal(log.timeout, false); assert.ok(log.elapsedMs >= 0);
+            const body = await response.json();
+            if (status === 200) assert.deepEqual(body, published);
+            else assert.deepEqual(body, { success: false, error: stage === "response_normalization" ? "FAQ_RESPONSE_INVALID" : "FAQ_UNAVAILABLE", message: "FAQ services are temporarily unavailable. Please retry." });
+            const serialized = JSON.stringify(log) + JSON.stringify(body);
+            for (const value of [secret, actor, "private-token", "private-service-key", "session-key", "private@example.test", "provider-subject"]) assert.equal(serialized.includes(value), false);
+            assert.deepEqual(Object.keys(log).sort(), ["debugId", "stage", "operation", "rpc", "upstreamStatus", "code", "timeout", "deadlineState", "elapsedMs"].sort());
+        }
+    } finally { console.info = originalInfo; globalThis.fetch = originalFetch; }
+});
+
+test("FAQ stalled fetch and body preserve browser error and report timeout stage", async t => {
+    const originalInfo = console.info;
+    let log;
+    console.info = (_, value) => { log = value; };
+    try {
+        for (const bodyStall of [false, true]) {
+            t.mock.timers.enable({ apis: ["setTimeout"] });
+            try {
+                const pending = handleFaq(request("/api/faq"), env, "public", null, { fetcher: async () => bodyStall
+                    ? new Response(new ReadableStream({ start() {} })) : new Promise(() => {}) });
+                await new Promise(resolve => setImmediate(resolve));
+                t.mock.timers.tick(10001);
+                const response = await pending;
+                assert.equal(response.status, 503); assert.equal(response.headers.get("Cache-Control"), "no-store");
+                assert.deepEqual(await response.json(), { success: false, error: "FAQ_UNAVAILABLE", message: "FAQ services are temporarily unavailable. Please retry." });
+                assert.equal(log.stage, bodyStall ? "body_read" : "rpc_fetch");
+                assert.equal(log.upstreamStatus, bodyStall ? 200 : null);
+                assert.equal(log.code, "UPSTREAM_TIMEOUT"); assert.equal(log.timeout, true); assert.equal(log.deadlineState, "expired");
+            } finally { t.mock.timers.reset(); }
+        }
+    } finally { console.info = originalInfo; }
+});

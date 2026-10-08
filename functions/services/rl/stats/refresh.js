@@ -1,3 +1,4 @@
+import { sanitizeLogMetadata } from "../../http/diagnostics.js";
 "use strict";
 
 /* =========================================================
@@ -17,7 +18,10 @@ Policy:
     - A completed Rocket League profile must exist.
     - A valid Rocket League player UUID must exist.
     - A linked Epic account must exist.
-    - Normal refresh: at most once every 24 hours.
+    - Legacy non-forced eligibility helper retains its historical 24-hour rule.
+    - Current callers use this service only for authorized Admin force refresh.
+    - Automatic collection uses Supabase mmr_due (3 hours) in the hourly Worker;
+      login/registration compatibility calls never reach this legacy gate.
     - Accounts not seen for more than 6 days are not
       refreshed through ordinary activity unless their
       activity timestamp has already been updated.
@@ -241,10 +245,10 @@ export async function refreshStats(
 
     console.info(
         "STATS REFRESH: Starting refresh evaluation.",
-        {
+        sanitizeLogMetadata({
             accountId:
                 normalizedAccountId
-        }
+        })
     );
 
     const state =
@@ -255,7 +259,7 @@ export async function refreshStats(
 
     console.info(
         "STATS REFRESH: State loaded.",
-        {
+        sanitizeLogMetadata({
             accountId:
                 normalizedAccountId,
 
@@ -284,7 +288,7 @@ export async function refreshStats(
                 Boolean(
                     state?.epicAccountId
                 )
-        }
+        })
     );
 
     if (
@@ -292,13 +296,13 @@ export async function refreshStats(
     ) {
         console.info(
             "STATS REFRESH: Profile not eligible.",
-            {
+            sanitizeLogMetadata({
                 accountId:
                     normalizedAccountId,
 
                 reason:
                     "ROCKET_LEAGUE_PROFILE_NOT_ELIGIBLE"
-            }
+            })
         );
 
         return {
@@ -342,13 +346,13 @@ export async function refreshStats(
     ) {
         console.info(
             "STATS REFRESH: Rocket League player missing.",
-            {
+            sanitizeLogMetadata({
                 accountId:
                     normalizedAccountId,
 
                 reason:
                     "ROCKET_LEAGUE_PLAYER_NOT_FOUND"
-            }
+            })
         );
 
         return {
@@ -367,7 +371,7 @@ export async function refreshStats(
 
     console.info(
         "STATS REFRESH: Eligibility evaluated.",
-        {
+        sanitizeLogMetadata({
             accountId:
                 normalizedAccountId,
 
@@ -384,7 +388,7 @@ export async function refreshStats(
                 eligibility.lastRefreshAt
                 || state.lastRefreshAt
                 || null
-        }
+        })
     );
 
     if (
@@ -420,7 +424,7 @@ export async function refreshStats(
     ) {
         console.info(
             "STATS REFRESH: Epic account missing.",
-            {
+            sanitizeLogMetadata({
                 accountId:
                     normalizedAccountId,
 
@@ -428,7 +432,7 @@ export async function refreshStats(
 
                 reason:
                     "EPIC_ACCOUNT_NOT_LINKED"
-            }
+            })
         );
 
         return {
@@ -447,14 +451,14 @@ export async function refreshStats(
 
     console.info(
         "STATS REFRESH: Verifying Epic authorization.",
-        {
+        sanitizeLogMetadata({
             accountId:
                 normalizedAccountId,
 
             rlPlayerId,
 
             epicAccountId
-        }
+        })
     );
 
     const epicAuthorized =
@@ -470,7 +474,7 @@ export async function refreshStats(
     ) {
         console.info(
             "STATS REFRESH: Epic reauthorization required.",
-            {
+            sanitizeLogMetadata({
                 accountId:
                     normalizedAccountId,
 
@@ -478,7 +482,7 @@ export async function refreshStats(
 
                 reason:
                     "EPIC_REAUTHORIZATION_REQUIRED"
-            }
+            })
         );
 
         return {
@@ -497,24 +501,24 @@ export async function refreshStats(
 
     console.info(
         "STATS REFRESH: MMR fetch starting.",
-        {
+        sanitizeLogMetadata({
             accountId:
                 normalizedAccountId,
 
             rlPlayerId,
 
             epicAccountId
-        }
+        })
     );
 
     let saved;
     try {
         const stats = await fetchMmrStats(env, epicAccountId);
-        console.info("STATS REFRESH: MMR fetch completed.", {
+        console.info("STATS REFRESH: MMR fetch completed.", sanitizeLogMetadata({
             accountId: normalizedAccountId,
             rlPlayerId,
             playlistCount: Array.isArray(stats?.playlists) ? stats.playlists.length : null
-        });
+        }));
         saved = await saveMmrStats(env, { accountId: normalizedAccountId, epicAccountId, stats });
     } catch (error) {
         try {
@@ -527,14 +531,14 @@ export async function refreshStats(
     try {
         await recordRefreshResult(env, normalizedAccountId, "mmr", true);
     } catch (error) {
-        console.warn("STATS REFRESH: MMR refresh checkpoint failed.", {
+        console.warn("STATS REFRESH: MMR refresh checkpoint failed.", sanitizeLogMetadata({
             code: error?.message === "SUPABASE_CONFIGURATION_MISSING" ? error.message : "REFRESH_RESULT_CHECKPOINT_FAILED"
-        });
+        }));
     }
 
     console.info(
         "STATS REFRESH: Snapshot saved.",
-        {
+        sanitizeLogMetadata({
             accountId:
                 normalizedAccountId,
 
@@ -549,7 +553,7 @@ export async function refreshStats(
             refreshedAt:
                 saved?.refreshedAt
                 || null
-        }
+        })
     );
 
     return {

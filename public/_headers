@@ -3,9 +3,25 @@
     X-Frame-Options: SAMEORIGIN
     Referrer-Policy: strict-origin-when-cross-origin
     Permissions-Policy: camera=(), microphone=()
+    Content-Security-Policy-Report-Only: object-src 'none'; base-uri 'self'; frame-ancestors 'self'; form-action 'self'; require-trusted-types-for 'script'
+    Strict-Transport-Security: max-age=300
 
 https://:project.pages.dev/*
     X-Robots-Tag: noindex
 
 https://:version.:project.pages.dev/*
     X-Robots-Tag: noindex
+
+# Mutable assets revalidate. Query version IDs do not make path names immutable.
+/Framework/*
+    Cache-Control: public, max-age=0, must-revalidate
+/Tabs/*
+    Cache-Control: public, max-age=0, must-revalidate
+/Global/*
+    Cache-Control: public, max-age=0, must-revalidate
+/scripts/*
+    Cache-Control: public, max-age=0, must-revalidate
+/Assets/*
+    Cache-Control: public, max-age=3600, must-revalidate
+/index.html
+    Cache-Control: no-cache

@@ -1,12 +1,18 @@
 PUBLIC/: BROWSER APPLICATION, PAGES, AND STATIC ASSETS
-Snapshot: 2026-10-02
+Snapshot: 2026-10-07
 
 ROLE
 
-public/ is the Cloudflare Pages build output configured by root wrangler.jsonc.
+public/ is the editable browser source. scripts/build-public-assets.mjs creates
+the ignored .wrangler/public-build deployment artifact configured in root
+wrangler.jsonc; npm run dev explicitly serves public/ for source development.
 It is a client-rendered site shell: index.html starts the application, routes.js
 describes pages, and Framework/Shell/JS/router.js loads shared and page-specific
 fragments/modules without separate full-page HTML documents.
+Public static routes also include their body in the Pages server response.
+Continuation surfaces: Features/HTML/ue6.html and Admin Home
+JS/custom_match_recovery.js. UE6 is public/static commentary; Admin recovery
+is server-authorized; its live RPC acceptance passed. Real runtime transport remains pending.
 
 ROOT FILES
 
@@ -69,12 +75,12 @@ public/Global/
 +-- Admin/
 |   +-- Home/            CSS/index.css, HTML/index.html, JS/index.js
 |   +-- UserManagement/  CSS/index.css, HTML/index.html, JS/index.js
-|   +-- Shared/          CSS/accordion.css, JS/accordion.js; native Admin disclosures and idempotent ARIA synchronization
+|   +-- Shared/          CSS/accordion.css, JS/accordion.js and modal_focus.js; native disclosures, ARIA synchronization and nested modal focus/inert ownership
 |   +-- WorkerStatus/    CSS/index.css, HTML/index.html, JS/index.js, JS/mmr_controls.js, JS/rocket_league_capabilities.js; Admin-only Rocket League force refresh
 |   +-- TaskBoard/
 |       +-- CSS/index.css, overlay.css
 |       +-- HTML/index.html, create_task.html, task_confirm.html,
-|       |        task_detail.html, task_edit.html, task_history.html
+|       |        task_detail.html, task_edit.html
 |       +-- JS/index.js, create_task.js, task_comments.js, task_confirm.js,
 |                task_detail.js, task_edit.js, task_history.js, task_lifecycle.js
 |   +-- PageSettings/      CSS/index.css, HTML/index.html, JS/index.js
@@ -83,7 +89,6 @@ public/Global/
 +-- Ads/                 CSS/ads.css, HTML/ads.html, JS/ads.js
 +-- Index/               CSS/index.css (main menu), CSS/dashboard.css,
 |                        HTML/home.html and JS/index.js (personal dashboard)
-+-- Links/               links.css, links.html, links.js
 +-- Login/               CSS/index.css, HTML/index.html, JS/index.js
 +-- Settings/            CSS/settings-page.css, HTML/settings.html, JS/settings.js and display_name_cooldown.js
 |                       Account Display Name precedes Appearance; browser-local themes include Blue/Orange/Purple/Green/Cyan/Emerald. Hex color contrast warns rather than blocks Apply/reload.
@@ -143,6 +148,7 @@ public/ocr/
 SHARED SCRIPTS
 
 public/scripts/
++-- accountScope.js          Versioned server/browser UI scope and matching legacy registration draft migration.
 +-- boundedRequest.js         Page request deadline covering fetch and JSON decoding.
 +-- apiConnection.js          Global API connection monitoring.
 +-- apiRoutes.js              Browser API route definitions/helpers, including suggestions.
@@ -196,3 +202,5 @@ The router loads the selected HTML body and JavaScript module, applies a master
 CSS bundle selected by route family, injects the shared header/sidebar/footer,
 enforces route authentication, and initializes the page module.
 
+
+OCR policy ownership: ocr_runtime.js and ocr/JS/index.js import ocr_review_policy.js when needed; index.html no longer eagerly loads it.

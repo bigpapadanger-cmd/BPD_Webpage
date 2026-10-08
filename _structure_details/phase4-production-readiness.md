@@ -1,5 +1,10 @@
 # Phase 4 production readiness — local implementation
 
+Historical local pass. The 2026-10-07 continuation adds generated asset
+minification/CSS caller bundles, automatic sitemap synchronization, mobile
+sidebar overlay spacing and single-main normalization. Current status and
+release limits are in deep-clean-progress.md and deep-clean-continuation.md.
+
 ## Boundaries
 
 No Supabase, deployment, provider polling, Worker runtime source, OAuth, account
@@ -49,7 +54,9 @@ numeric disclosure table and allows chart-local horizontal scrolling on mobile.
 
 ## Deferred Admin UUID contract
 
-Existing authorized UUID handling remains unchanged by approval. Later migration:
+Existing authorized Admin targeting contracts remain compatible. 1B now omits
+unneeded profile IDs and raw UUIDs in refresh confirmation/status text; it does
+not claim that this removes IDs from authorized requests. Later migration:
 
 - GET `/api/admin/user-management`: replace `users[].accountId` targeting contract.
 - GET `/api/admin/user-management/[accountId]`: opaque target resolver required.
@@ -60,8 +67,10 @@ Existing authorized UUID handling remains unchanged by approval. Later migration
   construction must resolve opaque targets server-side while retaining current
   actor authorization and target/Owner protections.
 
-Do not hide IDs cosmetically, fabricate opaque IDs, or change this contract until
-the server/database resolver and approved response shapes exist.
+Keep necessary targets in authorized requests, avoid unnecessary visual exposure,
+and do not fabricate frontend opaque IDs or claim visual masking is API privacy.
+Changing the API requires a real server resolver and approved response shapes.
+Current 1B/1C checkpoint: deep-clean-hardening.md.
 
 ## Changed application files in this pass
 
@@ -107,3 +116,7 @@ verification. No Lighthouse/CWV scores are claimed. No production assets replace
 Large optional originals: cover_img.png 1672×941/2.59 MB;
 gaming_network_banner.png 2111×745/1.99 MB; gaming_network_logo.png
 1254×1254/1.78 MB. Determine actual display/LCP use before optimizing them.
+
+## Final local supersession
+
+See deep-clean-final-local.md for current counts and gates. Global browser userId/provider accountId aliases are removed; server-issued accountScope preserves UI/draft ownership without changing server authorization. Admin targeting IDs remain a documented existing contract. Task Board focus/scroll fixes, FAQ/Suggestions bounded decoding, report-only policy/short HSTS staging and conditional OCR policy ownership are now locally implemented. Frozen spectator/Admin Recovery live contracts are accepted.

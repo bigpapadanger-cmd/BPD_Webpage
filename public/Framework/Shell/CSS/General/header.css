@@ -89,6 +89,7 @@ body.sidebar-collapsed
 
 .header-title {
     margin: 0;
+    font-weight: 700;
     color: var(--bpd-hover-text-color, #ffffff);
     font-size:
         clamp(

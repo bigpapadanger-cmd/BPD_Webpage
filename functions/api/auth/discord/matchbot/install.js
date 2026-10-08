@@ -1,3 +1,4 @@
+import { sanitizeLogMetadata } from "../../../../services/http/diagnostics.js";
 "use strict";
 
 /* =========================================================
@@ -295,13 +296,13 @@ export async function onRequestGet(
     ) {
         console.error(
             "MATCHBOT INSTALL API: Request failed.",
-            {
+            sanitizeLogMetadata({
                 debugId,
 
                 message:
                     error?.message
                     || "Unknown error"
-            }
+            })
         );
 
         let code =

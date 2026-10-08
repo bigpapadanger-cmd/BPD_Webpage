@@ -1,3 +1,4 @@
+import { sanitizeLogMetadata } from "../http/diagnostics.js";
 "use strict";
 
 import {
@@ -650,14 +651,14 @@ async function processTrainingSample(
     ) {
         console.error(
             "OCR TRAINING: Failed to read training image.",
-            {
+            sanitizeLogMetadata({
                 name:
                     error?.name
                     || "Error",
                 message:
                     error?.message
                     || "Unknown error"
-            }
+            })
         );
 
         return buildSampleFailure(
@@ -771,7 +772,7 @@ async function processTrainingSample(
     ) {
         console.error(
             "OCR TRAINING: Sample storage failed.",
-            {
+            sanitizeLogMetadata({
                 matchId:
                     matchValidation.matchId,
                 fingerprint,
@@ -783,7 +784,7 @@ async function processTrainingSample(
                 message:
                     error?.message
                     || "Unknown error"
-            }
+            })
         );
 
         return buildSampleFailure(
@@ -1592,7 +1593,7 @@ export async function handleOCRTrainingUpload(
     ) {
         console.error(
             "OCR training upload failed:",
-            error
+            sanitizeLogMetadata(error)
         );
 
         return jsonResponse(

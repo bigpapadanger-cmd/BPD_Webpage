@@ -11,10 +11,10 @@ const ROUND = /^CMRD[A-Za-z0-9]{8}$/;
 const RESULT = /^CMR[A-Za-z0-9]{8}$/;
 const IDEMPOTENCY = UUID;
 const exact = (value, names) => value && typeof value === "object" && !Array.isArray(value) && Object.keys(value).sort().join(",") === [...names].sort().join(",");
-async function authorized(request, env) {
+async function authorized(request, env, requireEnabled = true) {
     const expected = env.CUSTOM_MATCH_RUNTIME_CALLER_SECRET;
     const supplied = request.headers.get("X-Custom-Match-Caller");
-    if (env.CUSTOM_MATCH_RUNTIME_ENABLED !== "true" || typeof expected !== "string" || expected.length < 64
+    if ((requireEnabled && env.CUSTOM_MATCH_RUNTIME_ENABLED !== "true") || typeof expected !== "string" || expected.length < 64
         || typeof supplied !== "string" || supplied.length !== expected.length) return false;
     const [a, b] = await Promise.all([expected, supplied].map(value => crypto.subtle.digest("SHA-256", new TextEncoder().encode(value))));
     const left = new Uint8Array(a), right = new Uint8Array(b); let difference = 0;
@@ -99,7 +99,7 @@ export class CustomMatchSession {
                 if (this.state.getWebSockets().length >= 256) return fail("CUSTOM_MATCH_CAPACITY_REACHED", 429);
                 if ((this.members.get(actor.memberCode)?.size ?? 0) >= 4) return fail("CUSTOM_MATCH_CAPACITY_REACHED", 429);
                 this.matchCode = matchCode; this.memberTeams = new Map(detail.members.map(member => [member.memberCode, member.team]));
-                const pair = new WebSocketPair(); pair[1].accept(); this.add(actor.memberCode, pair[1], accountId);
+                const pair = new WebSocketPair(); this.state.acceptWebSocket(pair[1]); this.add(actor.memberCode, pair[1], accountId);
                 this.broadcast({ type: "presence", memberCode: actor.memberCode, connected: true, ready: false });
                 this.send(pair[1], await this.snapshot(detail));
                 return new Response(null, { status: 101, webSocket: pair[0] });
@@ -177,24 +177,14 @@ export class CustomMatchSession {
                 }
                 let detail;
                 try { detail = await this.detail(matchCode, accountId); } catch { return fail("CUSTOM_MATCH_UNAVAILABLE"); }
-                if (!detail.actor?.isMember) return fail("CUSTOM_MATCH_ACCESS_DENIED", 403);
+                if (!detail.actor?.isMember || detail.actor.team === "spectator") return fail("CUSTOM_MATCH_ACCESS_DENIED", 403);
                 let rounds; try { rounds = await callCustomMatchRpc(this.env, "rounds", { p_match_code: matchCode, p_actor_account_id: accountId }); } catch { return fail("CUSTOM_MATCH_UNAVAILABLE"); }
                 if (!rounds.rounds.some(item => item.roundCode === roundCode && item.state === "voting")) return fail("CUSTOM_MATCH_NOT_READY", 409);
                 const voteType = body.vote?.voteType;
-                if (!new Set(["player_target", "skip", "yes_no", "option"]).has(voteType)) return fail("CUSTOM_MATCH_INPUT_INVALID", 400);
-                const claim = await this.state.storage.transaction(async storage => {
-                    const key = `vote-type:${roundCode}`, current = await storage.get(key);
-                    if (current && current !== voteType) return { accepted: false, created: false };
-                    if (current === voteType) return { accepted: true, created: false };
-                    await storage.put(key, voteType); return { accepted: true, created: true };
-                });
-                if (!claim.accepted) return fail("CUSTOM_MATCH_VOTE_TYPE_CONFLICT", 409);
+                if (!["player_target", "skip"].includes(voteType)) return fail("CUSTOM_MATCH_INPUT_INVALID", 400);
                 const result = await this.forwardVote(operation, body, accountId, matchCode);
-                // A provider/server failure may have committed before its response
-                // was lost. Keep the category claim on ambiguous 5xx outcomes so
-                // retries or concurrent clients cannot introduce a second vote type.
-                if (!result.ok && result.status < 500 && claim.created) await this.state.storage.delete(`vote-type:${roundCode}`);
-                if (result.ok) this.broadcast({ type: "vote_window", roundCode, voteType });
+                // Skip is a ballot choice in the player-voting model. The database
+                // owns ballot supersession; one member's choice cannot lock others.
                 return result;
             });
         }
@@ -246,6 +236,20 @@ export class CustomMatchSession {
 export default {
     async fetch(request, env) {
         const url = new URL(request.url);
+        if (request.method === "GET" && url.pathname === "/internal/health" && !url.search) {
+            if (!await authorized(request, env, false)) return fail("CUSTOM_MATCH_RUNTIME_UNAVAILABLE", 503);
+            const enabled = env.CUSTOM_MATCH_RUNTIME_ENABLED === "true", disabled = env.CUSTOM_MATCH_RUNTIME_ENABLED === "false";
+            const namespaceConfigured = typeof env.CUSTOM_MATCH_SESSIONS?.idFromName === "function" && typeof env.CUSTOM_MATCH_SESSIONS?.get === "function";
+            let dataConfigured = false;
+            try {
+                const url = new URL(env.SUPABASE_URL);
+                dataConfigured = url.protocol === "https:" && !url.username && !url.password && !url.search && !url.hash
+                    && ["/", "/rest/v1", "/rest/v1/"].includes(url.pathname)
+                    && typeof env.SUPABASE_SERVICE_ROLE_KEY === "string" && Boolean(env.SUPABASE_SERVICE_ROLE_KEY.trim());
+            } catch { /* Configuration only; health never calls Supabase. */ }
+            return response({ success: true, service: "bpd-custom-match-runtime", status: disabled ? "disabled" : !enabled ? "unknown" : namespaceConfigured && dataConfigured ? "healthy" : "degraded",
+                checkedAt: new Date().toISOString(), namespaceConfigured, dataConfigured, instanceChecked: false });
+        }
         if (!await authorized(request, env)) return fail("CUSTOM_MATCH_RUNTIME_UNAVAILABLE", 503);
         if (url.search || url.hash) return fail("CUSTOM_MATCH_INPUT_INVALID", 400);
         const [operation, matchCode] = url.pathname.split("/").filter(Boolean);

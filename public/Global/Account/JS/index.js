@@ -1199,7 +1199,7 @@ function applyAuthState(
 
     if (
         !normalizeString(
-            authState.userId
+            authState.accountScope
         )
     ) {
         renderInvalidAccount();

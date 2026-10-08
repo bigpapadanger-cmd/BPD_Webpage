@@ -277,12 +277,6 @@ export async function getLatestMmrCache(
         console.warn(
             "LATEST MMR CACHE: KV read failed.",
             {
-                accountId:
-                    normalizedAccountId,
-
-                message:
-                    error?.message
-                    || "Unknown error"
             }
         );
 
@@ -412,11 +406,6 @@ export async function setLatestMmrCache(
         console.info(
             "LATEST MMR CACHE: Cache stored.",
             {
-                accountId:
-                    normalizedAccountId,
-
-                rlPlayerId:
-                    payload.rlPlayerId,
 
                 capturedAt:
                     payload.capturedAt,
@@ -434,12 +423,6 @@ export async function setLatestMmrCache(
         console.warn(
             "LATEST MMR CACHE: KV write failed.",
             {
-                accountId:
-                    normalizedAccountId,
-
-                message:
-                    error?.message
-                    || "Unknown error"
             }
         );
 
@@ -482,12 +465,6 @@ export async function clearLatestMmrCache(
         console.warn(
             "LATEST MMR CACHE: KV delete failed.",
             {
-                accountId:
-                    normalizedAccountId,
-
-                message:
-                    error?.message
-                    || "Unknown error"
             }
         );
 

@@ -1,3 +1,4 @@
+import { sanitizeLogMetadata } from "../http/diagnostics.js";
 "use strict";
 
 /* =========================================================
@@ -70,8 +71,10 @@ Important:
 ========================================================= */
 
 import {
-    json
+    json as responseJson
 } from "../common_helpers/responses.js";
+import { omitInternalIdentifiers } from "../http/responses.js";
+function json(value, ...options) { return responseJson(omitInternalIdentifiers(value), ...options); }
 
 import {
     authorizeRequest,
@@ -758,7 +761,7 @@ export async function handleRocketLeagueSession(
 
             console.error(
                 "ROCKET LEAGUE SESSION: Profile lookup failed.",
-                {
+                sanitizeLogMetadata({
                     debugId,
 
                     name:
@@ -780,7 +783,7 @@ export async function handleRocketLeagueSession(
                     upstreamCode:
                         error?.upstreamCode
                         || null
-                }
+                })
             );
         }
 
@@ -918,7 +921,7 @@ export async function handleRocketLeagueSession(
     ) {
         console.error(
             "ROCKET LEAGUE SESSION: Unexpected failure.",
-            {
+            sanitizeLogMetadata({
                 debugId,
 
                 name:
@@ -939,7 +942,7 @@ export async function handleRocketLeagueSession(
 
                 method:
                     request.method
-            }
+            })
         );
 
         return authorizationErrorResponse(

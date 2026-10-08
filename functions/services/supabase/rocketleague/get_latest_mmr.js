@@ -177,8 +177,6 @@ async function readLatestRocketLeagueMmrSnapshot(
     console.info(
         "LATEST MMR SNAPSHOT: Supabase RPC starting.",
         {
-            accountId:
-                normalizedAccountId
         }
     );
 
@@ -224,8 +222,6 @@ async function readLatestRocketLeagueMmrSnapshot(
     console.info(
         "LATEST MMR SNAPSHOT: Supabase RPC response received.",
         {
-            accountId:
-                normalizedAccountId,
 
             status:
                 response.status,
@@ -241,8 +237,6 @@ async function readLatestRocketLeagueMmrSnapshot(
         console.error(
             "LATEST MMR SNAPSHOT: Supabase RPC failed.",
             {
-                accountId:
-                    normalizedAccountId,
 
                 status:
                     response.status,
@@ -308,8 +302,6 @@ async function readLatestRocketLeagueMmrSnapshot(
         console.info(
             "LATEST MMR SNAPSHOT: No snapshot found.",
             {
-                accountId:
-                    normalizedAccountId
             }
         );
 
@@ -411,14 +403,6 @@ async function readLatestRocketLeagueMmrSnapshot(
     console.info(
         "LATEST MMR SNAPSHOT: Snapshot resolved.",
         {
-            accountId:
-                snapshot.accountId,
-
-            rlPlayerId:
-                snapshot.rlPlayerId,
-
-            snapshotId:
-                snapshot.snapshotId,
 
             capturedAt:
                 snapshot.capturedAt

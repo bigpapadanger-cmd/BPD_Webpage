@@ -5,7 +5,12 @@ import worker, { CustomMatchSession } from "../src/index.js";
 const account = "11111111-1111-4111-8111-111111111111", other = "22222222-2222-4222-8222-222222222222";
 const matchCode = "CMabcdefgh", hostMember = "CMMabcdefgh", otherMember = "CMMijklmnop", roundCode = "CMRDabcdefgh", voteCode = "CMVabcdefgh";
 const originalFetch = globalThis.fetch;
-afterEach(() => { globalThis.fetch = originalFetch; });
+const originalResponse = globalThis.Response, originalWebSocketPair = globalThis.WebSocketPair;
+afterEach(() => {
+    globalThis.fetch = originalFetch; globalThis.Response = originalResponse;
+    if (originalWebSocketPair === undefined) delete globalThis.WebSocketPair;
+    else globalThis.WebSocketPair = originalWebSocketPair;
+});
 
 function state(sockets = []) {
     const data = new Map();
@@ -14,7 +19,18 @@ function state(sockets = []) {
         async list({ prefix = "", limit = 100 } = {}) { return new Map([...data].filter(([key]) => key.startsWith(prefix)).slice(0, limit)); },
         async setAlarm() {}, async transaction(fn) { return fn(this); }
     };
-    return { getWebSockets: () => sockets, storage };
+    return {
+        getWebSockets: () => [...sockets], storage,
+        acceptWebSocket(socket) { assert.equal(sockets.includes(socket), false); sockets.push(socket); },
+        async dispatchMessage(session, socket, message) {
+            assert.ok(sockets.includes(socket), "Only DO-registered sockets receive hibernation messages");
+            await session.webSocketMessage(socket, message);
+        },
+        dispatchClose(session, socket) {
+            assert.ok(sockets.includes(socket), "Only DO-registered sockets receive hibernation close events");
+            sockets.splice(sockets.indexOf(socket), 1); session.webSocketClose(socket);
+        }
+    };
 }
 const detail = { success: true, match: { matchCode, title: "Test", gameKey: "rocketleague", modeKey: "standard", modeVersion: 1, visibility: "public", joinPolicy: "open",
     teamACapacity: 2, teamBCapacity: 2, allowJoinAfterStart: false, state: "pregame", region: null, mapName: null, teamACount: 1, teamBCount: 1,
@@ -41,6 +57,98 @@ function installFetch({ actorId = account, roundsState = "voting" } = {}) {
 }
 const rpcEnv = { SUPABASE_URL: "https://db.example", SUPABASE_SERVICE_ROLE_KEY: "test-service-role" };
 const internalHeaders = { "X-Custom-Match-Internal": "1", "X-Custom-Match-Account": account };
+
+test("private health authenticates disabled and enabled states without selecting a match instance", async () => {
+    const trap = () => { assert.fail("Health must not select a Durable Object"); };
+    const env = { ...rpcEnv, CUSTOM_MATCH_RUNTIME_CALLER_SECRET: "h".repeat(64), CUSTOM_MATCH_SESSIONS: { idFromName: trap, get: trap } };
+    const request = secret => new Request("https://runtime/internal/health", { headers: { "X-Custom-Match-Caller": secret } });
+    assert.equal((await worker.fetch(request("wrong"), env)).status, 503);
+    for (const [flag, expected] of [[undefined, "unknown"], ["invalid", "unknown"], ["false", "disabled"], ["true", "healthy"]]) {
+        env.CUSTOM_MATCH_RUNTIME_ENABLED = flag;
+        const response = await worker.fetch(request(env.CUSTOM_MATCH_RUNTIME_CALLER_SECRET), env), body = await response.json();
+        assert.equal(response.headers.get("Cache-Control"), "no-store");
+        assert.equal(body.status, expected); assert.equal(body.instanceChecked, false);
+        assert.doesNotMatch(JSON.stringify(body), /test-service-role|hhhhhhhh|db\.example/);
+    }
+    delete env.SUPABASE_SERVICE_ROLE_KEY; env.SUPABASE_AUTH = "legacy-key";
+    assert.equal((await (await worker.fetch(request(env.CUSTOM_MATCH_RUNTIME_CALLER_SECRET), env)).json()).status, "degraded");
+    env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role"; env.SUPABASE_URL = "http://db.example";
+    assert.equal((await (await worker.fetch(request(env.CUSTOM_MATCH_RUNTIME_CALLER_SECRET), env)).json()).status, "degraded");
+});
+
+function installWebSocketPair() {
+    const pairs = [];
+    globalThis.WebSocketPair = class {
+        constructor() {
+            let attachment;
+            this[0] = {};
+            this[1] = {
+                frames: [],
+                accept() { assert.fail("Hibernation sockets must use state.acceptWebSocket()"); },
+                serializeAttachment(value) { attachment = structuredClone(value); },
+                deserializeAttachment() { return structuredClone(attachment); },
+                send(value) { this.frames.push(JSON.parse(value)); }, close() {}
+            };
+            pairs.push(this);
+        }
+    };
+    // Node's Response rejects 101; emulate only the Workers upgrade response.
+    globalThis.Response = class extends originalResponse {
+        constructor(body, init) {
+            super(body, init?.status === 101 ? { ...init, status: 200 } : init);
+            if (init?.status === 101) {
+                Object.defineProperty(this, "status", { value: 101 }); this.webSocket = init.webSocket;
+            }
+        }
+    };
+    return pairs;
+}
+
+test("connect registers a hibernation socket before fanout and dispatches ready, resync, restart and close", async () => {
+    const calls = installFetch(), pairs = installWebSocketPair(), doState = state();
+    const session = new CustomMatchSession(doState, rpcEnv);
+    const connect = () => session.fetch(new Request(`https://session/${matchCode}/connect`, {
+        headers: { ...internalHeaders, Upgrade: "websocket" }
+    }));
+    const upgrade = await connect(), socket = pairs[0][1];
+    assert.equal(upgrade.status, 101); assert.equal(upgrade.webSocket, pairs[0][0]);
+    assert.deepEqual(doState.getWebSockets(), [socket]);
+    assert.deepEqual(socket.deserializeAttachment(), { memberCode: hostMember, accountId: account, matchCode, team: "a" });
+    assert.ok(socket.frames.some(frame => frame.type === "snapshot" && frame.members[0].connected));
+    assert.doesNotMatch(JSON.stringify(socket.frames), /accountId|service-role|credentials|discord|epic/i);
+    await doState.dispatchMessage(session, socket, JSON.stringify({ type: "ready", ready: true }));
+    assert.equal(session.ready.get(hostMember), true);
+    await doState.dispatchMessage(session, socket, JSON.stringify({ type: "resync" }));
+    assert.equal(socket.frames.at(-1).type, "snapshot");
+    assert.equal(socket.frames.at(-1).members[0].ready, true);
+    const restored = new CustomMatchSession(doState, rpcEnv);
+    assert.equal(restored.members.get(hostMember).has(socket), true);
+    assert.equal(restored.ready.get(hostMember), false);
+    await doState.dispatchMessage(restored, socket, JSON.stringify({ type: "resync" }));
+    assert.ok(socket.frames.some(frame => frame.type === "readiness_reset"));
+    assert.equal(socket.frames.at(-1).members[0].ready, false);
+    const callsBeforeClose = calls.length;
+    doState.dispatchClose(restored, socket);
+    assert.equal(doState.getWebSockets().length, 0);
+    assert.equal(restored.members.has(hostMember), false);
+    assert.equal(restored.ready.get(hostMember), false);
+    assert.equal(calls.length, callsBeforeClose);
+    for (let i = 0; i < 256; i++) doState.acceptWebSocket({});
+    assert.equal((await connect()).status, 429);
+    assert.equal(pairs.length, 1);
+});
+
+test("connect rejects missing internal authorization and nonmembers before socket registration", async () => {
+    const pairs = installWebSocketPair(), doState = state(), session = new CustomMatchSession(doState, rpcEnv);
+    assert.equal((await session.fetch(new Request(`https://session/${matchCode}/connect`, {
+        headers: { "X-Custom-Match-Account": account, Upgrade: "websocket" }
+    }))).status, 403);
+    session.detail = async () => ({ ...detail, actor: { isMember: false } });
+    assert.equal((await session.fetch(new Request(`https://session/${matchCode}/connect`, {
+        headers: { ...internalHeaders, Upgrade: "websocket" }
+    }))).status, 403);
+    assert.equal(pairs.length, 0); assert.equal(doState.getWebSockets().length, 0);
+});
 
 test("runtime stays unavailable until explicitly enabled and authenticates the Pages caller", async () => {
     const disabled = await worker.fetch(new Request(`https://runtime/start/${matchCode}`, { method: "POST" }), { CUSTOM_MATCH_RUNTIME_ENABLED: "false" });
@@ -128,16 +236,31 @@ test("Start conflicts on stale match version and never changes durable state", a
     assert.equal(calls.some(item => item.rpc === "apply_custom_match_action"), false);
 });
 
-test("one vote type is fixed for a voting window and changed vote category is rejected", async () => {
+test("spectators have presence but cannot vote or satisfy player Start requirements", async () => {
+    const calls = installFetch(); const session = new CustomMatchSession(state(), rpcEnv);
+    session.detail = async () => ({ ...detail, actor: { ...detail.actor, team: "spectator", memberRole: "spectator" }, members: [...detail.members, { memberCode: "CMMqrstuvwx", displayName: "Viewer", team: "spectator", memberRole: "spectator" }] });
+    const response = await session.fetch(new Request(`https://session/${matchCode}/vote`, { method: "POST", headers: internalHeaders, body: JSON.stringify({ roundCode, idempotencyKey: "44444444-4444-4444-8444-444444444444", vote: { voteType: "skip" } }) }));
+    assert.equal(response.status, 403); assert.equal(calls.some(item => item.rpc === "cast_custom_match_vote"), false);
+    const snapshot = await session.snapshot(await session.detail());
+    assert.equal(snapshot.members.at(-1).team, "spectator"); assert.equal(snapshot.members.at(-1).ready, false);
+    assert.doesNotMatch(JSON.stringify(snapshot), /accountId|playerId|credentials/);
+    const spectator = snapshot.members.at(-1);
+    session.detail = async () => ({ ...detail, members: [...detail.members, { ...spectator, memberRole: "spectator" }] });
+    for (const member of detail.members) { session.members.set(member.memberCode, new Set([{ send() {} }])); session.ready.set(member.memberCode, true); }
+    const started = await session.fetch(new Request(`https://session/${matchCode}/start`, { method: "POST", headers: internalHeaders, body: JSON.stringify({ expectedVersion: detail.match.version, idempotencyKey: "44444444-4444-4444-8444-444444444444" }) }));
+    assert.equal(started.status, 200);
+});
+
+test("player voting permits target and skip ballots without a window category lock", async () => {
     const calls = installFetch(); const session = new CustomMatchSession(state(), rpcEnv);
     const send = vote => session.fetch(new Request(`https://session/${matchCode}/vote`, { method: "POST", headers: internalHeaders,
         body: JSON.stringify({ roundCode, idempotencyKey: "44444444-4444-4444-8444-444444444444", vote }) }));
-    assert.equal((await send({ voteType: "yes_no", choiceKey: "yes" })).status, 200);
-    assert.equal((await send({ voteType: "skip" })).status, 409);
-    assert.equal(calls.filter(item => item.rpc === "cast_custom_match_vote").length, 1);
+    assert.equal((await send({ voteType: "player_target", targetMemberCode: otherMember })).status, 200);
+    assert.equal((await send({ voteType: "skip" })).status, 200);
+    assert.equal(calls.filter(item => item.rpc === "cast_custom_match_vote").length, 2);
 });
 
-test("ambiguous vote provider failure keeps the round's vote type fail-closed", async () => {
+test("ambiguous ballot failure permits safe database-authorized retry", async () => {
     const calls = [];
     globalThis.fetch = async url => {
         const rpc = String(url).split("/").at(-1); calls.push(rpc);
@@ -150,7 +273,7 @@ test("ambiguous vote provider failure keeps the round's vote type fail-closed", 
     const session = new CustomMatchSession(state(), rpcEnv);
     const vote = body => session.fetch(new Request(`https://session/${matchCode}/vote`, { method: "POST", headers: internalHeaders, body: JSON.stringify(body) }));
     const key = "44444444-4444-4444-8444-444444444444";
-    assert.equal((await vote({ roundCode, idempotencyKey: key, vote: { voteType: "yes_no", choiceKey: "yes" } })).status, 503);
-    assert.equal((await vote({ roundCode, idempotencyKey: key, vote: { voteType: "skip" } })).status, 409);
-    assert.equal(calls.filter(rpc => rpc === "cast_custom_match_vote").length, 1);
+    assert.equal((await vote({ roundCode, idempotencyKey: key, vote: { voteType: "player_target", targetMemberCode: otherMember } })).status, 503);
+    assert.equal((await vote({ roundCode, idempotencyKey: key, vote: { voteType: "skip" } })).status, 503);
+    assert.equal(calls.filter(rpc => rpc === "cast_custom_match_vote").length, 2);
 });

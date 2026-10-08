@@ -132,7 +132,8 @@
 .worker-status-group-count { min-width: 26px; padding: 3px 8px; border: 1px solid currentColor; border-radius: 999px; color: #b5c2d3; font-size: .72rem; text-align: center; }
 .worker-status-group.worker-status-healthy > .worker-status-group-summary { color: #75e3a1; }
 .worker-status-group.worker-status-degraded > .worker-status-group-summary { color: #ffd27a; }
-.worker-status-group.worker-status-down > .worker-status-group-summary { color: #ff8f9a; }
+.worker-status-group.worker-status-down > .worker-status-group-summary,
+.worker-status-group.worker-status-unavailable > .worker-status-group-summary { color: #ff8f9a; }
 .worker-status-group.worker-status-unknown > .worker-status-group-summary { color: #b5c2d3; }
 
 .worker-status-services {
@@ -247,7 +248,11 @@
 
 .worker-status-healthy { color: #75e3a1; }
 .worker-status-degraded { color: #ffd27a; }
-.worker-status-down { color: #ff8f9a; }
+.worker-status-down, .worker-status-unavailable { color: #ff8f9a; }
+.worker-status-disabled { color: #b5c2d3; }
+.worker-status-family { list-style: none; }
+.worker-status-family h3 { margin: .75rem 0 .25rem; font-size: .95rem; color: #b5c2d3; }
+.worker-status-checked, .worker-status-reason { color: #b5c2d3; font-size: .85rem; overflow-wrap: anywhere; }
 .worker-status-unknown { color: #b5c2d3; }
 
 .worker-status-card-actions {

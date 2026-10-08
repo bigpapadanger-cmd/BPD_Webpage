@@ -49,6 +49,7 @@ import {
     getAdminResponsibilityRoles
 } from "/Framework/Auth/auth.js";
 import { initializeAdminAccordions } from "../../Shared/JS/accordion.js";
+import { initializeCustomMatchRecovery } from "./custom_match_recovery.js";
 import {
     beginVerificationNotice,
     clearVerificationNotice
@@ -1634,6 +1635,7 @@ export async function initializePage() {
 
         adminState.auth =
             state;
+        initializeCustomMatchRecovery(state);
 
         const suggestionSection = document.getElementById("adminSuggestionSection");
         if (suggestionSection) suggestionSection.hidden = !hasAdminPermission("admin.suggestions.manage", state);

@@ -1,3 +1,4 @@
+import { sanitizeLogMetadata } from "../../http/diagnostics.js";
 import { completeOAuthCallback } from "./callback_response.js";
 import { withUpstreamDeadline, fetchBoundedResponse, safeUpstreamErrorCode, safeUpstreamErrorMessage } from "../../http/upstream.js";
 import { completeLinkedRolesVerification } from "../providers/discord/linked_roles.js";
@@ -2220,13 +2221,13 @@ async function executeCallback(
                 ) {
                     console.error(
                         "OAUTH CALLBACK: Failed to clean up session after auth-state failure.",
-                        {
+                        sanitizeLogMetadata({
                             debugId,
 
                             message:
                                 deleteError?.message
                                 || "Unknown error"
-                        }
+                        })
                     );
                 }
             }

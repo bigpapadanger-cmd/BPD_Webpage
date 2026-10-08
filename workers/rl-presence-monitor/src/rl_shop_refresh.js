@@ -1,3 +1,5 @@
+import { fetchBoundedResponse, withUpstreamDeadline } from "../../../functions/services/http/upstream.js";
+
 const REQUEST_TIMEOUT_MS = 30000;
 const RPC_TIMEOUT_MS = 10000;
 const MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
@@ -24,10 +26,9 @@ function supabaseConfiguration(env) {
 
 async function callRpc(env, name, payload) {
     const { root, key } = supabaseConfiguration(env);
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), RPC_TIMEOUT_MS);
     try {
-        const response = await fetch(new URL(`rpc/${name}`, root), {
+    return await withUpstreamDeadline(async signal => {
+        const response = await fetchBoundedResponse(new URL(`rpc/${name}`, root), {
             method: "POST",
             headers: {
                 apikey: key,
@@ -38,16 +39,17 @@ async function callRpc(env, name, payload) {
                 "Accept-Profile": "api"
             },
             body: JSON.stringify(payload),
-            signal: controller.signal
-        });
+            signal
+        }, MAX_RESPONSE_BYTES);
         if (!response.ok) throw fail(`SUPABASE_${name.toUpperCase()}_FAILED`);
         const body = await response.text();
         if (!body) return null;
         try { return JSON.parse(body); } catch { throw fail("SUPABASE_RPC_INVALID_JSON"); }
+    }, RPC_TIMEOUT_MS);
     } catch (error) {
         if (error?.code) throw error;
         throw fail(`SUPABASE_${name.toUpperCase()}_FAILED`);
-    } finally { clearTimeout(timeout); }
+    }
 }
 
 async function recordGlobalResult(env, success, changed, code = null) {
@@ -63,13 +65,12 @@ async function fetchShopSnapshot(env) {
     const baseUrl = cleanString(env?.MMR_API_URL);
     const apiKey = cleanString(env?.MMR_API_KEY);
     if (!baseUrl || !apiKey) throw fail("MMR_CONFIGURATION_MISSING");
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     try {
-        const response = await fetch(new URL("/get-shop-data", baseUrl), {
+        return await withUpstreamDeadline(async signal => {
+        const response = await fetchBoundedResponse(new URL("/get-shop-data", baseUrl), {
             headers: { Authorization: `Bearer ${apiKey}`, Accept: "application/json" },
-            signal: controller.signal
-        });
+            signal
+        }, MAX_RESPONSE_BYTES);
         const length = Number(response.headers.get("Content-Length"));
         if (Number.isFinite(length) && length > MAX_RESPONSE_BYTES) throw fail("RL_SHOP_PROVIDER_RESPONSE_TOO_LARGE");
         let body;
@@ -82,10 +83,11 @@ async function fetchShopSnapshot(env) {
             throw fail("RL_SHOP_PROVIDER_RESPONSE_INVALID");
         }
         return { shops: payload.shops, catalogues: payload.catalogues, notifications: [] };
+        }, REQUEST_TIMEOUT_MS);
     } catch (error) {
         if (error?.code) throw error;
         throw fail("RL_SHOP_PROVIDER_UNAVAILABLE");
-    } finally { clearTimeout(timeout); }
+    }
 }
 
 function canonicalJson(value) {

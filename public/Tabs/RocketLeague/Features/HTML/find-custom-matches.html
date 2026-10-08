@@ -19,14 +19,14 @@
     </section>
     <details class="cm-panel" open>
         <summary>Create a match</summary>
-        <p>Rocket League lobbies are created manually by the host. Current members can explicitly reveal the private credentials. Invite and approval management awaits its read contract.</p>
+        <p>The host creates the lobby manually in Rocket League and receives its private credentials after creating the match. Current members can reveal credentials when authorized. Hosts manage invitations and join requests inside the match.</p>
         <form id="cmCreateForm">
             <fieldset id="cmCreateFields" disabled>
                 <div class="cm-form-grid">
                     <label>Match title<input name="title" maxlength="120" required autocomplete="off"></label>
                     <label>Mode<select name="modeKey" id="cmMode" required></select></label>
                     <label>Visibility<select name="visibility"><option value="public">Public</option><option value="private">Private</option></select></label>
-                    <label>Join policy<select name="joinPolicy"><option value="open">Open</option><option value="invite_only">Invite only (tools later)</option><option value="approval">Approval (tools later)</option></select></label>
+                <label>Join policy<select name="joinPolicy"><option value="open">Open</option><option value="invite_only">Invite only</option><option value="approval">Approval</option></select></label>
                     <label>Team A capacity<input name="teamACapacity" type="number" min="1" step="1" value="2" required></label>
                     <label>Team B capacity<input name="teamBCapacity" type="number" min="1" step="1" value="2" required></label>
                     <label>Region (optional)<input name="region" maxlength="50"></label>
@@ -34,6 +34,8 @@
                 </div>
                 <div class="cm-actions" id="cmPresets" aria-label="Team capacity presets"><button type="button" data-capacity="1">1v1</button><button type="button" data-capacity="2">2v2</button><button type="button" data-capacity="3">3v3</button><button type="button" data-capacity="4">4v4</button><span>Or enter separate capacities for custom teams.</span></div>
                 <label class="cm-check"><input name="allowJoinAfterStart" type="checkbox">Allow joins after start</label>
+                <label class="cm-check"><input name="allowSpectators" type="checkbox">Allow spectators</label>
+                <label>Spectator capacity<input name="spectatorCapacity" type="number" min="1" step="1" disabled></label>
                 <p id="cmLimitsNote">Loading configured limits…</p>
                 <button type="submit">Create match</button>
             </fieldset>

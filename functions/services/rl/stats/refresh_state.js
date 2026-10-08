@@ -1,3 +1,4 @@
+import { sanitizeLogMetadata } from "../../http/diagnostics.js";
 "use strict";
 
 /* =========================================================
@@ -147,10 +148,10 @@ export async function getStatsRefreshState(
 
     console.info(
         "STATS REFRESH STATE: RPC starting.",
-        {
+        sanitizeLogMetadata({
             accountId:
                 normalizedAccountId
-        }
+        })
     );
 
     const response =
@@ -193,7 +194,7 @@ export async function getStatsRefreshState(
 
     console.info(
         "STATS REFRESH STATE: RPC response received.",
-        {
+        sanitizeLogMetadata({
             accountId:
                 normalizedAccountId,
 
@@ -202,7 +203,7 @@ export async function getStatsRefreshState(
 
             ok:
                 response.ok
-        }
+        })
     );
 
     if (
@@ -210,7 +211,7 @@ export async function getStatsRefreshState(
     ) {
         console.error(
             "STATS REFRESH STATE: RPC failed.",
-            {
+            sanitizeLogMetadata({
                 accountId:
                     normalizedAccountId,
 
@@ -227,7 +228,7 @@ export async function getStatsRefreshState(
                             0,
                             300
                         )
-            }
+            })
         );
 
         const error =
@@ -249,10 +250,10 @@ export async function getStatsRefreshState(
     ) {
         console.info(
             "STATS REFRESH STATE: No eligible state returned.",
-            {
+            sanitizeLogMetadata({
                 accountId:
                     normalizedAccountId
-            }
+            })
         );
 
         return null;
@@ -269,7 +270,7 @@ export async function getStatsRefreshState(
     catch {
         console.error(
             "STATS REFRESH STATE: Invalid JSON returned.",
-            {
+            sanitizeLogMetadata({
                 accountId:
                     normalizedAccountId,
 
@@ -283,7 +284,7 @@ export async function getStatsRefreshState(
                             0,
                             300
                         )
-            }
+            })
         );
 
         const error =
@@ -313,10 +314,10 @@ export async function getStatsRefreshState(
     ) {
         console.info(
             "STATS REFRESH STATE: No eligible row returned.",
-            {
+            sanitizeLogMetadata({
                 accountId:
                     normalizedAccountId
-            }
+            })
         );
 
         return null;
@@ -334,12 +335,12 @@ export async function getStatsRefreshState(
     ) {
         console.error(
             "STATS REFRESH STATE: Account mismatch.",
-            {
+            sanitizeLogMetadata({
                 requestedAccountId:
                     normalizedAccountId,
 
                 returnedAccountId
-            }
+            })
         );
 
         const error =
@@ -387,7 +388,7 @@ export async function getStatsRefreshState(
 
     console.info(
         "STATS REFRESH STATE: State resolved.",
-        {
+        sanitizeLogMetadata({
             accountId:
                 result.accountId
                 || normalizedAccountId,
@@ -408,7 +409,7 @@ export async function getStatsRefreshState(
                 Boolean(
                     result.epicAccountId
                 )
-        }
+        })
     );
 
     return result;

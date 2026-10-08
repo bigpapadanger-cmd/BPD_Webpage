@@ -181,3 +181,104 @@ test("User Management route and page use authenticated route shell without Disco
     assert.match(html, /umPrevious/);
     assert.match(html, /umNext/);
 });
+
+
+test("list diagnostics locate failures, correlate responses, and exclude sensitive values", async () => {
+    const sensitive = "private@example.test token-cookie-provider-secret " + actorId;
+    const scenarios = [
+        ["session_account_resolution", null, null, env => { env.AUTH_SESSIONS.get = async () => { throw new Error(sensitive); }; }],
+        ["account_access_configuration", "get_account_access_state", null, env => { env.SUPABASE_AUTH = ""; }],
+        ["account_access_decode", "get_account_access_state", 403, null, "get_account_access_state", () => Response.json({ code: "42501", message: sensitive }, { status: 403 })],
+        ["account_access_normalization", "get_account_access_state", 200, null, "get_account_access_state", () => Response.json({ email: sensitive })],
+        ["account_access_decode", "can_account_perform", 200, null, "can_account_perform", () => new Response(sensitive)],
+        ["configuration", "admin_list_users", null, env => { env.SUPABASE_SERVICE_ROLE_KEY = ""; env.SUPABASE_AUTH = "auth-secret"; env.SUPABASE_URL = "http://invalid.example"; }],
+        ["rpc_fetch_body", "admin_list_users", null, null, "admin_list_users", () => { throw new Error(sensitive); }],
+        ["rpc_rejected", "admin_list_users", 500, null, "admin_list_users", () => Response.json({ code: sensitive, message: sensitive, details: sensitive }, { status: 500 })],
+        ["rpc_rejected", "admin_list_users", 404, null, "admin_list_users", () => Response.json({ code: "PGRST202", message: sensitive }, { status: 404 })],
+        ["response_decode", "admin_list_users", 200, null, "admin_list_users", () => new Response(sensitive)],
+        ["response_normalization", "admin_list_users", 200, null, "admin_list_users", () => Response.json({ success: true, users: "invalid", email: sensitive })],
+        ["admin_authorization", "admin_list_users", 200, null, "admin_list_users", () => Response.json({ success: true, users: [], capturedAt: timestamp, permissions: { ...permissions("staff"), view: false } })]
+    ];
+    const originalFetch = globalThis.fetch, originalInfo = console.info;
+    const records = [];
+    console.info = (label, record) => { assert.equal(label, "[USER MANAGEMENT DIAGNOSTIC]"); records.push(record); };
+    try {
+        for (const [stage, rpc, upstreamStatus, configure, failingRpc, result] of scenarios) {
+            const env = envFor("admin", () => { throw new Error("Unexpected RPC"); });
+            configure?.(env);
+            const normal = fetcherFor(env);
+            globalThis.fetch = (url, init) => String(url).endsWith("/" + failingRpc) ? result() : normal(url, init);
+            const response = await listRoute({ request: request("/api/admin/user-management?query=private%40example.test", { headers: { authorization: sensitive, "X-Debug-ID": sensitive } }), env });
+            const record = records.at(-1);
+            assert.equal(record.stage, stage);
+            assert.equal(record.rpc, rpc);
+            assert.equal(record.upstreamStatus, upstreamStatus);
+            assert.equal(response.headers.get("Cache-Control"), "no-store");
+            assert.equal(response.headers.get("X-Debug-ID"), record.debugId);
+            assert.match(record.debugId, /^[0-9a-f-]{36}$/);
+            assert.ok(record.elapsedMs >= 0);
+            assert.equal(record.timeout, false);
+            const text = JSON.stringify(record) + JSON.stringify(await response.json());
+            for (const forbidden of [sensitive, actorId, "service-secret", "auth-secret", "test-session", "private@example.test"]) assert.equal(text.includes(forbidden), false);
+            assert.deepEqual(Object.keys(record).sort(), ["debugId", "stage", "operation", "rpc", "upstreamStatus", "code", "timeout", "deadlineState", "elapsedMs"].sort());
+        }
+        assert.equal(records[8].code, "PGRST202");
+        assert.equal(records[7].code, "UPSTREAM_REJECTED");
+    } finally { globalThis.fetch = originalFetch; console.info = originalInfo; }
+});
+
+test("signed-out list remains 401 no-store and never calls an RPC", async () => {
+    const original = globalThis.fetch;
+    globalThis.fetch = () => { throw new Error("Must not call an upstream"); };
+    try {
+        const response = await listRoute({ request: new Request("https://bpd.example/api/admin/user-management"), env: { AUTH_SESSIONS: { get: async () => null } } });
+        assert.equal(response.status, 401);
+        assert.equal(response.headers.get("Cache-Control"), "no-store");
+        assert.equal((await response.json()).error, "AUTHENTICATION_REQUIRED");
+    } finally { globalThis.fetch = original; }
+});
+
+test("stalled RPC body reports deadline expiry with observed upstream status", async t => {
+    t.mock.timers.enable({ apis: ["setTimeout"] });
+    const env = envFor("admin", () => new Response(new ReadableStream({ start() {} })));
+    const original = globalThis.fetch, originalInfo = console.info;
+    let record;
+    globalThis.fetch = fetcherFor(env);
+    console.info = (_, value) => { record = value; };
+    try {
+        const pending = listRoute({ request: request("/api/admin/user-management"), env });
+        await new Promise(resolve => setImmediate(resolve));
+        t.mock.timers.tick(10_000);
+        const response = await pending;
+        assert.equal(response.status, 503);
+        assert.equal((await response.json()).error, "USER_MANAGEMENT_TIMEOUT");
+        assert.equal(record.stage, "rpc_fetch_body");
+        assert.equal(record.upstreamStatus, 200);
+        assert.equal(record.timeout, true);
+        assert.equal(record.deadlineState, "expired");
+    } finally { globalThis.fetch = original; console.info = originalInfo; t.mock.timers.reset(); }
+});
+
+
+test("account-access timeout survives fail-closed error mapping in diagnostics", async t => {
+    t.mock.timers.enable({ apis: ["setTimeout"] });
+    const env = envFor("admin", () => { throw new Error("Admin RPC must not run"); });
+    const original = globalThis.fetch, originalInfo = console.info;
+    let record;
+    globalThis.fetch = async () => new Response(new ReadableStream({ start() {} }));
+    console.info = (_, value) => { record = value; };
+    try {
+        const pending = listRoute({ request: request("/api/admin/user-management"), env });
+        await new Promise(resolve => setImmediate(resolve));
+        t.mock.timers.tick(10_000);
+        const response = await pending;
+        assert.equal(response.status, 503);
+        assert.equal(response.headers.get("Cache-Control"), "no-store");
+        assert.deepEqual(await response.json(), { success: false, error: "USER_MANAGEMENT_UNAVAILABLE", message: "User Management is temporarily unavailable. Try again." });
+        assert.equal(record.stage, "account_access_fetch_body");
+        assert.equal(record.rpc, "get_account_access_state");
+        assert.equal(record.upstreamStatus, 200);
+        assert.equal(record.code, "UPSTREAM_TIMEOUT");
+        assert.equal(record.timeout, true);
+    } finally { globalThis.fetch = original; console.info = originalInfo; t.mock.timers.reset(); }
+});

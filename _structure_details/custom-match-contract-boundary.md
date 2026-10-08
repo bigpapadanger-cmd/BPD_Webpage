@@ -43,10 +43,10 @@ The existing JSON reader gained an optional abort signal; existing callers retai
 their behavior. Database transport retains Phase A deadlines/size limits.
 
 The UI offers configured basic modes, standard capacity presets and asymmetric custom
-capacities. Round/vote modes are listed but disabled until their workflows exist.
+capacities. Round/vote workflows are implemented locally; live runtime provisioning remains disabled.
 Basic host actions include open, pregame, resize, team assignment, join policy,
 late-join policy, cancel, close and archive. Host leave is locked when transfer is
-required; transfer and kick are available for current members. Rejoin/invite/approval tools remain blocked.
+required; transfer and kick are available for current members. Rejoin/general-invite/approval tools are implemented by Phase C.
 
 Reads are initial/manual only. Mutation conflicts refresh authoritative detail without
 retrying. Temporary transport failures retain the exact serialized request/key for an
@@ -69,7 +69,7 @@ No automatic mutation retries or assumed replacement versions/keys exist.
 - Voting routes through the Phase E single-vote-type authority. All four request
   schemas are validated independently; runtime provisioning is still required.
 - Targeted invite UUIDs are rejected at the untrusted request boundary. A future
-  server-derived recipient lookup is required; untargeted invite schemas exist but no browser route is enabled.
+  server-derived recipient lookup is required; general invite creation/read/revoke and invitation-code joining are enabled in the repository.
 - Non-null `modeResult` is rejected pending its exact public-safe nested schema.
 - Reason text has a local 500-character safety limit; this is not a claimed DB limit.
 - Unspecified round-state/outcome/threshold/result-type strings are bounded but
@@ -270,3 +270,58 @@ resolution remains deferred independently of these implemented host lists.
 - _folder_structure/folder_organization/04_workers.txt
 - _structure_details/request-frequency-inventory.md
 - _structure_details/custom-match-contract-boundary.md
+
+## 4A authoritative backend reconciliation (2026-10-07)
+
+This checkpoint supersedes historical Phase C/D/E limitations above. The user's
+continuation supplies confirmed database guarantees: sanitized action receipts
+and historical rows; kicked departure history retained with independent rejoin
+permission; gameplay-interval participation including eligible late joins;
+monotonic provider verification; authoritative invite team; optional spectators;
+one current round/ballot; cross-row player-result integrity; normal durable host
+transfer. No replacement SQL is pending for those guarantees.
+
+Repository integration now projects allowSpectators/spectatorCapacity and
+backend spectator limits, accepts spectator create/settings/join/request/approval,
+keeps team capacity independent, excludes spectators from readiness/Start/voting
+and playing results, and limits voting to player_target/skip. The old first-ballot
+window-category lock was removed: skip is a choice within player voting, and the
+database owns ballot supersession. Invite preferences never override the database
+assignment. Provider data remains nullable and cannot be declared by browsers.
+Rejoin history remains kicked; optional rejoinAllowedAt is projected without IDs.
+
+Create responses no longer require or return receipt credentials. A successful
+create/retry immediately loads current authorized credentials through the existing
+protected read. Secrets remain transient, expire after ten seconds, and clear on
+refresh, blur, navigation and disposal. No credential persistence/logging added.
+
+Admin recovery: POST /api/admin/rocketleague/custom-match-host-recovery uses the
+existing current server-verified Admin context, then calls the fixed service-role
+admin_transfer_custom_match_host RPC with server-derived admin account, public
+match/member codes, expected version, idempotency key and explicit reason. The
+Admin home form retains the key for unchanged ambiguous retries; conflict requires
+operator review. Missing RPC fails sanitized/no-store with no fallback. The normal
+RL service explicitly refuses this operation. Recovery never uses offline status.
+Live acceptance PASS (authoritative user verification, 2026-10-07): SECURITY
+DEFINER true; EXECUTE service_role/postgres true; PUBLIC/anon/authenticated false.
+The repository continues to authorize current Admin first and fail safely.
+
+Spectator live acceptance PASS (authoritative user consolidated checks):
+allowSpectators/spectatorCapacity create/read contract, limits defaults/max,
+set_spectator_settings, disabled/full/occupancy guards, spectator role behavior
+and authoritative invite intended_team. Rocket League defaults: disabled, 4;
+maximum: 8. Missing limits still fail closed; legacy projections remain compatible.
+The Custom Match database contract is frozen for this release; no SQL is pending.
+
+Verification: combined Custom Match/API/UI/runtime/health/routes suite 168/168;
+focused runtime rerun 13/13 after adding disconnected spectator Start acceptance.
+Admin tests cover verified Admin, moderator denial, unavailable RPC, malformed
+response, method/origin/session rejection, server actor and sensitive projection.
+Real WebSocket upgrade, reconnect, hibernation/restart, concurrency and durable
+provider/result interactions still need separately authorized release validation.
+
+Runtime stays disabled on Pages and Worker. Activation separately requires matching
+64+ character caller secrets, service binding, Worker service-role secret, HTTPS
+Supabase URL and approved custom-match-session-v1 SQLite DO migration/binding.
+Enable both flags only after approved provisioning and live validation. No deploy,
+push, Supabase change or production configuration change occurred.

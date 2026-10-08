@@ -1,3 +1,4 @@
+import { sanitizeLogMetadata } from "../http/diagnostics.js";
 "use strict";
 
 /* =========================================================
@@ -226,11 +227,11 @@ export async function verifyTurnstile(
     ) {
         console.error(
             "TURNSTILE: Verification request failed.",
-            {
+            sanitizeLogMetadata({
                 message:
                     error?.message
                     || "Unknown error"
-            }
+            })
         );
 
         return createFailureResult(
@@ -273,11 +274,11 @@ export async function verifyTurnstile(
     ) {
         console.error(
             "TURNSTILE: Could not parse verification response.",
-            {
+            sanitizeLogMetadata({
                 message:
                     error?.message
                     || "Unknown error"
-            }
+            })
         );
 
         return createFailureResult(

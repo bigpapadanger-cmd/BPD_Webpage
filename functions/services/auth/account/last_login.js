@@ -1,3 +1,4 @@
+import { sanitizeLogMetadata } from "../../http/diagnostics.js";
 "use strict";
 
 /* =========================================================
@@ -177,7 +178,7 @@ export async function touchAccountLastSeen(
     ) {
         console.error(
             "LAST LOGIN SERVICE: RPC failed.",
-            {
+            sanitizeLogMetadata({
                 status:
                     response.status,
 
@@ -191,7 +192,7 @@ export async function touchAccountLastSeen(
                             0,
                             300
                         )
-            }
+            })
         );
 
         const error =
@@ -289,13 +290,13 @@ export async function handleAccountLastLogin(
 
         console.info(
             "LAST LOGIN SERVICE: Background refresh completed.",
-            {
+            sanitizeLogMetadata({
                 accountId:
                     normalizedAccountId,
 
                 result:
                     statsRefresh
-            }
+            })
         );
     }
     catch (
@@ -303,7 +304,7 @@ export async function handleAccountLastLogin(
     ) {
         console.error(
             "LAST LOGIN SERVICE: Background refresh failed.",
-            {
+            sanitizeLogMetadata({
                 accountId:
                     normalizedAccountId,
 
@@ -330,7 +331,7 @@ export async function handleAccountLastLogin(
                 message:
                     error?.message
                     || "Unknown error"
-            }
+            })
         );
 
         statsRefresh = {

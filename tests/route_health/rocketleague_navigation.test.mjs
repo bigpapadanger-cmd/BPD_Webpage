@@ -22,6 +22,15 @@ function htmlFiles(directory) {
     });
 }
 
+test("UE6 is a public static opinion page without new external links or invented author views", () => {
+    const route = ROUTES["/RocketLeague/UE6"];
+    assert.equal(route.module, null); assert.equal(route.sitemap, true); assert.equal(route.auth, undefined);
+    const html = readFileSync(resolve(publicRoot, route.body.slice(1)), "utf8");
+    assert.match(html, /My perspective/); assert.match(html, /separate from official announcements/);
+    assert.doesNotMatch(html, /href="https?:/);
+    assert.doesNotMatch(html, /<script|<iframe/);
+});
+
 test("all local Rocket League links in public HTML resolve to registered pages", () => {
     const failures = [];
     for (const file of htmlFiles(publicRoot)) {
@@ -200,7 +209,7 @@ test("Shop reads cached public data and Match History does not invent matches", 
     const history = readFileSync(resolve(publicRoot, "Tabs/RocketLeague/Features/HTML/match-history.html"), "utf8");
     assert.match(shop, /data-shop-items/);
     assert.match(shop, /does not sell items or make purchases/i);
-    assert.match(shopModule, /fetch\("\/api\/rocketleague\/shop"/);
+    assert.match(shopModule, /boundedJson\("\/api\/rocketleague\/shop"/);
     assert.doesNotMatch(shopModule, /SUPABASE_AUTH|\/get-shop-data|Shops\/Get/);
     assert.match(history, /periodic snapshots, not individual matches/i);
     assert.equal(ROUTES["/RocketLeague/Shop"].module, "/Tabs/RocketLeague/Features/JS/shop.js");
@@ -222,4 +231,16 @@ test("generated sitemap lists public Shop and Find Players but excludes private 
     assert.match(sitemap, /https:\/\/bpd-gaming-network\.com\/RocketLeague\/Shop/);
     assert.match(sitemap, /https:\/\/bpd-gaming-network\.com\/RocketLeague\/FindPlayers/);
     assert.doesNotMatch(sitemap, /\/RocketLeague\/(?:MyProfile|MatchHistory|Profile)(?:<|\/)/);
+});
+
+
+test("Match History remains capability-gated and cannot reinterpret MMR captures", () => {
+    const route = ROUTES["/RocketLeague/MatchHistory"];
+    assert.equal(route.requiresAuth, true);
+    assert.deepEqual(route.auth, { required: true, provider: "epic", rocketLeague: true });
+    assert.equal(route.module, null); assert.equal(route.sitemap, false);
+    const html = readFileSync(resolve(publicRoot, "Tabs/RocketLeague/Features/HTML/match-history.html"), "utf8");
+    assert.match(html, /does not have authoritative match-by-match history/);
+    assert.match(html, /periodic snapshots, not individual matches/);
+    assert.doesNotMatch(html, /<script|data-match-id|data-match-timestamp/);
 });

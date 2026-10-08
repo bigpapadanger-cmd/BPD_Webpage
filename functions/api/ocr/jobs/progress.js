@@ -1,3 +1,4 @@
+import { sanitizeLogMetadata } from "../../../services/http/diagnostics.js";
 "use strict";
 import { onRequestGet as readOwnedJob } from "./get_job.js";
 
@@ -486,7 +487,7 @@ export async function onRequestPost(
     ) {
         console.error(
             "[OCR PROGRESS][POST] Failed.",
-            {
+            sanitizeLogMetadata({
                 message:
                     String(
                         error?.message
@@ -494,7 +495,7 @@ export async function onRequestPost(
                     ),
                 version:
                     PROGRESS_VERSION
-            }
+            })
         );
 
         return jsonResponse(
@@ -641,7 +642,7 @@ export async function onRequestGet(
     ) {
         console.error(
             "[OCR PROGRESS][GET] Failed.",
-            {
+            sanitizeLogMetadata({
                 message:
                     String(
                         error?.message
@@ -649,7 +650,7 @@ export async function onRequestGet(
                     ),
                 version:
                     PROGRESS_VERSION
-            }
+            })
         );
 
         return jsonResponse(

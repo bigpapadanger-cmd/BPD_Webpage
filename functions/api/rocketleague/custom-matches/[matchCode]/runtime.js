@@ -14,6 +14,7 @@ export async function onRequest(context) {
         const matchCode = params?.matchCode;
         if (typeof matchCode !== "string" || !/^CM[A-Za-z0-9]{8}$/.test(matchCode)) return Response.json({ success: false, code: "CUSTOM_MATCH_INPUT_INVALID" }, { status: 400, headers: { "Cache-Control": "no-store" } });
         const authorization = await authorizeRocketLeagueRequest(request, env, "rocket_league");
+        if (env?.CUSTOM_MATCH_RUNTIME_ENABLED === "false") return Response.json({ success: false, code: "CUSTOM_MATCH_RUNTIME_DISABLED" }, { status: 503, headers: { "Cache-Control": "no-store" } });
         if (!isCustomMatchRuntimeCallerConfigured(env) || typeof env.CUSTOM_MATCH_RUNTIME?.fetch !== "function") {
             return Response.json({ success: false, code: "CUSTOM_MATCH_RUNTIME_UNAVAILABLE" }, { status: 503, headers: { "Cache-Control": "no-store" } });
         }

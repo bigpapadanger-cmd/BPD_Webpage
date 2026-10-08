@@ -223,21 +223,91 @@ test("chart defaults to all with doubles guides, filters playlists and retains s
     assert.equal(graph.dataset.chartPlaylist, "all");
     assert.ok(labels().includes("Champion I · 1075"));
     const controls = graph.children[2];
-    assert.equal(controls.children.length, 4);
+    assert.equal(controls.children.length, 5);
     assert.equal(controls.children[0].attributes["aria-pressed"], "true");
     controls.children[1].click();
     assert.equal(graph.dataset.rankReferencePlaylist, "ones");
-    assert.ok(labels().includes("Champion I · 995"));
+    assert.equal(labels().includes("Champion I · 995"), false); // Outside the selected 1v1 scale.
     assert.equal(graph.children[0].children.filter(node => node.tagName === "circle").length, 1);
     renderMmrHistory(history, documentRef);
     assert.equal(graph.dataset.rankReferencePlaylist, "ones");
     graph.children[2].children[3].click();
     assert.equal(graph.dataset.rankReferencePlaylist, "threes");
-    assert.ok(labels().includes("Diamond III · 980"));
+    assert.equal(graph.dataset.rankReferencePlaylist, "threes");
     graph.children[2].children[0].click();
     assert.equal(graph.dataset.chartPlaylist, "all");
     assert.equal(graph.dataset.rankReferencePlaylist, "twos");
     assert.equal(graph.children[0].children.filter(node => node.tagName === "circle").length, 3);
     assert.ok(graph.children[0].children.some(node => node.attributes.class === "rl-mmr-chart-rank-box" && node.attributes.rx === "6"));
-    assert.equal(graph.children[3].children[0].textContent, "Estimates · 2v2");
+    assert.match(graph.children[3].textContent, /Ranking estimates · 2v2.*last adjusted.*2026-10-06/);
+    assert.equal(graph.children[3].children.length, 0);
+});
+
+
+test("range and playlist controllers filter locally, preserve source and table consistency", () => {
+    const now = Date.parse("2026-10-07T12:00:00Z");
+    const history = [8, 7, 1, 0].map(days => ({ capturedAt: new Date(now - days * 86400000).toISOString(),
+        ones: { mmr: 800 + days }, twos: { mmr: days === 1 ? null : 1100 + days }, threes: { mmr: 1000 + days } }));
+    const original = JSON.stringify(history);
+    const graph = fakeElement("div"), status = fakeElement("p");
+    const documentRef = { getElementById: id => id === "rocketLeagueMmrHistoryGraph" ? graph : status, createElement: fakeElement, createElementNS: (_ns, tag) => fakeElement(tag) };
+    const select = () => graph.children.find(node => node.className === "rl-mmr-chart-reference-controls").children.at(-1).children[0];
+    const rows = () => graph.children.at(-1).children[1].children[2].children;
+    renderMmrHistory(history, documentRef, { now });
+    assert.equal(select().attributes["aria-label"], "MMR history range");
+    assert.equal(rows().length, 4);
+    select().value = "7"; select().change();
+    assert.equal(rows().length, 3); // Inclusive seven-day boundary.
+    graph.children[2].children[2].click();
+    assert.equal(graph.dataset.chartPlaylist, "twos");
+    assert.equal(rows()[0].children.length, 2); // Timestamp plus selected series.
+    assert.equal(rows()[1].children[1].textContent, "—");
+    const paths = graph.children[0].children.filter(node => node.tagName === "path");
+    assert.equal(paths.length, 0); // Missing middle point breaks the line.
+    select().value = "1"; select().change();
+    assert.equal(rows().length, 2);
+    assert.equal(rows()[0].children[0].textContent, "2026-10-06T12:00:00.000Z");
+    assert.equal(JSON.stringify(history), original);
+    const svg = graph.children[0];
+    renderMmrHistory(history, documentRef, { now });
+    assert.equal(graph.children[0], svg); // No duplicate render/instance.
+    // A new route DOM starts independently with All and all loaded captures.
+    const fresh = fakeElement("div");
+    renderMmrHistory(history, { ...documentRef, getElementById: id => id === "rocketLeagueMmrHistoryGraph" ? fresh : status }, { now });
+    assert.equal(fresh.dataset.chartPlaylist, "all"); assert.equal(fresh.dataset.chartRange, "all");
+    assert.equal(fresh.children[0].attributes.viewBox, "0 0 720 290");
+});
+
+test("empty ranges keep controls and changing back restores graph without fetching", () => {
+    const graph = fakeElement("div"), status = fakeElement("p");
+    const doc = { getElementById: id => id === "rocketLeagueMmrHistoryGraph" ? graph : status, createElement: fakeElement, createElementNS: (_ns, tag) => fakeElement(tag) };
+    const history = [{ capturedAt: "2026-10-01T00:00:00Z", ones: { mmr: 1 }, twos: { mmr: null }, threes: { mmr: null } }];
+    renderMmrHistory(history, doc, { now: Date.parse("2026-10-07T12:00:00Z") });
+    let select = graph.children[2].children.at(-1).children[0];
+    select.value = "1"; select.change();
+    assert.match(status.textContent, /No saved MMR captures/);
+    assert.equal(graph.children.length, 1);
+    select = graph.children[0].children.at(-1).children[0];
+    select.value = "all"; select.change();
+    assert.equal(graph.children[0].tagName, "svg");
+    graph.children[2].children[2].click();
+    assert.match(status.textContent, /No playlist MMR values/);
+    graph.children[0].children[0].click();
+    assert.equal(graph.children[0].tagName, "svg");
+});
+
+test("series patterns and public daily ranges use distinct accessible representations", () => {
+    const graph = fakeElement("div"), status = fakeElement("p");
+    const doc = { getElementById: () => graph, createElement: fakeElement, createElementNS: (_ns, tag) => fakeElement(tag) };
+    const history = [0, 1].map(day => ({ capturedAt: `2026-10-0${6 + day}T00:00:00Z`, ones: { mmr: 1 }, twos: { mmr: 2 }, threes: { mmr: 3 } }));
+    const documentRef = { ...doc, getElementById: id => id === "publicGraph" ? graph : status };
+    renderMmrHistory(history, documentRef, { graphId: "publicGraph", days: 14, dailyAverages: true, now: Date.parse("2026-10-07T12:00:00Z") });
+    const patterns = graph.children[0].children.filter(node => node.tagName === "path").map(node => node.attributes["stroke-dasharray"]);
+    assert.deepEqual(patterns, ["none", "8 4", "2 5"]);
+    const select = graph.children[2].children.at(-1).children[0];
+    assert.deepEqual(select.children.map(option => option.textContent), ["All 14 days", "7 Days"]);
+    select.value = "7"; select.change();
+    assert.match(status.textContent, /7-day window/);
+    const legend = graph.children[1].children.map(node => node.textContent).join(" ");
+    assert.match(legend, /solid/); assert.match(legend, /dashed/); assert.match(legend, /dotted/);
 });

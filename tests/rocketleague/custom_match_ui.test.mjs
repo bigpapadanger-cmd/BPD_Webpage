@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
 import { createCustomMatchController, requestCustomMatch, errorMessage } from "../../public/Tabs/RocketLeague/CustomMatches/JS/client.js";
-import { basicLifecycleActions, renderLobby, renderBrowse, renderCredentials, renderHostManagement } from "../../public/Tabs/RocketLeague/CustomMatches/JS/view.js";
+import { basicLifecycleActions, renderLobby, renderBrowse, renderCredentials, renderHostManagement, renderRounds } from "../../public/Tabs/RocketLeague/CustomMatches/JS/view.js";
 
 const matchCode = "CMabcdefgh", memberCode = "CMMabcdefgh";
 const limits = { success: true, maxTeamCapacity: 32, maxTotalParticipants: 64, modes: [{ modeKey: "standard", usesRounds: false, usesVoting: false }] };
@@ -28,6 +28,15 @@ test("access and limits gate mutations; failure settles and public browse remain
     await controller.limits(); await controller.browse(); await controller.create({ title: "x", modeKey: "standard", teamACapacity: 1, teamBCapacity: 1 });
     assert.equal(controller.state.browsePending, false); assert.match(controller.state.browseMessage, /No public matches/);
     assert.ok(!calls.some(item => item.init?.method === "POST"));
+});
+
+test("successful create immediately uses protected credentials read, without trusting receipt secrets", async () => {
+    const { controller, calls } = setup({ mutate: () => ({ success: true, match: { matchCode }, credentials: { lobbyName: "unsafe", lobbyPassword: "unsafe" } }) });
+    await controller.access(); await controller.limits();
+    await controller.create({ title: "Test", modeKey: "standard", teamACapacity: 1, teamBCapacity: 1 });
+    assert.equal(calls.filter(item => item.path.endsWith("/credentials")).length, 1);
+    assert.equal(controller.state.credentials.lobbyName, "abcdefgh12");
+    controller.dispose(); assert.equal(controller.state.credentials, null);
 });
 test("version conflict refreshes authoritative version exactly once with no blind retry", async () => {
     let version = 5;
@@ -91,6 +100,18 @@ class Node {
     setAttribute(name, value) { this[name] = value; }
 }
 const doc = { createElement: tag => new Node(tag) };
+
+test("player voting has accessible choices and a real submit control; spectators get no ballot form", () => {
+    const value = detail(5); value.actor.team = "a";
+    const state = { detail: value, rounds: [{ roundCode: "CMRDabcdefgh", roundNumber: 1, state: "voting", roundVersion: 1 }], voteResults: {}, voteTypes: {} };
+    const container = new Node("section"); renderRounds(doc, container, state);
+    const nodes = flatten(container), form = nodes.find(node => node.tagName === "form");
+    assert.ok(form); assert.equal(nodes.find(node => node.dataset.cmVoteSubmit).type, "submit");
+    assert.deepEqual(nodes.find(node => node.dataset.voteType).children.map(node => node.value), ["player_target", "skip"]);
+    assert.ok(nodes.find(node => node.dataset.voteType)["aria-label"]);
+    value.actor.team = "spectator"; renderRounds(doc, container, state);
+    assert.equal(flatten(container).some(node => node.tagName === "form"), false);
+});
 const flatten = node => [node, ...node.children.flatMap(flatten)];
 
 test("Phase C host lists refresh after mutations and clear credentials; one failed list does not discard the others", async () => {

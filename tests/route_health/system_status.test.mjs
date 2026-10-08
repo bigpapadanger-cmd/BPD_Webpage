@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import test from "node:test";
 
 import { getSystemStatus, performSystemStatusAction, runScheduledAdminHealthChecks, updateMmrBuildConfiguration } from "../../functions/services/admin/system_status.js";
@@ -7,8 +7,109 @@ import { getPermissionsForDiscordRoles, ADMIN_PERMISSIONS } from "../../function
 import { onRequestGet, onRequestPost } from "../../functions/api/admin/system-status.js";
 import { getMmrControlModel } from "../../public/Global/Admin/WorkerStatus/JS/mmr_controls.js";
 import { ROCKET_LEAGUE_CAPABILITIES, ROCKET_LEAGUE_CAPABILITY_CATEGORIES } from "../../public/Global/Admin/WorkerStatus/JS/rocket_league_capabilities.js";
+import customRuntime from "../../workers/bpd-custom-match-runtime/src/index.js";
+import communicationsRuntime from "../../workers/bpd-discord-communications/src/index.js";
 
 const INTERNAL_HOSTNAME_FOR_TEST = "ocr-google-transport.internal";
+
+test("health inventory covers every configured Worker and separates intentional disablement", async () => {
+    const trap = () => { throw new Error("Disabled health must not contact a Worker"); };
+    const status = await getSystemStatus({ CUSTOM_MATCH_RUNTIME_ENABLED: "false", DISCORD_COMMUNICATIONS_ENABLED: "false",
+        CUSTOM_MATCH_RUNTIME: { fetch: trap }, DISCORD_COMMUNICATIONS: { fetch: trap } }, { force: true });
+    const names = new Set(status.services.map(service => service.name));
+    for (const directory of await readdir(new URL("../../workers/", import.meta.url), { withFileTypes: true })) {
+        if (!directory.isDirectory()) continue;
+        const config = JSON.parse(await readFile(new URL(`../../workers/${directory.name}/wrangler.jsonc`, import.meta.url), "utf8"));
+        assert.ok(names.has(config.name), `Missing configured Worker ${config.name}`);
+    }
+    for (const id of ["custom-match-runtime", "custom-match-session", "discord-communications"]) {
+        assert.equal(status.services.find(service => service.id === id).canonicalStatus, "disabled");
+    }
+    assert.equal(new Set(status.services.map(service => service.id)).size, status.services.length);
+    assert.ok(status.services.every(service => service.group && service.checkedAt));
+    assert.equal(status.services.find(service => service.id === "google-mtls-diagnostic").classification, "retirement-candidate");
+});
+
+test("authenticated bound health checks never instantiate DOs or call providers", async () => {
+    const trap = () => { throw new Error("Health must not create instances or call a provider"); };
+    const namespace = { idFromName: trap, get: trap };
+    const customEnv = { CUSTOM_MATCH_RUNTIME_ENABLED: "true", CUSTOM_MATCH_RUNTIME_CALLER_SECRET: "c".repeat(64),
+        CUSTOM_MATCH_SESSIONS: namespace, SUPABASE_URL: "https://database.example", SUPABASE_SERVICE_ROLE_KEY: "private-data-key" };
+    const communicationsEnv = { DISCORD_COMMUNICATIONS_ENABLED: "true", DISCORD_COMMUNICATIONS_SECRET: "d".repeat(64), DISCORD_COMMUNICATION_RECEIPTS: namespace };
+    const env = { ...customEnv, ...communicationsEnv, CUSTOM_MATCH_RUNTIME: { fetch: request => customRuntime.fetch(request, customEnv) },
+        DISCORD_COMMUNICATIONS: { fetch: request => communicationsRuntime.fetch(request, communicationsEnv) } };
+    const original = globalThis.fetch; globalThis.fetch = trap;
+    try {
+        const status = await getSystemStatus(env, { force: true });
+        assert.equal(status.services.find(service => service.id === "custom-match-runtime").status, "healthy");
+        assert.equal(status.services.find(service => service.id === "discord-communications").status, "healthy");
+        const session = status.services.find(service => service.id === "custom-match-session");
+        assert.equal(session.status, "unknown"); assert.equal(session.runtimeAvailable, true); assert.equal(session.instanceChecked, false);
+        assert.doesNotMatch(JSON.stringify(status), /private-data-key|cccccccc|dddddddd|database\.example/);
+        delete customEnv.CUSTOM_MATCH_SESSIONS;
+        const missingNamespace = await getSystemStatus(env, { force: true });
+        assert.equal(missingNamespace.services.find(service => service.id === "custom-match-runtime").status, "degraded");
+        assert.equal(missingNamespace.services.find(service => service.id === "custom-match-session").status, "unavailable");
+        customEnv.CUSTOM_MATCH_RUNTIME_ENABLED = "false";
+        assert.equal((await getSystemStatus(env, { force: true })).services.find(service => service.id === "custom-match-runtime").status, "disabled");
+    } finally { globalThis.fetch = original; }
+});
+
+test("bound runtime health distinguishes absent flags, missing bindings, unreachable and malformed responses", async () => {
+    const env = { CUSTOM_MATCH_RUNTIME_CALLER_SECRET: "c".repeat(64) };
+    const read = async () => (await getSystemStatus(env, { force: true })).services.find(service => service.id === "custom-match-runtime");
+    assert.equal((await read()).status, "unknown");
+    env.CUSTOM_MATCH_RUNTIME_ENABLED = "true";
+    assert.match((await read()).message, /Binding is missing/);
+    env.CUSTOM_MATCH_RUNTIME = { fetch: async () => { throw new Error("private-upstream-secret"); } };
+    assert.equal((await read()).canonicalStatus, "unavailable");
+    env.CUSTOM_MATCH_RUNTIME.fetch = async () => Response.json({ success: true, service: "bpd-custom-match-runtime", status: "healthy",
+        checkedAt: "2026-10-07T12:00:00Z", namespaceConfigured: true, dataConfigured: true, instanceChecked: false, accountId: "private-account" });
+    assert.equal((await read()).status, "unavailable");
+    env.CUSTOM_MATCH_RUNTIME.fetch = async () => Response.json({ success: true, service: "bpd-custom-match-runtime", status: "healthy",
+        checkedAt: "Wed, 07 Oct 2026 12:00:00 GMT (private-upstream-secret)", namespaceConfigured: true, dataConfigured: true, instanceChecked: false });
+    const normalized = await read();
+    assert.equal(normalized.checkedAt, "2026-10-07T12:00:00.000Z");
+    assert.doesNotMatch(JSON.stringify(normalized), /private-upstream-secret|private-account/);
+});
+
+test("MMR, presence and OCR deadlines include stalled bodies and isolate failures", async t => {
+    t.mock.timers.enable({ apis: ["setTimeout"] });
+    const { env } = createEnv();
+    let reads = 0, started;
+    const allStarted = new Promise(resolve => { started = resolve; });
+    const stalled = () => new Response(new ReadableStream({ start(controller) {
+        controller.enqueue(new TextEncoder().encode("{")); if (++reads === 3) started();
+    } }));
+    const original = globalThis.fetch; globalThis.fetch = stalled;
+    env.OCR_GOOGLE_TRANSPORT.fetch = stalled;
+    try {
+        const pending = getSystemStatus(env, { force: true });
+        await allStarted; await new Promise(resolve => setImmediate(resolve));
+        t.mock.timers.tick(2000);
+        const result = await pending;
+        for (const id of ["mmr-api", "rl-presence", "ocr-transport"]) {
+            const service = result.services.find(service => service.id === id);
+            assert.equal(service.canonicalStatus, "unavailable"); assert.match(service.message, /timed out/);
+        }
+        assert.equal(result.services.find(service => service.id === "pages").status, "healthy");
+        assert.equal(result.services.find(service => service.id === "provider-runtime").status, "healthy");
+    } finally { globalThis.fetch = original; t.mock.timers.reset(); }
+});
+
+test("cached operational and provider health fields discard private payloads", async () => {
+    const { env, values, calls } = createEnv();
+    const secret = "private-payload-secret";
+    values.set("admin:service-status:ocr-queue", { body: JSON.stringify({ lastInvocationAt: new Date().toISOString(), accountId: secret,
+        lastSummary: { completed: 1, accountId: secret }, message: secret, lastErrorCode: secret }), expiresAt: Date.now() + 60000 });
+    const restore = installHealthFetch(calls), ordinaryFetch = globalThis.fetch;
+    globalThis.fetch = async (input, init) => new URL(input).hostname === "mmr.example.test"
+        ? Response.json({ status: "degraded", rootCause: secret, activeRepair: secret, components: { psynetSocket: { status: "healthy", state: secret } },
+            config: { missingConfig: [secret] }, build: { source: secret, currentBuildId: secret, gameVersion: secret }, psynet: { lastAuthAttemptAt: secret } })
+        : ordinaryFetch(input, init);
+    try { assert.equal(JSON.stringify(await getSystemStatus(env, { force: true })).includes(secret), false); }
+    finally { restore(); }
+});
 
 function createEnv() {
     const values = new Map();
@@ -321,13 +422,13 @@ test("Admin role receives system-status and MMR deploy permissions", () => {
 test("provider runtime is called only server-side and has no browser/public route", async () => {
     const source = await readFile(new URL("../../public/Global/Admin/WorkerStatus/JS/index.js", import.meta.url), "utf8");
     const config = JSON.parse(await readFile(new URL("../../workers/bpd-provider-runtime/wrangler.jsonc", import.meta.url), "utf8"));
-    assert.match(source, /fetch\("\/api\/admin\/system-status"/);
+    assert.match(source, /boundedJson\("\/api\/admin\/system-status"/);
     assert.doesNotMatch(source, /bpd-provider-runtime\.internal|PROVIDER_RUNTIME_CALLER_SECRET|PROVIDER_RUNTIME/);
     assert.equal(config.workers_dev, false);
     assert.equal(config.preview_urls, false);
     assert.deepEqual(config.placement, { mode: "smart" });
     assert.equal("routes" in config, false);
-    assert.match(source, /healthy: "Online", degraded: "Degraded", down: "Down", unknown: "Unknown"/);
+    assert.match(source, /healthy: "Healthy", degraded: "Degraded", unavailable: "Unavailable", disabled: "Disabled", unknown: "Unknown"/);
     assert.match(source, /Health check: \$\{service\.errorCode\}/);
     assert.match(source, /service\.checkedAt \? `Checked/);
     assert.match(source, /Number\.isFinite\(service\.responseTimeMs\)/);
@@ -600,8 +701,8 @@ test("Admin service rows group exclusively by backend canonical health", async (
     const html = await readFile(new URL("../../public/Global/Admin/WorkerStatus/HTML/index.html", import.meta.url), "utf8");
     assert.match(html, /id="workerStatusGroups"/);
     assert.match(source, /service\.canonicalStatus/);
-    assert.match(source, /statusNames = \{ healthy: "Online", degraded: "Degraded", down: "Down", unknown: "Unknown" \}/);
-    assert.match(source, /\["degraded", "down"\]\.includes\(status\) && services\.length > 0/);
+    assert.match(source, /statusNames = \{ healthy: "Healthy", degraded: "Degraded", unavailable: "Unavailable", disabled: "Disabled", unknown: "Unknown" \}/);
+    assert.match(source, /\["degraded", "unavailable"\]\.includes\(status\) && services\.length > 0/);
     assert.match(source, /previous\.count === 0 \? true : previous\.open/);
     assert.match(source, /`\(\$\{services\.length\}\)`/);
     assert.doesNotMatch(source, /String\(service\.status \|\| "unknown"\)\.toLowerCase\(\)/);

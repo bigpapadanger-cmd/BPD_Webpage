@@ -1,6 +1,5 @@
 // Observed Division I minimums, not official promotion guarantees.
 // Update all playlist values together after reviewing the source distribution.
-export const MMR_RANK_REFERENCE_SOURCE = "https://rocketleague.tracker.network/rocket-league/distribution";
 export const MMR_RANK_REFERENCE_DATE = "2026-10-06";
 const RANKS = ["Bronze I", "Bronze II", "Bronze III", "Silver I", "Silver II", "Silver III",
     "Gold I", "Gold II", "Gold III", "Platinum I", "Platinum II", "Platinum III",

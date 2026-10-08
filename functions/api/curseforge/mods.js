@@ -1,3 +1,4 @@
+import { sanitizeLogMetadata } from "../../services/http/diagnostics.js";
 const MODS = {
     ark: [
         1103705,
@@ -155,7 +156,7 @@ export async function onRequestGet(
 
         console.error(
             "CurseForge mods error:",
-            error
+            sanitizeLogMetadata(error)
         );
 
 

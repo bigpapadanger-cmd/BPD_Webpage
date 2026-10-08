@@ -243,3 +243,43 @@ test("due capabilities share one authorized Worker request and persist/checkpoin
     assert.equal(writes.some(item => item.rpc === "save_rl_player_stats" && item.body.p_wins === 1), true);
     assert.equal(writes.some(item => item.body?.p_access_token), false);
 });
+
+
+test("hourly scanner obeys authoritative three-hour MMR fixtures despite old KV gates", async () => {
+    // These booleans model supplied SQL boundary results, not a second due gate.
+    const cases = [["never", true], ["2h59m59s", false], ["3h", true], ["4h", true], ["fresh-but-authoritatively-due", true]];
+    for (const [age, due] of cases) {
+        const writes = [], requested = [];
+        const now = Date.now();
+        const records = new Map([
+            ["provider_auth_id:account-1:epic", { accountId: "account-1", provider: "epic", connectedAt: new Date(now - 60000).toISOString(), expiresAt: new Date(now + 86400000).toISOString() }],
+            ["account_login_status:account-1", { accountId: "account-1", lastLoginAt: new Date(now - 60000).toISOString(), providerReauthAfter: null }]
+        ]);
+        globalThis.fetch = async (url, init = {}) => {
+            const parsed = new URL(url), rpc = parsed.pathname.split("/").at(-1);
+            if (parsed.hostname === "mmr.example.test") {
+                requested.push(parsed.searchParams.get("capabilities"));
+                return Response.json({ success: true, capabilities: {
+                    skills: { status: "success", data: { playlists: [{ id: 11, mmr: 1000, tier: 15 }] } },
+                    profile: { status: "success", data: { display_username: "Pilot" } }
+                } });
+            }
+            if (rpc === "get_rl_refresh_candidates") return Response.json([{ ...candidate, mmr_due: due, provider_due: true, club_due: false, career_stats_due: false, match_history_due: false, discord_due: false,
+                mmr_last_success_at: new Date(now).toISOString() }]);
+            if (rpc === "get_account_session_identity") return Response.json([{ id: "account-1", active: true }]);
+            if (rpc === "verify_account_provider_identity") return Response.json([{ account_id: "account-1", provider: "epic", provider_subject: "epic-1", active: true }]);
+            writes.push({ rpc, args: JSON.parse(init.body) });
+            return Response.json({ saved: true, refreshSucceeded: true });
+        };
+        const runtime = { ...baseEnv, SUPABASE_AUTH: "test-secret", MMR_API_URL: "https://mmr.example.test", MMR_API_KEY: "test-key",
+            AUTH_SESSIONS: { get: async key => records.get(key) || null, put: async () => {} },
+            RL_STATS_CACHE: { get: () => { throw new Error("Legacy KV gate must not be consulted"); } },
+            SERVICE_STATUS: { get: async () => null, put: async () => {}, delete: async () => {} } };
+        const result = await runRocketLeagueRefreshCycle(runtime);
+        assert.equal(result.failed, 0, age);
+        assert.deepEqual(requested, [due ? "skills,profile" : "profile"], age);
+        assert.equal(writes.some(row => row.rpc === "save_rl_player_mmr_snapshot_v2"), due, age);
+        assert.ok(writes.some(row => row.rpc === "save_rl_player_provider_profile"));
+        assert.equal(writes.some(row => row.args.p_component === "mmr"), due);
+    }
+});

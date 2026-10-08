@@ -54,17 +54,22 @@ export function renderLobby(doc, container, detail, { locked = false, limits = n
             && (["open", "lobby", "pregame"].includes(match.state) || (match.state === "active" && match.allowJoinAfterStart));
         joins.append(button(doc, "Join Team A", "join", { team: "a" }, locked || !canJoin || match.teamACount >= match.teamACapacity),
             button(doc, "Join Team B", "join", { team: "b" }, locked || !canJoin || match.teamBCount >= match.teamBCapacity));
+        if (match.allowSpectators) joins.append(button(doc, "Join as spectator", "join", { team: "spectator" }, locked || !canJoin || match.spectatorCount >= match.spectatorCapacity));
         container.append(joins);
         if (match.joinPolicy === "approval") {
             joins.append(button(doc, "Request Team A", "request_join", { team: "a" }, locked || actor?.eligible !== true),
                 button(doc, "Request Team B", "request_join", { team: "b" }, locked || actor?.eligible !== true));
+            if (match.allowSpectators) joins.append(button(doc, "Request spectator place", "request_join", { team: "spectator" }, locked || actor?.eligible !== true || match.spectatorCount >= match.spectatorCapacity));
         }
         if (match.joinPolicy === "invite_only") {
             const form = element(doc, "form"); form.dataset.cmJoinInvite = "true"; form.className = "cm-actions";
             const field = element(doc, "input"); field.name = "inviteCode"; field.pattern = "CMI[A-Za-z0-9]{12}"; field.maxLength = 15; field.required = true; field.autocomplete = "off"; field.disabled = locked;
             const label = element(doc, "label", "Invite code"); label.append(field);
+            const teamLabel = element(doc, "label", "Preferred team (the invitation's assigned team takes priority)"); const preferred = element(doc, "select"); preferred.name = "team"; preferred.disabled = locked;
+            for (const [value, title] of [["", "Use invitation assignment"], ["a", "Team A"], ["b", "Team B"], ...(match.allowSpectators ? [["spectator", "Spectator"]] : [])]) { const option = element(doc, "option", title); option.value = value; preferred.append(option); }
+            teamLabel.append(preferred);
             const join = button(doc, "Join with invite", "", {}, locked || actor?.eligible !== true); delete join.dataset.cmAction; join.type = "submit";
-            form.append(label, join); container.append(form);
+            form.append(label, teamLabel, join); container.append(form);
         }
     }
     if (actor?.isMember && !terminal) {
@@ -80,7 +85,7 @@ export function renderLobby(doc, container, detail, { locked = false, limits = n
         const status = element(doc, "p"); status.dataset.runtimeStatus = "true"; status.setAttribute("role", "status"); container.append(status);
     }
     const teams = element(doc, "div", undefined, "cm-teams");
-    for (const [team, name, capacity] of [["a", "Team A", match.teamACapacity], ["b", "Team B", match.teamBCapacity], ["spectator", "Spectators", null]]) {
+    for (const [team, name, capacity] of [["a", "Team A", match.teamACapacity], ["b", "Team B", match.teamBCapacity], ["spectator", "Spectators", match.spectatorCapacity ?? null]]) {
         const section = element(doc, "section", undefined, "cm-team");
         const list = members.filter(member => member.team === team);
         section.append(element(doc, "h3", `${name} · ${list.length}${capacity === null ? "" : `/${capacity}`}`));
@@ -97,6 +102,7 @@ export function renderLobby(doc, container, detail, { locked = false, limits = n
                 select.dataset.cmAssign = member.memberCode;
                 select.dataset.protected = "true";
                 for (const [value, text] of [["a", "Team A"], ["b", "Team B"], ["spectator", "Spectator"]]) {
+                    if (value === "spectator" && !match.allowSpectators) continue;
                     const option = element(doc, "option", text); option.value = value; select.append(option);
                 }
                 select.value = member.team; select.disabled = locked;
@@ -121,6 +127,13 @@ export function renderLobby(doc, container, detail, { locked = false, limits = n
         const start = button(doc, "Start match", "start", {}, locked || runtimeStatus !== "connected" || !ready);
         start.dataset.runtimeStart = "true";
         actions.append(start); controls.append(actions);
+        if (!terminal && limits?.maxSpectatorCapacity && Number.isSafeInteger(match.spectatorCapacity)) {
+            const form = element(doc, "form"); form.dataset.cmSpectators = "true"; form.className = "cm-actions";
+            const label = element(doc, "label", "Allow spectators"); const enabled = element(doc, "input"); enabled.type = "checkbox"; enabled.name = "allowSpectators"; enabled.checked = match.allowSpectators === true; enabled.disabled = locked; label.append(enabled);
+            const capacityLabel = element(doc, "label", "Spectator capacity"); const capacity = element(doc, "input"); capacity.type = "number"; capacity.name = "spectatorCapacity"; capacity.min = String(Math.max(1, match.spectatorCount)); capacity.max = String(limits.maxSpectatorCapacity); capacity.value = String(match.spectatorCapacity); capacity.required = true; capacity.disabled = locked; capacityLabel.append(capacity);
+            const save = element(doc, "button", "Save spectator settings"); save.type = "submit"; save.disabled = locked;
+            form.append(label, capacityLabel, save); controls.append(form);
+        }
         if (["created", "open", "lobby", "pregame"].includes(match.state)) {
             const form = element(doc, "form"); form.dataset.cmResize = "true"; form.className = "cm-actions";
             for (const [key, text, value, count] of [["teamACapacity", "Team A capacity", match.teamACapacity, match.teamACount], ["teamBCapacity", "Team B capacity", match.teamBCapacity, match.teamBCount]]) {
@@ -185,6 +198,7 @@ export function renderHostManagement(doc, container, state, { locked = false } =
         const expiryLabel = element(doc, "label", "Expires at (your local time, optional)"); expiryLabel.append(expiry);
         const teamSelect = element(doc, "select"); teamSelect.name = "team";
         for (const [value, label] of [["", "No assigned team"], ["a", "Team A"], ["b", "Team B"], ["spectator", "Spectator"]]) {
+            if (value === "spectator" && !state.detail.match.allowSpectators) continue;
             const option = element(doc, "option", label); option.value = value; teamSelect.append(option);
         }
         const teamLabel = element(doc, "label", "Intended team"); teamLabel.append(teamSelect);
@@ -206,6 +220,10 @@ export function renderHostManagement(doc, container, state, { locked = false } =
         row.append(button(doc, "Approve Team A", "approve_join", { requestCode: request.requestCode, team: "a" }, disabled),
             button(doc, "Approve Team B", "approve_join", { requestCode: request.requestCode, team: "b" }, disabled),
             button(doc, "Reject request", "reject_join", { requestCode: request.requestCode }, disabled)); requests.append(row);
+        if (request.requestedTeam === "spectator") {
+            row.querySelectorAll("button").forEach(node => { if (node.dataset.cmAction === "approve_join") node.remove(); });
+            row.append(button(doc, "Approve spectator", "approve_join", { requestCode: request.requestCode, team: "spectator" }, disabled || !state.detail.match.allowSpectators || state.detail.match.spectatorCount >= state.detail.match.spectatorCapacity));
+        }
     }
     const history = section("Former members", "memberHistory", state.memberHistory);
     for (const member of state.memberHistory) {
@@ -213,6 +231,7 @@ export function renderHostManagement(doc, container, state, { locked = false } =
         row.append(element(doc, "h4", member.displayName ?? "Former player"), element(doc, "p", `${member.team ?? "No team"} · ${member.memberRole} · ${member.departureReason?.replaceAll("_", " ") ?? "Reason unavailable"}`),
             element(doc, "p", `Joined ${member.joinedAt} · Left ${member.leftAt}`));
         if (member.kickedByDisplayName !== null) row.append(element(doc, "p", `Removed by ${member.kickedByDisplayName}`));
+        if (member.rejoinAllowedAt) row.append(element(doc, "p", `Rejoin authorized ${member.rejoinAllowedAt}. Original departure history is retained.`));
         if (member.departureReason === "kicked" || member.canAllowRejoin) row.append(button(doc, "Allow rejoin", "allow_rejoin", { memberCode: member.memberCode }, disabled || !member.canAllowRejoin));
         history.append(row);
     }
@@ -254,18 +273,16 @@ export function renderRounds(doc, container, state, { locked = false } = {}) {
         if (round.state === "voting" && detail.actor?.isMember && detail.actor.team !== "spectator") {
             const form = element(doc, "form"); form.dataset.cmVote = round.roundCode; form.className = "cm-actions";
             const type = element(doc, "select"); type.dataset.voteType = "true";
-            for (const [value, label] of [["player_target", "Choose a player"], ["skip", "Skip"], ["yes_no", "Yes / no"], ["option", "Choose an option"]]) { const option = element(doc, "option", label); option.value = value; type.append(option); }
-            const current = state.voteTypes?.[round.roundCode]; if (current) { type.value = current; type.disabled = true; }
+            type.setAttribute("aria-label", "Vote choice");
+            for (const [value, label] of [["player_target", "Choose a player"], ["skip", "Skip"]]) { const option = element(doc, "option", label); option.value = value; type.append(option); }
             const target = element(doc, "select"); target.dataset.voteTarget = "true";
+            target.setAttribute("aria-label", "Player to vote for");
             for (const member of detail.members.filter(member => member.team !== "spectator")) { const option = element(doc, "option", member.displayName); option.value = member.memberCode; target.append(option); }
-            const choice = element(doc, "input"); choice.dataset.voteChoice = "true"; choice.maxLength = 200; choice.autocomplete = "off";
-            choice.hidden = (current ?? type.value) !== "option";
-            const yesNo = element(doc, "select"); yesNo.dataset.voteYesNo = "true"; yesNo.hidden = (current ?? type.value) !== "yes_no";
-            for (const value of ["yes", "no"]) { const option = element(doc, "option", value === "yes" ? "Yes" : "No"); option.value = value; yesNo.append(option); }
-            target.hidden = (current ?? type.value) !== "player_target";
+            target.hidden = type.value !== "player_target";
             const submit = button(doc, "Submit vote", "", {}, locked); delete submit.dataset.cmAction; submit.dataset.cmVoteSubmit = "true";
-            form.append(type, target, yesNo, choice, submit);
-            card.append(element(doc, "p", current ? `Vote type for this window: ${current}` : "The first accepted vote selects the single vote type for this window."), form);
+            submit.type = "submit";
+            form.append(type, target, submit);
+            card.append(element(doc, "p", "Choose a player or skip. A new accepted ballot replaces your previous ballot."), form);
         }
         const read = button(doc, "View resolved vote", "read_vote_result", { roundCode: round.roundCode }, false); card.append(read);
         const result = state.voteResults?.[round.roundCode];

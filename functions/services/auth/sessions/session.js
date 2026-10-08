@@ -484,9 +484,7 @@ export async function getStoredSession(
             console.warn(
                 "BPD SESSION: Expired session cleanup failed.",
                 {
-                    message:
-                        error?.message
-                        || "Unknown error"
+                    code: "SESSION_STORAGE_OPERATION_FAILED"
                 }
             );
         }
@@ -566,13 +564,7 @@ export async function getStoredSession(
             console.error(
                 "BPD SESSION: Failed to refresh session TTL.",
                 {
-                    name:
-                        error?.name
-                        || "Error",
-
-                    message:
-                        error?.message
-                        || "Unknown error"
+                    code: "SESSION_STORAGE_OPERATION_FAILED"
                 }
             );
         }
@@ -1273,9 +1265,7 @@ export async function destroyRequestSession(
             console.warn(
                 "BPD SESSION: Session deletion failed.",
                 {
-                    message:
-                        error?.message
-                        || "Unknown error"
+                    code: "SESSION_STORAGE_OPERATION_FAILED"
                 }
             );
         }
@@ -1315,9 +1305,7 @@ export async function replaceRequestSession(
             console.warn(
                 "BPD SESSION: Existing session cleanup failed.",
                 {
-                    message:
-                        error?.message
-                        || "Unknown error"
+                    code: "SESSION_STORAGE_OPERATION_FAILED"
                 }
             );
         }

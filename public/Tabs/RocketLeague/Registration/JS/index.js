@@ -1,3 +1,4 @@
+import { normalizeAccountScope, migrateRegistrationDraft } from "/scripts/accountScope.js";
 "use strict";
 
 /* =========================================================
@@ -88,11 +89,19 @@ CONFIGURATION
 const REGISTRATION_DRAFT_KEY =
     "bpdRocketLeagueRegistrationDraft";
 
-let registrationDraftAccountId = "";
+let registrationDraftAccountScope = "";
+let registrationDraftGeneration = 0;
+document.addEventListener("bpd:auth-state-changed", event => {
+    const scope = event.detail?.state?.authenticated === true ? normalizeAccountScope(event.detail.state.accountScope) : "";
+    if (scope !== registrationDraftAccountScope) {
+        registrationDraftGeneration += 1;
+        registrationDraftAccountScope = "";
+    }
+});
 
 function getRegistrationDraftKey() {
-    return registrationDraftAccountId
-        ? `${REGISTRATION_DRAFT_KEY}:${registrationDraftAccountId}`
+    return registrationDraftAccountScope
+        ? `${REGISTRATION_DRAFT_KEY}:${registrationDraftAccountScope}`
         : null;
 }
 
@@ -1890,14 +1899,6 @@ function normalizeProfile(
     } });
 
     return {
-        EpicUniqueId:
-            profile.EpicUniqueId
-            || profile.epicUniqueId
-            || profile.epicAccountId
-            || user.EpicUniqueId
-            || user.epicUniqueId
-            || null,
-
         EpicDisplayName:
             profile.EpicDisplayName
             || profile.epicDisplayName
@@ -1979,8 +1980,7 @@ function normalizeProfile(
 
         profileExists:
             result?.profileExists === true
-            || profile.profileExists === true
-            || Boolean(profile.rlPlayerId || profile.rl_player_id),
+            || profile.profileExists === true,
 
         provider: normalizeObject(profile.provider),
         stats: normalizeObject(profile.stats),
@@ -2122,8 +2122,13 @@ async function getAuthenticatedEpicUser() {
     const authState =
         await getAuthState();
 
-    registrationDraftAccountId = authState?.authenticated === true
-        ? normalizeString(authState.userId) : "";
+    const generation = ++registrationDraftGeneration;
+    const scope = authState?.authenticated === true ? normalizeAccountScope(authState.accountScope) : "";
+    registrationDraftAccountScope = "";
+    await migrateRegistrationDraft(localStorage, REGISTRATION_DRAFT_KEY, scope,
+        () => registrationDraftGeneration === generation);
+    if (registrationDraftGeneration !== generation) return null;
+    registrationDraftAccountScope = scope;
 
     if (
         authState?.available !==
@@ -2151,10 +2156,6 @@ async function getAuthenticatedEpicUser() {
     }
 
     return {
-        EpicUniqueId:
-            epicProvider.accountId
-            || null,
-
         EpicDisplayName:
             epicProvider.displayName
             || "",
@@ -2184,6 +2185,7 @@ async function loadRocketLeagueProfile() {
         );
     }
 
+    const draftGeneration = registrationDraftGeneration;
     let response;
 
     try {
@@ -2247,6 +2249,7 @@ async function loadRocketLeagueProfile() {
                 () => ({})
             );
 
+    if (registrationDraftGeneration !== draftGeneration) return null;
     if (handleRegistrationAuthFailure(response, result)) return null;
 
     const normalized =
@@ -2931,7 +2934,8 @@ export async function initializePage() {
     form.dataset.initialized =
         "true";
 
-    registrationDraftAccountId = "";
+    registrationDraftAccountScope = "";
+    registrationDraftGeneration += 1;
 
     renderAvailabilityRows();
 

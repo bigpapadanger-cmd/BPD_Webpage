@@ -1,3 +1,4 @@
+import { sanitizeLogMetadata } from "../../../http/diagnostics.js";
 "use strict";
 
 /* =========================================================
@@ -728,7 +729,7 @@ export async function handleEpicLogin(
     ) {
         console.error(
             "EPIC LOGIN: Unexpected failure.",
-            {
+            sanitizeLogMetadata({
                 debugId,
 
                 name:
@@ -738,7 +739,7 @@ export async function handleEpicLogin(
                 message:
                     error?.message
                     || "Unknown error"
-            }
+            })
         );
 
         if (

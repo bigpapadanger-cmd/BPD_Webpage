@@ -1,3 +1,4 @@
+import { sanitizeLogMetadata } from "../../../services/http/diagnostics.js";
 "use strict";
 
 import {
@@ -1726,10 +1727,10 @@ async function persistResult(
                 saved: false,
                 reason: "candidate_archive_write_failed"
             };
-            console.warn("[OCR PROCESS] Review-candidate archive write failed.", {
+            console.warn("[OCR PROCESS] Review-candidate archive write failed.", sanitizeLogMetadata({
                 jobId,
                 message: normalizeErrorMessage(error)
-            });
+            }));
         }
     }
 
@@ -1817,14 +1818,14 @@ async function deleteProgressObject(
     ) {
         console.warn(
             "[OCR PROCESS] Temporary progress cleanup failed.",
-            {
+            sanitizeLogMetadata({
                 jobId,
 
                 message:
                     normalizeErrorMessage(
                         error
                     )
-            }
+            })
         );
     }
 }
@@ -2554,7 +2555,7 @@ async function processJob(
     ) {
         console.error(
             "[OCR PROCESS] Job processing failed.",
-            {
+            sanitizeLogMetadata({
                 jobId,
 
                 code:
@@ -2565,7 +2566,7 @@ async function processJob(
                     normalizeErrorMessage(
                         error
                     )
-            }
+            })
         );
 
         if (isRosterUncertainty(error)) {
@@ -2589,10 +2590,10 @@ async function processJob(
                 }, 200);
             }
             catch (reviewError) {
-                console.error("[OCR PROCESS] Could not persist roster review outcome.", {
+                console.error("[OCR PROCESS] Could not persist roster review outcome.", sanitizeLogMetadata({
                     jobId,
                     message: normalizeErrorMessage(reviewError)
-                });
+                }));
             }
         }
 
@@ -2609,14 +2610,14 @@ async function processJob(
         ) {
             console.error(
                 "[OCR PROCESS] Failed to persist terminal failure status.",
-                {
+                sanitizeLogMetadata({
                     jobId,
 
                     message:
                         normalizeErrorMessage(
                             statusError
                         )
-                }
+                })
             );
         }
 

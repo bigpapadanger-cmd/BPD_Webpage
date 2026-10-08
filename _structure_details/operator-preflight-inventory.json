@@ -1,0 +1,1145 @@
+{
+  "bpd-webpage": {
+    "repository_path": ".",
+    "selected_login_account": "19f0487e1a0cbe5cd63c85ef4cbd7e83",
+    "production_account_verified": false,
+    "entrypoint": "functions/ (file routes)",
+    "compatibility_date": "2026-09-16",
+    "compatibility_flags": [],
+    "workers_dev": "not specified",
+    "preview_urls": "not specified",
+    "placement": "not specified",
+    "routes": [],
+    "variable_names": [
+      "CUSTOM_MATCH_RUNTIME_ENABLED",
+      "DISCORD_AUTHZ_ADMIN_ROLE_ID",
+      "DISCORD_AUTHZ_DATABASE_ROLE_ID",
+      "DISCORD_AUTHZ_LEAGUE_STAFF_ROLE_ID",
+      "DISCORD_AUTHZ_MOD_ROLE_ID",
+      "DISCORD_AUTHZ_OWNER_ROLE_ID",
+      "DISCORD_AUTHZ_SECURITY_ROLE_ID",
+      "DISCORD_AUTHZ_UI_ROLE_ID",
+      "DISCORD_COMMUNICATIONS_ENABLED",
+      "DISCORD_MATCHBOT_INSTALL_URL",
+      "DISCORD_MATCHBOT_PUBLIC_KEY",
+      "MMR_API_URL",
+      "OCR_API_URL",
+      "OCR_GCP_PROJECT_NUMBER",
+      "OCR_GCP_SERVICE_ACCOUNT_EMAIL",
+      "OCR_GCP_WORKLOAD_IDENTITY_POOL_ID",
+      "OCR_GCP_WORKLOAD_IDENTITY_PROVIDER_ID",
+      "OCR_JOB_PROCESS_URL",
+      "OCR_JOB_PROGRESS_URL",
+      "RL_PRESENCE_MONITOR_URL",
+      "SB_CALLBACK_URL",
+      "SB_PUB_KEY",
+      "SUPABASE_URL",
+      "TURNSTILE_SITE_KEY"
+    ],
+    "disabled_flags": {
+      "DISCORD_COMMUNICATIONS_ENABLED": "false",
+      "CUSTOM_MATCH_RUNTIME_ENABLED": "false"
+    },
+    "secret_references_presence_unverified": [
+      "CURSEFORGE_API_KEY",
+      "CUSTOM_MATCH_RUNTIME_CALLER_SECRET",
+      "DISCORD_AUTHZ_BOT_TOKEN",
+      "DISCORD_COMMUNICATIONS_SECRET",
+      "DISCORD_MATCHBOT_TOKEN",
+      "EPIC_CLIENT_SECRET",
+      "MMR_ADMIN_API_KEY",
+      "MMR_API_KEY",
+      "MMR_DEPLOY_GITHUB_TOKEN",
+      "OCR_API_KEY",
+      "OCR_GOOGLE_TRANSPORT_SECRET",
+      "OCR_JOB_PROCESS_SECURE_TOKEN",
+      "OCR_OWNER_SECRET",
+      "OCR_STORAGE_TOKEN",
+      "OCR_TRAINING_REVIEW_TOKEN",
+      "PROVIDER_RUNTIME_CALLER_SECRET",
+      "RL_PROBE_ACCOUNT_KEY_SECRET",
+      "RL_PROBE_REVOCATION_SECRET",
+      "RL_PROBE_SIGNING_JWK",
+      "SUPABASE_SERVICE_ROLE_KEY",
+      "TURNSTILE_SECRET_KEY"
+    ],
+    "all_static_environment_references": [
+      "AUTH_SESSIONS",
+      "CURSEFORGE_API_KEY",
+      "CUSTOM_MATCH_RUNTIME",
+      "CUSTOM_MATCH_RUNTIME_CALLER_SECRET",
+      "CUSTOM_MATCH_RUNTIME_ENABLED",
+      "DISCORD_AUTHZ_ADMIN_ROLE_ID",
+      "DISCORD_AUTHZ_BOT_TOKEN",
+      "DISCORD_AUTHZ_DATABASE_ROLE_ID",
+      "DISCORD_AUTHZ_GUILD_ID",
+      "DISCORD_AUTHZ_LEAGUE_STAFF_ROLE_ID",
+      "DISCORD_AUTHZ_MOD_ROLE_ID",
+      "DISCORD_AUTHZ_OWNER_ROLE_ID",
+      "DISCORD_AUTHZ_SECURITY_ROLE_ID",
+      "DISCORD_AUTHZ_UI_ROLE_ID",
+      "DISCORD_COMMUNICATIONS",
+      "DISCORD_COMMUNICATIONS_ENABLED",
+      "DISCORD_COMMUNICATIONS_SECRET",
+      "DISCORD_ELIGIBILITY_DIAGNOSTICS",
+      "DISCORD_MATCHBOT_INSTALL_URL",
+      "DISCORD_MATCHBOT_PUBLIC_KEY",
+      "DISCORD_MATCHBOT_TOKEN",
+      "EPIC_CLIENT_ID",
+      "EPIC_CLIENT_SECRET",
+      "EPIC_REDIRECT_URI",
+      "MMR_ADMIN_API_KEY",
+      "MMR_API_KEY",
+      "MMR_API_URL",
+      "MMR_DEPLOY_GITHUB_TOKEN",
+      "OCR_API_KEY",
+      "OCR_API_TEST_URL",
+      "OCR_API_URL",
+      "OCR_GCP_MTLS",
+      "OCR_GCP_PROJECT_NUMBER",
+      "OCR_GCP_SERVICE_ACCOUNT_EMAIL",
+      "OCR_GCP_WORKLOAD_IDENTITY_POOL_ID",
+      "OCR_GCP_WORKLOAD_IDENTITY_PROVIDER_ID",
+      "OCR_GCP_X509_CERT_CHAIN",
+      "OCR_GOOGLE_TRANSPORT",
+      "OCR_GOOGLE_TRANSPORT_SECRET",
+      "OCR_JOB_PROCESS_SECURE_TOKEN",
+      "OCR_JOB_QUEUE",
+      "OCR_LOCALIZE_URL",
+      "OCR_OWNER_SECRET",
+      "OCR_PROGRESS",
+      "OCR_STORAGE",
+      "OCR_STORAGE_TOKEN",
+      "OCR_TRAINING",
+      "OCR_TRAINING_REVIEW_TOKEN",
+      "PRESENCE_TRIGGER_KEY",
+      "PROVIDER_RUNTIME",
+      "PROVIDER_RUNTIME_CALLER_SECRET",
+      "RL_PRESENCE_MONITOR_URL",
+      "RL_PROBE_ACCOUNT_KEY_SECRET",
+      "RL_PROBE_ISSUER",
+      "RL_PROBE_KEY_VERSION",
+      "RL_PROBE_REVOCATION_SECRET",
+      "RL_PROBE_SECURITY_ENABLED",
+      "RL_PROBE_SIGNING_JWK",
+      "RL_STATS_CACHE",
+      "SB_PUB_KEY",
+      "SERVICE_STATUS",
+      "SUPABASE_AUTH",
+      "SUPABASE_SERVICE_ROLE_KEY",
+      "SUPABASE_URL",
+      "TURNSTILE_SECRET_KEY"
+    ],
+    "secret_like_vars": [],
+    "kv_namespaces": [
+      {
+        "binding": "AUTH_SESSIONS",
+        "id": "941c19ab958e498a9846b80cfd3f6525"
+      },
+      {
+        "binding": "RL_STATS_CACHE",
+        "id": "b01a6271a3fd47e7831bcb2502a0b901"
+      }
+    ],
+    "r2_buckets": [
+      {
+        "binding": "OCR_TRAINING",
+        "bucket_name": "ocr-training"
+      },
+      {
+        "binding": "OCR_STORAGE",
+        "bucket_name": "ocr-storage"
+      },
+      {
+        "binding": "OCR_PROGRESS",
+        "bucket_name": "ocr-progress"
+      }
+    ],
+    "services": [
+      {
+        "binding": "DISCORD_COMMUNICATIONS",
+        "service": "bpd-discord-communications"
+      },
+      {
+        "binding": "PROVIDER_RUNTIME",
+        "service": "bpd-provider-runtime"
+      },
+      {
+        "binding": "CUSTOM_MATCH_RUNTIME",
+        "service": "bpd-custom-match-runtime"
+      },
+      {
+        "binding": "OCR_GOOGLE_TRANSPORT",
+        "service": "bpd-ocr-cloud-run-proxy"
+      }
+    ],
+    "durable_objects": [],
+    "migrations": [],
+    "triggers": [],
+    "queues": {
+      "producers": [
+        {
+          "queue": "bpd-ocr-jobs",
+          "binding": "OCR_JOB_QUEUE"
+        }
+      ]
+    },
+    "observability": [],
+    "mtls_certificates": [
+      {
+        "binding": "OCR_GCP_MTLS",
+        "certificate_id": "3e548c5b-b4e6-4a00-bc90-582b8c8e7fd3"
+      }
+    ],
+    "d1": [],
+    "current_deployed_version": "UNVERIFIED",
+    "rollback_version": "UNVERIFIED"
+  },
+  "bpd-custom-match-runtime": {
+    "repository_path": "workers\\bpd-custom-match-runtime",
+    "selected_login_account": "19f0487e1a0cbe5cd63c85ef4cbd7e83",
+    "production_account_verified": false,
+    "entrypoint": "src/index.js",
+    "compatibility_date": "2026-10-06",
+    "compatibility_flags": [],
+    "workers_dev": false,
+    "preview_urls": false,
+    "placement": {
+      "mode": "smart"
+    },
+    "routes": [],
+    "variable_names": [
+      "CUSTOM_MATCH_RUNTIME_ENABLED",
+      "SUPABASE_URL"
+    ],
+    "disabled_flags": {
+      "CUSTOM_MATCH_RUNTIME_ENABLED": "false"
+    },
+    "secret_references_presence_unverified": [
+      "CUSTOM_MATCH_RUNTIME_CALLER_SECRET",
+      "SUPABASE_SERVICE_ROLE_KEY"
+    ],
+    "all_static_environment_references": [
+      "CUSTOM_MATCH_RUNTIME_CALLER_SECRET",
+      "CUSTOM_MATCH_RUNTIME_ENABLED",
+      "CUSTOM_MATCH_SESSIONS",
+      "SUPABASE_SERVICE_ROLE_KEY",
+      "SUPABASE_URL"
+    ],
+    "secret_like_vars": [],
+    "kv_namespaces": [],
+    "r2_buckets": [],
+    "services": [],
+    "durable_objects": {
+      "bindings": [
+        {
+          "name": "CUSTOM_MATCH_SESSIONS",
+          "class_name": "CustomMatchSession"
+        }
+      ]
+    },
+    "migrations": [
+      {
+        "tag": "custom-match-session-v1",
+        "new_sqlite_classes": [
+          "CustomMatchSession"
+        ]
+      }
+    ],
+    "triggers": [],
+    "queues": [],
+    "observability": {
+      "logs": {
+        "enabled": true,
+        "head_sampling_rate": 0.1,
+        "invocation_logs": true
+      }
+    },
+    "mtls_certificates": [],
+    "d1": [],
+    "current_deployed_version": "UNVERIFIED",
+    "rollback_version": "UNVERIFIED"
+  },
+  "bpd-discord-communications": {
+    "repository_path": "workers\\bpd-discord-communications",
+    "selected_login_account": "19f0487e1a0cbe5cd63c85ef4cbd7e83",
+    "production_account_verified": false,
+    "entrypoint": "src/index.js",
+    "compatibility_date": "2026-10-06",
+    "compatibility_flags": [],
+    "workers_dev": false,
+    "preview_urls": false,
+    "placement": {
+      "mode": "smart"
+    },
+    "routes": [],
+    "variable_names": [
+      "BPD_SITE_URL",
+      "DISCORD_COMMUNICATIONS_ENABLED",
+      "DISCORD_MATCHBOT_CLIENT_ID",
+      "DISCORD_MATCHBOT_PUBLIC_KEY"
+    ],
+    "disabled_flags": {
+      "DISCORD_COMMUNICATIONS_ENABLED": "false"
+    },
+    "secret_references_presence_unverified": [
+      "DISCORD_AUTHZ_BOT_TOKEN",
+      "DISCORD_COMMUNICATIONS_SECRET",
+      "SUPABASE_SERVICE_ROLE_KEY"
+    ],
+    "all_static_environment_references": [
+      "AUTH_SESSIONS",
+      "BPD_SITE_URL",
+      "DISCORD_AUTHZ_ADMIN_ROLE_ID",
+      "DISCORD_AUTHZ_BOT_TOKEN",
+      "DISCORD_AUTHZ_DATABASE_ROLE_ID",
+      "DISCORD_AUTHZ_GUILD_ID",
+      "DISCORD_AUTHZ_LEAGUE_STAFF_ROLE_ID",
+      "DISCORD_AUTHZ_MOD_ROLE_ID",
+      "DISCORD_AUTHZ_OWNER_ROLE_ID",
+      "DISCORD_AUTHZ_SECURITY_ROLE_ID",
+      "DISCORD_AUTHZ_UI_ROLE_ID",
+      "DISCORD_COMMUNICATIONS",
+      "DISCORD_COMMUNICATIONS_ENABLED",
+      "DISCORD_COMMUNICATIONS_SECRET",
+      "DISCORD_COMMUNICATION_RECEIPTS",
+      "DISCORD_MATCHBOT_CLIENT_ID",
+      "DISCORD_MATCHBOT_PUBLIC_KEY",
+      "SUPABASE_AUTH",
+      "SUPABASE_SERVICE_ROLE_KEY",
+      "SUPABASE_URL"
+    ],
+    "secret_like_vars": [],
+    "kv_namespaces": [],
+    "r2_buckets": [],
+    "services": [],
+    "durable_objects": {
+      "bindings": [
+        {
+          "name": "DISCORD_COMMUNICATION_RECEIPTS",
+          "class_name": "DiscordCommunicationReceipts"
+        }
+      ]
+    },
+    "migrations": [
+      {
+        "tag": "v1",
+        "new_sqlite_classes": [
+          "DiscordCommunicationReceipts"
+        ]
+      }
+    ],
+    "triggers": {
+      "crons": [
+        "0 22,23 * * 5"
+      ]
+    },
+    "queues": [],
+    "observability": [],
+    "mtls_certificates": [],
+    "d1": [],
+    "current_deployed_version": "UNVERIFIED",
+    "rollback_version": "UNVERIFIED",
+    "reviewed_required_secret_names": [
+      "DISCORD_COMMUNICATIONS_SECRET",
+      "TASKBOARD_SUMMARY_DISCORD",
+      "NEW_TASKBOARD_REPORT_DISCORD"
+    ],
+    "transitive_reference_warning": "SUPABASE_SERVICE_ROLE_KEY and DISCORD_AUTHZ_BOT_TOKEN occur in shared imported module bodies, not evidence they are required by this Worker. Do not provision database secrets here."
+  },
+  "bpd-provider-runtime": {
+    "repository_path": "workers\\bpd-provider-runtime",
+    "selected_login_account": "19f0487e1a0cbe5cd63c85ef4cbd7e83",
+    "production_account_verified": false,
+    "entrypoint": "src/index.js",
+    "compatibility_date": "2026-10-05",
+    "compatibility_flags": [],
+    "workers_dev": false,
+    "preview_urls": false,
+    "placement": {
+      "mode": "smart"
+    },
+    "routes": [],
+    "variable_names": [
+      "DISCORD_LARGE_BOT_SHARDING",
+      "RL_PROBE_SECURITY_ENABLED"
+    ],
+    "disabled_flags": {
+      "RL_PROBE_SECURITY_ENABLED": "false"
+    },
+    "secret_references_presence_unverified": [
+      "DISCORD_MATCHBOT_TOKEN",
+      "PROVIDER_RUNTIME_CALLER_SECRET",
+      "RL_PROBE_REVOCATION_SECRET"
+    ],
+    "all_static_environment_references": [
+      "DISCORD_ELIGIBILITY_DIAGNOSTICS",
+      "DISCORD_LARGE_BOT_SHARDING",
+      "DISCORD_LINKED_ROLE_NONCE",
+      "DISCORD_MATCHBOT_TOKEN",
+      "PROVIDER_RUNTIME_CALLER_SECRET",
+      "RL_PROBE_ISSUER",
+      "RL_PROBE_KEY_VERSION",
+      "RL_PROBE_REVOCATION_SECRET",
+      "RL_PROBE_SECURITY",
+      "RL_PROBE_SECURITY_ENABLED",
+      "RL_PROBE_VERIFY_JWK",
+      "RL_USER_SESSION"
+    ],
+    "secret_like_vars": [],
+    "kv_namespaces": [],
+    "r2_buckets": [],
+    "services": [],
+    "durable_objects": {
+      "bindings": [
+        {
+          "name": "RL_USER_SESSION",
+          "class_name": "UserRocketLeagueSession"
+        },
+        {
+          "name": "RL_PROBE_SECURITY",
+          "class_name": "RlProbeSecurityAuthority"
+        },
+        {
+          "name": "DISCORD_LINKED_ROLE_NONCE",
+          "class_name": "DiscordLinkedRoleNonceAuthority"
+        }
+      ]
+    },
+    "migrations": [
+      {
+        "tag": "rl-probe-security-v1",
+        "new_sqlite_classes": [
+          "UserRocketLeagueSession"
+        ]
+      },
+      {
+        "tag": "rl-probe-authority-v2",
+        "new_sqlite_classes": [
+          "RlProbeSecurityAuthority"
+        ]
+      },
+      {
+        "tag": "discord-linked-role-nonce-v1",
+        "new_sqlite_classes": [
+          "DiscordLinkedRoleNonceAuthority"
+        ]
+      }
+    ],
+    "triggers": [],
+    "queues": [],
+    "observability": {
+      "logs": {
+        "enabled": true,
+        "head_sampling_rate": 0.1,
+        "invocation_logs": true,
+        "persist": true
+      }
+    },
+    "mtls_certificates": [],
+    "d1": [],
+    "current_deployed_version": "UNVERIFIED",
+    "rollback_version": "UNVERIFIED"
+  },
+  "bpd-google-mtls-diagnostic": {
+    "repository_path": "workers\\google-mtls-diagnostic",
+    "selected_login_account": "19f0487e1a0cbe5cd63c85ef4cbd7e83",
+    "production_account_verified": false,
+    "entrypoint": "src/index.js",
+    "compatibility_date": "2026-10-05",
+    "compatibility_flags": [],
+    "workers_dev": false,
+    "preview_urls": false,
+    "placement": "not specified",
+    "routes": [],
+    "variable_names": [
+      "OCR_GCP_CLOUD_RUN_AUDIENCE",
+      "OCR_GCP_PROJECT_NUMBER",
+      "OCR_GCP_SERVICE_ACCOUNT_EMAIL",
+      "OCR_GCP_WORKLOAD_IDENTITY_POOL_ID",
+      "OCR_GCP_WORKLOAD_IDENTITY_PROVIDER_ID"
+    ],
+    "disabled_flags": {},
+    "secret_references_presence_unverified": [
+      "DIAGNOSTIC_BEARER_TOKEN"
+    ],
+    "all_static_environment_references": [
+      "DIAGNOSTIC_BEARER_TOKEN",
+      "OCR_GCP_CLOUD_RUN_AUDIENCE",
+      "OCR_GCP_MTLS",
+      "OCR_GCP_PROJECT_NUMBER",
+      "OCR_GCP_SERVICE_ACCOUNT_EMAIL",
+      "OCR_GCP_WORKLOAD_IDENTITY_POOL_ID",
+      "OCR_GCP_WORKLOAD_IDENTITY_PROVIDER_ID",
+      "OCR_GCP_X509_CERT_CHAIN"
+    ],
+    "secret_like_vars": [],
+    "kv_namespaces": [],
+    "r2_buckets": [],
+    "services": [],
+    "durable_objects": [],
+    "migrations": [],
+    "triggers": [],
+    "queues": [],
+    "observability": {
+      "logs": {
+        "enabled": true,
+        "head_sampling_rate": 1,
+        "invocation_logs": true,
+        "persist": true
+      }
+    },
+    "mtls_certificates": [
+      {
+        "binding": "OCR_GCP_MTLS",
+        "certificate_id": "3e548c5b-b4e6-4a00-bc90-582b8c8e7fd3"
+      }
+    ],
+    "d1": [],
+    "current_deployed_version": "UNVERIFIED",
+    "rollback_version": "UNVERIFIED"
+  },
+  "bpd-ocr-cloud-run-proxy": {
+    "repository_path": "workers\\ocr-cloud-run-proxy",
+    "selected_login_account": "19f0487e1a0cbe5cd63c85ef4cbd7e83",
+    "production_account_verified": false,
+    "entrypoint": "src/index.js",
+    "compatibility_date": "2026-10-05",
+    "compatibility_flags": [],
+    "workers_dev": false,
+    "preview_urls": false,
+    "placement": {
+      "mode": "smart"
+    },
+    "routes": [
+      {
+        "pattern": "ocr-transport.bpd-gaming-network.com",
+        "custom_domain": true
+      }
+    ],
+    "variable_names": [
+      "OCR_API_URL",
+      "OCR_GCP_PROJECT_NUMBER",
+      "OCR_GCP_SERVICE_ACCOUNT_EMAIL",
+      "OCR_GCP_WORKLOAD_IDENTITY_POOL_ID",
+      "OCR_GCP_WORKLOAD_IDENTITY_PROVIDER_ID",
+      "OCR_PROVIDER_TIMEOUT_MS",
+      "OCR_PUBLIC_HOSTNAME"
+    ],
+    "disabled_flags": {},
+    "secret_references_presence_unverified": [
+      "OCR_API_KEY",
+      "OCR_GOOGLE_TRANSPORT_SECRET"
+    ],
+    "all_static_environment_references": [
+      "OCR_API_KEY",
+      "OCR_API_URL",
+      "OCR_GCP_MTLS",
+      "OCR_GCP_PROJECT_NUMBER",
+      "OCR_GCP_SERVICE_ACCOUNT_EMAIL",
+      "OCR_GCP_WORKLOAD_IDENTITY_POOL_ID",
+      "OCR_GCP_WORKLOAD_IDENTITY_PROVIDER_ID",
+      "OCR_GCP_X509_CERT_CHAIN",
+      "OCR_GOOGLE_TRANSPORT_SECRET",
+      "OCR_PROVIDER_TIMEOUT_MS",
+      "OCR_PUBLIC_HOSTNAME",
+      "SERVICE_STATUS"
+    ],
+    "secret_like_vars": [],
+    "kv_namespaces": [
+      {
+        "binding": "SERVICE_STATUS",
+        "id": "b01a6271a3fd47e7831bcb2502a0b901"
+      }
+    ],
+    "r2_buckets": [],
+    "services": [],
+    "durable_objects": [],
+    "migrations": [],
+    "triggers": [],
+    "queues": [],
+    "observability": {
+      "logs": {
+        "enabled": true,
+        "head_sampling_rate": 0.1,
+        "invocation_logs": true,
+        "persist": true
+      }
+    },
+    "mtls_certificates": [
+      {
+        "binding": "OCR_GCP_MTLS",
+        "certificate_id": "3e548c5b-b4e6-4a00-bc90-582b8c8e7fd3"
+      }
+    ],
+    "d1": [],
+    "current_deployed_version": "UNVERIFIED",
+    "rollback_version": "UNVERIFIED"
+  },
+  "bpd-ocr-job-consumer": {
+    "repository_path": "workers\\ocr-job-consumer",
+    "selected_login_account": "19f0487e1a0cbe5cd63c85ef4cbd7e83",
+    "production_account_verified": false,
+    "entrypoint": "src/index.js",
+    "compatibility_date": "2026-10-05",
+    "compatibility_flags": [],
+    "workers_dev": false,
+    "preview_urls": false,
+    "placement": {
+      "mode": "smart"
+    },
+    "routes": [
+      {
+        "pattern": "ocr.bpd-gaming-network.com",
+        "custom_domain": true
+      }
+    ],
+    "variable_names": [
+      "OCR_DEBUG_TRACE_ENABLED",
+      "OCR_JOB_PROCESS_URL"
+    ],
+    "disabled_flags": {},
+    "secret_references_presence_unverified": [
+      "OCR_JOB_PROCESS_SECURE_TOKEN"
+    ],
+    "all_static_environment_references": [
+      "OCR_DEBUG_TRACE_ENABLED",
+      "OCR_JOB_PROCESS_SECURE_TOKEN",
+      "OCR_JOB_PROCESS_URL",
+      "OCR_PROGRESS",
+      "OCR_STORAGE",
+      "SERVICE_STATUS"
+    ],
+    "secret_like_vars": [],
+    "kv_namespaces": [
+      {
+        "binding": "SERVICE_STATUS",
+        "id": "b01a6271a3fd47e7831bcb2502a0b901"
+      }
+    ],
+    "r2_buckets": [
+      {
+        "binding": "OCR_STORAGE",
+        "bucket_name": "ocr-storage"
+      },
+      {
+        "binding": "OCR_PROGRESS",
+        "bucket_name": "ocr-progress"
+      }
+    ],
+    "services": [],
+    "durable_objects": [],
+    "migrations": [],
+    "triggers": {
+      "crons": [
+        "*/30 * * * *"
+      ]
+    },
+    "queues": {
+      "consumers": [
+        {
+          "queue": "bpd-ocr-jobs",
+          "max_batch_size": 1,
+          "max_batch_timeout": 1,
+          "max_retries": 2,
+          "max_concurrency": 2
+        }
+      ]
+    },
+    "observability": {
+      "logs": {
+        "enabled": true,
+        "head_sampling_rate": 1,
+        "invocation_logs": true,
+        "persist": true
+      },
+      "traces": {
+        "enabled": false,
+        "head_sampling_rate": 1,
+        "persist": true
+      }
+    },
+    "mtls_certificates": [],
+    "d1": [],
+    "current_deployed_version": "UNVERIFIED",
+    "rollback_version": "UNVERIFIED"
+  },
+  "bpd-rl-presence-monitor": {
+    "repository_path": "workers\\rl-presence-monitor",
+    "selected_login_account": "19f0487e1a0cbe5cd63c85ef4cbd7e83",
+    "production_account_verified": false,
+    "entrypoint": "src/index.js",
+    "compatibility_date": "2026-10-05",
+    "compatibility_flags": [],
+    "workers_dev": false,
+    "preview_urls": false,
+    "placement": {
+      "mode": "smart"
+    },
+    "routes": [
+      {
+        "pattern": "status.bpd-gaming-network.com",
+        "custom_domain": true
+      }
+    ],
+    "variable_names": [
+      "MMR_API_URL",
+      "SUPABASE_URL"
+    ],
+    "disabled_flags": {},
+    "secret_references_presence_unverified": [
+      "DISCORD_AUTHZ_BOT_TOKEN",
+      "DISCORD_COMMUNICATIONS_SECRET",
+      "EPIC_CLIENT_SECRET",
+      "MMR_ADMIN_API_KEY",
+      "MMR_API_KEY",
+      "OCR_GOOGLE_TRANSPORT_SECRET",
+      "PROVIDER_RUNTIME_CALLER_SECRET",
+      "SUPABASE_SERVICE_ROLE_KEY"
+    ],
+    "all_static_environment_references": [
+      "AUTH_SESSIONS",
+      "DISCORD_AUTHZ_BOT_TOKEN",
+      "DISCORD_AUTHZ_GUILD_ID",
+      "DISCORD_COMMUNICATIONS",
+      "DISCORD_COMMUNICATIONS_SECRET",
+      "DISCORD_ELIGIBILITY_DIAGNOSTICS",
+      "EPIC_CLIENT_ID",
+      "EPIC_CLIENT_SECRET",
+      "EPIC_REDIRECT_URI",
+      "MMR_ADMIN_API_KEY",
+      "MMR_API_KEY",
+      "MMR_API_URL",
+      "OCR_GOOGLE_TRANSPORT",
+      "OCR_GOOGLE_TRANSPORT_SECRET",
+      "PRESENCE_TRIGGER_KEY",
+      "PROVIDER_RUNTIME",
+      "PROVIDER_RUNTIME_CALLER_SECRET",
+      "RL_PRESENCE_MONITOR_URL",
+      "RL_STATS_CACHE",
+      "SERVICE_STATUS",
+      "SUPABASE_AUTH",
+      "SUPABASE_SERVICE_ROLE_KEY",
+      "SUPABASE_URL"
+    ],
+    "secret_like_vars": [],
+    "kv_namespaces": [
+      {
+        "binding": "AUTH_SESSIONS",
+        "id": "941c19ab958e498a9846b80cfd3f6525"
+      },
+      {
+        "binding": "SERVICE_STATUS",
+        "id": "b01a6271a3fd47e7831bcb2502a0b901"
+      }
+    ],
+    "r2_buckets": [],
+    "services": [
+      {
+        "binding": "PROVIDER_RUNTIME",
+        "service": "bpd-provider-runtime"
+      }
+    ],
+    "durable_objects": [],
+    "migrations": [],
+    "triggers": {
+      "crons": [
+        "*/15 * * * *",
+        "0 * * * *",
+        "0 12 * * *"
+      ]
+    },
+    "queues": [],
+    "observability": {
+      "logs": {
+        "enabled": true,
+        "head_sampling_rate": 0.25,
+        "invocation_logs": true,
+        "persist": true
+      }
+    },
+    "mtls_certificates": [],
+    "d1": [],
+    "current_deployed_version": "UNVERIFIED",
+    "rollback_version": "UNVERIFIED"
+  },
+  "_release": {
+    "branch": "main",
+    "commit": "d94625078b859db982b58200034fd5dcfb40158d",
+    "working_tree": [
+      " M _README",
+      " M _folder_structure/folder_organization/00_project_root.txt",
+      " M _folder_structure/folder_organization/01_functions.txt",
+      " M _folder_structure/folder_organization/03_public.txt",
+      " M _folder_structure/folder_organization/04_workers.txt",
+      " M _folder_structure/folder_organization/05_support_and_generated.txt",
+      " M _folder_structure/route-health/routes.json",
+      " M _structure_details/custom-match-contract-boundary.md",
+      " M _structure_details/phase4-production-readiness.md",
+      " M _structure_details/request-frequency-inventory.md",
+      " M _structure_details/rocketleague-capability-audit.md",
+      " M _structure_details/rocketleague-leaderboards.md",
+      " M _structure_details/rocketleague-page-pass.md",
+      " M _structure_details/security-remediation-follow-up.md",
+      " M _structure_details/system-map.md",
+      " M _structure_details/system_sub_map/worker-status.md",
+      " M functions/[[path]].js",
+      " M functions/api/admin/system-status.js",
+      " M functions/api/admin/system-status/mmr-deploy.js",
+      " M functions/api/admin/user-management/index.js",
+      " M functions/api/auth/account/last_login.js",
+      " M functions/api/auth/admin/access.js",
+      " M functions/api/auth/admin/tasks/[taskCode].js",
+      " M functions/api/auth/admin/tasks/[taskCode]/events.js",
+      " M functions/api/auth/admin/tasks/[taskCode]/lifecycle.js",
+      " M functions/api/auth/admin/tasks/index.js",
+      " M functions/api/auth/admin/tasks/task-activity.js",
+      " M functions/api/auth/admin/tasks/task-assignees.js",
+      " M functions/api/auth/admin/tasks/task-summary.js",
+      " M functions/api/auth/discord/matchbot/channels.js",
+      " M functions/api/auth/discord/matchbot/events.js",
+      " M functions/api/auth/discord/matchbot/guilds.js",
+      " M functions/api/auth/discord/matchbot/install.js",
+      " M functions/api/auth/discord/matchbot/test_message.js",
+      " M functions/api/auth/logout.js",
+      " M functions/api/auth/rocketleague/session.js",
+      " M functions/api/auth/session.js",
+      " M functions/api/curseforge/mods.js",
+      " M functions/api/ocr/jobs/get_job.js",
+      " M functions/api/ocr/jobs/get_result.js",
+      " M functions/api/ocr/jobs/image.js",
+      " M functions/api/ocr/jobs/process_job.js",
+      " M functions/api/ocr/jobs/progress.js",
+      " M functions/api/ocr/jobs/submit_job.js",
+      " M functions/api/rocketleague/custom-matches/[matchCode]/runtime.js",
+      " M functions/services/admin/generatedApiRouteInventory.js",
+      " M functions/services/admin/system_status.js",
+      " M functions/services/admin/user_management.js",
+      " M functions/services/auth/account/access.js",
+      " M functions/services/auth/account/get_session.js",
+      " M functions/services/auth/account/last_login.js",
+      " M functions/services/auth/account/link_provider.js",
+      " M functions/services/auth/account/unlink_provider.js",
+      " M functions/services/auth/authorization.js",
+      " M functions/services/auth/oauth/callback.js",
+      " M functions/services/auth/providers/discord_matchbot/interactions.js",
+      " M functions/services/auth/providers/epic/login.js",
+      " M functions/services/auth/providers/google/login.js",
+      " M functions/services/auth/sessions/session.js",
+      " M functions/services/faq/service.js",
+      " M functions/services/http/responses.js",
+      " M functions/services/ocr/confirm.js",
+      " M functions/services/ocr/handler.js",
+      " M functions/services/ocr/storeMatch.js",
+      " M functions/services/ocr/training.js",
+      " M functions/services/rl/custom_matches/contracts.js",
+      " M functions/services/rl/custom_matches/http.js",
+      " M functions/services/rl/custom_matches/runtime_client.js",
+      " M functions/services/rl/custom_matches/service.js",
+      " M functions/services/rl/profile.js",
+      " M functions/services/rl/session.js",
+      " M functions/services/rl/stats/fetch_mmr.js",
+      " M functions/services/rl/stats/latest_cache.js",
+      " M functions/services/rl/stats/latest_mmr.js",
+      " M functions/services/rl/stats/refresh.js",
+      " M functions/services/rl/stats/refresh_gate.js",
+      " M functions/services/rl/stats/refresh_state.js",
+      " M functions/services/rl/stats/refresh_with_gate.js",
+      " M functions/services/rl/stats/save_mmr.js",
+      " M functions/services/security/turnstile.js",
+      " M functions/services/supabase/admin/tasks/create.js",
+      " M functions/services/supabase/admin/tasks/lifecycle.js",
+      " M functions/services/supabase/rocketleague/current_shop.js",
+      " M functions/services/supabase/rocketleague/discovery.js",
+      " M functions/services/supabase/rocketleague/get_latest_mmr.js",
+      " M package-lock.json",
+      " M package.json",
+      " M public/Framework/Auth/auth.js",
+      " M public/Framework/Banner/JS/account_banner.js",
+      " M public/Framework/Shell/CSS/Callers/master.css",
+      " M public/Framework/Shell/CSS/Callers/master_ark.css",
+      " M public/Framework/Shell/CSS/Callers/master_mc.css",
+      " M public/Framework/Shell/CSS/Callers/master_rl.css",
+      " M public/Framework/Shell/CSS/General/body.css",
+      " M public/Framework/Shell/CSS/General/header.css",
+      " M public/Framework/Shell/HTML/Header/header.html",
+      " M public/Framework/Shell/HTML/Sidebar/rl_menu.html",
+      " M public/Framework/Shell/JS/ocr_runtime.js",
+      " M public/Framework/Shell/JS/renderHeader.js",
+      " M public/Framework/Shell/JS/router.js",
+      " M public/Global/Account/JS/index.js",
+      " M public/Global/Admin/Home/HTML/index.html",
+      " M public/Global/Admin/Home/JS/index.js",
+      " M public/Global/Admin/Suggestions/JS/index.js",
+      " D public/Global/Admin/TaskBoard/HTML/task_history.html",
+      " M public/Global/Admin/TaskBoard/JS/create_task.js",
+      " M public/Global/Admin/TaskBoard/JS/task_confirm.js",
+      " M public/Global/Admin/TaskBoard/JS/task_detail.js",
+      " M public/Global/Admin/TaskBoard/JS/task_edit.js",
+      " M public/Global/Admin/WorkerStatus/CSS/index.css",
+      " M public/Global/Admin/WorkerStatus/JS/index.js",
+      " D public/Global/Links/links.css",
+      " D public/Global/Links/links.html",
+      " D public/Global/Links/links.js",
+      " M public/Required/FAQ/JS/shared.js",
+      " M public/Tabs/RocketLeague/CustomMatches/JS/client.js",
+      " M public/Tabs/RocketLeague/CustomMatches/JS/index.js",
+      " M public/Tabs/RocketLeague/CustomMatches/JS/view.js",
+      " M public/Tabs/RocketLeague/Features/HTML/find-custom-matches.html",
+      " M public/Tabs/RocketLeague/Features/HTML/match-history.html",
+      " M public/Tabs/RocketLeague/Features/HTML/shop.html",
+      " M public/Tabs/RocketLeague/Features/JS/shop.js",
+      " M public/Tabs/RocketLeague/FindPlayers/HTML/index.html",
+      " M public/Tabs/RocketLeague/FindPlayers/JS/view.js",
+      " M public/Tabs/RocketLeague/Index/CSS/index.css",
+      " M public/Tabs/RocketLeague/Index/JS/auth.js",
+      " M public/Tabs/RocketLeague/Index/JS/mmr_dashboard.js",
+      " M public/Tabs/RocketLeague/Registration/JS/index.js",
+      " M public/Tabs/RocketLeague/shared/mmrRankReferences.js",
+      " M public/_headers",
+      " M public/index.html",
+      " M public/ocr/JS/index.js",
+      " M public/routes.js",
+      " M public/scripts/cacheHandler.js",
+      " M public/scripts/repopulate_sitemap.js",
+      " M public/sitemap.xml",
+      " M scripts/generate-api-route-inventory.mjs",
+      " M tests/admin/accordion.test.mjs",
+      " M tests/admin/faq.test.mjs",
+      " M tests/admin/user_management.test.mjs",
+      " M tests/auth/display_name_validation.test.mjs",
+      " M tests/rocketleague/custom_match_api.test.mjs",
+      " M tests/rocketleague/custom_match_ui.test.mjs",
+      " M tests/rocketleague/custom_matches.test.mjs",
+      " M tests/rocketleague/global_leaderboards.test.mjs",
+      " M tests/rocketleague/mmr_history.test.mjs",
+      " M tests/rocketleague/phase1_diagnostics.test.mjs",
+      " M tests/rocketleague/public_discovery.test.mjs",
+      " M tests/rocketleague/shop_api.test.mjs",
+      " M tests/route_health/mmr_deployment.test.mjs",
+      " M tests/route_health/rocketleague_navigation.test.mjs",
+      " M tests/route_health/system_status.test.mjs",
+      " M workers/bpd-custom-match-runtime/README.md",
+      " M workers/bpd-custom-match-runtime/src/index.js",
+      " M workers/bpd-custom-match-runtime/tests/runtime.test.mjs",
+      " M workers/bpd-discord-communications/README.md",
+      " M workers/bpd-discord-communications/src/index.js",
+      " M workers/bpd-discord-communications/tests/communications.test.mjs",
+      " M workers/bpd-provider-runtime/tests/rl_user_session.test.mjs",
+      " M workers/ocr-job-consumer/src/cleanup.js",
+      " M workers/ocr-job-consumer/src/index.js",
+      " M workers/rl-presence-monitor/README.md",
+      " M workers/rl-presence-monitor/src/rl_global_leaderboards.js",
+      " M workers/rl-presence-monitor/src/rl_shop_refresh.js",
+      " M workers/rl-presence-monitor/src/scheduled_mmr.js",
+      " M workers/rl-presence-monitor/tests/oauth_navigation.test.mjs",
+      " M workers/rl-presence-monitor/tests/provider_authorization.test.mjs",
+      " M workers/rl-presence-monitor/tests/rl_refresh_cycle.test.mjs",
+      " M wrangler.jsonc",
+      "?? _structure_details/deep-clean-continuation.md",
+      "?? _structure_details/deep-clean-final-local-resume.md",
+      "?? _structure_details/deep-clean-final-local.md",
+      "?? _structure_details/deep-clean-hardening.md",
+      "?? _structure_details/deep-clean-progress.md",
+      "?? functions/_middleware.js",
+      "?? functions/api/admin/rocketleague/custom-match-host-recovery.js",
+      "?? functions/services/http/diagnostics.js",
+      "?? public/Global/Admin/Home/JS/custom_match_recovery.js",
+      "?? public/Global/Admin/Shared/JS/modal_focus.js",
+      "?? public/Tabs/RocketLeague/Features/HTML/ue6.html",
+      "?? public/scripts/accountScope.js",
+      "?? scripts/build-public-assets.mjs",
+      "?? tests/admin/modal_focus.test.mjs",
+      "?? tests/auth/account_scope.test.mjs",
+      "?? tests/route_health/final_local.test.mjs",
+      "?? tests/route_health/public_build.test.mjs",
+      "?? tests/route_health/security_hardening.test.mjs"
+    ],
+    "candidate_file_sha256": {
+      "_README": "8cba8deedbe011e54b28f381f1d14aab719c38ea61a277ca7bb0704da5a4aa60",
+      "_folder_structure/folder_organization/00_project_root.txt": "99428b641ec02f0828e4d05e1e550f1ae9bafd67b27c73eec054eb028b3df06c",
+      "_folder_structure/folder_organization/01_functions.txt": "673024f2072789182c1ad4752eaa25bca78c43db727ed91074658d236ae53a98",
+      "_folder_structure/folder_organization/03_public.txt": "92a413c1c5e2fcc138e70d53416aaf1082d249c65082695c0da881ac83abcb56",
+      "_folder_structure/folder_organization/04_workers.txt": "8c9017b0bc32e6632b7e856bc21f77199c4d2556d22daeee63c23e245986d676",
+      "_folder_structure/folder_organization/05_support_and_generated.txt": "c9300cb450a281647a33ab0a4799ad02b22f57df7288796b6a82dded96a506bc",
+      "_folder_structure/route-health/routes.json": "7fe6f0656e119e855b35db012ecb534f9917b9bd0e15bd438308dc3e89ebcf8a",
+      "_structure_details/custom-match-contract-boundary.md": "fda4e491ff9eabef6cc8a76a4ba318dce857add50b3c04591c9360aa19d9dbac",
+      "_structure_details/phase4-production-readiness.md": "f928083cff6f98733ec31ace32bf14f7fbae72fae626fc1af9d8d1267d3f6c3e",
+      "_structure_details/request-frequency-inventory.md": "60d88a258f1c4be8858c80797c2f8cd98a49074848186ce6fb0594bd20452aad",
+      "_structure_details/rocketleague-capability-audit.md": "f20e21b86f6990a0bc73cf57c7669fa186e702d28d92513725b7bb02815098bb",
+      "_structure_details/rocketleague-leaderboards.md": "c4a558b27dcabaa89bb38deba0c982dd78f00234ce41c0787417654d9b4ed1ac",
+      "_structure_details/rocketleague-page-pass.md": "2f32310eae6627e95b9ece4bbed25e07f14d1a02f43c3be638bab7bace3c03d8",
+      "_structure_details/security-remediation-follow-up.md": "74ab80a29212faae8111a9c2842ce87cb5aa57e015c019f6a83c3073f80590c7",
+      "_structure_details/system-map.md": "96c5300fd8b0cb98b7b28c646e200282d32df4e8b496dbb6345c543f6d88aebe",
+      "_structure_details/system_sub_map/worker-status.md": "703e19224c01bd9f4c3576b1d3b6e57a9c29595835804c2b446506ef3b6307cd",
+      "functions/[[path]].js": "73ed73908239660841af8043d875cf90c72085e3fb9d2bc39228e5f9fbc488f8",
+      "functions/api/admin/system-status.js": "30c90611ec981d2b49d7b53a3e59b42a8fd246a87a47a32afb1ad38e52d28631",
+      "functions/api/admin/system-status/mmr-deploy.js": "10e48ff0b65d81a2047a42a158d8f57056993dfb3698f334adb4f99548f2432a",
+      "functions/api/admin/user-management/index.js": "bf84c6302ae3321ac61e594e044b0cc603018cf7ebd42265bff56752f3931138",
+      "functions/api/auth/account/last_login.js": "3245b7fe96d0e6c26598e519d66af712020b3202ea6a878140e420ee3d62a80c",
+      "functions/api/auth/admin/access.js": "eb0064f7777dc27ae26056cc11826d6df78c750a1a9d234b83dbafeef4290355",
+      "functions/api/auth/admin/tasks/[taskCode].js": "e23b12d5ac360866cff937dde8cc72968063d5611ed07573db2d60d1b5dfe07f",
+      "functions/api/auth/admin/tasks/[taskCode]/events.js": "2600a0db23f07c4800df53c9ead23e1d10a17b51afd71e24fa6ce292775f3496",
+      "functions/api/auth/admin/tasks/[taskCode]/lifecycle.js": "2fb0cf9228c7e3dfe1e39196522f077c549e6739a10016f522dbf276e9712867",
+      "functions/api/auth/admin/tasks/index.js": "57083167b918e287166eb51758615e136c99247a493d698364f270fa9ae44055",
+      "functions/api/auth/admin/tasks/task-activity.js": "f38195e609514772e3f189502d0176596657f767362fbc47ad96f04c518914a4",
+      "functions/api/auth/admin/tasks/task-assignees.js": "0979f255fba7d947232cebc9d3856b0ae3ecc337c5395742733c74b568793735",
+      "functions/api/auth/admin/tasks/task-summary.js": "51312c46cb278f45190b1988cd0f813fc938d84bf0570c4ed9c7e45f97aa37f4",
+      "functions/api/auth/discord/matchbot/channels.js": "1f61ef03b7feb01c88fcbf3ca9296ca2b3c308a8a7917e58caa88712e9b167a3",
+      "functions/api/auth/discord/matchbot/events.js": "f1b956f93765c988fba3b35efa08633ae76d7f95b57f92a25ff0781381d07377",
+      "functions/api/auth/discord/matchbot/guilds.js": "f556a470ac63cb451a8618d94984b5f47bedaafbf88cc4014f8fdeac95f70793",
+      "functions/api/auth/discord/matchbot/install.js": "ea56d90e02ce036f9567495d2cedb2006172ff833081e095a747732606bf5d82",
+      "functions/api/auth/discord/matchbot/test_message.js": "04d9161581cff7d49761cfd21a2ab453787d1b18545be123dffddb3fcb07ff48",
+      "functions/api/auth/logout.js": "b74c340a5c7e1e317f833fc0d1f04a3fcdf77b62e8d6650f19d7b2613628e784",
+      "functions/api/auth/rocketleague/session.js": "2f3ceafc2527c5390653ae9d54ed4b202c860c2da0ab63f833eabe1889ebdd75",
+      "functions/api/auth/session.js": "bcedf07ff041c96b35a7f8e9ceb9cce81609885a816e246665f51b2d66c6b307",
+      "functions/api/curseforge/mods.js": "6a0f5ca07a4dccca45b59644c9c2404c1c54cc62e4c3d2c369b0ddd483c8376a",
+      "functions/api/ocr/jobs/get_job.js": "c090facaba4d806286a6c63dffa3544a39592c9ec44e0da8ea6a673f1cdaa952",
+      "functions/api/ocr/jobs/get_result.js": "ece47cdd2bc21296dc2cca1e612690e51f3cf2e0ef8bff2b5c1a535ee50d4a79",
+      "functions/api/ocr/jobs/image.js": "9e8658859299d4d1b33942b79eedada943e5f04d982f28fa410e2261216a85d7",
+      "functions/api/ocr/jobs/process_job.js": "8bcf10611251c8c3c177ae50c519e76359988e071f3a5fce83a74a9d04ae156e",
+      "functions/api/ocr/jobs/progress.js": "3ab105115ddaaea08e43d06f8a8373b582409c50ba67fc69a246e521663215a2",
+      "functions/api/ocr/jobs/submit_job.js": "1505a432921cb14e98e746c836be4f813a55ca896ccb96cacd60f463fd206fc8",
+      "functions/api/rocketleague/custom-matches/[matchCode]/runtime.js": "2462e6042dde1e428a4014802a9f163468d6686dad1fad0f415de51236291578",
+      "functions/services/admin/generatedApiRouteInventory.js": "1451b3ad2626da6898a5e412dc01d3f417309b6acc0a067f3c31604d35b8f4e0",
+      "functions/services/admin/system_status.js": "24b586cd6c2abcbd64d4d14e315773d0538af3cfd65243a1ef8eb8a09a7e6c5d",
+      "functions/services/admin/user_management.js": "163295deb69bf4b58cc83f1a369f427d1e0428187f5231f90c1217726f78e5c9",
+      "functions/services/auth/account/access.js": "adf303b0fda22cd4a629ffdf40b6a23f65140127d56540ea803b938891a54f93",
+      "functions/services/auth/account/get_session.js": "ca5391d77655cc289bf828b51d893d85fdcae10398d0ec93b7fa0390cd68a8fc",
+      "functions/services/auth/account/last_login.js": "3c26018f609c0fe70b65ac1c8895288cf30203a8f84018e3ffe207a6bb07faf4",
+      "functions/services/auth/account/link_provider.js": "17e5843004365f2d826e7caadd8972eb334c05d4277907898b9a392631760a32",
+      "functions/services/auth/account/unlink_provider.js": "7774b16c3d89e72abe6085c38af3172d6abb5d5bc12e736e38e5b528be867a4a",
+      "functions/services/auth/authorization.js": "1f16e77b4580f5d639c87eb4c348e4c3f14acfe4c2c613666b4bec26d9b311df",
+      "functions/services/auth/oauth/callback.js": "9a9338f3f9e800b9103cb8690df43947fa3c0d9a413067fa050ded38469b2686",
+      "functions/services/auth/providers/discord_matchbot/interactions.js": "7583bd3deb25f1dd434e5fb47a4ecc8f96f366339abf9f99451d375918472a47",
+      "functions/services/auth/providers/epic/login.js": "85e2b837ca166b990ceb0e56b1aca96d94fe1aa713806325467c7a6141b57fd4",
+      "functions/services/auth/providers/google/login.js": "24fc8015ebee9bba272ec7cf675f6ac6d9f30865470fee73a9bd09681fdabe86",
+      "functions/services/auth/sessions/session.js": "94758363259634a03b9fa7be14516eb8576b66b10fddafa9c4a74ecec5756ece",
+      "functions/services/faq/service.js": "b9cd9e27082bafae9127bcecb0dbdefac2665c1dcb07a5906741e05759e5cf10",
+      "functions/services/http/responses.js": "f3d9403915205222bb42682874cdbaa457c036587e3b62295cef23e448b376c5",
+      "functions/services/ocr/confirm.js": "1a01c883a06f7b2f0841fdee5dc692f03f2551f06e9b85c003608769fb79a21a",
+      "functions/services/ocr/handler.js": "e5c7a6ab1e696187e08732a53fbed81e68afdc21e83718179b2655118ac998ae",
+      "functions/services/ocr/storeMatch.js": "678605e91fae9c3e1a86fd78b359a03270bd988919276515382ce2db2ebfda44",
+      "functions/services/ocr/training.js": "8145e1da9d81fbf752b8516eb150fd4314d4db489d1bb2e39526bd02125338d4",
+      "functions/services/rl/custom_matches/contracts.js": "a21fd5e2b9fbcdf0691c42729562ab1a754d5785ff8d7cb43983fd3901d99992",
+      "functions/services/rl/custom_matches/http.js": "2d670137b6ad82706e05c931905767561dfbc858f9e781f726e89efc08aa61cd",
+      "functions/services/rl/custom_matches/runtime_client.js": "d32470c80ef6edb286d8bbda130d1cb19f900b5f98e3b8b133b2a88436ba469e",
+      "functions/services/rl/custom_matches/service.js": "2846d0f53e36f793ab0623c29afa7963d93a9876592d20275f5bf77939d4b3af",
+      "functions/services/rl/profile.js": "7118f0029bb6abbaee3b263a082ac3f27fd024c3de419cf37e9120d0e9fd8220",
+      "functions/services/rl/session.js": "189eb21dcd2650664fcbab7bda25bb1b1cf962b08f734f7c914c43951e4ea02f",
+      "functions/services/rl/stats/fetch_mmr.js": "436769693e2ae2a840a79ef9f2d4c6263ac4a447bb233dc81342d342c6339ecd",
+      "functions/services/rl/stats/latest_cache.js": "7f53d14cad186420d21eb4c445b43aea4d7c9b1982803fe49f6a4bfe207ed9e6",
+      "functions/services/rl/stats/latest_mmr.js": "1bf33217c23cc0027def091514fd0c6294869ff92dff2d0b1954e650531c3d1f",
+      "functions/services/rl/stats/refresh.js": "ef8d46284501a3b601c276bfda6c4f41d38ea038581db1ccabc973ede619ef4c",
+      "functions/services/rl/stats/refresh_gate.js": "80565471e34df54fd9c937abef313d4122d7f3ebd55bd2bc2bced4253d5a8fa0",
+      "functions/services/rl/stats/refresh_state.js": "3f1402cd65987451e93a16f5e4a3b55ae96f39247caf6f83748cd4bf6f2ac83e",
+      "functions/services/rl/stats/refresh_with_gate.js": "ddc9fef9f89150cab07a25f82d2d30435a200ac847e522a2641cc594279497a6",
+      "functions/services/rl/stats/save_mmr.js": "02170a0d489e5cbd08863ef6323ba9f0c4b61a64128c093ca7b2eb9cca4545a7",
+      "functions/services/security/turnstile.js": "be00e010c58ca5e7c13ff0625a9b17578c43ca40a2d4ddc2c3d608b63dce8cf1",
+      "functions/services/supabase/admin/tasks/create.js": "0e0b5e8875bec62d53b25ee69a0bb4edde0468df2db94d11d296709d8a185c95",
+      "functions/services/supabase/admin/tasks/lifecycle.js": "9ae72b8e193c9afcdc8be9cd3ab0c04dcd8e190514e9541ce3c76c75ff3372c7",
+      "functions/services/supabase/rocketleague/current_shop.js": "3acf27f7e76c4f7e216ae7f14206ee3b1b24590cf6e496690b16f46c668d45e7",
+      "functions/services/supabase/rocketleague/discovery.js": "bd65e96c780def0d99b77e73af00f5d831386195f9fc2b9e4258bab709459c2f",
+      "functions/services/supabase/rocketleague/get_latest_mmr.js": "6f30139b07bf58ed068511f025544acd1eaec95d93eb1310b76b8637c2e5dd6f",
+      "package-lock.json": "00fa5129554ad812a7f1c8398f22855ec985f5cd9e5b5e8e0e5f9d4e517b532a",
+      "package.json": "8d16a47160fa122646bc8be3e76d980d96735dda93c0cdcb7557db738ecbac61",
+      "public/Framework/Auth/auth.js": "345eae5ada3e71a30308f49fb906a25905427c213123a7079becfeec2695c167",
+      "public/Framework/Banner/JS/account_banner.js": "8d25368758302eb72e39a70ead9bbf4ed20a5b2c8fa31ed9250da1eeb08c28ad",
+      "public/Framework/Shell/CSS/Callers/master.css": "954077dcc44149e8d3651bd712ece0d4d6948fd4f0316b834c0bdcb052343903",
+      "public/Framework/Shell/CSS/Callers/master_ark.css": "b42067cdc3cf0ac26cd96864e3da341a5c025ab245d3c1132b31c179ef9a3b28",
+      "public/Framework/Shell/CSS/Callers/master_mc.css": "f8547ab81cf706921a3648e873754858ef5837cf7bf310d0a529f1170cc1e7a1",
+      "public/Framework/Shell/CSS/Callers/master_rl.css": "61d477dd820828fa07fb877a176fa28a14bca213e691a840c586928d5c6be431",
+      "public/Framework/Shell/CSS/General/body.css": "0902049c98b0f1cfc2c388886fed32c68812675cfa30363638a1df81ec6d98ff",
+      "public/Framework/Shell/CSS/General/header.css": "c345db9f92c63146d10e9e1f8148ba86fa27a54c0904c52f8a5aae57810e63e5",
+      "public/Framework/Shell/HTML/Header/header.html": "1ca80773d615d462a765a0663d60fc41ca62d9ae6d3fe58e2bec0974f7ba9525",
+      "public/Framework/Shell/HTML/Sidebar/rl_menu.html": "9cdf72dbf4bf6e972a98452c7aebf6e4cb6a9100caee3a69c8ac9cf19d633702",
+      "public/Framework/Shell/JS/ocr_runtime.js": "0c14be15204d866d2591b20d3adea477df320feb4bbd93986f48f1b564e8a118",
+      "public/Framework/Shell/JS/renderHeader.js": "7f738d02d12ffe6e949b22d3e061e5d342a57618c5406a5217c8d1c189ef00d4",
+      "public/Framework/Shell/JS/router.js": "84b9bcc9fc896367841c066e3f4a7b50d8eda3a88b6f810d9a0839a69db1df2f",
+      "public/Global/Account/JS/index.js": "0e94a9d0d574bdb36caab67b80d2ffbba325a2e4c6e349feba80c5f5432338af",
+      "public/Global/Admin/Home/HTML/index.html": "5f127774821bca11b8803ba870b8f163d1634821567e73aecdbdfb1338944507",
+      "public/Global/Admin/Home/JS/index.js": "ec1837a120288f958ab665f8bddc2e56d18a323c0719b1ddd357c85985518033",
+      "public/Global/Admin/Suggestions/JS/index.js": "afdfec00799a2bf038b78b26ef376f09b697b5568206db464f1e458bc4b4fce0",
+      "public/Global/Admin/TaskBoard/JS/create_task.js": "aacbb80a39948faac6bc0800a7ab64afa56cde15649e1de62b3c96c4f69751c1",
+      "public/Global/Admin/TaskBoard/JS/task_confirm.js": "f0a5af2cafed8c14533eadbd8d7f5059905b89fb87fdb14a97d3ba40a0474e8f",
+      "public/Global/Admin/TaskBoard/JS/task_detail.js": "2970359366a7a7ee03d898b7a128ee78a36bd49992ca0c00283961ab3952349e",
+      "public/Global/Admin/TaskBoard/JS/task_edit.js": "9281b4e3672cc039aa80751b69aacc5c98d91a363325b7b5353f58830064ecc6",
+      "public/Global/Admin/WorkerStatus/CSS/index.css": "0a5119c4021df51cd9e96ad5df2ea389d8a17dd2fa50493d0c07b5d586a139fb",
+      "public/Global/Admin/WorkerStatus/JS/index.js": "8dc03a9cb01e0d9e345ddcf5bae54c6c6aa26f8bca07899a3be934c71c389eb2",
+      "public/Required/FAQ/JS/shared.js": "17a1f9952ae048d25063e4c4742249ef76f59f81bd76ba17bdff8b3e79ecb431",
+      "public/Tabs/RocketLeague/CustomMatches/JS/client.js": "034aacb5589d01d331c8d44091c47d4d714172e003c19232d47d348937c61796",
+      "public/Tabs/RocketLeague/CustomMatches/JS/index.js": "4cad0099282170474cbe5986a17cc1204d4ce51008824588c8052ddd25584dd8",
+      "public/Tabs/RocketLeague/CustomMatches/JS/view.js": "f71608bff05f50f93f2e1e816c8228cadd9b5d9369dc54c8a5b6f530522caf5a",
+      "public/Tabs/RocketLeague/Features/HTML/find-custom-matches.html": "e324bbffebcd49eefed43f3c8f18a2e2d0026e6ff2b2fe1932c9b15a6f2366f5",
+      "public/Tabs/RocketLeague/Features/HTML/match-history.html": "fe2750406003b58de0c4c2e6ffc3ea6140bc0e6ac93e39c93566ecfad95b33c8",
+      "public/Tabs/RocketLeague/Features/HTML/shop.html": "30601e0ffc6196d9de572822fbbee084dd237fbd7962d1b1e83075db869ca877",
+      "public/Tabs/RocketLeague/Features/JS/shop.js": "d71ef493fc6366596de615402c568e7325d192ce9ceaa0727fb944b7331dfbe8",
+      "public/Tabs/RocketLeague/FindPlayers/HTML/index.html": "85b5c8d3f47d9b087e6945c93a719e7ca7f9b11d26adc217fdaa9890b67dd8a6",
+      "public/Tabs/RocketLeague/FindPlayers/JS/view.js": "25825e077331a192716a4191bc221641b7f864cca9820baa409f45c072a6254c",
+      "public/Tabs/RocketLeague/Index/CSS/index.css": "7f674412e50049b0c59db996ba4a74f644ebb3caf2f1b68d3cd6624e105c0201",
+      "public/Tabs/RocketLeague/Index/JS/auth.js": "3eea329875f8e9191744a0ec08595a66481b77b634c6628e94b9bf2b99042d37",
+      "public/Tabs/RocketLeague/Index/JS/mmr_dashboard.js": "7bd43eb8db9eda754eab94b29f982838a2f452c2580b89e8af97be41d6fb06f6",
+      "public/Tabs/RocketLeague/Registration/JS/index.js": "d239449c07008e1b83ac4131c441a0b25322a2dc62fa9adf201dbcc6e465edc8",
+      "public/Tabs/RocketLeague/shared/mmrRankReferences.js": "899e59d1444171c089a8d7b3d25012e20814cc77fb93b72effebd03238c45242",
+      "public/_headers": "f98467e7c517036f923376b4887cb93a48407e73f3c2180c0a352035c642c16e",
+      "public/index.html": "d6ad87825b08f460677c647ecf8158dd3e30988ccc7bfc495e40d683ebbe1c8c",
+      "public/ocr/JS/index.js": "e2350c032a017e7d0fa7aa003af33a1b25fa8bcb39e8ef06c8d58b944df9e126",
+      "public/routes.js": "df9a80a4cec585ddda3b1dba97d5793aafa6553e2e05c6a2702636ee6e1d4683",
+      "public/scripts/cacheHandler.js": "1dd222c7a3d83756c3388efe9e1d20ccf5e67077ae784a8b284e0dc72957017f",
+      "public/scripts/repopulate_sitemap.js": "839e9b803497f02c8221ebdf5f68a6fb998d2c9bc79943f67f0ad8d8ce5ab8d1",
+      "public/sitemap.xml": "a54a8fadc30cbdf64ef8a9a3a8fb71cca24c1230385cbd8a31d22c9fd6a87281",
+      "scripts/generate-api-route-inventory.mjs": "5e53b78560668b2470eca7707299f6a67cd94c14b61c7a2afa2ffbef88a868d8",
+      "tests/admin/accordion.test.mjs": "3fb246e637c65a13ca6040b172e01039b69be321bf97ddb7e458f8a00e0dac72",
+      "tests/admin/faq.test.mjs": "7885f7ba76e0d6742dcff0b1e93fa61e3b70cd24d14ac55094d318c81fb20f89",
+      "tests/admin/user_management.test.mjs": "7bf101bee15be3c13b59c2021aeb9b7c8f52278ec6d0d15b745c63c19c447ab2",
+      "tests/auth/display_name_validation.test.mjs": "ed08867a3295c742c31fe6944ecdba80975a8c41c0c0da8d66f720da5a33b83c",
+      "tests/rocketleague/custom_match_api.test.mjs": "25c27393eebe90e2abcc11126f953fac347a9c07819e81782c10d07313cffd5d",
+      "tests/rocketleague/custom_match_ui.test.mjs": "985643ccf37f9fb4d6b86786cdaa1ecd961c415b75382d95d54f4a7db01ee0b5",
+      "tests/rocketleague/custom_matches.test.mjs": "c0dd60f13808d33ba0d20b76d9f92225ba5223c95cf1aa1665a1d7deb1e27caf",
+      "tests/rocketleague/global_leaderboards.test.mjs": "36b41a88ab76c9a5dbdcc664bccd82b724e1d260adf45e4dcbff1e5a1c0436e8",
+      "tests/rocketleague/mmr_history.test.mjs": "9a4efd783cdaf7e8f34de280bd9b774ec8d965b19607624550d6866b4255d14c",
+      "tests/rocketleague/phase1_diagnostics.test.mjs": "2dec419f6ccd33403b3efe52de29bc1d11c7db8e9e8dd52f97e3fd9ccad07547",
+      "tests/rocketleague/public_discovery.test.mjs": "eac995dc0ab02f3f46588da5e849a491256278e7f15de6894071fb613be3b321",
+      "tests/rocketleague/shop_api.test.mjs": "86aba1dcd9b30b8edd2cff7fc210df5f22b06f4892167336266a5e984f3b4b02",
+      "tests/route_health/mmr_deployment.test.mjs": "9dc7d3b948857a89ed2d9330b2a82a1f1225871f9f219bacb5e459b1fad49704",
+      "tests/route_health/rocketleague_navigation.test.mjs": "b2bc671425f1ae17201bbf453dfe77254537a9805222d63fc45125b53ea9e53b",
+      "tests/route_health/system_status.test.mjs": "b37c8e8e4eaf70308477398ee469912d4b987265ca7596de954213f71b773f6e",
+      "workers/bpd-custom-match-runtime/README.md": "cea9d0c20b2b755bf3c9998369b2c98b1d4b9fbf9bf705e12e6d8513145386ef",
+      "workers/bpd-custom-match-runtime/src/index.js": "e38f70a03839cd07d5af72f8d2028ea5cdd835cf235ac95a0c6a9c28b55282ec",
+      "workers/bpd-custom-match-runtime/tests/runtime.test.mjs": "589092e715998cbb6cfe4003781da85aeae8f77ced60d544e60678dd506183eb",
+      "workers/bpd-discord-communications/README.md": "886396253cd4bee6d988f6e07c029d82b60327b4796da16e310ad559b4310f88",
+      "workers/bpd-discord-communications/src/index.js": "81672193789e47dc1d9a8c962476f0ff2a8b2f8f39a1c488aa4162e3b5579435",
+      "workers/bpd-discord-communications/tests/communications.test.mjs": "9474340fb8761a9ba216eaf64426ae805c78a7f0e29d3d255989f647224ab920",
+      "workers/bpd-provider-runtime/tests/rl_user_session.test.mjs": "dc1ae9c19c5085ad4bbcc2e363531cd0d8310ca96a3b1830f7a17ea29ed0a4d9",
+      "workers/ocr-job-consumer/src/cleanup.js": "9b661bd5f0058674e8e7fadc959fb1decea9d3e79c15e8c8d7c906aa68b0bfa8",
+      "workers/ocr-job-consumer/src/index.js": "45ed6ac1acbf1f825255ace61a3e752f3e5de4e561a53834548d073feceb5d43",
+      "workers/rl-presence-monitor/README.md": "bf36fc0e0ed4f015a3c7e7cecbf77a1c074c9a814a7fd4bc1eb0b4c0f9c0987a",
+      "workers/rl-presence-monitor/src/rl_global_leaderboards.js": "323fef71026eb11a4ca7efd285bc6a53b616fefed6feaeba3fedb68c59e3af4b",
+      "workers/rl-presence-monitor/src/rl_shop_refresh.js": "e2632d3fea3276b6aaed9ebbba6d4ad5943fac097f8ccde4b12a43acec8f6280",
+      "workers/rl-presence-monitor/src/scheduled_mmr.js": "2085a004071fb6d77f58d2f8d62534c8459a7d2acfd80bffeb3ff3c9743b140e",
+      "workers/rl-presence-monitor/tests/oauth_navigation.test.mjs": "42ef63d74e71fde69e06d763056ec29b9081bcb4ceb3f1b8b0850ae1476276bb",
+      "workers/rl-presence-monitor/tests/provider_authorization.test.mjs": "642c608e2fc778a5a662b783b9d8e65c51147ec8d81f228a173ee0d146079870",
+      "workers/rl-presence-monitor/tests/rl_refresh_cycle.test.mjs": "89b2b9bb510203a3614910e6fb209038bf3076937478cd3925c8b3ea5c16abae",
+      "wrangler.jsonc": "dede92c9f25535840929ecd934a838d1a5abae063f25fffce6a61c80e5610044",
+      "_structure_details/deep-clean-continuation.md": "8839febb11dd8f6760245ff1e22e0e33f6143419df8cdcb3dd8b5f464920119b",
+      "_structure_details/deep-clean-final-local-resume.md": "d9b79e3b98964d30e5c709dcd7ba354dbb98a37eab658f49afed195403d7b007",
+      "_structure_details/deep-clean-final-local.md": "01c3fa9cc58c9892d3af9e22dd80cb269f2303b3917770c1ddb13aba4def07a2",
+      "_structure_details/deep-clean-hardening.md": "e06241de949f2c1e588224376ddc934ac30fcf27967286780e60091356b441a8",
+      "_structure_details/deep-clean-progress.md": "62cc1571dfbbcabc45cb3e2cf712e66e2649077c1822d5354be1d3b0dc796a80",
+      "functions/_middleware.js": "bcaf3e6dec1334a3951b272b21f749338dd69cbbec49ee8811ed5bdd829d7798",
+      "functions/api/admin/rocketleague/custom-match-host-recovery.js": "a658ed39fe2ca78c84c0e3853cc4c83b1ea8881cdf015d4c55ad2c8550b70c21",
+      "functions/services/http/diagnostics.js": "e66875b424a0357107433cc734450865872e195f2dfde088931718f982ca2ee5",
+      "public/Global/Admin/Home/JS/custom_match_recovery.js": "a9ad1ea7628af46f1b26a500f719d4bd551665ab6310fe7ddcaa4f7f98d3ba21",
+      "public/Global/Admin/Shared/JS/modal_focus.js": "f87318eb13e0d3b8fcb4c32108857a29cf0c79f34c821676329cd1786d8cd00d",
+      "public/Tabs/RocketLeague/Features/HTML/ue6.html": "39d5a1a000294631e3fcf9f769fe9d441584ff7bff3ee01739a8b496b4edd730",
+      "public/scripts/accountScope.js": "6db7d0ae44f686ecefccd16869c5c0376741d1b70edb46201b958928a87d8a99",
+      "scripts/build-public-assets.mjs": "2026b60cac3935704485db50845054b4c8410489a7034115e5f0b8931df01d13",
+      "tests/admin/modal_focus.test.mjs": "77fe5e366826275eaecaf4eb36cdaa47287b2884be7207febfd9fc71c952bfd1",
+      "tests/auth/account_scope.test.mjs": "52fa68e963188fd2401fc2f21c692bc888cbc494f6d83eb634ce7869d5fa687e",
+      "tests/route_health/final_local.test.mjs": "dbc5657b4adf13678c89d2ca7a79c851daf15bdfb1a834e280784ce6d7fdc85e",
+      "tests/route_health/public_build.test.mjs": "eae868d16e93e093aebb3bca8f80f9d725f89a986b77477038e7bc380a7b2880",
+      "tests/route_health/security_hardening.test.mjs": "41d1ed13f50daef98519796bd67fd991c465bd910418bdddaaeb777e8538efea"
+    },
+    "note": "Uncommitted candidate, not an immutable release version. Preflight documentation additions are not part of the earlier tested application candidate."
+  }
+}

@@ -5,7 +5,7 @@ DomainData/  (saved in Codex as the RLFolderStructuring project)
 |
 +-- functions/           Cloudflare Pages API handlers and server services.
 +-- ocr_cloudData/       Python/Flask OCR processor, OCR source, and OCR datasets.
-+-- public/              Static site output, client router, pages, and assets.
++-- public/              Editable browser source, client router, pages, and assets.
 +-- workers/             Independently deployed Cloudflare Workers.
 +-- _structure_details/  Canonical system map and maintained subsystem maps.
 |   +-- auth-mobile-compatibility.md Provider flows, cookie boundaries, and manual test matrix.
@@ -19,7 +19,8 @@ DomainData/  (saved in Codex as the RLFolderStructuring project)
 +-- .git/                Git repository metadata.
 +-- .ruff_cache/         Root Python lint cache.
 +-- .venv/               Local Python virtual environment.
-+-- .wrangler/           Cloudflare local/build artifacts.
++-- .wrangler/           Cloudflare local/build artifacts; public-build is the
+                         generated Pages asset output, not editable source.
 +-- node_modules/        Installed JavaScript dependencies.
 |
 +-- wrangler.jsonc       Main Cloudflare Pages configuration.
@@ -85,3 +86,5 @@ files, and a tracked .wrangler subset. ocr_cloudData, Notes, local environments,
 and several backup/local-secret files are present in the working directory but
 are not listed as tracked files in the current Git index.
 
+
+Current final Deep Clean checkpoint: _structure_details/deep-clean-final-local.md.

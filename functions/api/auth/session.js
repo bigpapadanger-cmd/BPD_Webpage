@@ -84,15 +84,7 @@ export async function onRequestGet(
             "AUTH SESSION ROUTE: Unexpected failure.",
             {
                 debugId,
-                name:
-                    error?.name
-                    || "Error",
-                message:
-                    error?.message
-                    || "Unknown error",
-                stack:
-                    error?.stack
-                    || null
+                code: "AUTH_SESSION_FAILED"
             }
         );
 

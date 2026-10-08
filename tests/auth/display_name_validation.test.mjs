@@ -240,7 +240,7 @@ test("authenticated session endpoint carries only the normalized display-name co
         assert.equal(body.user.displayName, "Player");
         assert.equal(body.user.displayNameChangedAt, Date.parse(changedAt));
         assert.equal(body.user.displayNameChangeAvailableAt, Date.parse(availableAt));
-        assert.deepEqual(Object.keys(body.user).sort(), ["active", "access", "displayName", "displayNameChangeAvailableAt", "displayNameChangedAt", "role", "userId"].sort());
+        assert.deepEqual(Object.keys(body.user).sort(), ["active", "access", "displayName", "displayNameChangeAvailableAt", "displayNameChangedAt", "role", "accountScope"].sort());
         assert.equal(body.user.access.state, "active");
     } finally {
         globalThis.fetch = originalFetch;

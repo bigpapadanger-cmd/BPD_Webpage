@@ -169,7 +169,7 @@ Shared SVG styling applies to public Player and private homepage graphs. Public 
 
 The hourly due-aware refresh cycle remains the automatic MMR collector/Supabase writer. Account activity and registration retain `refreshStatsWithGate` but no longer trigger competing daily collection. Latest private MMR reads check Supabase on each read; KV is outage fallback. Authorized Admin force refresh remains available.
 
-`scripts/debug-data-readiness.mjs` performs fixed read-only FAQ/leaderboard RPC checks and prints only safe diagnostics. The live leaderboard check found SQL code 42883 for nonexistent `pg_catalog.greatest`; live definition correction remains manual. Admin FAQ also depends on User Management authorization; both live Admin paths still require verification. Private Match History remains blocked on independent PsyNet identity proof; no probe or persistence was enabled.
+`scripts/debug-data-readiness.mjs` performs fixed read-only FAQ/leaderboard RPC checks and prints only safe diagnostics. An earlier inspection recorded SQL code 42883 for `pg_catalog.greatest`; that historical observation does not establish the current deployed collector failure. Current User Management, FAQ and Leaderboard causes await released diagnostics and authorized reproduction evidence; no speculative repair or SQL is pending from that observation. Private general Match History remains unsupported; no identity probe or persistence was enabled.
 
 # Manual MTX artwork diagnostic
 
@@ -178,3 +178,59 @@ The local debugger accepts `catalog` to call the protected MMR Worker `/get-mtx-
 Run manually after independently approving deployment of the Worker change: `node --env-file=.dev.vars scripts/debug-rl-shop.mjs catalog`. Local implementation alone does not make the live endpoint available. Upstream documents StarterPack and permits empty artwork; this diagnostic does not establish a universal Featured Shop icon mapping.
 
 The diagnostic now reports `imageStatus`: `missing`, `empty`, `rejected` or `usable`. Older Worker responses show `unreported` in the local caller. Rejected raw values are never printed. The read-only October 5, 2026 artwork check found rlshop.gg uses hashed static assets named by ProductID, including `4770.xtzkzIGC.webp` (Dominus) and `4989.C-86jkoV.webp` (Interstellar), with paint metadata separate from those paths. This proves a static mapping exists there, not an official general icon endpoint or variant-specific artwork contract. Asset reuse permission, a maintained mapping and paint/variant accuracy remain dependencies. No scraping, hotlinking, image download, R2 upload or third-party runtime dependency was added.
+
+## Applied 3A / 3E contracts (2026-10-07)
+
+The hourly scanner obeys Supabase due flags: MMR at/after 3 hours or no prior
+success; provider/history/club 60 minutes; career stats 24 hours; Discord 12 hours.
+Old daily KV gates have no automatic caller. Login/registration compatibility
+returns scheduler ownership, Admin force bypasses legacy timing, and latest-MMR
+KV verification is a read concern, not a collection gate. No cadence change is
+needed in the scanner and no database changes are pending.
+
+Find Players searches BPD account display name only through the applied SQL RPC.
+Case/whitespace normalization and scoring stay database-side: edit distance <=2
+OR max(trigram, normalized Levenshtein) >=0.80. DTOs retain match_percent (finite
+numeric 0..100) unchanged; non-exact cards round the display badge and exact
+matches omit it. Server ordering and empty results are preserved. Provider
+names/aliases/IDs are never used as local search keys. Active-account/player and
+find_profile_enabled eligibility remain database-side. Tests use fixed contract
+fixtures, including 91.67 for bruck dager; they do not reimplement SQL scoring.
+
+## 3B MMR graph integration (2026-10-07)
+
+The existing SVG renderer is retained. Private Home requests history through the
+server-authorized profile service and get_rl_player_mmr_history RPC. The service
+loads the latest 90 captures by default (up to 1000 supported for other callers);
+actual deployed retention is not inferred from that cap. Capture timestamps are
+preserved, sorted chronologically, and can be irregular because unchanged MMR
+need not create a new snapshot. Public profiles use their separate 14 UTC daily
+average contract, not private intraday captures.
+
+All / 1v1 / 2v2 / 3v3 buttons filter loaded data without fetching. Private ranges
+are All loaded captures, 24 Hours and 7 Days. Time-window boundaries include
+both now-minus-window and now; All is the loaded sample, not a claim of complete
+account history. Public daily-average ranges are All 14 days and 7 Days; missing
+days remain unavailable and are never fabricated as MMR values. No 30/90-day
+option is offered because current private loading does not guarantee that depth.
+
+Selected playlists control series, scale, legend and table columns. Null points
+break paths. Private table timestamps show complete UTC instants; daily tables
+show UTC dates. Solid/dashed/dotted lines plus labeled legends distinguish series
+without color. Native buttons/select retain accessible state, labels, keyboard
+operation and visible focus; display changes restore focus. Empty ranges keep
+controls so users can recover. No chart animation is introduced.
+
+The SVG viewBox responds to container resizing without listeners or chart
+instances. At narrow widths, the existing 600px minimum keeps labels readable
+inside the graph's horizontal scroll region; controls fit within 280px and the
+data disclosure scrolls internally. Repeated identical renders reuse the existing
+DOM; new route targets initialize independently. No polling or filter request is
+added. Graph filtering does not change three-hour MMR eligibility or any cadence.
+
+Verification: transformation/controller and SVG DOM tests cover filters, ranges,
+boundaries, gaps, empty recovery, full timestamp table consistency, non-color
+patterns, reinitialization, duplicate-render suppression and immutable input.
+Responsive CSS/viewBox behavior is checked structurally; real browser layout,
+keyboard focus and narrow-width rendering remain release-validation boundaries.
+No authenticated private graph session was used for live verification.

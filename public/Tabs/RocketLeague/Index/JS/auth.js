@@ -553,9 +553,9 @@ function createRocketLeagueSession(
             authState?.authenticated ===
                 true
             ? {
-                userId:
+                accountScope:
                     normalizeString(
-                        authState.userId
+                        authState.accountScope
                     )
                     || null,
 
@@ -1089,9 +1089,9 @@ async function loadProfileState(
     const profileResult =
         await loadRocketLeagueProfile(
             {
-                userId:
+                accountScope:
                     normalizeString(
-                        authState?.userId
+                        authState?.accountScope
                     )
                     || null,
 

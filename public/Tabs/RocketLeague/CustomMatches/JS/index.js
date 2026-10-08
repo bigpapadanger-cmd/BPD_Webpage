@@ -59,6 +59,11 @@ export async function initializePage() {
                 form.elements.teamACapacity.max = form.elements.teamBCapacity.max = String(state.limits.maxTeamCapacity);
                 if (mode) { form.elements.teamACapacity.value = String(mode.defaultTeamACapacity); form.elements.teamBCapacity.value = String(mode.defaultTeamBCapacity); }
                 form.elements.allowJoinAfterStart.checked = state.limits.defaultAllowJoinAfterStart;
+                form.elements.allowSpectators.checked = false;
+                form.elements.allowSpectators.disabled = !Number.isSafeInteger(state.limits.maxSpectatorCapacity);
+                form.elements.spectatorCapacity.value = String(state.limits.defaultSpectatorCapacity ?? "");
+                form.elements.spectatorCapacity.max = String(state.limits.maxSpectatorCapacity ?? "");
+                form.elements.spectatorCapacity.disabled = true;
                 get("cmLimitsNote").textContent = `Up to ${state.limits.maxTeamCapacity} per team; ${state.limits.maxTotalParticipants} total. Asymmetric teams are supported.`;
                 root.querySelectorAll("[data-capacity]").forEach(button => { button.disabled = Number(button.dataset.capacity) > state.limits.maxTeamCapacity || Number(button.dataset.capacity) * 2 > state.limits.maxTotalParticipants; });
             }
@@ -140,8 +145,6 @@ export async function initializePage() {
         if (target.dataset.voteType) {
             const form = target.closest("form"), kind = target.value;
             form.querySelector("[data-vote-target]").hidden = kind !== "player_target";
-            form.querySelector("[data-vote-yes-no]").hidden = kind !== "yes_no";
-            form.querySelector("[data-vote-choice]").hidden = kind !== "option";
         }
         if (target.dataset.cmAssign) run(() => controller.action("assign_team", { memberCode: target.dataset.cmAssign, team: target.value }));
         if (target.dataset.cmPolicy) run(() => controller.action("set_join_policy", { joinPolicy: target.value }));
@@ -150,6 +153,7 @@ export async function initializePage() {
             if (mode) { const form = get("cmCreateForm"); form.elements.teamACapacity.value = String(mode.defaultTeamACapacity); form.elements.teamBCapacity.value = String(mode.defaultTeamBCapacity); }
         }
         if (target.name === "visibility") get("cmCreateForm").elements.joinPolicy.value = target.value === "private" ? "invite_only" : "open";
+        if (target.name === "allowSpectators") get("cmCreateForm").elements.spectatorCapacity.disabled = !target.checked;
     }, { signal: lifetime.signal });
     root.addEventListener("submit", event => {
         event.preventDefault(); const form = event.target;
@@ -159,6 +163,7 @@ export async function initializePage() {
             const f = form.elements;
             run(() => controller.create({ title: f.title.value.trim(), modeKey: f.modeKey.value, visibility: f.visibility.value, joinPolicy: f.joinPolicy.value,
                 teamACapacity: Number(f.teamACapacity.value), teamBCapacity: Number(f.teamBCapacity.value), allowJoinAfterStart: f.allowJoinAfterStart.checked,
+                allowSpectators: f.allowSpectators.checked, ...(f.allowSpectators.checked ? { spectatorCapacity: Number(f.spectatorCapacity.value) } : {}),
                 region: f.region.value.trim() || null, mapName: f.mapName.value.trim() || null }));
         } else if (form.dataset.cmCreateInvite) {
             const f = form.elements, payload = {};
@@ -166,13 +171,13 @@ export async function initializePage() {
             if (f.team.value) payload.team = f.team.value;
             if (f.expiresAt.value) { const expiry = new Date(f.expiresAt.value); payload.expiresAt = Number.isFinite(expiry.getTime()) ? expiry.toISOString() : f.expiresAt.value; }
             run(() => controller.action("create_invite", payload));
-        } else if (form.dataset.cmJoinInvite) run(() => controller.action("join_with_invite", { inviteCode: form.elements.inviteCode.value.trim() }));
+        } else if (form.dataset.cmJoinInvite) run(() => controller.action("join_with_invite", { inviteCode: form.elements.inviteCode.value.trim(), ...(form.elements.team.value ? { team: form.elements.team.value } : {}) }));
         else if (form.dataset.cmResize) run(() => controller.action("resize", { teamACapacity: Number(form.elements.teamACapacity.value), teamBCapacity: Number(form.elements.teamBCapacity.value) }));
+        else if (form.dataset.cmSpectators) run(() => controller.action("set_spectator_settings", { allowSpectators: form.elements.allowSpectators.checked, spectatorCapacity: Number(form.elements.spectatorCapacity.value) }));
         else if (form.dataset.cmVote) {
             const kind = form.querySelector("[data-vote-type]")?.value;
             const vote = kind === "skip" ? { voteType: kind }
-                : kind === "player_target" ? { voteType: kind, targetMemberCode: form.querySelector("[data-vote-target]")?.value }
-                    : { voteType: kind, choiceKey: kind === "yes_no" ? form.querySelector("[data-vote-yes-no]")?.value : form.querySelector("[data-vote-choice]")?.value };
+                : { voteType: kind, targetMemberCode: form.querySelector("[data-vote-target]")?.value };
             run(() => controller.castVote(controller.state.rounds.find(item => item.roundCode === form.dataset.cmVote), vote));
         } else if (form.dataset.cmSubmitResult) run(() => controller.submitResult(Number(form.elements.teamAScore.value), Number(form.elements.teamBScore.value)));
         else if (form.dataset.cmConfirmResult) run(() => controller.confirmResult(form.elements.resultCode.value.trim()));

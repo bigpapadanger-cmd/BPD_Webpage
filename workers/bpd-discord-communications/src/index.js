@@ -1,6 +1,7 @@
 import { communicationsError, operationHash, readCommunicationBody, signedCommunicationRequest,
     verifyCommunicationRequest } from "../../../functions/services/admin/discord_communications.js";
 import { fetchBoundedResponse, withUpstreamDeadline } from "../../../functions/services/http/upstream.js";
+import { createRequestDiagnostics } from "../../../functions/services/http/diagnostics.js";
 import { verifyDiscordMatchBotInteraction, parseDiscordMatchBotInteraction,
     createDiscordMatchBotPong, createDiscordMatchBotEphemeralMessage,
     createDiscordMatchBotAutocompleteResponse } from "../../../functions/services/auth/providers/discord_matchbot/interactions.js";
@@ -24,10 +25,11 @@ export async function claimOperation(env, key, ttlMs) {
         return result.accepted;
     }, 2000);
 }
-async function deliver(url, payload) {
+async function deliver(url, payload, diagnostics = null) {
     return withUpstreamDeadline(async signal => {
         const response = await fetchBoundedResponse(url, { method: "POST", signal, redirect: "error",
             headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }, 16384);
+        diagnostics?.upstream(response.status);
         if (!response.ok) throw communicationsError(response.status === 429 ? "DISCORD_RATE_LIMITED" : "DISCORD_DELIVERY_UNAVAILABLE");
     }, 10000);
 }
@@ -60,22 +62,38 @@ export function validateSummary(value) {
 export async function runWeeklySummary(env, timestamp) {
     if (env.DISCORD_COMMUNICATIONS_ENABLED !== "true") return;
     const date = weeklyOccurrence(timestamp);
-    if (!date || !await claimOperation(env, `weekly:${date}`, 8 * 86400000)) return;
+    if (!date) return;
+    const diagnostics = createRequestDiagnostics({ label: "[DISCORD WEEKLY DIAGNOSTIC]", operation: "weekly_summary", codes: new Set(["DISCORD_COMMUNICATIONS_UNAVAILABLE", "DISCORD_RATE_LIMITED", "DISCORD_DELIVERY_UNAVAILABLE", "UPSTREAM_TIMEOUT"]) });
+    let failure = null;
+    try {
+    diagnostics.mark("receipt_claim");
+    if (!await claimOperation(env, `weekly:${date}`, 8 * 86400000)) return;
     // Claim first: uncertain delivery is never automatically retried.
+    diagnostics.mark("configuration");
     if (env.BPD_SITE_URL !== "https://bpd-gaming-network.com") throw communicationsError();
     const request = await signedCommunicationRequest(env, `${env.BPD_SITE_URL}/api/internal/discord/task-summary`, { occurrence: date });
     const summary = await withUpstreamDeadline(async signal => {
+        diagnostics.mark("summary_fetch_body", "admin_taskboard_summary");
         const response = await fetchBoundedResponse(request, { signal, redirect: "error" }, 16384);
+        diagnostics.upstream(response.status);
         if (!response.ok) throw communicationsError();
-        return validateSummary(await response.json());
+        diagnostics.mark("summary_decode", "admin_taskboard_summary");
+        const value = await response.json();
+        diagnostics.mark("summary_validation", "admin_taskboard_summary");
+        return validateSummary(value);
     }, 10000);
-    await deliver(webhook(env, "summary"), { username: "BPD Taskboard", allowed_mentions: { parse: [] }, embeds: [{
+    diagnostics.mark("webhook_configuration");
+    const destination = webhook(env, "summary");
+    diagnostics.mark("delivery");
+    await deliver(destination, { username: "BPD Taskboard", allowed_mentions: { parse: [] }, embeds: [{
         title: "BPD Taskboard Weekly Summary", color: 0x9B59B6,
         description: `Total: ${summary.total_tasks} · Active (not deleted): ${summary.active_tasks} · Deleted: ${summary.deleted_tasks}`,
         fields: [{ name: "Task status", value: Object.entries(summary.status).map(([k, v]) => `${k.replaceAll("_", " ")}: ${v}`).join("\n") },
             { name: "Responsibility", value: Object.entries(summary.responsibility).map(([k, v]) => `${k}: ${v}`).join("\n") }],
         timestamp: new Date(timestamp).toISOString()
-    }] });
+    }] }, diagnostics);
+    } catch (error) { failure = error; throw error; }
+    finally { diagnostics.finish(failure); }
 }
 export default {
     async fetch(request, env) {
@@ -83,6 +101,13 @@ export default {
             if (request.method !== "POST") return Response.json({ success: false, code: "METHOD_NOT_ALLOWED" }, { status: 405 });
             const body = await readCommunicationBody(request);
             await verifyCommunicationRequest(env, request, body);
+            if (new URL(request.url).pathname === "/internal/health" && !new URL(request.url).search) {
+                schema(JSON.parse(body), []);
+                const enabled = env.DISCORD_COMMUNICATIONS_ENABLED === "true", disabled = env.DISCORD_COMMUNICATIONS_ENABLED === "false";
+                const receiptsConfigured = typeof env.DISCORD_COMMUNICATION_RECEIPTS?.idFromName === "function" && typeof env.DISCORD_COMMUNICATION_RECEIPTS?.get === "function";
+                return Response.json({ success: true, service: "bpd-discord-communications", status: disabled ? "disabled" : !enabled ? "unknown" : receiptsConfigured ? "healthy" : "degraded",
+                    checkedAt: new Date().toISOString(), receiptsConfigured, deliveryChecked: false }, { headers: { "Cache-Control": "no-store" } });
+            }
             if (env.DISCORD_COMMUNICATIONS_ENABLED !== "true") throw communicationsError("COMMUNICATIONS_DISABLED");
             const value = JSON.parse(body);
             const path = new URL(request.url).pathname;
@@ -142,7 +167,7 @@ export default {
             return Response.json({ success: false, code: "NOT_FOUND" }, { status: 404 });
         } catch (error) {
             return Response.json({ success: false, code: ["COMMUNICATION_AUTH_FAILED", "COMMUNICATION_INPUT_INVALID", "COMMUNICATIONS_DISABLED", "DISCORD_SIGNATURE_INVALID", "DISCORD_APPLICATION_INVALID", "DISCORD_INTERACTION_REPLAY", "DISCORD_RATE_LIMITED"].includes(error?.code)
-                ? error.code : "DISCORD_COMMUNICATIONS_UNAVAILABLE" }, { status: error?.status === 401 ? 401 : error?.status === 400 ? 400 : error?.status === 409 ? 409 : 503 });
+                ? error.code : "DISCORD_COMMUNICATIONS_UNAVAILABLE" }, { status: error?.status === 401 ? 401 : error?.status === 400 ? 400 : error?.status === 409 ? 409 : 503, headers: { "Cache-Control": "no-store" } });
         }
     },
     scheduled(controller, env, ctx) {

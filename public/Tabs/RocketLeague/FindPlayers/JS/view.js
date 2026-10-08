@@ -47,6 +47,10 @@ export function createPlayerCard(documentRef, player, { featured = false } = {})
     const badges = documentRef.createElement("div");
     badges.className = "rl-player-badges";
     badges.append(textElement(documentRef, "span", getPlatformDisplayName(player.rl_platform), "rl-player-platform"));
+    if (!featured && typeof player.match_percent === "number" && Number.isFinite(player.match_percent)
+        && player.match_percent >= 0 && player.match_percent < 100) {
+        badges.append(textElement(documentRef, "span", `${Math.round(player.match_percent)}% match`, "rl-player-platform rl-player-match"));
+    }
     const presence = textElement(documentRef, "span", getPublicPresenceLabel(player), "rl-player-presence");
     presence.dataset.presence = getPresenceState(player);
     badges.append(presence);

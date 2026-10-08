@@ -1,4 +1,5 @@
 "use strict";
+import { activateModalFocus, deactivateModalFocus } from "../../Shared/JS/modal_focus.js";
 
 /* =========================================================
 BPD GAMING NETWORK
@@ -1585,6 +1586,7 @@ export async function openTaskDetail(
     ) {
         overlay.hidden =
             false;
+        activateModalFocus(overlay, () => closeTaskDetail());
     }
 
     document.documentElement.classList.add(
@@ -1637,6 +1639,7 @@ export function closeTaskDetail() {
     ) {
         overlay.hidden =
             true;
+        deactivateModalFocus(overlay);
     }
 
     taskDetailState = {

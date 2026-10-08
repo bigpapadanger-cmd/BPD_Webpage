@@ -3,7 +3,7 @@ Snapshot: 2026-10-07
 
 ROLE
 
-workers/ contains six separately configured Worker deployments. They do not use
+workers/ contains seven separately configured Worker deployments. They do not use
 the root Pages wrangler.jsonc at deployment time; each child owns its entrypoint,
 bindings, routes, triggers, and observability settings.
 
@@ -23,6 +23,7 @@ workers/
 |   +-- wrangler.jsonc       Private Pages Service Binding Worker; disabled by default; per-match DO migration.
 |   +-- README.md            Authentication boundary, readiness/voting semantics, and required operator provisioning.
 |   +-- src/index.js         CustomMatchSession WebSocket presence, ready gate, Start and vote-type enforcement.
+|                           Authenticated /internal/health reads configuration only; no DO instance selection.
 |   +-- tests/runtime.test.mjs Caller authentication, readiness, restart reset, safe fanout, revoke and vote tests.
 +-- bpd-provider-runtime/
 |   Manual authenticated internal /internal/discord/bot-health checks MatchBot token authentication only; no public surface or schedule.
@@ -34,6 +35,12 @@ workers/
 |   +-- src/discord_linked_role_nonce.js Separate transactional Linked Roles nonce DO; short-lived replay state only.
 |   +-- tests/discord.test.mjs Inventory completeness, sharding, validation, provider errors, and privacy tests.
 |   +-- tests/discord_nonce.test.mjs Atomic races, replay, expiry, binding mismatch and private dispatch tests.
++-- bpd-discord-communications/
+|   +-- wrangler.jsonc       Private Service Binding Worker; disabled by default; Friday New York summary schedule.
+|   +-- src/index.js         Signed delivery/interaction operations and read-only signed /internal/health.
+|   +-- src/receipts.js      DiscordCommunicationReceipts DO; health never selects an instance.
+|   +-- README.md            Communications boundary, enablement and health scope.
+|   +-- tests/communications.test.mjs Signing, deduplication, scheduling and read-only health contracts.
 +-- google-mtls-diagnostic/
 |   +-- wrangler.jsonc
 |   +-- README.md          Temporary, protected, manually invoked WIF/mTLS probes.
@@ -59,6 +66,7 @@ workers/
 |   |   +-- index.js             /health, protected /admin/health, authorized /wake, cron dispatcher, presence heartbeat.
 |   |   +-- presence_cycle.js    Supabase-eligible candidates, normalized presence fetch/save cycle.
 |   |   +-- rl_refresh_cycle.js  Due-aware paged MMR/profile/stats/club/Discord refresh orchestration.
+|   |   +-- rl_global_leaderboards.js Daily isolated playlist snapshot collector with sanitized correlated diagnostics.
 |   |   +-- rl_shop_refresh.js   Hourly global Shop snapshot fetch/hash/save/checkpoint.
 |   |   +-- scheduled_mmr.js     Legacy weekly MMR refresh implementation (retained, no longer scheduled).
 |   +-- tests/

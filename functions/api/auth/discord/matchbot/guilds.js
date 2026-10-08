@@ -1,3 +1,4 @@
+import { sanitizeLogMetadata } from "../../../../services/http/diagnostics.js";
 "use strict";
 
 /* =========================================================
@@ -465,7 +466,7 @@ export async function onRequestGet(
     ) {
         console.error(
             "MATCHBOT GUILDS API: Request failed.",
-            {
+            sanitizeLogMetadata({
                 debugId,
 
                 code:
@@ -479,7 +480,7 @@ export async function onRequestGet(
                 message:
                     error?.message
                     || "Unknown error"
-            }
+            })
         );
 
         if (

@@ -1,3 +1,4 @@
+import { sanitizeLogMetadata } from "../../../http/diagnostics.js";
 "use strict";
 
 /* =========================================================
@@ -152,13 +153,13 @@ async function notifyTaskCreated(
     ) {
         console.error(
             "[TASKBOARD DISCORD CREATE NOTIFICATION SKIPPED]",
-            {
+            sanitizeLogMetadata({
                 code:
                     "TASKBOARD_CREATED_TASK_MISSING",
 
                 message:
                     "The authoritative created task could not be extracted from the RPC response."
-            }
+            }, ["TASKBOARD_CREATED_TASK_MISSING"])
         );
 
         return;
@@ -175,7 +176,7 @@ async function notifyTaskCreated(
     ) {
         console.error(
             "[TASKBOARD DISCORD CREATE NOTIFICATION FAILED]",
-            {
+            sanitizeLogMetadata({
                 name:
                     error?.name
                     || null,
@@ -195,7 +196,7 @@ async function notifyTaskCreated(
                 details:
                     error?.details
                     || null
-            }
+            })
         );
     }
 }

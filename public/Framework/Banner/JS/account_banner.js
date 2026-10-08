@@ -25,7 +25,7 @@ Authentication:
         Framework/Auth/auth.js
 
     Logout:
-        GET /api/auth/logout
+        POST /api/auth/logout
 
 Security:
     - The banner is UI only and is not a security boundary.
@@ -1151,7 +1151,7 @@ async function handleLogout() {
                 BPD_AUTH_LOGOUT_URL,
                 {
                     method:
-                        "GET",
+                        "POST",
 
                     credentials:
                         "same-origin",

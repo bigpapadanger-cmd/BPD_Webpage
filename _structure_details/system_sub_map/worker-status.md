@@ -42,6 +42,12 @@ same account in that isolate, not as a global lock.
 | Cloud Run OCR | Cached result from last explicit recheck | Secret-gated fixed transport route → cached WIF credential → authenticated `/api/ocr/health`; 30-second outer/6-second health request bound | `SERVICE_STATUS`; no OCR inference |
 | Supabase | Last scheduled or explicit result; no page-load network call | Existing read-only `api.get_rl_featured_player()` RPC with server-side service-role authorization and bounded response validation | `RL_STATS_CACHE` |
 | MMR API/PsyNet | Protected `/health/ready` | 45-second aggregate cache plus explicit Recheck or Check Rocket League Version | Safe config/build state, auth stage, recent-failure, backoff, reconnect, latency, and aggregate traffic state |
+| Provider runtime | Private authenticated `/internal/health` | Same bounded read | Worker liveness, not provider/DO instance health |
+| Discord communications | Signed private `/internal/health`, unless explicitly disabled | Same read-only route | Worker reachability; no delivery/receipt instance is tested |
+| Custom Match runtime | Private authenticated `/internal/health`, unless explicitly disabled | Same read-only route | Worker reachability and required namespace/data configuration |
+| CustomMatchSession availability | Derived from runtime check | No instance probe | Disabled/unavailable as applicable; individual instance health remains Unknown |
+| Discord bots | Last recorded connection result; no routine Discord request | Existing bounded credential/membership checks | Allowlisted statuses/timestamps/codes only |
+| Google mTLS diagnostic | No probe; diagnostic-only retirement candidate | None | No current production caller configured; live retirement needs operator verification |
 
 Worker `SERVICE_STATUS` bindings reuse the existing `RL_STATS_CACHE` KV
 namespace; no new namespace or cloud resource is introduced. The hourly
@@ -101,18 +107,37 @@ the `shop` global refresh result. The public Shop page reads the cached DomainDa
 endpoint only; it does not call the provider. Old or expired snapshots are
 labeled potentially out of date.
 
-The main view groups services into Online, Degraded, Down, and Unknown
-accordions using the backend's canonical status classification; Down and
+The main view groups services into Healthy, Degraded, Unavailable, Disabled, and Unknown
+accordions using the backend's canonical status classification; Unavailable and
 Degraded groups open automatically when populated, while the other groups
 start collapsed. Each service retains its existing status row, actions, and
-Details. Route, connection, and known-finding diagnostics share the same page
+Details. Each status group contains Application, Data, Provider Services, Rocket
+League, Custom Matches, OCR, Discord or Diagnostics headings as applicable.
+Rows show the last check time and sanitized reason. Route, connection, and known-finding diagnostics share the same page
 in collapsed groups. The sidebar and Admin home provide one System Status
 entry; `/Admin/PageSettings` remains only as a bookmark-compatible alias.
 
 ## Status semantics and limits
 
-Statuses are `healthy`, `degraded`, `down`, or `unknown`. An idle queue is not
-Down; a queue with no heartbeat is Unknown. Cloud Run is Unknown until an
+Canonical statuses are `healthy`, `degraded`, `unavailable`, `disabled`, or `unknown`.
+Legacy `down`/`repairing` status values remain compatible and map to
+Unavailable/Degraded. Only explicit false configuration means intentionally
+Disabled; absent enablement is Unknown. Application and Worker flag mismatches
+are reported without enabling anything. A configured DO namespace is not an
+instance health claim; no health route selects or creates a DO instance.
+
+Routine adapters have a 2-second fetch/body budget and a 2.1-second complete
+adapter deadline including decoding/validation and last-known KV reads. One
+failed or stalled adapter cannot reject the whole sweep. Cache reads/writes are
+bounded separately to 2 seconds. The existing 45-second cache and request
+coalescing remain; no browser polling was added. Ordinary browser health reads
+use the shared 12-second fetch/body decoding helper. Explicit Cloud Run readiness
+uses its existing 30-second budget plus a 100ms adapter margin; Supabase explicit
+and scheduled checks retain a 10-second complete bound. Health projections
+allow only known statuses, bounded counts, normalized timestamps and sanitized
+codes/configuration facts; raw payloads and identifiers are discarded.
+
+An idle queue is not Unavailable; a queue with no heartbeat is Unknown. Cloud Run is Unknown until an
 operator explicitly rechecks it. Supabase is checked hourly and by explicit
 Recheck through the existing read-only Featured Player RPC. Previously checked
 operational state becomes Unknown/stale after two hours rather than remaining

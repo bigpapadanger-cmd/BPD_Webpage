@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test, { afterEach } from "node:test";
 import { onRequest as index } from "../../functions/api/rocketleague/custom-matches/index.js";
+import { onRequest as recovery } from "../../functions/api/admin/rocketleague/custom-match-host-recovery.js";
 import { onRequest as limitsRoute } from "../../functions/api/rocketleague/custom-matches/limits.js";
 import { onRequest as detailRoute } from "../../functions/api/rocketleague/custom-matches/[matchCode].js";
 import { onRequest as actionsRoute } from "../../functions/api/rocketleague/custom-matches/[matchCode]/actions.js";
@@ -75,6 +76,50 @@ test("Phase C mutations preserve server actor, external codes, versions and logi
     const calls = install();
     assert.equal((await actionsRoute({ request: request(`/${code}/actions`, { action: "create_invite", payload: { targetAccountId: accountId }, expectedVersion: 5, idempotencyKey: key }), env: environment(), params: { matchCode: code } })).status, 400);
     assert.equal(calls.length, 0);
+});
+
+test("Admin recovery rejects wrong method, cross-origin, missing session and unverified Admin", async () => {
+    const input = { matchCode: code, targetMemberCode: member, expectedVersion: 5, idempotencyKey: key, reason: "Abandoned host" };
+    const calls = install();
+    for (const [req, expected] of [[request(), 405], [request("", input, { origin: "https://untrusted.example" }), 403], [request("", input, { cookie: false }), 401], [request("", input), 503]]) {
+        const response = await recovery({ request: req, env: environment() });
+        assert.equal(response.status, expected); assert.equal(response.headers.get("Cache-Control"), "no-store");
+        assert.doesNotMatch(await response.text(), /service-role|account_id|player_id/);
+    }
+    assert.equal(calls.some(item => item.rpc === "admin_transfer_custom_match_host"), false);
+});
+
+test("Admin recovery derives authorized actor, rejects moderators and fails safely for absent RPC", async () => {
+    for (const scenario of ["admin", "moderator", "rpc-unavailable", "malformed"]) {
+        const env = environment();
+        Object.assign(env, { DISCORD_AUTHZ_GUILD_ID: "900000000000000002", DISCORD_AUTHZ_BOT_TOKEN: "private-bot", DISCORD_AUTHZ_ADMIN_ROLE_ID: "admin-role", DISCORD_AUTHZ_MOD_ROLE_ID: "mod-role" });
+        Object.assign(env, { DISCORD_AUTHZ_OWNER_ROLE_ID: "900000000000000011", DISCORD_AUTHZ_DATABASE_ROLE_ID: "900000000000000012", DISCORD_AUTHZ_SECURITY_ROLE_ID: "900000000000000013", DISCORD_AUTHZ_UI_ROLE_ID: "900000000000000014" });
+        const sessionGet = env.AUTH_SESSIONS.get;
+        env.AUTH_SESSIONS.get = async name => {
+            if (name.startsWith("provider_auth_id:")) return { accountId, provider: "discord", connectedAt: new Date(Date.now() - 1000).toISOString(), expiresAt: new Date(Date.now() + 60000).toISOString() };
+            if (name.startsWith("account_login_status:")) return { accountId, lastLoginAt: new Date(Date.now() - 1000).toISOString(), providerReauthAfter: null };
+            const value = await sessionGet(name);
+            return value ? { ...value, Providers: { discord: { AccountId: "900000000000000001", Linked: true } } } : null;
+        };
+        install(); const base = globalThis.fetch; let recoveryCalls = 0;
+        globalThis.fetch = async (url, init) => {
+            if (String(url).includes("/guilds/")) return Response.json({ user: { id: "900000000000000001" }, roles: [scenario === "moderator" ? "mod-role" : "admin-role"] });
+            const rpc = String(url).split("/").at(-1);
+            if (rpc === "verify_account_provider_identity") return Response.json([{ account_id: accountId, provider: "discord", provider_subject: "900000000000000001", active: true }]);
+            if (rpc === "admin_transfer_custom_match_host") {
+                recoveryCalls++; const args = JSON.parse(init.body);
+                assert.equal(args.p_admin_account_id, accountId); assert.equal(args.p_target_member_code, member);
+                assert.equal(args.p_reason, "Abandoned host"); assert.equal(args.p_expected_version, 5); assert.equal(args.p_idempotency_key, key);
+                if (scenario === "rpc-unavailable") return Response.json({ code: "PGRST202", message: "private infrastructure" }, { status: 404 });
+                return Response.json({ success: true, matchCode: code, version: scenario === "malformed" ? 5 : 6, accountId });
+            }
+            return base(url, init);
+        };
+        const response = await recovery({ request: request("", { matchCode: code, targetMemberCode: member, expectedVersion: 5, idempotencyKey: key, reason: "Abandoned host" }), env });
+        assert.equal(response.status, scenario === "admin" ? 200 : scenario === "moderator" ? 403 : scenario === "malformed" ? 502 : 503, scenario);
+        assert.equal(recoveryCalls, scenario === "moderator" ? 0 : 1);
+        assert.doesNotMatch(await response.text(), new RegExp(`${accountId}|private|service-role`));
+    }
 });
 
 test("explicit credentials reauthorize server-derived actor and never cache secrets", async () => {
@@ -153,6 +198,15 @@ function install({ allowed = true, active = true, custom = {}, profileMismatch =
     };
     return calls;
 }
+test("sanitized create receipt without credentials remains usable on idempotent replay", async () => {
+    install({ custom: { create_custom_match: () => Response.json({ success: true, match: { ...basic, state: "created", version: 1, roundBased: false, usesVoting: false, hostMemberCode: member }, capturedAt: at }) } });
+    for (let attempt = 0; attempt < 2; attempt++) {
+        const response = await index({ request: request("", { idempotencyKey: key, options: { title: "Test", teamACapacity: 2, teamBCapacity: 2 } }), env: environment() });
+        assert.equal(response.status, 200); assert.equal(response.headers.get("Cache-Control"), "no-store");
+        const value = await response.json(); assert.equal(value.match.matchCode, code); assert.equal(value.credentials, undefined);
+    }
+});
+
 test("public browse and limits do not require account identity and never expose credentials", async () => {
     const calls = install();
     const ctx = { request: request("", undefined, { cookie: false }), env: environment() };
@@ -279,4 +333,16 @@ test("voting and confirmation use the private runtime/fixed RPCs with no browser
     assert.ok(runtimeRequests.every(item => !JSON.stringify(item.body).includes(accountId)));
     assert.ok(calls.some(item => item.rpc === "get_custom_match_vote_result"));
     assert.ok(calls.some(item => item.rpc === "confirm_custom_match_result" && item.body.p_result_code === resultCode));
+});
+
+
+test("Pages runtime client distinguishes deliberate disablement without contacting Worker", async () => {
+    const { callCustomMatchRuntime } = await import("../../functions/services/rl/custom_matches/runtime_client.js");
+    let calls = 0;
+    const response = await callCustomMatchRuntime({ CUSTOM_MATCH_RUNTIME_ENABLED: "false", CUSTOM_MATCH_RUNTIME_CALLER_SECRET: "x".repeat(64),
+        CUSTOM_MATCH_RUNTIME: { fetch() { calls++; throw new Error("Disabled runtime must not be contacted"); } } }, "/start/CM12345678", "server-account", {});
+    assert.equal(response.status, 503); assert.equal(response.headers.get("Cache-Control"), "no-store");
+    assert.equal((await response.json()).code, "CUSTOM_MATCH_RUNTIME_DISABLED"); assert.equal(calls, 0);
+    const missing = await callCustomMatchRuntime({ CUSTOM_MATCH_RUNTIME_ENABLED: "true" }, "/start/CM12345678", "server-account", {});
+    assert.equal((await missing.json()).code, "CUSTOM_MATCH_RUNTIME_UNAVAILABLE");
 });

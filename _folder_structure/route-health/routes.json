@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-07T11:04:10.540Z",
+  "generatedAt": "2026-10-08T02:58:44.558Z",
   "policy": {
     "humanPagePaths": "case-insensitive lookup; canonical TitleCase path",
     "apiAndAssetPaths": "exact-case; never normalized by the human-page router",
@@ -350,6 +350,42 @@
         },
         {
           "path": "/Tabs/RocketLeague/Features/JS/shop.js",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "path": "/RocketLeague/UE6",
+      "lookupKey": "/rocketleague/ue6",
+      "canonicalPath": "/RocketLeague/UE6",
+      "routeType": "page",
+      "casePolicy": "human-insensitive",
+      "sourceFiles": [
+        "public/routes.js"
+      ],
+      "handler": "functions/[[path]].js",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "authRequired": false,
+      "healthStatus": "registered",
+      "deepLinkSupported": true,
+      "targets": [
+        {
+          "path": "/Tabs/RocketLeague/Features/HTML/ue6.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Header/header.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Sidebar/rl_menu.html",
+          "exists": true
+        },
+        {
+          "path": "/Framework/Shell/HTML/Footer/footer.html",
           "exists": true
         }
       ]
@@ -1601,6 +1637,22 @@
       "deepLinkSupported": false
     },
     {
+      "path": "/api/admin/rocketleague/custom-match-host-recovery",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/admin/rocketleague/custom-match-host-recovery.js"
+      ],
+      "handler": "functions/api/admin/rocketleague/custom-match-host-recovery.js",
+      "methods": [
+        "ALL"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    },
+    {
       "path": "/api/admin/rocketleague/force-refresh",
       "lookupKey": null,
       "routeType": "api",
@@ -2254,7 +2306,8 @@
       ],
       "handler": "functions/api/auth/logout.js",
       "methods": [
-        "GET"
+        "GET",
+        "POST"
       ],
       "authRequired": "handler-defined",
       "healthStatus": "valid",
@@ -3131,6 +3184,23 @@
     }
   ],
   "workerRoutes": [
+    {
+      "path": "/internal/health",
+      "lookupKey": null,
+      "routeType": "worker",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "workers/bpd-custom-match-runtime/src/index.js"
+      ],
+      "handler": "workers/bpd-custom-match-runtime/src/index.js",
+      "methods": [
+        "GET"
+      ],
+      "authRequired": false,
+      "healthStatus": "handler-defined",
+      "deepLinkSupported": false,
+      "ownerSystem": "bpd-custom-match-runtime"
+    },
     {
       "path": "https://ocr-transport.bpd-gaming-network.com/health",
       "lookupKey": null,

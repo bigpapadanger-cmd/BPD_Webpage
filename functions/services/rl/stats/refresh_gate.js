@@ -1,3 +1,4 @@
+import { sanitizeLogMetadata } from "../../http/diagnostics.js";
 "use strict";
 
 /* =========================================================
@@ -110,14 +111,14 @@ export async function getMmrRefreshGate(
     ) {
         console.warn(
             "MMR REFRESH GATE: KV read failed.",
-            {
+            sanitizeLogMetadata({
                 accountId:
                     normalizedAccountId,
 
                 message:
                     error?.message
                     || "Unknown error"
-            }
+            })
         );
 
         return null;
@@ -188,12 +189,12 @@ export async function setMmrRefreshGate(
     ) {
         console.error(
             "MMR REFRESH GATE: Invalid refresh gate TTL.",
-            {
+            sanitizeLogMetadata({
                 accountId:
                     normalizedAccountId,
 
                 ttlSeconds
-            }
+            })
         );
 
         return false;
@@ -249,7 +250,7 @@ export async function setMmrRefreshGate(
 
         console.info(
             "MMR REFRESH GATE: Gate stored.",
-            {
+            sanitizeLogMetadata({
                 accountId:
                     normalizedAccountId,
 
@@ -260,7 +261,7 @@ export async function setMmrRefreshGate(
 
                 reason:
                     payload.reason
-            }
+            })
         );
 
         return true;
@@ -270,14 +271,14 @@ export async function setMmrRefreshGate(
     ) {
         console.warn(
             "MMR REFRESH GATE: KV write failed.",
-            {
+            sanitizeLogMetadata({
                 accountId:
                     normalizedAccountId,
 
                 message:
                     error?.message
                     || "Unknown error"
-            }
+            })
         );
 
         return false;
@@ -312,10 +313,10 @@ export async function clearMmrRefreshGate(
 
         console.info(
             "MMR REFRESH GATE: Gate cleared.",
-            {
+            sanitizeLogMetadata({
                 accountId:
                     normalizedAccountId
-            }
+            })
         );
 
         return true;
@@ -325,14 +326,14 @@ export async function clearMmrRefreshGate(
     ) {
         console.warn(
             "MMR REFRESH GATE: KV delete failed.",
-            {
+            sanitizeLogMetadata({
                 accountId:
                     normalizedAccountId,
 
                 message:
                     error?.message
                     || "Unknown error"
-            }
+            })
         );
 
         return false;

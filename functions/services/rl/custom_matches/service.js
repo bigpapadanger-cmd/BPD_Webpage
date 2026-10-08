@@ -4,10 +4,12 @@ import { authorizeRocketLeagueRequest } from "../authorization.js";
 import { callCustomMatchRpc } from "../../supabase/rocketleague/custom_matches.js";
 import { CustomMatchError, validateCustomMatchRequest, toCustomMatchRpcParameters } from "./contracts.js";
 
-// Server-only boundary. Phase B will add narrow HTTP routes with method/CSRF gates.
+// Server-only boundary behind narrow HTTP routes with method/CSRF gates.
 // No caller-supplied authorization context, actor IDs or dependency overrides.
 export async function executeCustomMatchOperation(request, env, operation, input) {
     const validated = validateCustomMatchRequest(operation, input);
+    // Recovery has a separate Admin-only entry point; ordinary RL access is insufficient.
+    if (operation === "adminTransferHost") throw new CustomMatchError("CUSTOM_MATCH_ACCESS_DENIED", 403);
     if (operation === "action" && validated.action === "start") throw new CustomMatchError("CUSTOM_MATCH_RUNTIME_REQUIRED", 503);
     if (["openVote", "castVote", "resolveVote"].includes(operation)) throw new CustomMatchError("CUSTOM_MATCH_VOTING_NOT_AVAILABLE", 503);
     const action = operation === "create" ? "create_private_match"
@@ -15,9 +17,12 @@ export async function executeCustomMatchOperation(request, env, operation, input
             : ["submitResult", "confirmResult"].includes(operation) ? "submit_result" : "rocket_league";
     const authorization = await authorizeRocketLeagueRequest(request, env, action);
     const parameters = toCustomMatchRpcParameters(operation, validated, authorization.accountId);
-    if (operation === "create" || (operation === "action" && validated.action === "resize")) {
+    if (operation === "create" || (operation === "action" && ["resize", "set_spectator_settings"].includes(validated.action))) {
         const limits = await callCustomMatchRpc(env, "limits", { p_game_key: "rocketleague" });
         const options = operation === "create" ? validated.options : validated.payload;
+        if (options.spectatorCapacity !== undefined && (!Number.isSafeInteger(limits.maxSpectatorCapacity) || options.spectatorCapacity > limits.maxSpectatorCapacity)) {
+            throw new CustomMatchError("CUSTOM_MATCH_INPUT_INVALID", 400);
+        }
         const mode = limits.modes.find(item => item.modeKey === (options.modeKey ?? "standard"));
         if (operation === "create" && !mode) throw new CustomMatchError("CUSTOM_MATCH_INPUT_INVALID", 400);
         const a = options.teamACapacity ?? mode?.defaultTeamACapacity ?? limits.defaultTeamCapacity;

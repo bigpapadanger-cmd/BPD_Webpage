@@ -1,5 +1,16 @@
 # Discord communications
 
+## Admin health
+
+The existing Admin Health system uses signed POST `/internal/health` through the
+private Service Binding and existing communications HMAC contract. Explicit
+application disablement skips the request. The Worker authenticates health even
+when disabled, returns no-store status/configuration booleans, and never selects
+a receipt Durable Object, contacts Discord, sends a message, or modifies a task.
+Only explicit false is Disabled; missing or malformed enablement is Unknown.
+Healthy indicates authenticated Worker reachability/configuration, not verified
+Discord delivery. Both application and Worker defaults remain disabled.
+
 Private communication runtime; no public routes, workers.dev, preview URLs,
 Supabase credentials, account resolution, task mutation, or RL session state.
 Pages keeps the existing public Discord interaction URL:

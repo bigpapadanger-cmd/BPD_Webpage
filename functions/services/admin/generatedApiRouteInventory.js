@@ -349,6 +349,42 @@ export const PAGE_ROUTE_INVENTORY = Object.freeze([
     ]
   },
   {
+    "path": "/RocketLeague/UE6",
+    "lookupKey": "/rocketleague/ue6",
+    "canonicalPath": "/RocketLeague/UE6",
+    "routeType": "page",
+    "casePolicy": "human-insensitive",
+    "sourceFiles": [
+      "public/routes.js"
+    ],
+    "handler": "functions/[[path]].js",
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "authRequired": false,
+    "healthStatus": "registered",
+    "deepLinkSupported": true,
+    "targets": [
+      {
+        "path": "/Tabs/RocketLeague/Features/HTML/ue6.html",
+        "exists": true
+      },
+      {
+        "path": "/Framework/Shell/HTML/Header/header.html",
+        "exists": true
+      },
+      {
+        "path": "/Framework/Shell/HTML/Sidebar/rl_menu.html",
+        "exists": true
+      },
+      {
+        "path": "/Framework/Shell/HTML/Footer/footer.html",
+        "exists": true
+      }
+    ]
+  },
+  {
     "path": "/RocketLeague/FindPlayers",
     "lookupKey": "/rocketleague/findplayers",
     "canonicalPath": "/RocketLeague/FindPlayers",
@@ -1595,6 +1631,22 @@ export const API_ROUTE_INVENTORY = Object.freeze([
     "deepLinkSupported": false
   },
   {
+    "path": "/api/admin/rocketleague/custom-match-host-recovery",
+    "lookupKey": null,
+    "routeType": "api",
+    "casePolicy": "exact",
+    "sourceFiles": [
+      "functions/api/admin/rocketleague/custom-match-host-recovery.js"
+    ],
+    "handler": "functions/api/admin/rocketleague/custom-match-host-recovery.js",
+    "methods": [
+      "ALL"
+    ],
+    "authRequired": "handler-defined",
+    "healthStatus": "valid",
+    "deepLinkSupported": false
+  },
+  {
     "path": "/api/admin/rocketleague/force-refresh",
     "lookupKey": null,
     "routeType": "api",
@@ -2248,7 +2300,8 @@ export const API_ROUTE_INVENTORY = Object.freeze([
     ],
     "handler": "functions/api/auth/logout.js",
     "methods": [
-      "GET"
+      "GET",
+      "POST"
     ],
     "authRequired": "handler-defined",
     "healthStatus": "valid",
@@ -3125,6 +3178,23 @@ export const API_ROUTE_INVENTORY = Object.freeze([
   }
 ]);
 export const WORKER_ROUTE_INVENTORY = Object.freeze([
+  {
+    "path": "/internal/health",
+    "lookupKey": null,
+    "routeType": "worker",
+    "casePolicy": "exact",
+    "sourceFiles": [
+      "workers/bpd-custom-match-runtime/src/index.js"
+    ],
+    "handler": "workers/bpd-custom-match-runtime/src/index.js",
+    "methods": [
+      "GET"
+    ],
+    "authRequired": false,
+    "healthStatus": "handler-defined",
+    "deepLinkSupported": false,
+    "ownerSystem": "bpd-custom-match-runtime"
+  },
   {
     "path": "https://ocr-transport.bpd-gaming-network.com/health",
     "lookupKey": null,

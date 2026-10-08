@@ -876,6 +876,7 @@ export async function authorizeRequest(
     env,
     requirements = {}
 ) {
+    requirements.diagnostics?.mark("session_account_resolution");
     let authorization =
         await getAuthorizationContext(
             request,
@@ -895,6 +896,7 @@ export async function authorizeRequest(
         requirements?.account ===
         true
     ) {
+        requirements.diagnostics?.mark("session_authorization");
         requireAuthenticatedSession(authorization);
         if (!normalizeString(authorization.accountId)) {
             throw new AuthorizationError(
@@ -907,7 +909,9 @@ export async function authorizeRequest(
             const state = await assertAccountCanPerform(
                 env,
                 authorization.accountId,
-                requirements.action || "view_account"
+                requirements.action || "view_account",
+                fetch,
+                requirements.diagnostics
             );
             const effectiveActive = state.accountActive === true || state.state === "suspended";
             const sessionContext = {
