@@ -25,6 +25,8 @@ export function createRequestDiagnostics({ label, operation, codes, timeoutCode 
     const started = performance.now();
     const gameMode = { 10: "1v1", 11: "2v2", 13: "3v3" }[playlistId];
     const playlist = gameMode ? { playlistId, gameMode, rowCount: null, snapshotStatus: null } : null;
+    const transportErrorClasses = new Set(["invalid_url", "invalid_header", "request_construction", "aborted", "network_failure", "fetch_type_error", "unknown_transport"]);
+    const exceptionNames = new Set(["TypeError", "AbortError", "Error", "RangeError"]);
     let context = { stage: "route", operation, rpc: null, upstreamStatus: null, code: null, timeout: false };
     return {
         debugId,
@@ -32,6 +34,14 @@ export function createRequestDiagnostics({ label, operation, codes, timeoutCode 
         rows(count) { if (playlist) playlist.rowCount = Number.isSafeInteger(count) && count >= 0 && count <= 20000 ? count : null; },
         snapshot(status) { if (playlist) playlist.snapshotStatus = ["not_started", "in_progress", "already_complete", "completed", "failed", "recording_failed"].includes(status) ? status : null; },
         markTimeout() { context.timeout = true; },
+        transportFailure(transportErrorClass, exceptionName = null) {
+            if (!transportErrorClasses.has(transportErrorClass)) return;
+            context = {
+                ...context,
+                transportErrorClass,
+                ...(exceptionNames.has(exceptionName) ? { exceptionName } : {})
+            };
+        },
         upstream(status, code) {
             context.upstreamStatus = status === undefined ? context.upstreamStatus : Number.isInteger(status) && status >= 100 && status <= 599 ? status : null;
             context.code = codes.has(code) ? code : code ? "UPSTREAM_REJECTED" : null;

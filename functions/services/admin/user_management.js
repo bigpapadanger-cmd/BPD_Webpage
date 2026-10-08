@@ -273,25 +273,67 @@ function sanitizeMetadata(value, depth = 0) {
         .slice(0, 50).map(([key, item]) => [key, sanitizeMetadata(item, depth + 1)]));
 }
 
+function classifyFetchException(error) {
+    const exceptionName = ["TypeError", "AbortError", "Error", "RangeError"].includes(error?.name)
+        ? error.name : null;
+    if (exceptionName === "AbortError") return { transportErrorClass: "aborted", exceptionName };
+    if (exceptionName === "TypeError") return { transportErrorClass: "fetch_type_error", exceptionName };
+    if (exceptionName === "Error") return { transportErrorClass: "network_failure", exceptionName };
+    return { transportErrorClass: "unknown_transport", exceptionName };
+}
+
 async function callRpc(env, name, parameters, diagnostics = null) {
     if (!ALLOWED_RPCS.has(name)) fail("USER_MANAGEMENT_RPC_NOT_ALLOWED", 500);
     diagnostics?.mark("configuration", name);
     const base = String(env?.SUPABASE_URL || "").trim().replace(/\/+$/, "").replace(/\/rest\/v1$/i, "");
-    const key = String(env?.SUPABASE_SERVICE_ROLE_KEY || "").trim() || String(env?.SUPABASE_AUTH || "").trim();
+    const serviceRoleKey = String(env?.SUPABASE_SERVICE_ROLE_KEY || "").trim();
+    const key = serviceRoleKey || String(env?.SUPABASE_AUTH || "").trim();
     if (!base || !key) {
         if (!diagnostics) console.warn("User Management RPC unavailable.", { rpc: name, stage: "configuration" });
         fail("USER_MANAGEMENT_UNAVAILABLE", 503);
     }
-    try { if (new URL(base).protocol !== "https:") fail(); } catch { fail(); }
+    let rpcUrl;
+    try {
+        const root = new URL(base);
+        if (root.protocol !== "https:" || root.username || root.password || root.search || root.hash || root.pathname !== "/") {
+            diagnostics?.transportFailure("invalid_url");
+            fail();
+        }
+        if (!/^[a-z][a-z0-9_]*$/u.test(name)) {
+            diagnostics?.transportFailure("request_construction");
+            fail();
+        }
+        rpcUrl = new URL(`/rest/v1/rpc/${name}`, root.origin).href;
+        const parsedRpcUrl = new URL(rpcUrl);
+        if (parsedRpcUrl.protocol !== "https:" || parsedRpcUrl.pathname !== `/rest/v1/rpc/${name}`
+            || parsedRpcUrl.search || parsedRpcUrl.hash || parsedRpcUrl.username || parsedRpcUrl.password) {
+            diagnostics?.transportFailure("invalid_url");
+            fail();
+        }
+    } catch (error) {
+        if (error instanceof UserManagementError) throw error;
+        diagnostics?.transportFailure("invalid_url", error?.name);
+        fail();
+    }
+    if (/[\u0000-\u001f\u007f]/u.test(key)) {
+        diagnostics?.transportFailure("invalid_header");
+        fail();
+    }
     try {
         const response = await withUpstreamDeadline(async signal => {
             diagnostics?.mark("rpc_fetch_body", name);
-            const bounded = await fetchBoundedResponse(`${base}/rest/v1/rpc/${name}`, {
+            const bounded = await fetchBoundedResponse(rpcUrl, {
                 method: "POST", signal, redirect: "error",
                 headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json", Accept: "application/json", "Content-Profile": "api", "Accept-Profile": "api" },
                 body: JSON.stringify(parameters)
             }, 512 * 1024, async (url, init) => {
-                const upstream = await fetch(url, init);
+                let upstream;
+                try { upstream = await fetch(url, init); }
+                catch (error) {
+                    const transport = classifyFetchException(error);
+                    diagnostics?.transportFailure(transport.transportErrorClass, transport.exceptionName);
+                    throw error;
+                }
                 diagnostics?.upstream(upstream.status);
                 return upstream;
             });

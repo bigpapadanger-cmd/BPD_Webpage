@@ -23,6 +23,7 @@ function envFor(role, onRpc) {
 }
 function fetcherFor(env) {
     return async (url, init) => {
+        env.lastUrl = String(url);
         const name = String(url).split("/").at(-1);
         if (name === "get_account_access_state") return Response.json(state);
         if (name === "can_account_perform") return Response.json(JSON.parse(init.body).p_action === "view_account");
@@ -49,7 +50,11 @@ test("User List derives actor from the authenticated BPD session and returns san
         assert.equal(args.p_limit, 30);
         assert.equal(args.p_offset, 0);
         assert.equal(args.actorAccountId, undefined);
+        assert.equal(env.lastUrl, "https://database.example/rest/v1/rpc/admin_list_users");
+        assert.equal(init.method, "POST");
         assert.equal(init.headers.apikey, "service-secret");
+        assert.equal(init.headers.Authorization, "Bearer service-secret");
+        assert.deepEqual(Object.keys(init.headers).sort(), ["Accept", "Accept-Profile", "Authorization", "Content-Profile", "Content-Type", "apikey"].sort());
         return Response.json({ success: true, permissions: permissions("staff"), pagination: { total: 1, limit: 30, offset: 0, hasMore: false },
             users: [{ accountId: targetId, displayName: "Player", role: null, status: "active", accountActive: true, createdAt: timestamp,
                 lastSeenAt: null, providers: ["discord"], rocketLeague: { exists: true, active: true, playerId: targetId, platform: "Epic",
@@ -220,7 +225,12 @@ test("list diagnostics locate failures, correlate responses, and exclude sensiti
             assert.equal(record.timeout, false);
             const text = JSON.stringify(record) + JSON.stringify(await response.json());
             for (const forbidden of [sensitive, actorId, "service-secret", "auth-secret", "test-session", "private@example.test"]) assert.equal(text.includes(forbidden), false);
-            assert.deepEqual(Object.keys(record).sort(), ["debugId", "stage", "operation", "rpc", "upstreamStatus", "code", "timeout", "deadlineState", "elapsedMs"].sort());
+            const expectedKeys = ["debugId", "stage", "operation", "rpc", "upstreamStatus", "code", "timeout", "deadlineState", "elapsedMs"];
+            if (record.transportErrorClass) {
+                expectedKeys.push("transportErrorClass");
+                if (record.exceptionName) expectedKeys.push("exceptionName");
+            }
+            assert.deepEqual(Object.keys(record).sort(), expectedKeys.sort());
         }
         assert.equal(records[8].code, "PGRST202");
         assert.equal(records[7].code, "UPSTREAM_REJECTED");
@@ -257,6 +267,81 @@ test("stalled RPC body reports deadline expiry with observed upstream status", a
         assert.equal(record.timeout, true);
         assert.equal(record.deadlineState, "expired");
     } finally { globalThis.fetch = original; console.info = originalInfo; t.mock.timers.reset(); }
+});
+
+test("RPC URL accepts the configured REST base without duplicating the REST path", async () => {
+    const env = envFor("admin", (name, args, init) => {
+        assert.equal(name, "admin_list_users");
+            assert.equal(env.lastUrl, "https://database.example/rest/v1/rpc/admin_list_users");
+        return Response.json({ success: true, permissions: permissions("admin"), pagination: { total: 0, limit: 30, offset: 0, hasMore: false }, users: [], capturedAt: timestamp });
+    });
+    env.SUPABASE_URL = "https://database.example/rest/v1/";
+    const original = globalThis.fetch;
+    const normalFetch = fetcherFor(env);
+    globalThis.fetch = async (url, init) => {
+        if (String(url).endsWith("/admin_list_users")) assert.equal(String(url), "https://database.example/rest/v1/rpc/admin_list_users");
+        return normalFetch(url, init);
+    };
+    try {
+        const response = await listRoute({ request: request("/api/admin/user-management"), env });
+        assert.equal(response.status, 200);
+    } finally { globalThis.fetch = original; }
+});
+
+test("service-role credential is preferred and SUPABASE_AUTH fallback stays raw before Bearer prefix", async () => {
+    for (const [changes, expected] of [[{}, "Bearer service-secret"],
+        [{ SUPABASE_SERVICE_ROLE_KEY: "  ", SUPABASE_AUTH: "auth-fallback" }, "Bearer auth-fallback"]]) {
+        const env = envFor("admin", (name, _args, init) => {
+            assert.equal(name, "admin_list_users");
+            assert.equal(init.headers.Authorization, expected);
+            assert.equal(init.headers.apikey, expected.slice("Bearer ".length));
+            return Response.json({ success: true, permissions: permissions("admin"), pagination: { total: 0, limit: 30, offset: 0, hasMore: false }, users: [], capturedAt: timestamp });
+        });
+        Object.assign(env, changes);
+        const original = globalThis.fetch; globalThis.fetch = fetcherFor(env);
+        try {
+            const response = await listRoute({ request: request("/api/admin/user-management"), env });
+            assert.equal(response.status, 200);
+        } finally { globalThis.fetch = original; }
+    }
+});
+
+test("pre-response transport diagnostics classify safe URL/header/fetch failures only", async () => {
+    const sensitive = "private-token-cookie " + actorId;
+    const originalFetch = globalThis.fetch, originalInfo = console.info;
+    const records = [];
+    console.info = (_label, record) => records.push(record);
+    try {
+        const cases = [
+            { name: "malformed URL", configure: env => { env.SUPABASE_URL = "https://database.example/unexpected/"; }, stage: "configuration", expected: "invalid_url", errorName: undefined },
+            { name: "invalid header", configure: env => { env.SUPABASE_SERVICE_ROLE_KEY = `bad\n${sensitive}`; }, stage: "configuration", expected: "invalid_header", errorName: undefined },
+            { name: "fetch TypeError", error: () => new TypeError(sensitive), stage: "rpc_fetch_body", expected: "fetch_type_error", errorName: "TypeError" },
+            { name: "fetch AbortError", error: () => Object.assign(new Error(sensitive), { name: "AbortError" }), stage: "rpc_fetch_body", expected: "aborted", errorName: "AbortError" },
+            { name: "unknown fetch error", error: () => { const error = new Error(sensitive); error.name = "CustomError"; return error; }, stage: "rpc_fetch_body", expected: "unknown_transport", errorName: undefined }
+        ];
+        for (const item of cases) {
+            const env = envFor("admin", () => { throw new Error("Unexpected RPC"); });
+            item.configure?.(env);
+            const normalFetch = fetcherFor(env);
+            globalThis.fetch = async (url, init) => {
+                if (String(url).endsWith("/admin_list_users")) throw item.error();
+                return normalFetch(url, init);
+            };
+            const response = await listRoute({ request: request("/api/admin/user-management"), env });
+            assert.equal(response.status, 503);
+            const body = await response.json();
+            assert.deepEqual(body, { success: false, error: item.name === "fetch AbortError" ? "USER_MANAGEMENT_TIMEOUT" : "USER_MANAGEMENT_UNAVAILABLE",
+                message: item.name === "fetch AbortError" ? "User Management took too long to respond. Try again." : "User Management is temporarily unavailable. Try again." });
+            const record = records.at(-1);
+            assert.equal(record.stage, item.stage === "configuration" ? "configuration" : "rpc_fetch_body");
+            assert.equal(record.upstreamStatus, null);
+            assert.equal(record.transportErrorClass, item.expected);
+            if (item.errorName) assert.equal(record.exceptionName, item.errorName);
+            else assert.equal("exceptionName" in record, false);
+            assert.equal(JSON.stringify(record).includes(sensitive), false);
+            assert.equal(JSON.stringify(body).includes(sensitive), false);
+        }
+    } finally { globalThis.fetch = originalFetch; console.info = originalInfo; }
 });
 
 

@@ -1,50 +1,72 @@
 <!-- Shared submenu interactions. Route/API authorization remains server-side. -->
 <div class="sidebar-toggle-box">
     <button id="sidebarToggle" class="sidebar-toggle" type="button" aria-label="Toggle navigation" aria-expanded="true">
-        <span aria-hidden="true"></span><span aria-hidden="true"></span><span aria-hidden="true"></span>
+        <span aria-hidden="true"></span>
+        <span aria-hidden="true"></span>
+        <span aria-hidden="true"></span>
     </button>
 </div>
+
 <nav class="sidebar-navigation sidebar-nav" aria-label="Admin navigation">
     <div class="sidebar-navigation-top">
-        <a href="/Dashboard" class="nav-item" data-router-link data-nav-route="/Dashboard" data-tooltip="Dashboard" ><span class="nav-icon" data-sidebar-icon="dashboard" aria-hidden="true"></span><span class="nav-label">Dashboard</span></a>
-        <a href="/Admin" class="nav-item" data-router-link data-nav-route="/Admin" data-tooltip="Admin Homepage" data-nav-exact><span class="nav-icon" data-sidebar-icon="admin" aria-hidden="true"></span><span class="nav-label">Admin Homepage</span></a>
+        <a href="/Dashboard" class="nav-item" data-router-link data-nav-route="/Dashboard" data-tooltip="Dashboard">
+            <span class="nav-icon" data-sidebar-icon="dashboard" aria-hidden="true"></span>
+            <span class="nav-label">Dashboard</span>
+        </a>
+        <a href="/Admin" class="nav-item" data-router-link data-nav-route="/Admin" data-tooltip="Admin Homepage" data-nav-exact>
+            <span class="nav-icon" data-sidebar-icon="admin" aria-hidden="true"></span>
+            <span class="nav-label">Admin Homepage</span>
+        </a>
+
         <div class="sidebar-group sidebar-menu" data-sidebar-menu>
-    <span class="sidebar-group-label">Operations</span>
-    <button class="nav-item sidebar-menu-toggle" type="button" aria-expanded="false" aria-controls="adminOperationsSubmenu" data-tooltip="Operations">
-        <span class="nav-icon" data-sidebar-icon="taskboard" aria-hidden="true"></span><span class="nav-label">Operations</span>
-        <span class="submenu-arrow" data-sidebar-icon="chevron" aria-hidden="true"></span>
-    </button>
-    <div class="sidebar-submenu" id="adminOperationsSubmenu" hidden>
-        <a href="/Admin/Taskboard" class="submenu-item" data-router-link data-nav-route="/Admin/Taskboard" >Taskboard</a>
-        <a href="/Admin/UserManagement" class="submenu-item" data-router-link data-nav-route="/Admin/UserManagement" >User Management</a>
-        <a href="/Admin/MatchManagement" class="submenu-item" data-router-link data-nav-route="/Admin/MatchManagement" >Match Management</a>
-    </div>
-</div>
+            <button class="nav-item sidebar-menu-toggle" type="button" aria-expanded="false" aria-controls="adminOperationsSubmenu" data-tooltip="Operations">
+                <span class="nav-icon" data-sidebar-icon="taskboard" aria-hidden="true"></span>
+                <span class="nav-label">Operations</span>
+                <span class="submenu-arrow" data-sidebar-icon="chevron" aria-hidden="true"></span>
+            </button>
+            <div class="sidebar-submenu" id="adminOperationsSubmenu" role="group" aria-label="Operations" hidden>
+                <a href="/Admin/Taskboard" class="submenu-item" data-router-link data-nav-route="/Admin/Taskboard">Taskboard</a>
+                <a href="/Admin/UserManagement" class="submenu-item" data-router-link data-nav-route="/Admin/UserManagement">User Management</a>
+                <a href="/Admin/MatchManagement" class="submenu-item" data-router-link data-nav-route="/Admin/MatchManagement">Match Management</a>
+            </div>
+        </div>
+
         <div class="sidebar-group sidebar-menu" data-sidebar-menu>
-    <span class="sidebar-group-label">Community Review</span>
-    <button class="nav-item sidebar-menu-toggle" type="button" aria-expanded="false" aria-controls="adminReviewSubmenu" data-tooltip="Community Review">
-        <span class="nav-icon" data-sidebar-icon="suggestions" aria-hidden="true"></span><span class="nav-label">Community Review</span>
-        <span class="submenu-arrow" data-sidebar-icon="chevron" aria-hidden="true"></span>
-    </button>
-    <div class="sidebar-submenu" id="adminReviewSubmenu" hidden>
-        <a href="/Admin/FAQReview" class="submenu-item" data-router-link data-nav-route="/Admin/FAQReview" >FAQ</a>
-        <a href="/Admin/SuggestionReview" class="submenu-item" data-router-link data-nav-route="/Admin/SuggestionReview" >Suggestions</a>
-    </div>
-</div>
+            <button class="nav-item sidebar-menu-toggle" type="button" aria-expanded="false" aria-controls="adminReviewSubmenu" data-tooltip="Community Review">
+                <span class="nav-icon" data-sidebar-icon="suggestions" aria-hidden="true"></span>
+                <span class="nav-label">Community Review</span>
+                <span class="submenu-arrow" data-sidebar-icon="chevron" aria-hidden="true"></span>
+            </button>
+            <div class="sidebar-submenu" id="adminReviewSubmenu" role="group" aria-label="Community Review" hidden>
+                <a href="/Admin/FAQReview" class="submenu-item" data-router-link data-nav-route="/Admin/FAQReview">FAQ</a>
+                <a href="/Admin/SuggestionReview" class="submenu-item" data-router-link data-nav-route="/Admin/SuggestionReview">Suggestions</a>
+            </div>
+        </div>
+
         <div class="sidebar-group sidebar-menu" data-sidebar-menu>
-    <span class="sidebar-group-label">System</span>
-    <button class="nav-item sidebar-menu-toggle" type="button" aria-expanded="false" aria-controls="adminSystemSubmenu" data-tooltip="System">
-        <span class="nav-icon" data-sidebar-icon="status" aria-hidden="true"></span><span class="nav-label">System</span>
-        <span class="submenu-arrow" data-sidebar-icon="chevron" aria-hidden="true"></span>
-    </button>
-    <div class="sidebar-submenu" id="adminSystemSubmenu" hidden>
-        <a href="/Admin/WorkerStatus" class="submenu-item" data-router-link data-nav-route="/Admin/WorkerStatus" data-nav-aliases="/Admin/PageSettings" data-tooltip="System Status">System Status</a>
+            <button class="nav-item sidebar-menu-toggle" type="button" aria-expanded="false" aria-controls="adminSystemSubmenu" data-tooltip="System">
+                <span class="nav-icon" data-sidebar-icon="status" aria-hidden="true"></span>
+                <span class="nav-label">System</span>
+                <span class="submenu-arrow" data-sidebar-icon="chevron" aria-hidden="true"></span>
+            </button>
+            <div class="sidebar-submenu" id="adminSystemSubmenu" role="group" aria-label="System" hidden>
+                <a href="/Admin/WorkerStatus" class="submenu-item" data-router-link data-nav-route="/Admin/WorkerStatus" data-nav-aliases="/Admin/PageSettings" data-tooltip="System Status">System Status</a>
+            </div>
+        </div>
     </div>
-</div>
-    </div>
+
     <div class="sidebar-navigation-bottom">
-        <a href="/Settings" class="nav-item" data-router-link data-nav-route="/Settings" data-tooltip="User Settings" ><span class="nav-icon" data-sidebar-icon="settings" aria-hidden="true"></span><span class="nav-label">User Settings</span></a>
-        <a href="/TOS" class="nav-item" data-router-link data-nav-route="/TOS" data-tooltip="TOS" ><span class="nav-icon" data-sidebar-icon="terms" aria-hidden="true"></span><span class="nav-label">TOS</span></a>
-        <a href="/Privacy" class="nav-item" data-router-link data-nav-route="/Privacy" data-tooltip="Privacy Policy" ><span class="nav-icon" data-sidebar-icon="privacy" aria-hidden="true"></span><span class="nav-label">Privacy Policy</span></a>
+        <a href="/Settings" class="nav-item" data-router-link data-nav-route="/Settings" data-tooltip="User Settings">
+            <span class="nav-icon" data-sidebar-icon="settings" aria-hidden="true"></span>
+            <span class="nav-label">User Settings</span>
+        </a>
+        <a href="/TOS" class="nav-item" data-router-link data-nav-route="/TOS" data-tooltip="TOS">
+            <span class="nav-icon" data-sidebar-icon="terms" aria-hidden="true"></span>
+            <span class="nav-label">TOS</span>
+        </a>
+        <a href="/Privacy" class="nav-item" data-router-link data-nav-route="/Privacy" data-tooltip="Privacy Policy">
+            <span class="nav-icon" data-sidebar-icon="privacy" aria-hidden="true"></span>
+            <span class="nav-label">Privacy Policy</span>
+        </a>
     </div>
 </nav>
