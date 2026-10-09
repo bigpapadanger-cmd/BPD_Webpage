@@ -1,5 +1,6 @@
 "use strict";
 import { boundedJson } from "/scripts/boundedRequest.js";
+import { apiFetch } from "/scripts/apiConnection.js";
 import { initializeAdminAccordions } from "../../Shared/JS/accordion.js";
 const initializedPages = new WeakSet();
 
@@ -23,7 +24,7 @@ async function request(path, options = {}) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 12000);
     try {
-        const { response, payload } = await boundedJson(path, { credentials: "same-origin", cache: "no-store", ...options, signal: pageLifetime?.signal ?? controller.signal });
+        const { response, payload } = await boundedJson(path, { credentials: "same-origin", cache: "no-store", ...options, signal: pageLifetime?.signal ?? controller.signal }, { fetcher: apiFetch });
         if (!response.ok || payload?.success !== true) throw new Error(payload?.message || "The request could not be completed.");
         return payload;
     } catch (error) {

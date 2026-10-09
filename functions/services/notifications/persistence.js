@@ -1,6 +1,7 @@
 "use strict";
 
 import { fetchBoundedResponse, withUpstreamDeadline } from "../http/upstream.js";
+import { fetchSupabase, supabaseRestBase, supabaseRestUrl } from "../supabase/rest.js";
 import { dedupeNotificationCandidates } from "./core.js";
 
 const TABLE = "notification_state";
@@ -30,16 +31,12 @@ function fail(code = "NOTIFICATIONS_UNAVAILABLE", status = 503) {
 }
 
 function configuration(env) {
-    const base = typeof env?.SUPABASE_URL === "string"
-        ? env.SUPABASE_URL.trim().replace(/\/+$/, "").replace(/\/rest\/v1$/i, "")
-        : "";
     const key = (typeof env?.SUPABASE_SERVICE_ROLE_KEY === "string" ? env.SUPABASE_SERVICE_ROLE_KEY.trim() : "")
         || (typeof env?.SUPABASE_AUTH === "string" ? env.SUPABASE_AUTH.trim() : "");
-    if (!base || !key) fail();
-    try {
-        const parsed = new URL(base);
-        if (parsed.protocol !== "https:" || parsed.pathname !== "/" || parsed.username || parsed.password || parsed.search || parsed.hash) fail();
-    } catch { fail(); }
+    if (!key) fail();
+    let base;
+    try { base = supabaseRestBase(env?.SUPABASE_URL); }
+    catch { fail(); }
     return { base, key };
 }
 
@@ -72,10 +69,7 @@ function validTimestamp(value) { return typeof value === "string" && Number.isFi
 function nullableTimestamp(value) { return value === null || validTimestamp(value); }
 
 function requestUrl(base, parameters = {}, table = TABLE, columns = COLUMNS) {
-    const url = new URL(`/rest/v1/${table}`, base);
-    url.searchParams.set("select", columns);
-    for (const [key, value] of Object.entries(parameters)) url.searchParams.set(key, value);
-    return url.toString();
+    return supabaseRestUrl(base, table, { select: columns, ...parameters }).toString();
 }
 
 function classifyFetchException(error) {
@@ -145,7 +139,7 @@ async function callTable(env, url, { method = "GET", body, prefer = null, signal
             ...(body === undefined ? {} : { body: JSON.stringify(body) })
         }, MAX_RESPONSE_BYTES, async (input, init) => {
             let upstream;
-            try { upstream = await fetcher(input, init); }
+            try { upstream = await fetchSupabase(input, init, fetcher); }
             catch (error) {
                 const transport = classifyFetchException(error);
                 diagnostics?.transportFailure(transport.transportClass, transport.exceptionName, transport.transportCauseClass);

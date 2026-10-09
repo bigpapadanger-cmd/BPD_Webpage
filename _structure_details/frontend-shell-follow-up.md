@@ -218,6 +218,26 @@ verification. No release or deployment was performed.
 
 Cloudflare reference: [Turnstile widget configurations](https://developers.cloudflare.com/turnstile/get-started/client-side-rendering/widget-configurations/), accessed 2026-10-09.
 
+## Supabase redirect and REST-base follow-up
+
+The `SUPABASE_URL` setting may be either the project URL or the configured
+`/rest/v1/` endpoint. The shared `services/supabase/rest.js` helper normalizes
+to a trailing `/rest/v1/` base and appends table/RPC paths beneath it. It does
+not remove that suffix and reconstruct it elsewhere. Its redirect transport
+uses manual redirects, follows only HTTPS same-origin targets that remain under
+`/rest/v1/`, limits hops, and rejects ambiguous or cross-origin redirects so
+service authorization headers are never forwarded to another host. Notifications
+records HTTP redirect status and a safe destination category for rejected
+redirects.
+
+The browser Notifications and Admin User Management clients now use the existing
+same-origin `apiFetch` guard. The Leaderboard browser client already used it and
+remains on it. These browser requests still go to BPD `/api/*`; only server-side
+Cloudflare functions call Supabase directly. Relevant references: [Cloudflare
+Fetch redirect policy](https://developers.cloudflare.com/workers/runtime-apis/request/)
+and [Supabase Data REST API](https://supabase.com/docs/guides/api), accessed
+2026-10-09.
+
 ## Follow-up: production notification transport error
 
 When a Cloudflare log reports `stage: event_list`, `fetch_type_error`, and no

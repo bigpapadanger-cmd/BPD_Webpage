@@ -1,6 +1,7 @@
 "use strict";
 
 import { fetchBoundedResponse, withUpstreamDeadline } from "../../http/upstream.js";
+import { fetchSupabase, supabaseRestBase, supabaseRestUrl } from "../rest.js";
 
 const ALLOWED_RPCS = new Set([
     "get_rl_global_leaderboard",
@@ -37,10 +38,11 @@ function logRpcFailure(name, code, upstreamStatus = null) {
 
 async function callRpc(env, name, parameters) {
     if (!ALLOWED_RPCS.has(name)) throw new RocketLeagueLeaderboardError("RL_LEADERBOARD_UNAVAILABLE", 500);
-    const root = typeof env?.SUPABASE_URL === "string" ? env.SUPABASE_URL.trim().replace(/\/+$/, "").replace(/\/rest\/v1$/i, "") : "";
     const key = typeof env?.SUPABASE_AUTH === "string" ? env.SUPABASE_AUTH.trim() : "";
+    let restBase;
     try {
-        if (!key || new URL(root).protocol !== "https:") throw new Error("config");
+        if (!key) throw new Error("config");
+        restBase = supabaseRestBase(env?.SUPABASE_URL);
     } catch {
         logRpcFailure(name, "RL_LEADERBOARD_CONFIG_UNAVAILABLE");
         throw new RocketLeagueLeaderboardError();
@@ -49,7 +51,7 @@ async function callRpc(env, name, parameters) {
     let upstreamDiagnosticCode = null;
     try {
         return await withUpstreamDeadline(async signal => {
-            const response = await fetchBoundedResponse(`${root}/rest/v1/rpc/${name}`, {
+            const response = await fetchBoundedResponse(supabaseRestUrl(restBase, `rpc/${name}`), {
                 method: "POST",
                 headers: {
                     apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json",
@@ -57,7 +59,7 @@ async function callRpc(env, name, parameters) {
                 },
                 body: JSON.stringify(parameters),
                 signal
-            }, 1024 * 1024);
+            }, 1024 * 1024, (input, init) => fetchSupabase(input, init));
             upstreamStatus = response.status;
             if (!response.ok) {
                 const failure = await response.clone().json().catch(() => null);

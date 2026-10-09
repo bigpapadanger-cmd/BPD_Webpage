@@ -62,7 +62,7 @@ public/Framework/
     +-- JS/
         +-- initialization.js       Shared shell initialization.
         +-- router.js               Auth-aware fragment/module route loader.
-        +-- notifications.js        Deferred authenticated bell/dropdown, with loading/empty/error states.
+        +-- notifications.js        Deferred authenticated bell/dropdown, with loading/empty/error states; BPD API calls use apiFetch.
         +-- notification_destinations.js    Small shared allowlist for notification review actions.
         +-- renderHeader.js         Header rendering.
         +-- ocr_runtime.js          Persistent OCR client runtime.
@@ -85,7 +85,7 @@ public/Global/
 +-- Admin/
 |   +-- Home/            CSS/index.css, HTML/index.html, JS/index.js
 |   +-- MatchManagement/ CSS/index.css, HTML/index.html, JS/index.js (authenticated not-developed placeholder)
-|   +-- UserManagement/  CSS/index.css, HTML/index.html, JS/index.js
+|   +-- UserManagement/  CSS/index.css, HTML/index.html, JS/index.js; browser API requests use apiFetch
 |   +-- Shared/          CSS/accordion.css, JS/accordion.js and modal_focus.js; native disclosures, ARIA synchronization and nested modal focus/inert ownership
 |   +-- WorkerStatus/    CSS/index.css, HTML/index.html, JS/index.js, JS/mmr_controls.js, JS/rocket_league_capabilities.js; Admin-only Rocket League force refresh
 |   +-- TaskBoard/

@@ -3,6 +3,7 @@
 import { createRequestDiagnostics } from "../http/diagnostics.js";
 import { authorizeRequest } from "../auth/authorization.js";
 import { fetchBoundedResponse, withUpstreamDeadline } from "../http/upstream.js";
+import { fetchSupabase, supabaseRestBase, supabaseRestUrl } from "../supabase/rest.js";
 
 const RPCS = Object.freeze({
     list: "admin_list_users",
@@ -285,25 +286,21 @@ function classifyFetchException(error) {
 async function callRpc(env, name, parameters, diagnostics = null) {
     if (!ALLOWED_RPCS.has(name)) fail("USER_MANAGEMENT_RPC_NOT_ALLOWED", 500);
     diagnostics?.mark("configuration", name);
-    const base = String(env?.SUPABASE_URL || "").trim().replace(/\/+$/, "").replace(/\/rest\/v1$/i, "");
     const serviceRoleKey = String(env?.SUPABASE_SERVICE_ROLE_KEY || "").trim();
     const key = serviceRoleKey || String(env?.SUPABASE_AUTH || "").trim();
-    if (!base || !key) {
+    if (!key) {
         if (!diagnostics) console.warn("User Management RPC unavailable.", { rpc: name, stage: "configuration" });
         fail("USER_MANAGEMENT_UNAVAILABLE", 503);
     }
+    let restBase;
     let rpcUrl;
     try {
-        const root = new URL(base);
-        if (root.protocol !== "https:" || root.username || root.password || root.search || root.hash || root.pathname !== "/") {
-            diagnostics?.transportFailure("invalid_url");
-            fail();
-        }
+        restBase = supabaseRestBase(env?.SUPABASE_URL);
         if (!/^[a-z][a-z0-9_]*$/u.test(name)) {
             diagnostics?.transportFailure("request_construction");
             fail();
         }
-        rpcUrl = new URL(`/rest/v1/rpc/${name}`, root.origin).href;
+        rpcUrl = supabaseRestUrl(restBase, `rpc/${name}`).href;
         const parsedRpcUrl = new URL(rpcUrl);
         if (parsedRpcUrl.protocol !== "https:" || parsedRpcUrl.pathname !== `/rest/v1/rpc/${name}`
             || parsedRpcUrl.search || parsedRpcUrl.hash || parsedRpcUrl.username || parsedRpcUrl.password) {
@@ -312,7 +309,7 @@ async function callRpc(env, name, parameters, diagnostics = null) {
         }
     } catch (error) {
         if (error instanceof UserManagementError) throw error;
-        diagnostics?.transportFailure("invalid_url", error?.name);
+        diagnostics?.transportFailure("invalid_url");
         fail();
     }
     if (/[\u0000-\u001f\u007f]/u.test(key)) {
@@ -328,7 +325,7 @@ async function callRpc(env, name, parameters, diagnostics = null) {
                 body: JSON.stringify(parameters)
             }, 512 * 1024, async (url, init) => {
                 let upstream;
-                try { upstream = await fetch(url, init); }
+                try { upstream = await fetchSupabase(url, init); }
                 catch (error) {
                     const transport = classifyFetchException(error);
                     diagnostics?.transportFailure(transport.transportErrorClass, transport.exceptionName);

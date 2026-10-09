@@ -1,6 +1,7 @@
 "use strict";
 
 import { fetchBoundedResponse, withUpstreamDeadline } from "../http/upstream.js";
+import { fetchSupabase, supabaseRestBase, supabaseRestUrl } from "../supabase/rest.js";
 import { getProviderAuthorizationState } from "../auth/providers/provider_auth_state.js";
 import { verifyAccountProviderIdentity } from "../auth/providers/provider_identity.js";
 import { getRocketLeagueProfileByAccountId } from "../supabase/rocketleague/rocketleague_profile.js";
@@ -15,17 +16,11 @@ function fail(code = "NOTIFICATIONS_UNAVAILABLE") {
 }
 
 function supabaseConfig(env) {
-    const rawUrl = typeof env?.SUPABASE_URL === "string" ? env.SUPABASE_URL.trim().replace(/\/+$/, "") : "";
     const key = (typeof env?.SUPABASE_SERVICE_ROLE_KEY === "string" ? env.SUPABASE_SERVICE_ROLE_KEY.trim() : "")
         || (typeof env?.SUPABASE_AUTH === "string" ? env.SUPABASE_AUTH.trim() : "");
-    if (!rawUrl || !key) fail();
-    let base;
-    try {
-        const parsed = new URL(rawUrl);
-        if (parsed.protocol !== "https:" || parsed.username || parsed.password || parsed.search || parsed.hash) fail();
-        base = rawUrl.replace(/\/rest\/v1$/i, "");
-    } catch { fail(); }
-    return { base, key };
+    if (!key) fail();
+    try { return { base: supabaseRestBase(env?.SUPABASE_URL), key }; }
+    catch { fail(); }
 }
 
 async function getActiveEnforcement(env, accountId, fetcher = fetch) {
@@ -33,12 +28,12 @@ async function getActiveEnforcement(env, accountId, fetcher = fetch) {
     return withUpstreamDeadline(async signal => {
         let response;
         try {
-            response = await fetchBoundedResponse(`${base}/rest/v1/rpc/get_account_enforcement_state`, {
+            response = await fetchBoundedResponse(supabaseRestUrl(base, "rpc/get_account_enforcement_state"), {
                 method: "POST", signal, redirect: "error",
                 headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json",
                     Accept: "application/json", "Content-Profile": "api", "Accept-Profile": "api" },
                 body: JSON.stringify({ p_account_id: accountId })
-            }, 64 * 1024, fetcher);
+            }, 64 * 1024, (input, init) => fetchSupabase(input, init, fetcher));
         } catch { fail(); }
         let body;
         try { body = await response.json(); } catch { fail(); }

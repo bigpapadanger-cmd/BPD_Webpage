@@ -37,6 +37,48 @@ export function safeUpstreamErrorMessage(value, fallback) {
     return SAFE_ERROR_CODES.has(value) && value !== "23505" && value !== "P0001" ? value : fallback;
 }
 
+const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
+const SAFE_REDIRECT_METHODS = new Set(["GET", "HEAD"]);
+const REPLAYABLE_REDIRECT_STATUSES = new Set([307, 308]);
+
+// Manually handle redirects so authorization headers cannot be sent to another
+// origin. Only same-origin HTTPS redirects are followed; unsafe/ambiguous ones
+// are returned to the caller for normal status handling and diagnostics.
+export async function fetchSameOriginRedirects(input, init = {}, fetcher = fetch, { pathPrefix = null, maxRedirects = 3 } = {}) {
+    const initialUrl = new URL(input instanceof Request ? input.url : input);
+    const method = String(init.method || "GET").toUpperCase();
+    const visited = new Set([initialUrl.href]);
+    let currentUrl = initialUrl;
+    let redirects = 0;
+
+    while (true) {
+        const response = await fetcher(currentUrl, { ...init, redirect: "manual" });
+        if (!REDIRECT_STATUSES.has(response.status)) return response;
+        const location = response.headers.get("Location");
+        if (!location || redirects >= maxRedirects) return response;
+
+        let destination;
+        try { destination = new URL(location, currentUrl); }
+        catch { return response; }
+        destination.hash = "";
+        let decodedPath;
+        try { decodedPath = decodeURIComponent(destination.pathname); }
+        catch { return response; }
+        if (destination.origin !== initialUrl.origin || destination.protocol !== "https:"
+            || destination.username || destination.password
+            || (pathPrefix && (!decodedPath.startsWith(pathPrefix) || decodedPath.split("/").includes("..")))
+            || visited.has(destination.href)
+            || (!SAFE_REDIRECT_METHODS.has(method) && !REPLAYABLE_REDIRECT_STATUSES.has(response.status))) {
+            return response;
+        }
+
+        visited.add(destination.href);
+        redirects++;
+        await response.body?.cancel().catch(() => {});
+        currentUrl = destination;
+    }
+}
+
 // Stream/count decompressed bytes before constructing a bounded in-memory
 // Response. Never trust Content-Length alone. Call inside withUpstreamDeadline.
 export async function fetchBoundedResponse(input, init, maxBytes = UPSTREAM_MAX_BYTES, fetcher = fetch) {

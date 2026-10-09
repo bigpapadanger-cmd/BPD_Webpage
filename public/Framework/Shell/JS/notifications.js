@@ -313,5 +313,6 @@ let initialized = false;
 export async function initializeGlobalNotifications() {
     if (initialized || typeof document === "undefined") return;
     initialized = true;
-    await createNotificationController({ document, window }).initialize();
+    const { apiFetch } = await import("../../../scripts/apiConnection.js");
+    await createNotificationController({ document, window, fetcher: apiFetch }).initialize();
 }

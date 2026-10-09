@@ -122,6 +122,7 @@ functions/
     |       +-- refresh_with_gate.js, save_mmr.js
     +-- security/turnstile.js
     +-- supabase/
+        +-- rest.js                /rest/v1 URL builder and bounded same-origin Supabase redirects.
         +-- suggestions.js         Allow-listed website suggestion RPC transport.
         +-- rocketleague/
         |   +-- ensure_player.js, get_latest_mmr.js, get_mmr_progression.js,
@@ -171,7 +172,9 @@ services/ocr
 services/supabase
     Direct persistence boundary for Rocket League profiles/MMR/player discovery and admin
     Taskboard activity, assignment, comments, lifecycle, list/get/create/update,
-    summaries, payloads, and RPCs.
+    summaries, payloads, and RPCs. rest.js retains the configured /rest/v1 base
+    and applies the same-origin, REST-path-bounded redirect policy for the
+    Users, Notifications, and Leaderboard RPC/table callers.
 
 services/supabase/suggestions.js
     Calls only the five website-suggestion RPCs defined by the local-only,

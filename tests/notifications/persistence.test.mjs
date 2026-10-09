@@ -26,7 +26,7 @@ function database() {
         assert.equal(init.headers["Accept-Profile"], "core");
         assert.equal(init.headers.apikey, env.SUPABASE_AUTH);
         assert.equal(init.headers.Authorization, `Bearer ${env.SUPABASE_AUTH}`);
-        assert.equal(init.redirect, "error");
+        assert.equal(init.redirect, "manual");
         const account = url.searchParams.get("account_id")?.replace(/^eq\./, "");
         const dedupe = url.searchParams.get("dedupe_key")?.replace(/^eq\./, "");
         const publicCode = url.searchParams.get("public_code")?.replace(/^eq\./, "");
