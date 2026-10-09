@@ -40,13 +40,16 @@ export function trustedHTMLFromStaticAsset(markup, assetUrl, responseUrl = asset
     const actualUrl = new URL(responseUrl || assetUrl, expectedUrl.origin);
     const actualPath = decodeURIComponent(actualUrl.pathname).toLowerCase();
     const expectedPath = decodeURIComponent(expectedUrl.pathname).toLowerCase();
-    const expectedRedirectPath = expectedPath.slice(0, -".html".length);
+    const expectedRedirectPaths = [expectedPath.slice(0, -".html".length)];
+    if (expectedPath.endsWith("/index.html")) {
+        expectedRedirectPaths.push(expectedPath.slice(0, -"index.html".length));
+    }
     const allowedRoots = ["/Framework/", "/Global/", "/Tabs/", "/Required/", "/ocr/"];
     const isKnownStaticRoot = allowedRoots.some(root => actualPath.startsWith(root.toLowerCase()));
     if (actualUrl.origin !== expectedUrl.origin || !["https:", "http:"].includes(actualUrl.protocol)
         || actualUrl.username || actualUrl.password || actualUrl.hash || !isKnownStaticRoot
         || actualUrl.search !== expectedUrl.search
-        || (actualPath !== expectedPath && actualPath !== expectedRedirectPath)) {
+        || (actualPath !== expectedPath && !expectedRedirectPaths.includes(actualPath))) {
         throw new TypeError("Static HTML response URL is not an approved asset destination.");
     }
     return getPolicy()?.createHTML(markup) ?? markup;

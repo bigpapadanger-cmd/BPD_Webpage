@@ -252,9 +252,11 @@ The report-only Trusted Types findings came from dynamic HTML/script URL
 assignments in the account banner, router, header renderer, and sidebar hover
 loaders. The banner and header now build nodes with DOM APIs. Router and hover
 fragments accept TrustedHTML only when fetched from same-origin static `.html`
-assets; their final URL may be only the exact corresponding path without
-`.html`, because the live edge responds with 308 redirects that strip that
-suffix. All other destinations are rejected. Classic route script URLs are
+assets. A live read-only audit of route fragments and dynamically fetched
+templates found two exact 308 canonical forms: removing `.html` for regular
+filenames, and redirecting `index.html` to its containing directory with a
+trailing slash. The validator permits only those exact forms (preserving the
+origin and query); other destinations are rejected. Classic route script URLs are
 constrained to same-origin `.js` assets. Other app-owned HTML sinks now use
 either these static-asset checks or the escaped-template helper (whose callers
 must escape dynamic text/attributes and validate URLs). Dynamic script URLs are
