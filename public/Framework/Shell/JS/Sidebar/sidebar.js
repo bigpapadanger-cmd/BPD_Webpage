@@ -1,6 +1,7 @@
 "use strict";
 
 import { initializeSidebarIcons } from "./icons.js";
+import { trustedHTMLFromStaticAsset } from "/scripts/trustedDom.js";
 
 /* =========================================================
 BPD GAMING NETWORK
@@ -213,7 +214,7 @@ export async function loadSidebarHover() {
             );
 
         container.innerHTML =
-            hoverHTML;
+            trustedHTMLFromStaticAsset(hoverHTML, response.url || hoverFile);
 
         while (
             container.firstElementChild

@@ -238,6 +238,25 @@ Fetch redirect policy](https://developers.cloudflare.com/workers/runtime-apis/re
 and [Supabase Data REST API](https://supabase.com/docs/guides/api), accessed
 2026-10-09.
 
+## Notification API boundary and Trusted Types follow-up
+
+Keep `core.notification_state` and `core.notification_events` outside the
+Supabase exposed-schema list. The Pages service uses narrowly scoped
+`api.*notification*` RPCs, granted to `service_role` and `postgres` only; the
+prepared migration and rollback are in local operator materials under
+`Notes/supabase/notifications/`. These SQL files are not applied by application
+builds and must be reviewed/applied in Supabase before deploying matching Worker
+changes.
+
+The report-only Trusted Types findings came from dynamic HTML/script URL
+assignments in the account banner, router, header renderer, and sidebar hover
+loaders. The banner and header now build nodes with DOM APIs. Router and hover
+fragments accept TrustedHTML only when fetched from same-origin static `.html`
+assets; classic route script URLs are constrained to same-origin `.js` assets.
+The policy remains report-only while other page modules still contain HTML
+string sinks; do not switch to enforcement until those remaining sinks are
+reviewed and covered.
+
 ## Follow-up: production notification transport error
 
 When a Cloudflare log reports `stage: event_list`, `fetch_type_error`, and no

@@ -166,6 +166,7 @@ public/scripts/
 +-- generate-cache-ids.js     Build-time cache ID generation.
 +-- repopulate_sitemap.js     Sitemap maintenance utility.
 +-- verificationNotice.js    Shared 3-second transient verification/loading copy helper.
++-- trustedDom.js             Same-origin static HTML and JavaScript URL gate for Trusted Types sinks.
 
 ASSETS
 

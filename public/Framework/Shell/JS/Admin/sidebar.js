@@ -1,5 +1,7 @@
 "use strict";
 
+import { trustedHTMLFromStaticAsset } from "/scripts/trustedDom.js";
+
 /* =========================================================
 BPD GAMING NETWORK
 ADMIN SIDEBAR MODULE
@@ -438,7 +440,7 @@ export async function loadAdminSidebarHover() {
             );
 
         container.innerHTML =
-            hoverHTML;
+            trustedHTMLFromStaticAsset(hoverHTML, response.url || hoverFile);
 
         while (
             container.firstElementChild

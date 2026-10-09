@@ -21,34 +21,39 @@ function database() {
     let nextCode = 0;
     const fetcher = async (input, init) => {
         const url = new URL(input);
-        assert.equal(url.pathname, "/rest/v1/notification_state");
-        assert.equal(init.headers["Content-Profile"], "core");
-        assert.equal(init.headers["Accept-Profile"], "core");
+        const rpc = url.pathname.split("/").at(-1);
+        assert.equal(url.pathname, `/rest/v1/rpc/${rpc}`);
+        assert.equal(init.headers["Content-Profile"], "api");
+        assert.equal(init.headers["Accept-Profile"], "api");
         assert.equal(init.headers.apikey, env.SUPABASE_AUTH);
         assert.equal(init.headers.Authorization, `Bearer ${env.SUPABASE_AUTH}`);
         assert.equal(init.redirect, "manual");
-        const account = url.searchParams.get("account_id")?.replace(/^eq\./, "");
-        const dedupe = url.searchParams.get("dedupe_key")?.replace(/^eq\./, "");
-        const publicCode = url.searchParams.get("public_code")?.replace(/^eq\./, "");
-        if (init.method === "POST") {
-            const inputRow = JSON.parse(init.body);
-            const existing = rows.find(row => row.account_id === inputRow.account_id && row.dedupe_key === inputRow.dedupe_key);
-            if (existing) return Response.json([]);
+        const params = JSON.parse(init.body);
+        if (rpc === "reconcile_notification_state") {
+            const existing = rows.find(row => row.account_id === params.p_account_id && row.dedupe_key === params.p_dedupe_key);
+            if (existing) {
+                existing.last_seen_at = params.p_last_seen_at;
+                return Response.json(existing);
+            }
             nextCode++;
             const stamp = new Date().toISOString();
-            const row = { public_code: nextCode === 1 ? PUBLIC_A : PUBLIC_B, account_id: inputRow.account_id,
-                dedupe_key: inputRow.dedupe_key, acknowledged_at: null, suppress_until: null,
+            const row = { public_code: nextCode === 1 ? PUBLIC_A : PUBLIC_B, account_id: params.p_account_id,
+                dedupe_key: params.p_dedupe_key, acknowledged_at: null, suppress_until: null,
                 first_seen_at: stamp, last_seen_at: stamp, updated_at: stamp };
             rows.push(row);
-            return Response.json([row], { status: 201 });
+            row.last_seen_at = params.p_last_seen_at;
+            return Response.json(row);
         }
-        const matching = rows.filter(row => (!account || row.account_id === account)
-            && (!dedupe || row.dedupe_key === dedupe) && (!publicCode || row.public_code === publicCode));
-        if (init.method === "PATCH") {
-            const update = JSON.parse(init.body);
-            for (const row of matching) Object.assign(row, update);
+        if (rpc === "get_notification_state") {
+            return Response.json(rows.find(row => row.account_id === params.p_account_id && row.dedupe_key === params.p_dedupe_key) ?? null);
         }
-        return Response.json(matching);
+        if (rpc === "acknowledge_notification_state") {
+            const row = rows.find(item => item.account_id === params.p_account_id && item.public_code === params.p_public_code);
+            if (row) Object.assign(row, { acknowledged_at: params.p_acknowledged_at, suppress_until: params.p_suppress_until, updated_at: params.p_acknowledged_at });
+            return Response.json(row ?? null);
+        }
+        if (rpc === "list_notification_states") return Response.json(rows.filter(row => row.account_id === params.p_account_id));
+        throw new Error(`Unexpected notification RPC: ${rpc}`);
     };
     return { rows, fetcher };
 }

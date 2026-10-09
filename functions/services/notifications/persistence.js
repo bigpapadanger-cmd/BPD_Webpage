@@ -4,17 +4,13 @@ import { fetchBoundedResponse, withUpstreamDeadline } from "../http/upstream.js"
 import { fetchSupabase, supabaseRestBase, supabaseRestUrl } from "../supabase/rest.js";
 import { dedupeNotificationCandidates } from "./core.js";
 
-const TABLE = "notification_state";
-const EVENT_TABLE = "notification_events";
 const MAX_RESPONSE_BYTES = 32 * 1024;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const DEDUPE_KEY = /^[a-z0-9][a-z0-9:._-]{0,159}$/;
-const COLUMNS = "public_code,account_id,dedupe_key,acknowledged_at,suppress_until,first_seen_at,last_seen_at,updated_at";
-const EVENT_COLUMNS = "account_id,source,event_type,dedupe_key,source_public_code,occurred_at,resolved_at,expires_at";
 const OCR_EVENT_TYPES = new Set(["review_required", "failed", "completed"]);
 const OCR_JOB_ID = /^[A-Z0-9]{16}$/;
 const OCR_PUBLIC_CODE = /^[A-Z0-9]{16}$/;
-const UPSTREAM_CODES = new Set(["42501", "42P01", "42703", "23505", "PGRST116", "PGRST204", "PGRST301",
+const UPSTREAM_CODES = new Set(["42501", "42P01", "42703", "23505", "PGRST106", "PGRST116", "PGRST204", "PGRST205", "PGRST301",
     "UPSTREAM_TIMEOUT", "UPSTREAM_UNAVAILABLE", "UPSTREAM_REDIRECT", "UPSTREAM_RESPONSE_TOO_LARGE", "UPSTREAM_RESPONSE_INVALID"]);
 
 export class NotificationPersistenceError extends Error {
@@ -68,10 +64,6 @@ function normalizeState(value, accountId, dedupeKey = null) {
 function validTimestamp(value) { return typeof value === "string" && Number.isFinite(Date.parse(value)); }
 function nullableTimestamp(value) { return value === null || validTimestamp(value); }
 
-function requestUrl(base, parameters = {}, table = TABLE, columns = COLUMNS) {
-    return supabaseRestUrl(base, table, { select: columns, ...parameters }).toString();
-}
-
 function classifyFetchException(error) {
     const exceptionName = ["TypeError", "AbortError", "DOMException"].includes(error?.name) ? error.name : null;
     if (exceptionName === "AbortError" || exceptionName === "DOMException") return { transportClass: "abort", exceptionName };
@@ -116,27 +108,23 @@ function classifyRedirectTarget(location, requestUrl) {
     return "external_host";
 }
 
-async function callTable(env, url, { method = "GET", body, prefer = null, signal, fetcher = fetch, diagnostics = null, stage }) {
+async function callNotificationRpc(env, rpcName, parameters, { signal, fetcher = fetch, diagnostics = null, stage }) {
     const { base, key } = configuration(env);
     diagnostics?.mark(stage);
     let response;
     try {
-        response = await fetchBoundedResponse(url || requestUrl(base), {
-            method,
-            // Do not auto-follow: Supabase auth headers must never be sent
-            // to a redirect destination. Inspect and reject redirects below.
-            redirect: "manual",
+        response = await fetchBoundedResponse(supabaseRestUrl(base, `rpc/${rpcName}`), {
+            method: "POST", redirect: "manual",
             signal,
             headers: {
                 apikey: key,
                 Authorization: `Bearer ${key}`,
                 Accept: "application/json",
                 "Content-Type": "application/json",
-                "Accept-Profile": "core",
-                "Content-Profile": "core",
-                ...(prefer ? { Prefer: prefer } : {})
+                "Accept-Profile": "api",
+                "Content-Profile": "api"
             },
-            ...(body === undefined ? {} : { body: JSON.stringify(body) })
+            body: JSON.stringify(parameters)
         }, MAX_RESPONSE_BYTES, async (input, init) => {
             let upstream;
             try { upstream = await fetchSupabase(input, init, fetcher); }
@@ -156,7 +144,7 @@ async function callTable(env, url, { method = "GET", body, prefer = null, signal
         fail();
     }
     if (response.status >= 300 && response.status <= 399) {
-        diagnostics?.redirectRejected(response.status, classifyRedirectTarget(response.headers.get("Location"), url || requestUrl(configuration(env).base)));
+        diagnostics?.redirectRejected(response.status, classifyRedirectTarget(response.headers.get("Location"), supabaseRestUrl(base, `rpc/${rpcName}`)));
         fail("UPSTREAM_REDIRECT");
     }
     diagnostics?.mark(`${stage}_decode`);
@@ -194,10 +182,10 @@ async function bounded(env, diagnostics, callback) {
 export async function getNotificationState(env, accountId, dedupeKey, fetcher = fetch, diagnostics = null) {
     validateIdentity(accountId, dedupeKey);
     return bounded(env, diagnostics, async signal => {
-        const url = requestUrl(configuration(env).base, { account_id: `eq.${accountId}`, dedupe_key: `eq.${dedupeKey}`, limit: "2" });
-        const rows = await callTable(env, url, { signal, fetcher, diagnostics, stage: "state_lookup" });
-        if (!Array.isArray(rows) || rows.length > 1) fail("NOTIFICATIONS_DATA_INVALID");
-        return rows.length ? normalizeState(rows[0], accountId, dedupeKey) : null;
+        const row = await callNotificationRpc(env, "get_notification_state", {
+            p_account_id: accountId, p_dedupe_key: dedupeKey
+        }, { signal, fetcher, diagnostics, stage: "state_lookup" });
+        return row === null ? null : normalizeState(row, accountId, dedupeKey);
     });
 }
 
@@ -205,29 +193,10 @@ export async function reconcileNotificationState(env, accountId, dedupeKey, fetc
     validateIdentity(accountId, dedupeKey);
     const timestamp = now instanceof Date ? now.toISOString() : new Date(now).toISOString();
     return bounded(env, diagnostics, async signal => {
-        const base = configuration(env).base;
-        const insertUrl = requestUrl(base, { on_conflict: "account_id,dedupe_key" });
-        const inserted = await callTable(env, insertUrl, {
-            method: "POST", body: { account_id: accountId, dedupe_key: dedupeKey },
-            prefer: "resolution=ignore-duplicates,return=representation", signal, fetcher, diagnostics, stage: "state_reconcile"
-        });
-        if (!Array.isArray(inserted) || inserted.length > 1) fail("NOTIFICATIONS_DATA_INVALID");
-
-        let state = inserted.length ? normalizeState(inserted[0], accountId, dedupeKey) : null;
-        if (!state) {
-            const lookupUrl = requestUrl(base, { account_id: `eq.${accountId}`, dedupe_key: `eq.${dedupeKey}`, limit: "2" });
-            const rows = await callTable(env, lookupUrl, { signal, fetcher, diagnostics, stage: "state_lookup" });
-            if (!Array.isArray(rows) || rows.length !== 1) fail("NOTIFICATIONS_DATA_INVALID");
-            state = normalizeState(rows[0], accountId, dedupeKey);
-        }
-
-        const updateUrl = requestUrl(base, { account_id: `eq.${accountId}`, dedupe_key: `eq.${dedupeKey}` });
-        const updated = await callTable(env, updateUrl, {
-            method: "PATCH", body: { last_seen_at: timestamp }, prefer: "return=representation",
-            signal, fetcher, diagnostics, stage: "state_last_seen"
-        });
-        if (!Array.isArray(updated) || updated.length !== 1) fail("NOTIFICATIONS_DATA_INVALID");
-        return normalizeState(updated[0], accountId, dedupeKey);
+        const state = await callNotificationRpc(env, "reconcile_notification_state", {
+            p_account_id: accountId, p_dedupe_key: dedupeKey, p_last_seen_at: timestamp
+        }, { signal, fetcher, diagnostics, stage: "state_reconcile" });
+        return normalizeState(state, accountId, dedupeKey);
     });
 }
 
@@ -238,23 +207,20 @@ export async function acknowledgeNotificationState(env, accountId, publicCode, f
     const acknowledgedAt = new Date(instant).toISOString();
     const suppressUntil = new Date(instant + 60 * 60 * 1000).toISOString();
     return bounded(env, diagnostics, async signal => {
-        const url = requestUrl(configuration(env).base, { account_id: `eq.${accountId}`, public_code: `eq.${publicCode}` });
-        const rows = await callTable(env, url, {
-            method: "PATCH", body: { acknowledged_at: acknowledgedAt, suppress_until: suppressUntil, updated_at: acknowledgedAt },
-            prefer: "return=representation", signal, fetcher, diagnostics, stage: "state_acknowledge"
-        });
-        if (!Array.isArray(rows)) fail("NOTIFICATIONS_DATA_INVALID");
-        if (rows.length === 0) return null;
-        if (rows.length !== 1) fail("NOTIFICATIONS_DATA_INVALID");
-        return normalizeState(rows[0], accountId);
+        const row = await callNotificationRpc(env, "acknowledge_notification_state", {
+            p_account_id: accountId, p_public_code: publicCode,
+            p_acknowledged_at: acknowledgedAt, p_suppress_until: suppressUntil
+        }, { signal, fetcher, diagnostics, stage: "state_acknowledge" });
+        return row === null ? null : normalizeState(row, accountId);
     });
 }
 
 export async function listNotificationStates(env, accountId, fetcher = fetch, diagnostics = null) {
     validateIdentity(accountId);
     return bounded(env, diagnostics, async signal => {
-        const url = requestUrl(configuration(env).base, { account_id: `eq.${accountId}`, order: "last_seen_at.desc", limit: "100" });
-        const rows = await callTable(env, url, { signal, fetcher, diagnostics, stage: "state_list" });
+        const rows = await callNotificationRpc(env, "list_notification_states", {
+            p_account_id: accountId
+        }, { signal, fetcher, diagnostics, stage: "state_list" });
         if (!Array.isArray(rows) || rows.length > 100) fail("NOTIFICATIONS_DATA_INVALID");
         return rows.map(row => normalizeState(row, accountId));
     });
@@ -299,30 +265,20 @@ export async function emitOcrNotificationEvent(env, { accountId, jobId, eventTyp
     const dedupeKey = await createOcrDedupeKey(jobId, eventType, env?.OCR_OWNER_SECRET);
     const expiresAt = eventType === "review_required" ? null : new Date(Date.parse(timestamp) + 30 * 24 * 60 * 60 * 1000).toISOString();
     return bounded(env, diagnostics, async signal => {
-        const url = requestUrl(configuration(env).base, { on_conflict: "account_id,source,event_type,dedupe_key" }, EVENT_TABLE, EVENT_COLUMNS);
-        const rows = await callTable(env, url, {
-            method: "POST",
-            body: { account_id: accountId, source: "ocr", event_type: eventType, dedupe_key: dedupeKey,
-                source_public_code: sourcePublicCode, occurred_at: timestamp, resolved_at: null, expires_at: expiresAt },
-            prefer: "resolution=ignore-duplicates,return=representation", signal, fetcher, diagnostics, stage: "event_insert"
-        });
-        if (!Array.isArray(rows) || rows.length > 1) fail("NOTIFICATIONS_DATA_INVALID");
-        if (rows.length === 1) return normalizeOcrEvent(rows[0], accountId);
-        const lookup = requestUrl(configuration(env).base, { account_id: `eq.${accountId}`, source: "eq.ocr", event_type: `eq.${eventType}`,
-            dedupe_key: `eq.${dedupeKey}`, limit: "2" }, EVENT_TABLE, EVENT_COLUMNS);
-        const existing = await callTable(env, lookup, { signal, fetcher, diagnostics, stage: "event_lookup" });
-        if (!Array.isArray(existing) || existing.length !== 1) fail("NOTIFICATIONS_DATA_INVALID");
-        return normalizeOcrEvent(existing[0], accountId);
+        const row = await callNotificationRpc(env, "emit_ocr_notification_event", {
+            p_account_id: accountId, p_event_type: eventType, p_dedupe_key: dedupeKey,
+            p_source_public_code: sourcePublicCode, p_occurred_at: timestamp, p_expires_at: expiresAt
+        }, { signal, fetcher, diagnostics, stage: "event_insert" });
+        return normalizeOcrEvent(row, accountId);
     });
 }
 
 export async function listOcrNotificationEvents(env, accountId, fetcher = fetch, diagnostics = null) {
     validateIdentity(accountId);
     return bounded(env, diagnostics, async signal => {
-        const url = requestUrl(configuration(env).base, {
-            account_id: `eq.${accountId}`, source: "eq.ocr", order: "occurred_at.desc", limit: "100"
-        }, EVENT_TABLE, EVENT_COLUMNS);
-        const rows = await callTable(env, url, { signal, fetcher, diagnostics, stage: "event_list" });
+        const rows = await callNotificationRpc(env, "list_ocr_notification_events", {
+            p_account_id: accountId
+        }, { signal, fetcher, diagnostics, stage: "event_list" });
         if (!Array.isArray(rows) || rows.length > 100) fail("NOTIFICATIONS_DATA_INVALID");
         return rows.map(row => normalizeOcrEvent(row, accountId));
     });
@@ -334,12 +290,10 @@ export async function resolveOcrReviewEvent(env, { accountId, jobId, occurredAt 
     const timestamp = occurredAt instanceof Date ? occurredAt.toISOString() : new Date(occurredAt).toISOString();
     if (!validTimestamp(timestamp)) fail("NOTIFICATIONS_DATA_INVALID");
     return bounded(env, diagnostics, async signal => {
-        const url = requestUrl(configuration(env).base, { account_id: `eq.${accountId}`, source: "eq.ocr",
-            event_type: "eq.review_required", dedupe_key: `eq.${dedupeKey}` }, EVENT_TABLE, EVENT_COLUMNS);
-        const rows = await callTable(env, url, { method: "PATCH", body: { resolved_at: timestamp }, prefer: "return=representation",
-            signal, fetcher, diagnostics, stage: "event_resolve" });
-        if (!Array.isArray(rows) || rows.length > 1) fail("NOTIFICATIONS_DATA_INVALID");
-        return rows.length ? normalizeOcrEvent(rows[0], accountId) : null;
+        const row = await callNotificationRpc(env, "resolve_ocr_review_event", {
+            p_account_id: accountId, p_dedupe_key: dedupeKey, p_resolved_at: timestamp
+        }, { signal, fetcher, diagnostics, stage: "event_resolve" });
+        return row === null ? null : normalizeOcrEvent(row, accountId);
     });
 }
 

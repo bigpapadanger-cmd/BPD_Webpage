@@ -43,24 +43,21 @@ test("retrying a logical legacy failure with the same key inserts one durable ev
     globalThis.fetch = async (input, init) => {
         const url = new URL(input);
         writes.push({ method: init.method, url, body: init.body ? JSON.parse(init.body) : null });
-        if (init.method === "POST") {
-            if (!row) {
-                row = { account_id: ACCOUNT_ID, source: "ocr", event_type: "failed", dedupe_key: JSON.parse(init.body).dedupe_key,
-                    source_public_code: null, occurred_at: "2026-10-08T00:00:00.000Z", resolved_at: null, expires_at: "2026-11-07T00:00:00.000Z" };
-                return Response.json([row], { status: 201 });
-            }
-            return Response.json([], { status: 201 });
+        assert.equal(url.pathname, "/rest/v1/rpc/emit_ocr_notification_event");
+        assert.equal(init.headers["Content-Profile"], "api");
+        if (!row) {
+            row = { account_id: ACCOUNT_ID, source: "ocr", event_type: "failed", dedupe_key: init.body && JSON.parse(init.body).p_dedupe_key,
+                source_public_code: null, occurred_at: "2026-10-08T00:00:00.000Z", resolved_at: null, expires_at: "2026-11-07T00:00:00.000Z" };
         }
-        return Response.json([row]);
+        return Response.json(row);
     };
     try {
         const first = await emitOcrNotificationEvent(env, { accountId: ACCOUNT_ID, jobId, eventType: "failed" });
         const replay = await emitOcrNotificationEvent(env, { accountId: ACCOUNT_ID, jobId, eventType: "failed" });
         assert.equal(first.dedupeKey, replay.dedupeKey);
-        assert.equal(writes.filter(write => write.method === "POST").length, 2);
-        assert.equal(writes.filter(write => write.method === "GET").length, 1);
-        assert.equal(writes[0].body.account_id, ACCOUNT_ID);
-        assert.equal(writes[0].body.event_type, "failed");
+        assert.equal(writes.length, 2);
+        assert.equal(writes[0].body.p_account_id, ACCOUNT_ID);
+        assert.equal(writes[0].body.p_event_type, "failed");
     } finally {
         globalThis.fetch = originalFetch;
     }

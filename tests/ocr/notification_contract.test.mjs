@@ -31,16 +31,17 @@ test("internal OCR processing validates queue owner against stored HMAC and retr
     const previousFetch = globalThis.fetch;
     globalThis.fetch = async (url, init) => {
         writes.push({ url: new URL(url), init });
-        return Response.json([{ account_id: ACCOUNT_ID, source: "ocr", event_type: "review_required",
-            dedupe_key: JSON.parse(init.body).dedupe_key, source_public_code: JOB_ID,
-            occurred_at: status.completedAt, resolved_at: null, expires_at: null }]);
+        const params = JSON.parse(init.body);
+        return Response.json({ account_id: ACCOUNT_ID, source: "ocr", event_type: "review_required",
+            dedupe_key: params.p_dedupe_key, source_public_code: JOB_ID,
+            occurred_at: params.p_occurred_at, resolved_at: null, expires_at: params.p_expires_at });
     };
     try {
         const response = await onRequestPost({ request: validRequest, env });
         assert.equal(response.status, 200);
         assert.equal(writes.length, 1);
-        assert.equal(writes[0].url.pathname, "/rest/v1/notification_events");
-        assert.equal(JSON.parse(writes[0].init.body).account_id, ACCOUNT_ID);
+        assert.equal(writes[0].url.pathname, "/rest/v1/rpc/emit_ocr_notification_event");
+        assert.equal(JSON.parse(writes[0].init.body).p_account_id, ACCOUNT_ID);
     } finally { globalThis.fetch = previousFetch; }
 });
 

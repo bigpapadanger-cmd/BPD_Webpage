@@ -65,59 +65,47 @@ export function renderHeader({
             window.location.pathname
         );
 
-    const navigation =
-        tabs.length > 0
-            ? `
-                <nav
-                    class="header-navigation"
-                    aria-label="${title} navigation"
-                >
-                    ${tabs
-                        .map(
-                            tab => {
-                                const tabPath =
-                                    normalizePath(
-                                        tab.href
-                                    );
+    const headerContent = document.createElement("div");
+    headerContent.className = "header-content";
+    const headerBox = document.createElement("div");
+    headerBox.className = "header-box";
+    const titleRow = document.createElement("div");
+    titleRow.className = "header-title-row";
+    const titleContent = document.createElement("div");
+    titleContent.className = "header-title-content";
+    const eyebrowElement = document.createElement("span");
+    eyebrowElement.className = "header-eyebrow";
+    eyebrowElement.textContent = String(eyebrow);
+    const titleElement = document.createElement("p");
+    titleElement.className = "header-title";
+    titleElement.textContent = String(title);
+    titleContent.append(eyebrowElement, titleElement);
+    titleRow.append(titleContent);
+    headerBox.append(titleRow);
 
-                                const isActive =
-                                    currentPath ===
-                                    tabPath;
+    if (Array.isArray(tabs) && tabs.length > 0) {
+        const navigation = document.createElement("nav");
+        navigation.className = "header-navigation";
+        navigation.setAttribute("aria-label", `${String(title)} navigation`);
+        for (const tab of tabs) {
+            if (!tab || typeof tab.href !== "string") continue;
+            let tabUrl;
+            try { tabUrl = new URL(tab.href, window.location.origin); }
+            catch { continue; }
+            if (tabUrl.origin !== window.location.origin || !["https:", "http:"].includes(tabUrl.protocol)) continue;
 
-                                return `
-                                    <a
-                                        href="${tab.href}"
-                                        class="header-tab${isActive ? " active" : ""}"
-                                        ${isActive ? 'aria-current="page"' : ""}
-                                        data-router-link
-                                    >
-                                        ${tab.label}
-                                    </a>
-                                `;
-                            }
-                        )
-                        .join("")}
-                </nav>
-            `
-            : "";
+            const isActive = currentPath === normalizePath(tabUrl.pathname);
+            const link = document.createElement("a");
+            link.href = `${tabUrl.pathname}${tabUrl.search}${tabUrl.hash}`;
+            link.className = `header-tab${isActive ? " active" : ""}`;
+            if (isActive) link.setAttribute("aria-current", "page");
+            link.dataset.routerLink = "";
+            link.textContent = String(tab.label ?? "");
+            navigation.append(link);
+        }
+        if (navigation.childElementCount > 0) headerBox.append(navigation);
+    }
 
-    header.innerHTML = `
-        <div class="header-content">
-            <div class="header-box">
-                <div class="header-title-row">
-                    <div class="header-title-content">
-                        <span class="header-eyebrow">
-                            ${eyebrow}
-                        </span>
-
-                        <p class="header-title">
-                            ${title}
-                        </p>
-                    </div>
-                </div>
-
-                ${navigation}
-            </div>
-        </div>
-    `;
+    headerContent.append(headerBox);
+    header.replaceChildren(headerContent);
 }

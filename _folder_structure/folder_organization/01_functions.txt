@@ -66,7 +66,7 @@ functions/
 |
 +-- services/
     +-- notifications/core.js (normalized candidate contract, safe action identifiers, deduplication and acknowledgment rules)
-    +-- notifications/persistence.js (server-only notification_state adapter and verified core.notification_events OCR writer/reader/resolver)
+    +-- notifications/persistence.js (server-only adapter to allowlisted api notification RPCs; core tables remain private)
     +-- notifications/http.js (no-store responses, request diagnostics and same-origin mutation checks)
     +-- notifications/producers.js (condition-derived candidates plus safe OCR event-to-notification mapping)
     +-- rl/custom_matches/contracts.js, service.js, http.js, runtime_client.js (fixed Custom Match contracts, authorization, and private runtime client)
@@ -179,6 +179,10 @@ services/supabase
 services/supabase/suggestions.js
     Calls only the five website-suggestion RPCs defined by the local-only,
     operator-prepared Supabase contract under Notes/supabase/suggestions/.
+
+Notes/supabase/notifications/
+    Prepared migration/rollback for service-role-only api notification RPCs;
+    operator-applied, never executed by application builds.
 
 services/faq/service.js
     Published FAQ projection, authenticated question submission, and BPD User

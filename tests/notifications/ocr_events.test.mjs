@@ -19,27 +19,33 @@ function database() {
     const rows = [];
     const fetcher = async (input, init) => {
         const url = new URL(input);
-        assert.equal(url.pathname, "/rest/v1/notification_events");
-        assert.equal(init.headers["Content-Profile"], "core");
+        const rpc = url.pathname.split("/").at(-1);
+        assert.equal(url.pathname, `/rest/v1/rpc/${rpc}`);
+        assert.equal(init.headers["Content-Profile"], "api");
         assert.equal(init.headers.apikey, env.SUPABASE_AUTH);
-        assert.equal(init.redirect, "error");
-        const params = url.searchParams;
-        const account = params.get("account_id")?.replace(/^eq\./, "");
-        const source = params.get("source")?.replace(/^eq\./, "");
-        const eventType = params.get("event_type")?.replace(/^eq\./, "");
-        const dedupeKey = params.get("dedupe_key")?.replace(/^eq\./, "");
-        const selected = rows.filter(row => (!account || row.account_id === account) && (!source || row.source === source)
-            && (!eventType || row.event_type === eventType) && (!dedupeKey || row.dedupe_key === dedupeKey));
-        if (init.method === "POST") {
-            const inputRow = JSON.parse(init.body);
-            const exists = rows.some(row => row.account_id === inputRow.account_id && row.source === inputRow.source
-                && row.event_type === inputRow.event_type && row.dedupe_key === inputRow.dedupe_key);
-            if (exists) return Response.json([]);
-            rows.push(inputRow);
-            return Response.json([inputRow], { status: 201 });
+        assert.equal(init.headers["Accept-Profile"], "api");
+        assert.equal(init.redirect, "manual");
+        const params = JSON.parse(init.body);
+        if (rpc === "emit_ocr_notification_event") {
+            let row = rows.find(item => item.account_id === params.p_account_id && item.source === "ocr"
+                && item.event_type === params.p_event_type && item.dedupe_key === params.p_dedupe_key);
+            if (row) return Response.json(row);
+            row = { account_id: params.p_account_id, source: "ocr", event_type: params.p_event_type,
+                dedupe_key: params.p_dedupe_key, source_public_code: params.p_source_public_code,
+                occurred_at: params.p_occurred_at, resolved_at: null, expires_at: params.p_expires_at };
+            rows.push(row);
+            return Response.json(row);
         }
-        if (init.method === "PATCH") for (const row of selected) Object.assign(row, JSON.parse(init.body));
-        return Response.json(selected);
+        if (rpc === "list_ocr_notification_events") {
+            return Response.json(rows.filter(row => row.account_id === params.p_account_id && row.source === "ocr"));
+        }
+        if (rpc === "resolve_ocr_review_event") {
+            const row = rows.find(item => item.account_id === params.p_account_id && item.source === "ocr"
+                && item.event_type === "review_required" && item.dedupe_key === params.p_dedupe_key);
+            if (row) row.resolved_at = params.p_resolved_at;
+            return Response.json(row ?? null);
+        }
+        throw new Error(`Unexpected notification RPC: ${rpc}`);
     };
     return { rows, fetcher };
 }

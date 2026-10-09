@@ -1083,9 +1083,17 @@ async function fetchHTML(
         return "";
     }
 
+    let assetUrl;
+    try {
+        assetUrl = new URL(file, window.location.origin);
+        if (assetUrl.origin !== window.location.origin || !assetUrl.pathname.toLowerCase().endsWith(".html")) throw new Error();
+    } catch {
+        throw new Error(label + " URL is not an approved local HTML asset.");
+    }
+
     const response =
         await fetch(
-            file,
+            assetUrl.href,
             {
                 method:
                     "GET",
@@ -1113,7 +1121,9 @@ async function fetchHTML(
         );
     }
 
-    return response.text();
+    const markup = await response.text();
+    const { trustedHTMLFromStaticAsset } = await import("/scripts/trustedDom.js");
+    return trustedHTMLFromStaticAsset(markup, response.url || assetUrl.href);
 }
 
 /* =========================================================
@@ -1181,51 +1191,26 @@ function loadRouteScript(
                     "script"
                 );
 
-            script.src =
-                src;
-
-            script.async =
-                false;
-
-            script.dataset.loadedRouteScript =
-                src;
-
-            script.addEventListener(
-                "load",
-                function() {
+            import("/scripts/trustedDom.js")
+                .then(({ trustedScriptURLFromLocalAsset }) => {
+                    script.src = trustedScriptURLFromLocalAsset(src);
+                    script.async = false;
+                    script.dataset.loadedRouteScript = src;
+                    script.addEventListener("load", function() {
+                        placeholder.remove();
+                        resolve();
+                    }, { once: true });
+                    script.addEventListener("error", function() {
+                        script.remove();
+                        placeholder.remove();
+                        reject(new Error("Failed to load route script."));
+                    }, { once: true });
+                    document.head.appendChild(script);
+                })
+                .catch(error => {
                     placeholder.remove();
-
-                    resolve();
-                },
-                {
-                    once:
-                        true
-                }
-            );
-
-            script.addEventListener(
-                "error",
-                function() {
-                    script.remove();
-
-                    placeholder.remove();
-
-                    reject(
-                        new Error(
-                            "Failed to load route script: "
-                            + src
-                        )
-                    );
-                },
-                {
-                    once:
-                        true
-                }
-            );
-
-            document.head.appendChild(
-                script
-            );
+                    reject(error);
+                });
         }
     );
 }
@@ -1662,8 +1647,7 @@ function setHeaderVisibility(
     if (
         !showHeader
     ) {
-        headerElement.innerHTML =
-            "";
+        headerElement.replaceChildren();
     }
 }
 
@@ -2003,8 +1987,8 @@ function injectRouteFragments(
         elements.header
         && showHeader
     ) {
-        elements.header.innerHTML =
-            fragments.headerHTML;
+        if (fragments.headerHTML) elements.header.innerHTML = fragments.headerHTML;
+        else elements.header.replaceChildren();
         // Whitespace-only navigation must not allocate a padded empty row.
         for (const navigation of elements.header.querySelectorAll(".header-navigation")) {
             if (navigation.childElementCount === 0) navigation.remove();
@@ -2014,15 +1998,15 @@ function injectRouteFragments(
     if (
         elements.sidebar
     ) {
-        elements.sidebar.innerHTML =
-            fragments.sidebarHTML;
+        if (fragments.sidebarHTML) elements.sidebar.innerHTML = fragments.sidebarHTML;
+        else elements.sidebar.replaceChildren();
     }
 
     if (
         elements.content
     ) {
-        elements.content.innerHTML =
-            fragments.pageHTML;
+        if (fragments.pageHTML) elements.content.innerHTML = fragments.pageHTML;
+        else elements.content.replaceChildren();
         // The persistent shell owns the single main landmark. Route fragments
         // retain their labels, classes and IDs as sections inside that landmark.
         for (const nestedMain of elements.content.querySelectorAll("main")) {
@@ -2036,8 +2020,8 @@ function injectRouteFragments(
     if (
         elements.footer
     ) {
-        elements.footer.innerHTML =
-            fragments.footerHTML;
+        if (fragments.footerHTML) elements.footer.innerHTML = fragments.footerHTML;
+        else elements.footer.replaceChildren();
     }
 }
 
@@ -2057,24 +2041,18 @@ function renderRouteLoadError() {
         return;
     }
 
-    contentElement.innerHTML = `
-        <section class="route-load-error">
-            <h1>
-                Unable to load this page
-            </h1>
-
-            <p>
-                Please refresh the page or return to the main menu.
-            </p>
-
-            <a
-                href="/"
-                data-router-link
-            >
-                Main Menu
-            </a>
-        </section>
-    `;
+    const section = document.createElement("section");
+    section.className = "route-load-error";
+    const heading = document.createElement("h1");
+    heading.textContent = "Unable to load this page";
+    const message = document.createElement("p");
+    message.textContent = "Please refresh the page or return to the main menu.";
+    const link = document.createElement("a");
+    link.href = "/";
+    link.dataset.routerLink = "";
+    link.textContent = "Main Menu";
+    section.append(heading, message, link);
+    contentElement.replaceChildren(section);
 }
 
 /* =========================================================

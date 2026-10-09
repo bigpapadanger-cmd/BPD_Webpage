@@ -77,35 +77,6 @@ const FALLBACK_IMAGE_URL =
 LOCAL BANNER MARKUP
 ========================================================= */
 
-const BANNER_MARKUP = `
-    <div
-        class="bpd-account-banner__inner"
-        data-account-banner-state="loading"
-    >
-        <div class="bpd-account-banner__brand">
-            <span class="bpd-account-banner__network">
-                BPD Gaming Network
-            </span>
-        </div>
-
-        <div
-            class="bpd-account-banner__status"
-            id="accountBannerStatus"
-            aria-live="polite"
-        >
-            <span class="bpd-account-banner__message">
-                Loading account...
-            </span>
-        </div>
-
-        <div
-            class="bpd-account-banner__actions"
-            id="accountBannerActions"
-        >
-        </div>
-    </div>
-`;
-
 /* =========================================================
 PROVIDER CONFIGURATION
 ========================================================= */
@@ -278,8 +249,31 @@ function ensureBannerMarkup() {
         return root;
     }
 
-    root.innerHTML =
-        BANNER_MARKUP;
+    const inner = document.createElement("div");
+    inner.className = "bpd-account-banner__inner";
+    inner.dataset.accountBannerState = "loading";
+
+    const brand = document.createElement("div");
+    brand.className = "bpd-account-banner__brand";
+    const network = document.createElement("span");
+    network.className = "bpd-account-banner__network";
+    network.textContent = "BPD Gaming Network";
+    brand.append(network);
+
+    const status = document.createElement("div");
+    status.className = "bpd-account-banner__status";
+    status.id = "accountBannerStatus";
+    status.setAttribute("aria-live", "polite");
+    const message = document.createElement("span");
+    message.className = "bpd-account-banner__message";
+    message.textContent = "Loading account...";
+    status.append(message);
+
+    const actions = document.createElement("div");
+    actions.className = "bpd-account-banner__actions";
+    actions.id = "accountBannerActions";
+    inner.append(brand, status, actions);
+    root.replaceChildren(inner);
 
     return root;
 }
@@ -757,11 +751,8 @@ function renderLoading() {
         return;
     }
 
-    status.innerHTML =
-        "";
-
-    actions.innerHTML =
-        "";
+    status.replaceChildren();
+    actions.replaceChildren();
 
     const message =
         document.createElement(
@@ -806,11 +797,8 @@ function renderSignedOut() {
         return;
     }
 
-    status.innerHTML =
-        "";
-
-    actions.innerHTML =
-        "";
+    status.replaceChildren();
+    actions.replaceChildren();
 
     const message =
         document.createElement(
@@ -859,11 +847,8 @@ function renderSignedIn(
         return;
     }
 
-    status.innerHTML =
-        "";
-
-    actions.innerHTML =
-        "";
+    status.replaceChildren();
+    actions.replaceChildren();
 
     const username =
         document.createElement(
@@ -947,11 +932,8 @@ function renderOffline() {
         return;
     }
 
-    status.innerHTML =
-        "";
-
-    actions.innerHTML =
-        "";
+    status.replaceChildren();
+    actions.replaceChildren();
 
     const message =
         document.createElement(
@@ -991,11 +973,8 @@ function renderUnavailable() {
         return;
     }
 
-    status.innerHTML =
-        "";
-
-    actions.innerHTML =
-        "";
+    status.replaceChildren();
+    actions.replaceChildren();
 
     const message =
         document.createElement(
@@ -1346,11 +1325,8 @@ function renderWaitingForConnection() {
         return;
     }
 
-    status.innerHTML =
-        "";
-
-    actions.innerHTML =
-        "";
+    status.replaceChildren();
+    actions.replaceChildren();
 
     const message =
         document.createElement(

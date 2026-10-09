@@ -39,34 +39,36 @@ function inMemoryFetch(rows = [], { tableFailure = false,
         if (url.pathname.endsWith("/get_account_enforcement_state")) return enforcementResponse || Response.json(enforcementResult);
         if (url.pathname.endsWith("/get_rocketleague_profile_v2")) return Response.json(profile);
         if (url.pathname.endsWith("/verify_account_provider_identity")) return Response.json(identity);
-        if (url.pathname === "/rest/v1/notification_events") {
-            const account = url.searchParams.get("account_id")?.replace(/^eq\./, "");
-            return Response.json(eventRows.filter(row => row.account_id === account));
+        const rpc = url.pathname.split("/").at(-1);
+        if (!rpc || !["get_notification_state", "reconcile_notification_state", "acknowledge_notification_state",
+            "list_notification_states", "list_ocr_notification_events"].includes(rpc)) {
+            throw new Error(`Unexpected upstream path: ${url.pathname}`);
         }
-        if (url.pathname !== "/rest/v1/notification_state") throw new Error(`Unexpected upstream path: ${url.pathname}`);
-        writes.push({ url, init });
+        const params = JSON.parse(init.body);
+        if (rpc === "list_ocr_notification_events") return Response.json(eventRows.filter(row => row.account_id === params.p_account_id));
         if (tableFailure) return new Response(JSON.stringify({ code: SECRET, message: SECRET }), { status: 500 });
-        if (init.method === "POST") {
-            const value = JSON.parse(init.body);
-            let row = rows.find(item => item.account_id === value.account_id && item.dedupe_key === value.dedupe_key);
+        if (rpc === "reconcile_notification_state") {
+            writes.push({ rpc, url, init, params });
+            let row = rows.find(item => item.account_id === params.p_account_id && item.dedupe_key === params.p_dedupe_key);
             if (!row) {
-                row = { public_code: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", account_id: value.account_id,
-                    dedupe_key: value.dedupe_key, acknowledged_at: null, suppress_until: null,
+                row = { public_code: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", account_id: params.p_account_id,
+                    dedupe_key: params.p_dedupe_key, acknowledged_at: null, suppress_until: null,
                     first_seen_at: new Date().toISOString(), last_seen_at: new Date().toISOString(), updated_at: new Date().toISOString() };
                 rows.push(row);
-                return Response.json([row]);
             }
-            return Response.json([]);
+            row.last_seen_at = params.p_last_seen_at;
+            return Response.json(row);
         }
-        const account = url.searchParams.get("account_id")?.replace(/^eq\./, "");
-        const code = url.searchParams.get("public_code")?.replace(/^eq\./, "");
-        const dedupe = url.searchParams.get("dedupe_key")?.replace(/^eq\./, "");
-        const matching = rows.filter(row => row.account_id === account && (code ? row.public_code === code : true)
-            && (dedupe ? row.dedupe_key === dedupe : true));
-        if (init.method === "PATCH") {
-            for (const row of matching) Object.assign(row, JSON.parse(init.body));
+        if (rpc === "get_notification_state") {
+            return Response.json(rows.find(item => item.account_id === params.p_account_id && item.dedupe_key === params.p_dedupe_key) ?? null);
         }
-        return Response.json(matching);
+        if (rpc === "acknowledge_notification_state") {
+            writes.push({ rpc, url, init, params });
+            const row = rows.find(item => item.account_id === params.p_account_id && item.public_code === params.p_public_code);
+            if (row) Object.assign(row, { acknowledged_at: params.p_acknowledged_at, suppress_until: params.p_suppress_until, updated_at: params.p_acknowledged_at });
+            return Response.json(row ?? null);
+        }
+        if (rpc === "list_notification_states") return Response.json(rows.filter(item => item.account_id === params.p_account_id));
     };
     return { fetcher, writes, rpcCalls };
 }
@@ -102,7 +104,7 @@ test("authenticated GET derives identity from session, emits only condition noti
     assert.equal(body.notifications[0].reviewAction, "profile.complete");
     assert.equal(body.notifications[0].publicCode, "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb");
     assert.doesNotMatch(JSON.stringify(body), new RegExp(`${ACCOUNT_A}|profile:incomplete`));
-    assert.ok(writes.some(write => write.init.method === "POST"), "condition state is reconciled through notification_state");
+    assert.ok(writes.some(write => write.rpc === "reconcile_notification_state"), "condition state is reconciled through the api RPC");
 });
 
 test("authenticated GET maps durable OCR review events to a safe owner-checked job handoff", async () => {
@@ -268,9 +270,9 @@ test("acknowledgement ignores browser account targeting and scopes update to ses
     assert.deepEqual(body, { success: true, acknowledged: true });
     assert.equal(response.headers.get("Cache-Control"), "no-store, max-age=0");
     assert.equal(writes.length, 1);
-    assert.equal(writes[0].url.searchParams.get("account_id"), `eq.${ACCOUNT_A}`);
-    assert.equal(writes[0].url.searchParams.get("public_code"), `eq.${PUBLIC_CODE}`);
-    assert.equal(JSON.parse(writes[0].init.body).acknowledged_at, JSON.parse(writes[0].init.body).updated_at);
+    assert.equal(writes[0].rpc, "acknowledge_notification_state");
+    assert.equal(writes[0].params.p_account_id, ACCOUNT_A);
+    assert.equal(writes[0].params.p_public_code, PUBLIC_CODE);
     assert.equal(Date.parse(row.suppress_until) - Date.parse(row.acknowledged_at), 60 * 60 * 1000);
     assert.doesNotMatch(JSON.stringify(body), new RegExp(`${ACCOUNT_A}|${ACCOUNT_B}|${SECRET}`));
 });
@@ -286,7 +288,7 @@ test("public code owned by another account returns not found without revealing o
     }));
     assert.equal(response.status, 404);
     assert.deepEqual(await response.json(), { success: false, error: "NOTIFICATION_NOT_FOUND" });
-    assert.equal(writes[0].url.searchParams.get("account_id"), `eq.${ACCOUNT_B}`);
+    assert.equal(writes[0].params.p_account_id, ACCOUNT_B);
     assert.equal(row.acknowledged_at, null);
 });
 
