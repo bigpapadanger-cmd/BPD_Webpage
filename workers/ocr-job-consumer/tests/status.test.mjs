@@ -36,3 +36,11 @@ test("failed queue invocation records bounded safe metadata and does not store j
     assert.equal(state.lastErrorCode, "OCR_QUEUE_BATCH_PARTIAL_FAILURE");
     assert.equal(JSON.stringify(state).includes("jobId"), false);
 });
+
+test("queue consumer rejects a job lacking its server-derived account owner", async () => {
+    const env = createEnv();
+    let acked = false;
+    await handleQueueBatch({ messages: [{ body: { jobId: "ABCD1234EFGH5678" }, ack() { acked = true; }, retry() { assert.fail("malformed ownership is a permanent queue contract error"); } }] }, env, {});
+    assert.equal(acked, true);
+    assert.equal(env.records.get("admin:service-status:ocr-queue").lastFailureCount, 1);
+});

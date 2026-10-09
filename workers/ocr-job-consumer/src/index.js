@@ -18,6 +18,8 @@ import {
 const CONSUMER_VERSION =
     "ocr-job-consumer-1.7";
 
+const ACCOUNT_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 const OCR_JOB_STATUS_PREFIX =
     "ocr-jobs";
 
@@ -774,7 +776,8 @@ function getProcessorFailureMessage(
 
 async function fetchProcessor(
     env,
-    jobId
+    jobId,
+    notificationOwnerAccountId
 ) {
     const controller =
         new AbortController();
@@ -813,7 +816,8 @@ async function fetchProcessor(
                 body:
                     JSON.stringify(
                         {
-                            jobId
+                            jobId,
+                            notificationOwnerAccountId
                         }
                     ),
 
@@ -877,6 +881,7 @@ async function processMessage(
         normalizeJobId(
             message?.body?.jobId
         );
+    const notificationOwnerAccountId = String(message?.body?.notificationOwnerAccountId || "").trim();
 
     if (
         !jobId
@@ -892,6 +897,13 @@ async function processMessage(
         error.permanent =
             true;
 
+        throw error;
+    }
+
+    if (!ACCOUNT_ID.test(notificationOwnerAccountId)) {
+        const error = new Error("Queue message is missing a valid server-derived account owner.");
+        error.code = "INVALID_JOB_OWNER";
+        error.permanent = true;
         throw error;
     }
 
@@ -947,6 +959,13 @@ async function processMessage(
     if (
         starting.terminal
     ) {
+        const terminalNotificationResponse = await fetchProcessor(env, jobId, notificationOwnerAccountId);
+        if (!terminalNotificationResponse.ok) {
+            const error = new Error("OCR terminal notification persistence is unavailable.");
+            error.code = "TERMINAL_NOTIFICATION_UNAVAILABLE";
+            error.permanent = false;
+            throw error;
+        }
         scheduleDebugTrace(
             env,
             {
@@ -1130,7 +1149,8 @@ async function processMessage(
         response =
             await fetchProcessor(
                 env,
-                jobId
+                jobId,
+                notificationOwnerAccountId
             );
     }
     catch (

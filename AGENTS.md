@@ -236,6 +236,35 @@ Do not describe an implementation as optimized merely because it is cleaner.
 
 ---
 
+## 2026 SEO, Lighthouse & Frontend Performance Standards
+
+For frontend work, invoke the `frontend-review` Codex skill and read its canonical `SKILL.md` before planning implementation. Its installed location in the current environment is `C:\Users\bruck\.codex\skills\frontend-review\SKILL.md`; use the configured skill root on other machines. Apply it whenever work affects:
+
+* HTML structure or metadata
+* CSS or page layouts
+* JavaScript delivery or execution
+* frontend routing
+* static assets or images
+* Cloudflare Pages asset delivery
+* SEO, accessibility, Lighthouse findings, or Core Web Vitals
+* frontend build optimization
+
+Do not activate it for backend-only changes without frontend impact.
+
+Relevant frontend work must inspect the existing architecture before implementation, follow the skill’s standards, avoid unnecessary render-blocking resources, preserve efficient LCP resource discovery, minimize critical network dependency chains, and avoid shipping unnecessary JavaScript. Maintain semantic, crawlable HTML, accessibility, responsive behavior, appropriate caching, and security boundaries. Verify affected routes before completion.
+
+Use existing build and test tooling before adding dependencies or checks. `npm run check:frontend` runs the Pages/assets build validation followed by route-health checks against the built public assets. These checks cover JavaScript/CSS build errors and minification, route metadata and sitemap privacy, and built CSS asset references. The asset build also emits `.wrangler/public-build-report.json` with aggregate source/output byte counts; it is a measurement report, not a size-budget gate. Do not add an arbitrary bundle budget without an agreed baseline and regression policy.
+
+Choose verification depth proportionately:
+
+* **Level 1 — Routine changes:** run relevant static checks, `npm run check:frontend`, and affected-route smoke tests.
+* **Level 2 — Significant frontend changes:** run Level 1 checks, Lighthouse lab tests, desktop/mobile comparisons, critical-resource analysis, and accessibility/SEO checks.
+* **Level 3 — Release verification:** cover representative site-wide routes, all four Lighthouse categories, Core Web Vitals, authentication and routing regressions, and produce a final issue report.
+
+Do not run an expensive site-wide audit for every edit. Lighthouse and browser checks are verification steps; this standard does not change deployment behavior or authorize deployment.
+
+---
+
 ## Implementation
 
 For meaningful implementation work, identify:

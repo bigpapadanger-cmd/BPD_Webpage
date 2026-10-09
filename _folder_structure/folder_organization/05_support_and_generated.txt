@@ -57,6 +57,15 @@ _structure_details/pre-deployment-operator-checklist.md
     Prepared but unexecuted binding, secret, eligibility, RPC and diagnostic retirement checks.
 
 tests/ocr/local_tracking_retirement.test.mjs
+tests/ocr/legacy_failure_events.test.mjs
+tests/notifications/core.test.mjs
+tests/notifications/persistence.test.mjs
+tests/notifications/api.test.mjs
+tests/notifications/client.test.mjs
+    Shared drawer normalization, safe review routes, auth gating, focus/Escape, same-origin fetch and acknowledge behavior.
+    Notification core/persistence/API tests cover cross-device state reconciliation, owner-scoped acknowledgement, bounded API access and sanitized failures.
+    Legacy OCR event tests cover HMAC-derived retry identity and no-match owner-checked handoff without a fabricated match result.
+tests/route_health/sidebar_mobile_drawer.test.mjs
 tests/ocr/progress_authorization.test.mjs
 tests/auth/account_access.test.mjs
 tests/admin/accordion.test.mjs

@@ -1,5 +1,6 @@
 import { sanitizeLogMetadata } from "../http/diagnostics.js";
 import { authorizeRocketLeagueRequest, authorizationErrorResponse } from "../rl/authorization.js";
+import { emitOcrNotificationEvent } from "../notifications/persistence.js";
 "use strict";
 
 /* =========================================================
@@ -67,6 +68,11 @@ const OWNER_TYPE =
 
 const OWNER_VERSION =
     2;
+
+const IDEMPOTENCY_KEY =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const ACCOUNT_UUID =
+    IDEMPOTENCY_KEY;
 
 /* =========================================================
 OWNER HASH
@@ -186,6 +192,9 @@ export async function handleOCRRequest(
     request,
     env
 ) {
+    let authenticatedAccountId = "";
+    let terminalFailureJobId = "";
+    let upstreamAttemptStarted = false;
     try {
         /* =================================================
         METHOD
@@ -208,6 +217,14 @@ export async function handleOCRRequest(
                 },
                 405
             );
+        }
+
+        const idempotencyKey = normalizeString(request.headers.get("Idempotency-Key"));
+        if (!idempotencyKey) {
+            return jsonResponse({ success: false, code: "IDEMPOTENCY_KEY_REQUIRED", error: "A valid Idempotency-Key is required." }, 400);
+        }
+        if (!IDEMPOTENCY_KEY.test(idempotencyKey)) {
+            return jsonResponse({ success: false, code: "IDEMPOTENCY_KEY_INVALID", error: "The Idempotency-Key is invalid." }, 400);
         }
 
         /* =================================================
@@ -330,6 +347,8 @@ export async function handleOCRRequest(
             );
         }
 
+        authenticatedAccountId = accountId;
+
         if (
             session.active !==
             true
@@ -402,6 +421,11 @@ export async function handleOCRRequest(
                 accountId,
                 ownerSecret
             );
+        terminalFailureJobId = await createLegacyFailureJobId(
+            accountId,
+            ownerSecret,
+            idempotencyKey
+        );
 
         /* =================================================
         PARSE MULTIPART FORM
@@ -554,7 +578,9 @@ export async function handleOCRRequest(
             await fetchOcrThroughGoogleWorker(
                 env,
                 formData,
-                upstreamHeaders
+                upstreamHeaders,
+                undefined,
+                () => { upstreamAttemptStarted = true; }
             );
 
         /* =================================================
@@ -608,6 +634,10 @@ export async function handleOCRRequest(
             };
         }
 
+        if (!ocrResponse.ok || result?.success === false) {
+            await persistLegacyFailureEvent(env, authenticatedAccountId, terminalFailureJobId);
+        }
+
         /* =================================================
         PRESERVE PROVIDER STATUS
         ================================================= */
@@ -634,6 +664,9 @@ export async function handleOCRRequest(
     catch (
         error
     ) {
+        if (upstreamAttemptStarted && authenticatedAccountId && terminalFailureJobId) {
+            await persistLegacyFailureEvent(env, authenticatedAccountId, terminalFailureJobId);
+        }
         console.error(
             "OCR request handler failed.",
             sanitizeLogMetadata({
@@ -656,5 +689,27 @@ export async function handleOCRRequest(
             },
             500
         );
+    }
+}
+
+export async function createLegacyFailureJobId(accountId, secret, idempotencyKey) {
+    if (!ACCOUNT_UUID.test(String(accountId || "")) || typeof secret !== "string" || !secret.trim()) {
+        throw new TypeError("A verified account and OCR owner secret are required.");
+    }
+    if (!IDEMPOTENCY_KEY.test(String(idempotencyKey || ""))) {
+        throw new TypeError("A valid Idempotency-Key is required.");
+    }
+    const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+    const digest = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`legacy-ocr-event-v1\0${accountId.toLowerCase()}\0${idempotencyKey.toLowerCase()}`));
+    return Array.from(new Uint8Array(digest).slice(0, 8), value => value.toString(16).padStart(2, "0")).join("").toUpperCase();
+}
+
+async function persistLegacyFailureEvent(env, accountId, jobId) {
+    try {
+        await emitOcrNotificationEvent(env, { accountId, jobId, eventType: "failed" });
+    } catch (error) {
+        console.warn("Legacy OCR failure notification could not be persisted.", sanitizeLogMetadata({
+            code: error?.code || "NOTIFICATIONS_UNAVAILABLE"
+        }));
     }
 }

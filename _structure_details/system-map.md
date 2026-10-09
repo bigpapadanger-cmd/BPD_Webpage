@@ -53,7 +53,11 @@ Browser -> Pages OCR submission -> R2 + queue -> `workers/ocr-job-consumer/`
 -> Pages result persistence and progress -> browser polling.
 
 The synchronous `/api/ocr` handler uses the same internal transport after
-Pages-side session, Epic, and ownership validation. Google credentials remain
+Pages-side session, Epic, and ownership validation, and records a durable
+failed event after an authenticated terminal upstream failure. It requires a
+UUID `Idempotency-Key`, which callers reuse for retries; the dedupe ID is
+derived with the server OCR owner secret from that key and the authenticated
+account. Google credentials remain
 inside the transport Worker and are not returned to Pages or the browser.
 `workers/google-mtls-diagnostic/` remains temporary/reference-only. The
 authenticated `/api/ocr/compare` endpoint remains a separate Pages auth caller
@@ -226,9 +230,49 @@ No Gateway or persistent Discord session is used. The formerly proposed
 Gateway-owned guild registry, ingestion endpoint, and Cloud Run worker-pool
 design are obsolete and are not part of the current architecture.
 
-#### Central notification system (approved direction; not implemented)
+#### Account notification state API (implemented locally)
 
-The repository does not yet contain a general website notification inbox or
+Authenticated `/api/notifications` derives the account from the BPD session,
+collects condition-based moderation, Rocket League profile-completion, and
+linked-Epic reauthorization notices, and reconciles acknowledgment/suppression
+state through the existing `core.notification_state` table. The moderation
+producer calls `api.get_account_enforcement_state` server-side and exposes
+only its verified user-safe fields. Action identifiers are allowlisted; the
+browser receives the notification-state public code rather than a source
+enforcement code. Acknowledgment suppresses an unresolved condition for 60
+minutes, after which it is eligible to appear again. Resolved conditions stop
+being emitted.
+
+The shared authenticated shell mounts a right-side notification drawer from
+`public/Framework/Shell/JS/notifications.js`; all five master CSS callers load
+its shared styles. The drawer listens to canonical auth state, fetches the
+same-origin no-store endpoint only for confirmed signed-in users, and maps only
+allowlisted actions to fixed local routes. OCR uses the verified server-only
+`core.notification_events` table for review-required, failed, and completed
+events. The server derives
+the account at submission, sends it only through the private queue and
+Worker-to-Pages processing request, and verifies it against the job's stored
+owner HMAC; it is not persisted in R2 or returned to the browser. Review links
+use the owner-checked job endpoint, and successful report confirmation resolves
+the review event. If a no-match job has no report or real match ID, the route
+reopens that owner-checked job state and asks for a clearer upload; it does not
+invent a result. Only an authoritative OCR processing transition to a terminal
+state may emit a notification event. Artifact/progress cleanup never emits
+notifications. The scheduled OCR Worker removes transient progress only; its
+dormant durable-job timeout sweep remains disabled because it changes retention
+behavior and has no account UUID to address an account-scoped event. A future
+cleanup system that owns terminal job transitions requires a separate contract
+change. Expired notification-event retention has no scheduled caller yet; its
+recommended existing hook is the hourly `ROCKET_LEAGUE_REFRESH_CRON` branch in
+`workers/rl-presence-monitor/src/index.js` `handleScheduled`, which already has
+server-side Supabase credentials and a maintenance cadence. FAQ and
+result-submission producers are deferred until their user-facing review/read
+contracts are finalized. The distinct Admin broadcast notification design
+below is unchanged.
+
+#### Admin broadcast notification system (approved direction; not implemented)
+
+The repository does not yet contain an Admin broadcast notification inbox or
 durable cross-channel delivery system. Existing Rocket League reminder
 preferences, Discord eligibility checks, Taskboard messages, and Discord
 interactions remain separate features; none is the general notification

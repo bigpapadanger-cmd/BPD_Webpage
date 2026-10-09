@@ -20,6 +20,7 @@ function updateSidebarState(collapsed) {
     const sidebar = document.getElementById("sidebar");
     const sidebarToggle = document.getElementById("sidebarToggle");
     setSidebarCollapsed(sidebar, sidebarToggle, collapsed);
+    if (typeof document.dispatchEvent === "function") document.dispatchEvent(new Event("bpd:sidebar-state-change"));
 }
 
 function expandTemporarilyForSubmenu() {
@@ -74,7 +75,11 @@ function handleOutsideClick(event) {
 }
 
 function handleKeydown(event) {
-    if (event.key === "Escape") closeSidebarSubmenus();
+    if (event.key !== "Escape") return;
+    const openToggle = [...document.querySelectorAll("#sidebar .sidebar-menu-toggle")]
+        .find(button => button.getAttribute("aria-expanded") === "true");
+    closeSidebarSubmenus();
+    openToggle?.focus?.();
 }
 
 export function initializeSidebarSubmenus() {

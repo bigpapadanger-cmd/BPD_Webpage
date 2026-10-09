@@ -95,6 +95,10 @@ import {
 } from "../../Banner/JS/account_banner.js";
 
 import {
+    initializeGlobalNotifications
+} from "./notifications.js";
+
+import {
     authorizeRoute
 } from "../../Auth/auth.js";
 
@@ -2607,6 +2611,7 @@ scheduleIdleTask(
 scheduleAfterPaint(
     () => {
         void initializeAccountBanner();
+        initializeGlobalNotifications();
     }
 );
 

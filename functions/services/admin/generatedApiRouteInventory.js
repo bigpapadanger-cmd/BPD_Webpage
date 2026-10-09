@@ -2514,6 +2514,38 @@ export const API_ROUTE_INVENTORY = Object.freeze([
     "deepLinkSupported": false
   },
   {
+    "path": "/api/notifications/:publicCode/acknowledge",
+    "lookupKey": null,
+    "routeType": "api",
+    "casePolicy": "exact",
+    "sourceFiles": [
+      "functions/api/notifications/[publicCode]/acknowledge.js"
+    ],
+    "handler": "functions/api/notifications/[publicCode]/acknowledge.js",
+    "methods": [
+      "POST"
+    ],
+    "authRequired": "handler-defined",
+    "healthStatus": "valid",
+    "deepLinkSupported": false
+  },
+  {
+    "path": "/api/notifications",
+    "lookupKey": null,
+    "routeType": "api",
+    "casePolicy": "exact",
+    "sourceFiles": [
+      "functions/api/notifications/index.js"
+    ],
+    "handler": "functions/api/notifications/index.js",
+    "methods": [
+      "GET"
+    ],
+    "authRequired": "handler-defined",
+    "healthStatus": "valid",
+    "deepLinkSupported": false
+  },
+  {
     "path": "/api/ocr/compare",
     "lookupKey": null,
     "routeType": "api",

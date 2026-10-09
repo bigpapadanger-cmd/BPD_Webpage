@@ -39,6 +39,7 @@ import {
     getCurrentMatchReport,
     updateCurrentMatchReport
 } from "./storage.js";
+import { resolveOcrReviewEvent } from "../notifications/persistence.js";
 
 import {
     getProviderContext
@@ -2685,6 +2686,19 @@ export async function handleOcrConfirmation(
         if (
             result?.error
         ) {
+            const priorConfirmation = normalizeConfirmationStatus(existingReport?.confirmationStatus);
+            if (mode === CONFIRM_MODE_REVIEW
+                && ["confirmed", "confirmed_with_disputes"].includes(priorConfirmation)
+                && existingReport?.jobId) {
+                await resolveOcrReviewEvent(env, {
+                    accountId,
+                    jobId: String(existingReport.jobId).trim().toUpperCase(),
+                    occurredAt: existingReport.confirmedAt || new Date()
+                });
+                return jsonResponse({ success: true, version: OCR_CONFIRM_VERSION, matchId,
+                    mode: CONFIRM_MODE_REVIEW, confirmationStatus: priorConfirmation,
+                    confirmedAt: existingReport.confirmedAt || null, alreadyConfirmed: true }, 200);
+            }
             return jsonResponse(
                 {
                     success:
@@ -2707,6 +2721,14 @@ export async function handleOcrConfirmation(
                 matchId,
                 existingReport
             );
+
+        if (mode === CONFIRM_MODE_REVIEW && existingReport?.jobId) {
+            await resolveOcrReviewEvent(env, {
+                accountId,
+                jobId: String(existingReport.jobId).trim().toUpperCase(),
+                occurredAt: existingReport.confirmedAt || new Date()
+            });
+        }
 
         /* =================================================
         RESPONSE

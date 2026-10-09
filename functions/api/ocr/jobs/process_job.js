@@ -19,6 +19,7 @@ import {
     persistOcrCandidateArchive
 } from "../../../services/ocr/trainingCandidates.js";
 import { suggestRosterName } from "../../../services/ocr/playerNameMatching.js";
+import { emitOcrNotificationEvent } from "../../../services/notifications/persistence.js";
 
 const PROCESS_JOB_VERSION =
     "ocr-process-job-2.2";
@@ -45,6 +46,8 @@ const MAX_PROVIDER_RESPONSE_BYTES =
     2
     * 1024
     * 1024;
+
+const ACCOUNT_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const JOB_PROGRESS = Object.freeze({
     STARTING:
@@ -99,6 +102,33 @@ function normalizeMatchId(
     )
         ? matchId
         : "";
+}
+
+async function createOwnerHash(accountId, secret) {
+    const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(String(secret || "")),
+        { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+    const digest = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(accountId));
+    return [...new Uint8Array(digest)].map(value => value.toString(16).padStart(2, "0")).join("");
+}
+
+function safeEqual(left, right) {
+    if (typeof left !== "string" || typeof right !== "string" || left.length !== right.length) return false;
+    let difference = 0;
+    for (let index = 0; index < left.length; index++) difference |= left.charCodeAt(index) ^ right.charCodeAt(index);
+    return difference === 0;
+}
+
+async function persistTerminalNotification(env, status, jobId, accountId) {
+    const eventType = status?.status === "failed" ? "failed"
+        : status?.requiresPlayerReview === true || status?.reviewRequired === true || status?.confirmationStatus === "pending_review"
+            ? "review_required" : "completed";
+    return emitOcrNotificationEvent(env, {
+        accountId,
+        jobId,
+        eventType,
+        sourcePublicCode: eventType === "review_required" ? jobId : null,
+        occurredAt: status?.completedAt || status?.updatedAt || new Date()
+    });
 }
 
 function normalizeProgress(
@@ -1908,7 +1938,8 @@ async function markFailed(
     env,
     jobId,
     currentStatus,
-    error
+    error,
+    notificationOwnerAccountId
 ) {
     const now =
         new Date()
@@ -1996,6 +2027,8 @@ async function markFailed(
         env,
         jobId
     );
+
+    await persistTerminalNotification(env, nextStatus, jobId, notificationOwnerAccountId);
 
     return nextStatus;
 }
@@ -2134,6 +2167,7 @@ async function processJob(
         normalizeJobId(
             body?.jobId
         );
+    const notificationOwnerAccountId = String(body?.notificationOwnerAccountId || "").trim();
 
     if (
         !jobId
@@ -2159,6 +2193,7 @@ async function processJob(
                 jobId
             );
     }
+
     catch (
         error
     ) {
@@ -2183,6 +2218,16 @@ async function processJob(
         );
     }
 
+    if (!ACCOUNT_ID.test(notificationOwnerAccountId) || !String(env?.OCR_OWNER_SECRET || "").trim()) {
+        return jsonResponse({ success: false, code: "JOB_OWNER_INVALID", message: "OCR job ownership could not be verified." }, 403);
+    }
+    let suppliedOwnerHash;
+    try { suppliedOwnerHash = await createOwnerHash(notificationOwnerAccountId, env.OCR_OWNER_SECRET); }
+    catch { return jsonResponse({ success: false, code: "JOB_OWNER_INVALID", message: "OCR job ownership could not be verified." }, 403); }
+    if (!safeEqual(String(currentStatus?.ownerId || "").toLowerCase(), suppliedOwnerHash)) {
+        return jsonResponse({ success: false, code: "JOB_OWNER_INVALID", message: "OCR job ownership could not be verified." }, 403);
+    }
+
     const normalizedStatus =
         String(
             currentStatus?.status
@@ -2197,6 +2242,11 @@ async function processJob(
         || normalizedStatus ===
             "failed"
     ) {
+        try {
+            await persistTerminalNotification(env, currentStatus, jobId, notificationOwnerAccountId);
+        } catch {
+            return jsonResponse({ success: false, code: "NOTIFICATIONS_UNAVAILABLE", message: "OCR notification state is temporarily unavailable." }, 503);
+        }
         return jsonResponse(
             {
                 success:
@@ -2507,6 +2557,12 @@ async function processJob(
             jobId
         );
 
+        try {
+            await persistTerminalNotification(env, completedStatus, jobId, notificationOwnerAccountId);
+        } catch {
+            return jsonResponse({ success: false, code: "NOTIFICATIONS_UNAVAILABLE", message: "OCR notification state is temporarily unavailable." }, 503);
+        }
+
         return jsonResponse(
             {
                 success:
@@ -2577,6 +2633,8 @@ async function processJob(
                     currentStatus
                 );
 
+                await persistTerminalNotification(env, reviewStatus, jobId, notificationOwnerAccountId);
+
                 return jsonResponse({
                     success: true,
                     jobId,
@@ -2602,7 +2660,8 @@ async function processJob(
                 env,
                 jobId,
                 currentStatus,
-                error
+                error,
+                notificationOwnerAccountId
             );
         }
         catch (

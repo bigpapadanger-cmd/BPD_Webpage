@@ -2,7 +2,7 @@
 
 const INTERNAL_OCR_URL = "https://ocr-google-transport.internal/api/ocr";
 
-export async function fetchOcrThroughGoogleWorker(env, body, headers = {}, signal) {
+export async function fetchOcrThroughGoogleWorker(env, body, headers = {}, signal, onAttempt = null) {
     const binding = env?.OCR_GOOGLE_TRANSPORT;
     if (!binding || typeof binding.fetch !== "function") {
         const error = new Error("OCR transport is not configured.");
@@ -28,5 +28,6 @@ export async function fetchOcrThroughGoogleWorker(env, body, headers = {}, signa
         ...(signal ? { signal } : {})
     });
 
+    if (typeof onAttempt === "function") onAttempt();
     return binding.fetch(request);
 }

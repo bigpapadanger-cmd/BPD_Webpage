@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-08T04:48:17.335Z",
+  "generatedAt": "2026-10-09T02:57:47.273Z",
   "policy": {
     "humanPagePaths": "case-insensitive lookup; canonical TitleCase path",
     "apiAndAssetPaths": "exact-case; never normalized by the human-page router",
@@ -2514,6 +2514,38 @@
       "handler": "functions/api/internal/discord/task-summary.js",
       "methods": [
         "ALL"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/notifications/:publicCode/acknowledge",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/notifications/[publicCode]/acknowledge.js"
+      ],
+      "handler": "functions/api/notifications/[publicCode]/acknowledge.js",
+      "methods": [
+        "POST"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/notifications",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/notifications/index.js"
+      ],
+      "handler": "functions/api/notifications/index.js",
+      "methods": [
+        "GET"
       ],
       "authRequired": "handler-defined",
       "healthStatus": "valid",

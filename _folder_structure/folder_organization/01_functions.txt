@@ -51,6 +51,7 @@ functions/
 |   +-- admin/user-management/index.js, history.js, [targetAccountId].js
 |       +-- [targetAccountId]/actions.js, notes.js
 |   +-- admin/rocketleague/force-refresh.js, compatibility-probe.js (Admin-only; execution disabled)
+|   +-- notifications/index.js, [publicCode]/acknowledge.js (authenticated notification state API)
 |   +-- curseforge/mods.js
 |   +-- suggestions/index.js, [suggestionId]/vote.js
 |   +-- faq/index.js, questions.js
@@ -64,6 +65,10 @@ functions/
 |           +-- process_job.js, progress.js, submit_job.js
 |
 +-- services/
+    +-- notifications/core.js (normalized candidate contract, safe action identifiers, deduplication and acknowledgment rules)
+    +-- notifications/persistence.js (server-only notification_state adapter and verified core.notification_events OCR writer/reader/resolver)
+    +-- notifications/http.js (no-store responses, request diagnostics and same-origin mutation checks)
+    +-- notifications/producers.js (condition-derived candidates plus safe OCR event-to-notification mapping)
     +-- rl/custom_matches/contracts.js, service.js, http.js, runtime_client.js (fixed Custom Match contracts, authorization, and private runtime client)
     +-- supabase/rocketleague/custom_matches.js (fixed Custom Match RPC transport; no provider ingestion)
     +-- admin/

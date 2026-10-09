@@ -49,8 +49,6 @@ GROUPS
         12px
         6px;
 
-    overflow: hidden;
-
     color: #70798b;
 
     font-size: 0.65rem;
@@ -58,7 +56,8 @@ GROUPS
     letter-spacing: 0.12em;
     text-transform: uppercase;
 
-    white-space: nowrap;
+    white-space: normal;
+    overflow-wrap: anywhere;
 }
 
 .sidebar-view-rocketleague .sidebar-authenticated {
@@ -393,7 +392,8 @@ SUBMENUS
 
     text-decoration: none;
 
-    white-space: nowrap;
+    white-space: normal;
+    overflow-wrap: anywhere;
 }
 
 .sidebar-view-rocketleague .submenu-item:hover,
@@ -444,17 +444,6 @@ element inside the Rocket League sidebar.
 .sidebar-view-rocketleague .sidebar-group[hidden],
 .sidebar-view-rocketleague .sidebar-submenu[hidden] {
     display: none !important;
-}
-
-/*
-=========================================================
-COLLAPSED STATE
-=========================================================
-*/
-
-body.sidebar-collapsed .sidebar-view-rocketleague .sidebar-group-label,
-body.sidebar-collapsed .sidebar-view-rocketleague .submenu-arrow {
-    display: none;
 }
 
 /*

@@ -25,7 +25,8 @@ function createElement() {
             for (const handler of listeners.get(name) || []) handler(event);
         },
         setAttribute(name, value) { attributes.set(name, value); },
-        getAttribute(name) { return attributes.get(name) ?? null; }
+        getAttribute(name) { return attributes.get(name) ?? null; },
+        focus() { this.focused = true; }
     };
 }
 
@@ -100,6 +101,7 @@ test("collapsed-sidebar submenu expands temporarily and restores state on outsid
 
     assert.equal(submenu.hidden, true);
     assert.equal(sidebar.classList.contains("collapsed"), true);
+    assert.equal(button.focused, true);
 });
 
 test("switching collapsed sidebar dropdowns keeps the exact new group open until submenu navigation", () => {

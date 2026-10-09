@@ -44,6 +44,20 @@ test("missing Pages service binding has a stable internal error", async () => {
     );
 });
 
+test("OCR attempt callback runs only when the configured private binding is invoked", async () => {
+    let attempts = 0;
+    const headers = { "X-BPD-OCR-Handler-Version": "test" };
+    await fetchOcrThroughGoogleWorker({ OCR_GOOGLE_TRANSPORT_SECRET: "T".repeat(48), OCR_GOOGLE_TRANSPORT: {
+        async fetch() { return Response.json({ success: true }); }
+    } }, new FormData(), headers, undefined, () => { attempts++; });
+    assert.equal(attempts, 1);
+
+    await assert.rejects(fetchOcrThroughGoogleWorker({ OCR_GOOGLE_TRANSPORT_SECRET: "short", OCR_GOOGLE_TRANSPORT: {
+        async fetch() { throw new Error("must not invoke"); }
+    } }, new FormData(), headers, undefined, () => { attempts++; }));
+    assert.equal(attempts, 1);
+});
+
 test("normal Pages OCR callers use the transport and do not import Google auth directly", async () => {
     const paths = [
         "../../functions/api/ocr/jobs/process_job.js",

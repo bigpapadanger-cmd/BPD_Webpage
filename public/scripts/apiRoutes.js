@@ -57,6 +57,9 @@ export const BPD_AUTH_SESSION_URL =
 export const BPD_AUTH_LOGOUT_URL =
     "/api/auth/logout";
 
+export const BPD_NOTIFICATIONS_URL =
+    "/api/notifications";
+
 /* =========================================================
 ACCOUNT MANAGEMENT
 ========================================================= */

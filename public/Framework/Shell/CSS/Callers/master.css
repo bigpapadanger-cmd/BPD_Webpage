@@ -25,6 +25,7 @@ Also used as the fallback for unknown routes.
 @import url("../General/body.css");
 @import url("../General/footer.css");
 @import url("../General/ocr_popup.css");
+@import url("../General/notifications.css");
 
 /* =========================================================
    SIDEBAR

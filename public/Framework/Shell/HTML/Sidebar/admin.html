@@ -1,13 +1,13 @@
 <!-- Shared submenu interactions. Route/API authorization remains server-side. -->
 <div class="sidebar-toggle-box">
-    <button id="sidebarToggle" class="sidebar-toggle" type="button" aria-label="Toggle navigation" aria-expanded="true">
+    <button id="sidebarToggle" class="sidebar-toggle" type="button" aria-label="Toggle navigation" aria-controls="sidebarNavigation" aria-expanded="true">
         <span aria-hidden="true"></span>
         <span aria-hidden="true"></span>
         <span aria-hidden="true"></span>
     </button>
 </div>
 
-<nav class="sidebar-navigation sidebar-nav" aria-label="Admin navigation">
+<nav id="sidebarNavigation" class="sidebar-navigation sidebar-nav" aria-label="Admin navigation">
     <div class="sidebar-navigation-top">
         <a href="/Dashboard" class="nav-item" data-router-link data-nav-route="/Dashboard" data-tooltip="Dashboard">
             <span class="nav-icon" data-sidebar-icon="dashboard" aria-hidden="true"></span>

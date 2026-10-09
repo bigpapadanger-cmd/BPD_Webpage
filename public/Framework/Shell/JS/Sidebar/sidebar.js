@@ -45,6 +45,7 @@ import {
 
 import { resolveHumanPageRoute, getRocketLeagueSettingsContext } from "../../../../routes.js";
 import { applySidebarAuthState } from "./RocketLeague/sidebar_auth.js";
+import { initializeMobileSidebarDrawer, syncMobileSidebarDrawer } from "./mobile_drawer.js";
 
 import {
     applyAppearancePreferences,
@@ -95,6 +96,7 @@ function initializeCriticalSidebar() {
     applyGlobalSettings();
 
     setupSidebarToggle();
+    initializeMobileSidebarDrawer();
 
     setupRouteVisibility();
 
@@ -360,6 +362,8 @@ function setupSidebarToggle() {
                 willCollapse
             );
 
+            syncMobileSidebarDrawer({ focusOnOpen: !willCollapse });
+
             localStorage.setItem(
                 "bpdSidebar",
                 willCollapse
@@ -412,12 +416,13 @@ function handleSidebarResize() {
             "sidebarToggle"
         );
 
-    if (
-        !sidebar
-        || document.body.dataset.sidebarTemporaryExpanded === "true"
-    ) {
+    if (!sidebar) {
         return;
     }
+
+    syncMobileSidebarDrawer();
+
+    if (document.body.dataset.sidebarTemporaryExpanded === "true") return;
 
     const savedSidebar =
         localStorage.getItem(
@@ -430,6 +435,7 @@ function handleSidebarResize() {
         && savedSidebar !==
             "collapsed"
     ) {
+        syncMobileSidebarDrawer();
         return;
     }
 
@@ -560,6 +566,16 @@ function setupSidebarTooltips() {
                 "mouseleave",
                 hideSidebarTooltip
             );
+
+            item.addEventListener("focus", function() {
+                if (!sidebar.classList.contains("collapsed")) return;
+                const rect = item.getBoundingClientRect();
+                showSidebarTooltip(tooltip, tooltipText, {
+                    clientX: rect.right,
+                    clientY: rect.top + rect.height / 2
+                }, item.dataset.tooltip);
+            });
+            item.addEventListener("blur", hideSidebarTooltip);
 
             item
                 .dataset

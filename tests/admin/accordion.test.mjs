@@ -136,7 +136,8 @@ test("Admin navigation reuses shared controlled submenus and keeps all existing 
     assert.doesNotMatch(html, /onclick|<script|fetch\(/);
     const shared = await readFile(new URL("../../public/Framework/Shell/JS/Sidebar/submenu.js", import.meta.url), "utf8");
     assert.match(shared, /submenuInitialized/);
-    assert.match(shared, /event.key === "Escape"/);
+    assert.match(shared, /event\.key !== "Escape"/);
+    assert.match(shared, /openToggle\?\.focus/);
 });
 
 test("Admin integrations keep critical status outside disclosures and activate the FAQ review link", async () => {

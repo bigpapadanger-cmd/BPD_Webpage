@@ -2,13 +2,14 @@ import test, { afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
 import { onRequestGet } from "../../functions/api/ocr/jobs/progress.js";
+import { onRequestGet as getJob } from "../../functions/api/ocr/jobs/get_job.js";
 
 const oldFetch = globalThis.fetch;
 afterEach(() => { globalThis.fetch = oldFetch; });
 const jobId = "ABCDEFGHIJKLMNOP";
 const secret = "test-owner-secret";
 
-function fixture({ signedIn = true, owner = "account-1", legacy = false } = {}) {
+function fixture({ signedIn = true, owner = "account-1", legacy = false, noMatch = false } = {}) {
     const now = Date.now();
     const iso = time => new Date(time).toISOString();
     const records = new Map([
@@ -31,8 +32,10 @@ function fixture({ signedIn = true, owner = "account-1", legacy = false } = {}) 
         throw new Error("Unexpected test RPC");
     };
     let storageReads = 0;
-    const status = { jobId, status: "completed", stage: "completed", progress: 100,
-        matchId: "12345678-1234-4234-8234-123456789012", ownerId: createHmac("sha256", secret).update(owner).digest("hex"),
+    const status = { jobId, status: "completed", stage: noMatch ? "needs_review" : "completed", progress: 100,
+        ...(noMatch ? { disposition: "needs_review", reviewRequired: true, confirmationStatus: "pending_review", matchId: null }
+            : { matchId: "12345678-1234-4234-8234-123456789012" }),
+        ownerId: createHmac("sha256", secret).update(owner).digest("hex"),
         ...(legacy ? {} : { ownerType: "account", ownerVersion: 2 }), updatedAt: iso(now), completedAt: iso(now) };
     return {
         context: { request: new Request(`https://example.test/api/ocr/jobs/progress?jobId=${jobId}`, {
@@ -45,6 +48,31 @@ function fixture({ signedIn = true, owner = "account-1", legacy = false } = {}) 
         reads: () => storageReads
     };
 }
+
+test("no-match review job opens only for its authenticated owner", async () => {
+    const owner = fixture({ noMatch: true });
+    const response = await getJob(owner.context);
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.equal(body.job.reviewRequired, true);
+    assert.equal(body.job.disposition, "needs_review");
+    assert.equal(body.job.matchId, null);
+    assert.doesNotMatch(JSON.stringify(body), /account-1|ownerId|reviewObjectKey/);
+
+    const other = fixture({ noMatch: true, owner: "someone-else" });
+    const denied = await getJob(other.context);
+    assert.equal(denied.status, 403);
+});
+
+test("malformed or unknown no-match locators fail safely", async () => {
+    const f = fixture({ noMatch: true });
+    f.context.request = new Request("https://example.test/api/ocr/jobs/get_job?jobId=not-a-job", {
+        headers: { cookie: "bpd_session=test-session" }
+    });
+    const response = await getJob(f.context);
+    assert.equal(response.status, 400);
+    assert.doesNotMatch(await response.text(), /ownerId|account-1/);
+});
 
 test("job ID alone cannot authorize progress reads", async () => {
     const f = fixture({ signedIn: false });

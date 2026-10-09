@@ -202,7 +202,7 @@ SITE CONTENT
         transparent;
     opacity: 1;
 
-    transition: opacity 0.15s ease, padding-left 0.25s ease;
+    transition: opacity 0.15s ease;
 }
 
 /* =========================================================
@@ -223,7 +223,7 @@ body.sidebar-collapsed
         );
 }
 
-/* Mobile navigation overlays the page instead of squeezing its reading area. */
+/* Mobile navigation overlays the page while a backdrop blocks background controls. */
 @media (max-width: 700px) {
     body .site-content,
     body.sidebar-collapsed .site-content {
@@ -333,8 +333,8 @@ VERY SMALL VIEWPORTS
 Sidebar state remains controlled by:
     body.sidebar-collapsed
 
-If the user expands the sidebar on mobile, site-content
-continues to respect the expanded width.
+On mobile, the sidebar overlays the collapsed-width content rail;
+the modal drawer backdrop protects the underlying page controls.
 ========================================================= */
 
 @media (max-width: 700px) {
@@ -347,8 +347,7 @@ continues to respect the expanded width.
     }
 
     .site-content {
-        transition:
-            padding-left 0.22s ease;
+        transition: opacity 0.15s ease;
     }
 }
 

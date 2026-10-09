@@ -25,6 +25,19 @@ test("built CSS callers flatten imports and retain root asset URLs", { skip: !ex
         }
     }
 });
+test("shell document keeps parser-blocking scripts out of the route-loading path", () => {
+    const html = readFileSync(resolve(root, "public/index.html"), "utf8");
+    assert.match(html, /^<!doctype html>/i);
+    assert.match(html, /<html\b[^>]*\blang=["']en["']/i);
+    assert.match(html, /<meta\b[^>]*name=["']viewport["']/i);
+    assert.match(html, /<main\b[^>]*id=["']siteContent["']/i);
+    const scripts = [...html.matchAll(/<script\b([^>]*)>/gi)];
+    assert.ok(scripts.length > 0);
+    for (const [, attributes] of scripts) {
+        assert.match(attributes, /\b(?:async|defer)\b|\btype=["']module["']/i,
+            "shell scripts must be async, deferred, or JavaScript modules");
+    }
+});
 test("sitemap follows public route metadata and excludes private routes and aliases", () => {
     const xml = readFileSync(resolve(root, "public/sitemap.xml"), "utf8");
     const paths = [...xml.matchAll(/<loc>https:\/\/bpd-gaming-network\.com([^<]+)<\/loc>/g)].map(match => match[1]);

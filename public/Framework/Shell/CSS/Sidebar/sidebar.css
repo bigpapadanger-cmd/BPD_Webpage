@@ -141,10 +141,10 @@ SIDEBAR CONTAINER
     box-shadow: none;
     transform: none;
 
-    transition:
-        width 0.33s ease,
-        min-width 0.33s ease,
-        max-width 0.33s ease;
+}
+
+.sidebar-backdrop {
+    display: none;
 }
 
 /* =========================================================
@@ -843,11 +843,7 @@ NAVIGATION ITEM
 .site-sidebar .nav-item {
     display: flex;
 
-    flex:
-        0 0
-        var(
-            --sidebar-row-height
-        );
+    flex: 0 0 auto;
 
     align-items: center;
 
@@ -855,24 +851,14 @@ NAVIGATION ITEM
 
     min-width: 0;
 
-    height:
-        var(
-            --sidebar-row-height
-        );
-
     min-height:
-        var(
-            --sidebar-row-height
-        );
-
-    max-height:
         var(
             --sidebar-row-height
         );
 
     padding: 0;
 
-    overflow: hidden;
+    overflow: visible;
 
     border: 0;
 
@@ -992,28 +978,19 @@ NAVIGATION LABEL
 
     min-width: 0;
 
-    max-width:
-        calc(
-            var(
-                --sidebar-width
-            )
-            -
-            var(
-                --sidebar-icon-width
-            )
-        );
+    max-width: none;
 
     padding-right:
         10px;
 
     overflow:
-        hidden;
+        visible;
 
     white-space:
         normal;
 
     overflow-wrap:
-        break-word;
+        anywhere;
 
     line-height:
         1.2;
@@ -1026,13 +1003,23 @@ NAVIGATION LABEL
 
     transition:
         opacity 0.22s ease,
-        transform 0.28s ease,
-        max-width 0.33s ease;
+        transform 0.28s ease;
+}
+
+.site-sidebar .nav-text {
+    display: flex;
+    flex: 1 1 auto;
+    min-width: 0;
 }
 
 /* =========================================================
 COLLAPSED LABEL
 ========================================================= */
+
+body.sidebar-collapsed .site-sidebar .sidebar-group-label,
+body.sidebar-collapsed .site-sidebar .submenu-arrow {
+    display: none;
+}
 
 body.sidebar-collapsed
 .site-sidebar
@@ -1082,6 +1069,21 @@ VERY SMALL VIEWPORTS
                 8vw,
                 34px
             );
+    }
+
+    .sidebar-backdrop:not([hidden]) {
+        position: fixed;
+        inset: 0;
+        z-index: 99;
+        display: block;
+        width: 100%;
+        border: 0;
+        background: rgba(0, 0, 0, 0.64);
+        cursor: pointer;
+    }
+
+    html.sidebar-mobile-open {
+        overflow: hidden;
     }
 }
 

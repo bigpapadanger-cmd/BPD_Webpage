@@ -1,4 +1,5 @@
 import { sanitizeLogMetadata } from "../../../services/http/diagnostics.js";
+import { emitOcrNotificationEvent } from "../../../services/notifications/persistence.js";
 import { authorizeRocketLeagueRequest, authorizationErrorResponse } from "../../../services/rl/authorization.js";
 "use strict";
 
@@ -794,7 +795,8 @@ export async function onRequestPost(
         try {
             await env.OCR_JOB_QUEUE.send(
                 {
-                    jobId
+                    jobId,
+                    notificationOwnerAccountId: accountId
                 }
             );
         }
@@ -876,6 +878,13 @@ export async function onRequestPost(
                     }
                 }
             );
+
+            await emitOcrNotificationEvent(env, {
+                accountId,
+                jobId,
+                eventType: "failed",
+                occurredAt: failedAt
+            });
 
             console.error(
                 "[OCR SUBMIT] Queue send failed.",
