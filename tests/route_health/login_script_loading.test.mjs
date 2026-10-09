@@ -12,6 +12,7 @@ test("failed or stalled Turnstile script is removed so login retry can make prog
     let loads = 0;
     const context = vm.createContext({
         TURNSTILE_SCRIPT_ID: "fixture-turnstile", TURNSTILE_SCRIPT_URL: "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit",
+        trustedScriptURLFromApprovedThirdParty: url => url,
         turnstileLoadingPromise: null,
         window: { setTimeout(callback, ms) { assert.equal(ms, 12000); expire = callback; return 1; }, clearTimeout() {} },
         document: {

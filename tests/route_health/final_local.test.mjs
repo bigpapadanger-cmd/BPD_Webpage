@@ -91,6 +91,7 @@ test("successful Task edit clears submitting before close and preserves an under
     const file = resolve("public/Global/Admin/TaskBoard/JS/task_edit.js");
     let source = await readFile(file, "utf8");
     source = source.replace('"../../Shared/JS/modal_focus.js"', JSON.stringify(pathToFileURL(resolve("public/Global/Admin/Shared/JS/modal_focus.js")).href));
+    source = source.replace('"/scripts/trustedDom.js"', JSON.stringify(pathToFileURL(resolve("public/scripts/trustedDom.js")).href));
     // Exercise the private event handler without adding production test hooks.
     source += '\nexport { handleTaskEditSubmit }; export function setFixtureTask(task) { taskEditState = { task, taskCode: task.taskCode, submitting: false, onUpdated: null }; }';
     const module = await import(`data:text/javascript;base64,${Buffer.from(source).toString("base64")}`);

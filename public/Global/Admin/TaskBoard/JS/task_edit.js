@@ -1,5 +1,6 @@
 "use strict";
 import { activateModalFocus, deactivateModalFocus } from "../../Shared/JS/modal_focus.js";
+import { trustedHTMLFromStaticAsset } from "/scripts/trustedDom.js";
 
 /* =========================================================
 BPD GAMING NETWORK
@@ -374,12 +375,14 @@ async function loadTaskEditTemplate() {
         return;
     }
 
+    const templateUrl = getTaskEditTemplateUrl();
+
     let response;
 
     try {
         response =
             await fetch(
-                getTaskEditTemplateUrl(),
+                templateUrl,
                 {
                     method:
                         "GET",
@@ -439,7 +442,7 @@ async function loadTaskEditTemplate() {
         );
 
     template.innerHTML =
-        html;
+        trustedHTMLFromStaticAsset(html, templateUrl, response.url || templateUrl);
 
     const element =
         template.content.firstElementChild;

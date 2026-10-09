@@ -1,5 +1,6 @@
 import { consumeOAuthError } from "/Framework/Auth/oauthErrors.js";
 "use strict";
+import { trustedScriptURLFromApprovedThirdParty } from "/scripts/trustedDom.js";
 
 /* =========================================================
 BPD GAMING NETWORK
@@ -550,7 +551,7 @@ function loadTurnstileScript() {
                     TURNSTILE_SCRIPT_ID;
 
                 script.src =
-                    TURNSTILE_SCRIPT_URL;
+                    trustedScriptURLFromApprovedThirdParty(TURNSTILE_SCRIPT_URL);
 
                 script.async =
                     true;

@@ -252,10 +252,26 @@ The report-only Trusted Types findings came from dynamic HTML/script URL
 assignments in the account banner, router, header renderer, and sidebar hover
 loaders. The banner and header now build nodes with DOM APIs. Router and hover
 fragments accept TrustedHTML only when fetched from same-origin static `.html`
-assets; classic route script URLs are constrained to same-origin `.js` assets.
-The policy remains report-only while other page modules still contain HTML
-string sinks; do not switch to enforcement until those remaining sinks are
-reviewed and covered.
+assets; their final URL may be only the exact corresponding path without
+`.html`, because the live edge responds with 308 redirects that strip that
+suffix. All other destinations are rejected. Classic route script URLs are
+constrained to same-origin `.js` assets. Other app-owned HTML sinks now use
+either these static-asset checks or the escaped-template helper (whose callers
+must escape dynamic text/attributes and validate URLs). Dynamic script URLs are
+restricted to local assets or the fixed Turnstile/AdSense URLs.
+
+The live page also receives Cloudflare-injected code at
+`/cdn-cgi/challenge-platform/scripts/precursor/main.js`. Deprecation warnings
+attributed to `main.js` and the inline Trusted Types report at `(index)` match
+this edge injection, not a repository-owned `main.js` (none exists in `public`).
+The remaining report-only violation is from Cloudflare's injected inline loader,
+which assigns the Precursor script URL as a plain string. Cloudflare
+Precursor/JavaScript Detections is configurable in the Cloudflare zone's
+Security settings; changing it affects bot protection and must be a separate,
+deliberate security decision. Keep report-only CSP while this injection remains;
+app code does not suppress or trust it. See [Cloudflare Precursor](https://developers.cloudflare.com/cloudflare-challenges/precursor/)
+and [Cloudflare JavaScript Detections](https://developers.cloudflare.com/cloudflare-challenges/challenge-types/javascript-detections/),
+accessed 2026-10-09.
 
 ## Follow-up: production notification transport error
 

@@ -1,4 +1,5 @@
 "use strict";
+import { trustedScriptURLFromLocalAsset } from "/scripts/trustedDom.js";
 import "/Framework/Shell/JS/ocr_review_policy.js";
 
 /* =========================================================
@@ -112,7 +113,7 @@ function loadScript(
                 );
 
             script.src =
-                absoluteSrc;
+                trustedScriptURLFromLocalAsset(absoluteSrc);
 
             script.async =
                 false;

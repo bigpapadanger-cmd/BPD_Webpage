@@ -1,4 +1,5 @@
 "use strict";
+import { trustedScriptURLFromApprovedThirdParty } from "../../../scripts/trustedDom.js";
 
 // Approved display-unit IDs belong on existing slots as data-ad-slot.
 // Unconfigured placeholders never download advertising code.
@@ -18,7 +19,7 @@ function loadAdScript() {
         const script = document.createElement("script");
         script.async = true;
         script.crossOrigin = "anonymous";
-        script.src = `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${CLIENT}`;
+        script.src = trustedScriptURLFromApprovedThirdParty(`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${CLIENT}`);
         script.addEventListener("load", resolve, { once: true });
         script.addEventListener("error", () => { script.remove(); scriptPromise = null; reject(new Error("Advertising unavailable.")); }, { once: true });
         document.head.append(script);

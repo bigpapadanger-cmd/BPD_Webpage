@@ -5,6 +5,7 @@ ARK MODS PAGE
 =========================================================
 */
 
+import { trustedHTMLFromEscapedTemplate } from "/scripts/trustedDom.js";
 import {
     renderHeader
 } from "/Framework/Shell/JS/renderHeader.js";
@@ -174,18 +175,17 @@ async function loadModsForGame(
                 ? data.mods
                 : [];
 
-        modList.innerHTML =
-            "";
+        modList.replaceChildren();
 
         if (
             mods.length ===
             0
         ) {
-            modList.innerHTML = `
+            modList.innerHTML = trustedHTMLFromEscapedTemplate(`
                 <p class="ark-mod-empty">
                     No active mods are currently listed.
                 </p>
-            `;
+            `);
 
             return;
         }
@@ -197,10 +197,10 @@ async function loadModsForGame(
             ) {
                 modList.insertAdjacentHTML(
                     "beforeend",
-                    createModCard(
+                    trustedHTMLFromEscapedTemplate(createModCard(
                         mod,
                         index
-                    )
+                    ))
                 );
             }
         );
@@ -213,8 +213,7 @@ async function loadModsForGame(
             error
         );
 
-        modList.innerHTML =
-            "";
+        modList.replaceChildren();
 
         if (
             errorSection
@@ -232,7 +231,7 @@ async function loadModsForGame(
 function renderLoadingState(
     modList
 ) {
-    modList.innerHTML = `
+    modList.innerHTML = trustedHTMLFromEscapedTemplate(`
         <div
             class="ark-mod-loading"
             id="arkModLoading"
@@ -245,7 +244,7 @@ function renderLoadingState(
                 Loading ARK mods...
             </span>
         </div>
-    `;
+    `);
 }
 
 /* =========================================================

@@ -34,13 +34,50 @@ function validatedLocalAsset(value, extension, origin = globalThis.location?.ori
     return url.href;
 }
 
-export function trustedHTMLFromStaticAsset(markup, assetUrl) {
+export function trustedHTMLFromStaticAsset(markup, assetUrl, responseUrl = assetUrl) {
     if (typeof markup !== "string") throw new TypeError("Static HTML must be text.");
-    validatedLocalAsset(assetUrl, ".html");
+    const expectedUrl = new URL(validatedLocalAsset(assetUrl, ".html"));
+    const actualUrl = new URL(responseUrl || assetUrl, expectedUrl.origin);
+    const actualPath = decodeURIComponent(actualUrl.pathname).toLowerCase();
+    const expectedPath = decodeURIComponent(expectedUrl.pathname).toLowerCase();
+    const expectedRedirectPath = expectedPath.slice(0, -".html".length);
+    const allowedRoots = ["/Framework/", "/Global/", "/Tabs/", "/Required/", "/ocr/"];
+    const isKnownStaticRoot = allowedRoots.some(root => actualPath.startsWith(root.toLowerCase()));
+    if (actualUrl.origin !== expectedUrl.origin || !["https:", "http:"].includes(actualUrl.protocol)
+        || actualUrl.username || actualUrl.password || actualUrl.hash || !isKnownStaticRoot
+        || actualUrl.search !== expectedUrl.search
+        || (actualPath !== expectedPath && actualPath !== expectedRedirectPath)) {
+        throw new TypeError("Static HTML response URL is not an approved asset destination.");
+    }
+    return getPolicy()?.createHTML(markup) ?? markup;
+}
+
+// Callers must HTML-escape every dynamic text/attribute value and validate URL
+// attributes before building this markup. This creates a TrustedHTML value; it
+// is not a sanitizer.
+export function trustedHTMLFromEscapedTemplate(markup) {
+    if (typeof markup !== "string") throw new TypeError("Escaped HTML must be text.");
     return getPolicy()?.createHTML(markup) ?? markup;
 }
 
 export function trustedScriptURLFromLocalAsset(assetUrl) {
     const validatedUrl = validatedLocalAsset(assetUrl, ".js");
     return getPolicy()?.createScriptURL(validatedUrl) ?? validatedUrl;
+}
+
+export function trustedScriptURLFromApprovedThirdParty(assetUrl) {
+    if (typeof assetUrl !== "string") throw new TypeError("Script URL is invalid.");
+    let url;
+    try { url = new URL(assetUrl); }
+    catch { throw new TypeError("Script URL is invalid."); }
+    const turnstile = url.origin === "https://challenges.cloudflare.com"
+        && url.pathname === "/turnstile/v0/api.js"
+        && url.search === "?render=explicit";
+    const ads = url.origin === "https://pagead2.googlesyndication.com"
+        && url.pathname === "/pagead/js/adsbygoogle.js"
+        && /^\?client=ca-pub-\d{8,20}$/.test(url.search);
+    if (url.protocol !== "https:" || url.username || url.password || url.hash || !(turnstile || ads)) {
+        throw new TypeError("Third-party script URL is not approved.");
+    }
+    return getPolicy()?.createScriptURL(url.href) ?? url.href;
 }

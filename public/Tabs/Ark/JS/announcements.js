@@ -1,6 +1,7 @@
 import {
     renderHeader
 } from "/Framework/Shell/JS/renderHeader.js";
+import { trustedHTMLFromEscapedTemplate } from "/scripts/trustedDom.js";
 
 const announcements = [
     {
@@ -115,14 +116,13 @@ function renderAnnouncements() {
                 }
             );
 
-    announcementList.innerHTML =
-        "";
+    announcementList.replaceChildren();
 
     if (
         sortedAnnouncements.length ===
         0
     ) {
-        announcementList.innerHTML = `
+        announcementList.innerHTML = trustedHTMLFromEscapedTemplate(`
             <div class="ark-announcement-empty">
                 <span class="ark-content-eyebrow">
                     NO ANNOUNCEMENTS
@@ -131,7 +131,7 @@ function renderAnnouncements() {
                     There are currently no ARK announcements.
                 </p>
             </div>
-        `;
+        `);
 
         return;
     }
@@ -142,9 +142,9 @@ function renderAnnouncements() {
         ) {
             announcementList.insertAdjacentHTML(
                 "beforeend",
-                createAnnouncement(
+                trustedHTMLFromEscapedTemplate(createAnnouncement(
                     announcement
-                )
+                ))
             );
         }
     );

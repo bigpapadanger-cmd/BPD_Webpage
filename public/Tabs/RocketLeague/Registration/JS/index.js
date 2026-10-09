@@ -1,4 +1,5 @@
 import { normalizeAccountScope, migrateRegistrationDraft } from "/scripts/accountScope.js";
+import { trustedHTMLFromEscapedTemplate } from "/scripts/trustedDom.js";
 "use strict";
 
 /* =========================================================
@@ -430,7 +431,7 @@ function renderAvailabilityRows() {
             .end;
 
     container.innerHTML =
-        DAYS
+        trustedHTMLFromEscapedTemplate(DAYS
             .map(
                 day => {
                     const key =
@@ -484,7 +485,7 @@ function renderAvailabilityRows() {
                     `;
                 }
             )
-            .join("");
+            .join(""));
 
     container
         .querySelectorAll(

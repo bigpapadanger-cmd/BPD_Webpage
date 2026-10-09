@@ -5,6 +5,7 @@ MINECRAFT ANNOUNCEMENTS PAGE
 =========================================================
 */
 
+import { trustedHTMLFromEscapedTemplate } from "/scripts/trustedDom.js";
 import {
     renderHeader
 } from "/Framework/Shell/JS/renderHeader.js";
@@ -130,14 +131,13 @@ function renderAnnouncements() {
                 }
             );
 
-    announcementList.innerHTML =
-        "";
+    announcementList.replaceChildren();
 
     if (
         sortedAnnouncements.length ===
         0
     ) {
-        announcementList.innerHTML = `
+        announcementList.innerHTML = trustedHTMLFromEscapedTemplate(`
             <div class="minecraft-announcement-empty">
                 <span class="minecraft-content-eyebrow">
                     NO ANNOUNCEMENTS
@@ -147,7 +147,7 @@ function renderAnnouncements() {
                     There are currently no Minecraft announcements.
                 </p>
             </div>
-        `;
+        `);
 
         return;
     }
@@ -158,9 +158,9 @@ function renderAnnouncements() {
         ) {
             announcementList.insertAdjacentHTML(
                 "beforeend",
-                createAnnouncement(
+                trustedHTMLFromEscapedTemplate(createAnnouncement(
                     announcement
-                )
+                ))
             );
         }
     );
