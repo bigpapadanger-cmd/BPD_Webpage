@@ -1121,9 +1121,13 @@ async function fetchHTML(
         );
     }
 
+    if (response.redirected) {
+        throw new Error(label + " asset redirected unexpectedly.");
+    }
+
     const markup = await response.text();
     const { trustedHTMLFromStaticAsset } = await import("/scripts/trustedDom.js");
-    return trustedHTMLFromStaticAsset(markup, response.url || assetUrl.href);
+    return trustedHTMLFromStaticAsset(markup, assetUrl.href);
 }
 
 /* =========================================================

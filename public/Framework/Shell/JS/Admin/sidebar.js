@@ -420,6 +420,10 @@ export async function loadAdminSidebarHover() {
             );
         }
 
+        if (response.redirected) {
+            throw new Error("Admin sidebar hover asset redirected unexpectedly.");
+        }
+
         const hoverHTML =
             await response.text();
 
@@ -440,7 +444,7 @@ export async function loadAdminSidebarHover() {
             );
 
         container.innerHTML =
-            trustedHTMLFromStaticAsset(hoverHTML, response.url || hoverFile);
+            trustedHTMLFromStaticAsset(hoverHTML, hoverFile);
 
         while (
             container.firstElementChild

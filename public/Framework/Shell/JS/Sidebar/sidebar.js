@@ -194,6 +194,10 @@ export async function loadSidebarHover() {
             );
         }
 
+        if (response.redirected) {
+            throw new Error("Hover asset redirected unexpectedly.");
+        }
+
         const hoverHTML =
             await response.text();
 
@@ -214,7 +218,7 @@ export async function loadSidebarHover() {
             );
 
         container.innerHTML =
-            trustedHTMLFromStaticAsset(hoverHTML, response.url || hoverFile);
+            trustedHTMLFromStaticAsset(hoverHTML, hoverFile);
 
         while (
             container.firstElementChild
