@@ -121,7 +121,7 @@ test("mobile sidebar is an inert-background drawer with contained focus and safe
 
 test("all sidebar variants connect the disclosure toggle to flexible labels and the mobile drawer", async () => {
     const htmlRoot = new URL("../../public/Framework/Shell/HTML/Sidebar/", import.meta.url);
-    for (const name of ["mainmenu", "dashboard", "admin", "rl_menu"]) {
+    for (const name of ["mainmenu", "admin", "rl_menu"]) {
         const html = await readFile(new URL(`${name}.html`, htmlRoot), "utf8");
         assert.match(html, /id="sidebarToggle"[^>]*aria-controls="sidebarNavigation"/);
         assert.match(html, /id="sidebarNavigation"[^>]*class="sidebar-navigation/);

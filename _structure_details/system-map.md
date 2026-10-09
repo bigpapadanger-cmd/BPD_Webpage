@@ -1,6 +1,6 @@
 # DomainData System Map
 
-Snapshot: 2026-10-07
+Snapshot: 2026-10-09
 
 ## Runtime overview
 
@@ -34,15 +34,27 @@ general BPD access intact. OAuth provider resolve/link restrictions return only
 the generic `ACCOUNT_ACCESS_RESTRICTED` code. Verification outcome notices use
 the shared timed component and state-specific rounded borders/fade behavior.
 
-The shared Rocket League sidebar is implemented in
-`public/Framework/Shell/JS/Sidebar/`. A collapsed sidebar temporarily expands
+The shared navigation is implemented in
+`public/Framework/Shell/HTML/Sidebar/` and
+`public/Framework/Shell/JS/Sidebar/`. Dashboard and game hubs occupy the
+primary three-quarter section; account/settings, authorized Admin,
+community/help, and policies are grouped in the lower quarter. Game pages sit
+in expandable menus, and the current destination opens its matching menu.
+Collapsed navigation uses a compact fixed icon slot. A collapsed sidebar temporarily expands
 when a submenu is opened, then returns to the saved preference when the menu is
 closed or a destination is selected. This temporary state is not persisted.
-Competition, Players, and Tools use the shared submenu controller, and Rocket
+Player, Play, and Community use the shared submenu controller, and Rocket
 League access visibility refreshes on Rocket League subroutes while server
 route/API authorization remains authoritative. Settings and the router share
 browser-local `bpdTheme`, `bpdAnimations`, and `bpdSidebar` preferences; Settings
 changes apply immediately and appearance is reapplied on SPA and direct loads.
+
+The Dashboard uses existing account-auth state and the shared sanitized global
+notification controller. It displays up to three notifications for active
+signed-in accounts and generic copy while logged out. No authorized match
+activity feed is currently available, so match activity is not synthesized from
+other records. Admin Match Management is an authenticated placeholder that says
+the page is not developed; existing Admin access state gates its content.
 
 ## OCR execution
 

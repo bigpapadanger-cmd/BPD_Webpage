@@ -17,8 +17,7 @@
             + var(--sidebar-content-gap)
         );
     background: transparent;
-    transition:
-        padding-left 0.25s ease;
+    transition: background-color 0.25s ease;
 }
 
 body.sidebar-collapsed

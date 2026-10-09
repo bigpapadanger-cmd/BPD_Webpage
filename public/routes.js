@@ -67,7 +67,8 @@ export function getRouteStyles(pathname) {
         "/RocketLeague/MyMatches": ["/Tabs/RocketLeague/shared/featurePage.css"],
         "/RocketLeague/PrivateMatches": ["/Tabs/RocketLeague/shared/featurePage.css"],
         "/RocketLeague/UE6": ["/Tabs/RocketLeague/shared/featurePage.css"],
-        "/RocketLeague/WeeklyMatches": ["/Tabs/RocketLeague/shared/featurePage.css"]
+        "/RocketLeague/WeeklyMatches": ["/Tabs/RocketLeague/shared/featurePage.css"],
+        "/Admin/MatchManagement": ["/Global/Admin/MatchManagement/CSS/index.css"]
     };
     const result = styles[path] ?? [];
     if (path.startsWith("/RocketLeague") && !["/RocketLeague", "/RocketLeague/Profile", "/RocketLeague/MyProfile", "/RocketLeague/FindPlayers", "/RocketLeague/Player", "/RocketLeague/Shop", "/RocketLeague/FindCustomMatches", "/RocketLeague/Leaderboards", "/RocketLeague/MatchHistory", "/RocketLeague/MatchResults", "/RocketLeague/MyMatches", "/RocketLeague/PrivateMatches", "/RocketLeague/UE6", "/RocketLeague/WeeklyMatches"].includes(path)) {
@@ -151,7 +152,7 @@ export const ROUTES = {
             "/Framework/Shell/HTML/Header/header.html",
 
         sidebar:
-            "/Framework/Shell/HTML/Sidebar/dashboard.html",
+            "/Framework/Shell/HTML/Sidebar/mainmenu.html",
 
         footer:
             "/Framework/Shell/HTML/Footer/footer.html",
@@ -175,7 +176,7 @@ export const ROUTES = {
             "/Framework/Shell/HTML/Header/header.html",
 
         sidebar:
-            "/Framework/Shell/HTML/Sidebar/dashboard.html",
+            "/Framework/Shell/HTML/Sidebar/mainmenu.html",
 
         footer:
             "/Framework/Shell/HTML/Footer/footer.html",
@@ -973,6 +974,17 @@ export const ROUTES = {
 
         sitemap:
             false
+    },
+
+    "/Admin/MatchManagement": {
+        title: "Match Management | BPD Gaming Network",
+        body: "/Global/Admin/MatchManagement/HTML/index.html",
+        header: "/Framework/Shell/HTML/Header/header.html",
+        sidebar: "/Framework/Shell/HTML/Sidebar/admin.html",
+        footer: "/Framework/Shell/HTML/Footer/footer.html",
+        module: "/Global/Admin/MatchManagement/JS/index.js",
+        requiresAuth: true,
+        sitemap: false
     },
 
     "/Admin/FAQReview": {

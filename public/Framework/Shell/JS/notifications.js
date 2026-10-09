@@ -121,6 +121,7 @@ export function createNotificationController({ document, window, fetcher = windo
         });
         window.addEventListener("focus", () => { if (signedIn) void refresh(); });
         list.addEventListener("click", event => { void handleAction(event); });
+        document.addEventListener("bpd:notifications-refresh", () => { void refresh(true); });
     }
 
     function open() {
@@ -177,6 +178,16 @@ export function createNotificationController({ document, window, fetcher = windo
             item.append(title, messageNode, time, actions);
             list.append(item);
         }
+        if (typeof window.CustomEvent === "function") {
+            document.dispatchEvent(new window.CustomEvent("bpd:notifications-updated", {
+                detail: {
+                    signedIn,
+                    message,
+                    notifications: notifications.map(({ title, message: body, reviewAction, createdAt, reviewCode }) =>
+                        ({ title, message: body, reviewAction, createdAt, reviewCode }))
+                }
+            }));
+        }
     }
 
     async function refresh(force = false) {
@@ -211,6 +222,11 @@ export function createNotificationController({ document, window, fetcher = windo
             } catch {
                 if (timeoutId !== null) window.clearTimeout(timeoutId);
                 if (drawer && !drawer.hidden) status.textContent = "Notifications are temporarily unavailable. Please try again.";
+                if (typeof window.CustomEvent === "function") {
+                    document.dispatchEvent(new window.CustomEvent("bpd:notifications-unavailable", {
+                        detail: { signedIn }
+                    }));
+                }
             }
         })();
         try { await inFlight; } finally { inFlight = null; }

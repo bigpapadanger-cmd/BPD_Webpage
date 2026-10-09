@@ -31,12 +31,7 @@ Important:
             360px
         );
 
-    --sidebar-collapsed-width:
-        clamp(
-            64px,
-            5vw,
-            80px
-        );
+    --sidebar-collapsed-width: 58px;
 
     /* =====================================================
     SIDEBAR SPACING
@@ -67,10 +62,7 @@ Important:
             54px
         );
 
-    --sidebar-icon-width:
-        var(
-            --sidebar-collapsed-width
-        );
+    --sidebar-icon-width: 46px;
 
     /* =====================================================
     TOGGLE HEADER
@@ -709,7 +701,7 @@ NAVIGATION GROUPS
     display: flex;
 
     flex:
-        0 0 auto;
+        3 1 75%;
 
     flex-direction: column;
 
@@ -718,6 +710,14 @@ NAVIGATION GROUPS
     min-width: 0;
 
     gap: 2px;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+
+.sidebar-navigation-bottom {
+    flex: 1 1 25%;
+    min-height: 25%;
 }
 
 /* =========================================================
@@ -1053,12 +1053,7 @@ VERY SMALL VIEWPORTS
                 300px
             );
 
-        --sidebar-collapsed-width:
-            clamp(
-                58px,
-                16vw,
-                68px
-            );
+        --sidebar-collapsed-width: 56px;
 
         --sidebar-edge-gap:
             4px;
@@ -1104,6 +1099,22 @@ SHORT VIEWPORTS
     .site-sidebar .nav-item {
         min-height:
             36px;
+    }
+}
+
+/* Keep the collapsed desktop icon rail close to the icon's own height. */
+@media (min-width: 701px) {
+    body.sidebar-collapsed {
+        --sidebar-row-height: 24px;
+    }
+
+    body.sidebar-collapsed .site-sidebar .nav-item {
+        flex-basis: 24px;
+        min-height: 24px;
+    }
+
+    body.sidebar-collapsed .site-sidebar .nav-icon {
+        height: 24px;
     }
 }
 

@@ -7,7 +7,8 @@
             <span aria-hidden="true"></span>
         </button>
     </div>
-        <nav id="sidebarNavigation" class="sidebar-navigation sidebar-nav" aria-label="Rocket League navigation">
+    <nav id="sidebarNavigation" class="sidebar-navigation sidebar-nav" aria-label="Rocket League navigation">
+    <div class="sidebar-navigation-top">
         <div class="sidebar-group">
             <a href="/Dashboard" class="nav-item" data-router-link data-nav-route="/Dashboard" data-tooltip="Dashboard">
                 <span class="nav-icon" data-sidebar-icon="dashboard" aria-hidden="true"></span>
@@ -56,6 +57,8 @@
                     data-auth="authenticated" data-rl-access="required" hidden>Private Matches</a>
                 <a href="/RocketLeague/WeeklyMatches" class="submenu-item" data-router-link data-nav-route="/RocketLeague/WeeklyMatches"
                     data-auth="authenticated" data-rl-access="required" hidden>Weekly Matches</a>
+                <a href="/RocketLeague/SubmitMatchResults" class="submenu-item" data-router-link data-nav-route="/RocketLeague/SubmitMatchResults"
+                    data-auth="authenticated" data-rl-access="required" hidden>Submit Match Results</a>
             </div>
         </div>
         <div class="nav-divider" role="separator"></div>
@@ -77,13 +80,33 @@
                     target="_blank" rel="noopener noreferrer">Add Discord Bot</a>
             </div>
         </div>
-        <div class="sidebar-navigation-spacer" aria-hidden="true"></div>
-        <div class="nav-divider sidebar-bottom-divider" role="separator"></div>
-        <div class="sidebar-group sidebar-bottom">
-            <a href="/Settings?context=rocketleague&amp;returnTo=%2FRocketLeague" class="nav-item" data-router-link data-nav-route="/Settings" data-settings-context="rocketleague" data-tooltip="Settings">
-                <span class="nav-icon" data-sidebar-icon="settings" aria-hidden="true"></span>
-                <span class="nav-text"><span class="nav-label">Settings</span></span>
-            </a>
+    </div>
+    <div class="sidebar-navigation-bottom">
+        <div class="sidebar-group sidebar-menu" data-sidebar-menu>
+            <button class="nav-item sidebar-menu-toggle" type="button" aria-expanded="false" aria-controls="rlAccountMenu" data-tooltip="Account and settings">
+                <span class="nav-icon" data-sidebar-icon="account" aria-hidden="true"></span><span class="nav-label">Account &amp; settings</span><span class="submenu-arrow" data-sidebar-icon="chevron" aria-hidden="true"></span>
+            </button>
+            <div class="sidebar-submenu" id="rlAccountMenu" role="group" aria-label="Account and settings" hidden>
+                <a href="/Account" class="submenu-item" data-router-link data-nav-route="/Account">My Account</a>
+                <a href="/Settings?context=rocketleague&amp;returnTo=%2FRocketLeague" class="submenu-item" data-router-link data-nav-route="/Settings" data-settings-context="rocketleague">Settings</a>
+            </div>
         </div>
+        <a id="adminNavItem" href="/Admin" class="nav-item" data-router-link data-nav-route="/Admin" data-tooltip="Admin" hidden>
+            <span class="nav-icon" data-sidebar-icon="admin" aria-hidden="true"></span><span class="nav-label">Admin</span>
+        </a>
+        <a href="/FAQ" class="nav-item" data-router-link data-nav-route="/FAQ" data-tooltip="FAQ">
+            <span class="nav-icon" data-sidebar-icon="faq" aria-hidden="true"></span><span class="nav-label">FAQ</span>
+        </a>
+        <div class="sidebar-group sidebar-menu" data-sidebar-menu>
+            <button class="nav-item sidebar-menu-toggle" type="button" aria-expanded="false" aria-controls="rlInfoMenu" data-tooltip="About and policies">
+                <span class="nav-icon" data-sidebar-icon="about" aria-hidden="true"></span><span class="nav-label">About &amp; policies</span><span class="submenu-arrow" data-sidebar-icon="chevron" aria-hidden="true"></span>
+            </button>
+            <div class="sidebar-submenu" id="rlInfoMenu" role="group" aria-label="About and policies" hidden>
+                <a href="/About" class="submenu-item" data-router-link data-nav-route="/About">About us</a>
+                <a href="/Privacy" class="submenu-item" data-router-link data-nav-route="/Privacy">Privacy policy</a>
+                <a href="/TOS" class="submenu-item" data-router-link data-nav-route="/TOS">Terms of service</a>
+            </div>
+        </div>
+    </div>
     </nav>
 </div>

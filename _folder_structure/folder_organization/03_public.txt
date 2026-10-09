@@ -1,5 +1,5 @@
 PUBLIC/: BROWSER APPLICATION, PAGES, AND STATIC ASSETS
-Snapshot: 2026-10-07
+Snapshot: 2026-10-09
 
 ROLE
 
@@ -13,6 +13,12 @@ Public static routes also include their body in the Pages server response.
 Continuation surfaces: RocketLeague/UE6 and Admin Home
 JS/custom_match_recovery.js. UE6 is public/static commentary; Admin recovery
 is server-authorized; its live RPC acceptance passed. Real runtime transport remains pending.
+
+The shared navigation uses a primary top section and grouped lower account,
+Admin, support, and policy links. `mainmenu.html` is shared by the public home,
+Dashboard, and account routes; the Rocket League route family retains
+`rl_menu.html`. Dashboard updates reuse the existing authenticated notification
+controller and do not create a match-activity data contract.
 
 ROOT FILES
 
@@ -49,7 +55,8 @@ public/Framework/
     |   +-- Footer/footer.html
     |   +-- Header/header.html
     |   +-- Sidebar/
-|       +-- admin.html, dashboard.html, hover.html, mainmenu.html, rl_menu.html
+|       +-- admin.html, hover.html, mainmenu.html, rl_menu.html
+|           mainmenu.html: Dashboard and game destinations grouped above account/community/policy menus.
 |           rl_menu.html: shared RL Home / Player / Play / Community navigation; Community includes external Add Discord Bot.
 |           RL Settings links carry explicit context and a registered RL return path; Settings retains the RL sidebar/caller and a return link.
     +-- JS/
@@ -76,6 +83,7 @@ public/Global/
 +-- Account/             CSS/index.css, HTML/index.html, JS/index.js
 +-- Admin/
 |   +-- Home/            CSS/index.css, HTML/index.html, JS/index.js
+|   +-- MatchManagement/ CSS/index.css, HTML/index.html, JS/index.js (authenticated not-developed placeholder)
 |   +-- UserManagement/  CSS/index.css, HTML/index.html, JS/index.js
 |   +-- Shared/          CSS/accordion.css, JS/accordion.js and modal_focus.js; native disclosures, ARIA synchronization and nested modal focus/inert ownership
 |   +-- WorkerStatus/    CSS/index.css, HTML/index.html, JS/index.js, JS/mmr_controls.js, JS/rocket_league_capabilities.js; Admin-only Rocket League force refresh
@@ -177,6 +185,7 @@ ROUTE-TO-FOLDER MAP
     /, /Dashboard         -> Framework shell and Global/Index
     /Account, /Login      -> Global/Account and Global/Login
     /Admin                -> Global/Admin/Home
+    /Admin/MatchManagement -> Global/Admin/MatchManagement; authenticated placeholder, Admin access state checked before content
     /Admin/UserManagement -> Global/Admin/UserManagement; BPD-authenticated API delegates view/actions to live User Management RPC permissions
     /Admin/Taskboard      -> Global/Admin/TaskBoard
 /RocketLeague/Profile -> Registration onboarding; established accounts redirect to /RocketLeague/MyProfile

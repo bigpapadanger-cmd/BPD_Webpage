@@ -13,6 +13,7 @@ export const SIDEBAR_ICONS = Object.freeze({
     player: "👤",
     play: "🎮",
     community: "👥",
+    account: "♙",
     settings: "⚙️",
     faq: "❓",
     suggestions: "💡",

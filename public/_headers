@@ -3,8 +3,9 @@
     X-Frame-Options: SAMEORIGIN
     Referrer-Policy: strict-origin-when-cross-origin
     Permissions-Policy: camera=(), microphone=()
+    Cross-Origin-Opener-Policy: same-origin-allow-popups
     Content-Security-Policy-Report-Only: object-src 'none'; base-uri 'self'; frame-ancestors 'self'; form-action 'self'; require-trusted-types-for 'script'
-    Strict-Transport-Security: max-age=300
+    Strict-Transport-Security: max-age=31536000
 
 https://:project.pages.dev/*
     X-Robots-Tag: noindex

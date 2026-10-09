@@ -581,6 +581,9 @@ function createProviderIcon(
     image.alt =
         "";
 
+    image.width = 15;
+    image.height = 15;
+
     image.decoding =
         "async";
 

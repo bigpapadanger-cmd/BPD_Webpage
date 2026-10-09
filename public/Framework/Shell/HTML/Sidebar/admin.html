@@ -56,17 +56,28 @@
     </div>
 
     <div class="sidebar-navigation-bottom">
-        <a href="/Settings" class="nav-item" data-router-link data-nav-route="/Settings" data-tooltip="User Settings">
-            <span class="nav-icon" data-sidebar-icon="settings" aria-hidden="true"></span>
-            <span class="nav-label">User Settings</span>
-        </a>
-        <a href="/TOS" class="nav-item" data-router-link data-nav-route="/TOS" data-tooltip="TOS">
-            <span class="nav-icon" data-sidebar-icon="terms" aria-hidden="true"></span>
-            <span class="nav-label">TOS</span>
-        </a>
-        <a href="/Privacy" class="nav-item" data-router-link data-nav-route="/Privacy" data-tooltip="Privacy Policy">
-            <span class="nav-icon" data-sidebar-icon="privacy" aria-hidden="true"></span>
-            <span class="nav-label">Privacy Policy</span>
-        </a>
+        <div class="sidebar-group sidebar-menu" data-sidebar-menu>
+            <button class="nav-item sidebar-menu-toggle" type="button" aria-expanded="false" aria-controls="adminAccountSubmenu" data-tooltip="Account and settings">
+                <span class="nav-icon" data-sidebar-icon="account" aria-hidden="true"></span>
+                <span class="nav-label">Account &amp; settings</span>
+                <span class="submenu-arrow" data-sidebar-icon="chevron" aria-hidden="true"></span>
+            </button>
+            <div class="sidebar-submenu" id="adminAccountSubmenu" role="group" aria-label="Account and settings" hidden>
+                <a href="/Settings" class="submenu-item" data-router-link data-nav-route="/Settings">User Settings</a>
+                <a href="/Account" class="submenu-item" data-router-link data-nav-route="/Account">My Account</a>
+            </div>
+        </div>
+        <div class="sidebar-group sidebar-menu" data-sidebar-menu>
+            <button class="nav-item sidebar-menu-toggle" type="button" aria-expanded="false" aria-controls="adminPolicySubmenu" data-tooltip="About and policies">
+                <span class="nav-icon" data-sidebar-icon="about" aria-hidden="true"></span>
+                <span class="nav-label">About &amp; policies</span>
+                <span class="submenu-arrow" data-sidebar-icon="chevron" aria-hidden="true"></span>
+            </button>
+            <div class="sidebar-submenu" id="adminPolicySubmenu" role="group" aria-label="About and policies" hidden>
+                <a href="/About" class="submenu-item" data-router-link data-nav-route="/About">About us</a>
+                <a href="/Privacy" class="submenu-item" data-router-link data-nav-route="/Privacy">Privacy policy</a>
+                <a href="/TOS" class="submenu-item" data-router-link data-nav-route="/TOS">Terms of service</a>
+            </div>
+        </div>
     </div>
 </nav>

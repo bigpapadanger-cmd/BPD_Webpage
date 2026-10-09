@@ -771,7 +771,14 @@ function setupActiveNavigation() {
     );
     document.querySelectorAll("#sidebar [data-sidebar-menu]").forEach(group => {
         const toggle = group.querySelector?.(".sidebar-menu-toggle");
-        toggle?.classList.toggle("active", Boolean(group.querySelector?.(".submenu-item.active")));
+        const activeChild = group.querySelector?.(".submenu-item.active");
+        toggle?.classList.toggle("active", Boolean(activeChild));
+        if (activeChild && toggle) {
+            const submenu = toggle.getAttribute("aria-controls")
+                ? document.getElementById(toggle.getAttribute("aria-controls")) : null;
+            toggle.setAttribute("aria-expanded", "true");
+            if (submenu) submenu.hidden = false;
+        }
     });
 }
 

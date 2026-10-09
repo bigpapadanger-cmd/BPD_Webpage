@@ -10,7 +10,8 @@
     --dashboard-muted: #9eafc3;
     width: min(100% - 36px, 1120px);
     min-width: 0;
-    margin: 34px auto 54px;
+    margin: 0 auto;
+    padding: 34px 0 54px;
     color: #edf4ff;
 }
 
@@ -135,6 +136,26 @@
 
 .dashboard-shortcuts { margin-top: 33px; }
 
+.dashboard-updates { margin-top: 30px; }
+.dashboard-updates-status { margin: 0 0 12px; color: var(--dashboard-muted); font-size: .88rem; }
+.dashboard-updates-list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.dashboard-update-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    min-width: 0;
+    padding: 14px 16px;
+    border: 1px solid var(--dashboard-border);
+    border-radius: 13px;
+    background: rgba(17, 25, 38, .76);
+}
+.dashboard-update-card h3 { margin: 0; color: #f0f6ff; font-size: .94rem; }
+.dashboard-update-card p { margin: 5px 0; color: #d4dfed; font-size: .86rem; line-height: 1.45; }
+.dashboard-update-card time { color: var(--dashboard-muted); font-size: .76rem; }
+.dashboard-update-card a { flex: 0 0 auto; color: #c9eaff; font-size: .84rem; font-weight: 700; text-decoration: none; }
+.dashboard-update-card a:hover, .dashboard-update-card a:focus-visible { color: #fff; text-decoration: underline; }
+
 .dashboard-section-heading {
     display: flex;
     align-items: flex-end;
@@ -189,11 +210,12 @@
 .dashboard-arrow { justify-self: end; color: #8cb7d6; }
 
 @media (max-width: 700px) {
-    .user-dashboard { width: min(100% - 20px, 1120px); margin: 16px auto 32px; }
+    .user-dashboard { width: min(100% - 20px, 1120px); margin: 0 auto; padding: 16px 0 32px; }
     .dashboard-hero { align-items: flex-start; flex-direction: column; padding: 24px 20px; border-radius: 17px; }
     .dashboard-link-grid { grid-template-columns: minmax(0, 1fr); }
     .dashboard-account-panel { padding: 17px; }
     .dashboard-account-meta, .dashboard-sign-in { margin-left: 0; }
+    .dashboard-update-card { align-items: flex-start; }
 }
 
 @media (prefers-reduced-motion: reduce) {

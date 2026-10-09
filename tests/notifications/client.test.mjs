@@ -43,12 +43,15 @@ function fakePage(fetcher) {
         createElement(tag) { return new FakeElement(this, tag); },
         getElementById(id) { return this.ids.get(id) || null; },
         querySelector(selector) { return selector === ".bpd-account-banner__inner" ? this.inner : null; },
-        addEventListener(name, handler) { this.listeners.set(name, handler); } };
+        addEventListener(name, handler) { this.listeners.set(name, handler); },
+        dispatchEvent(event) { this.dispatched.push(event); this.listeners.get(event.type)?.(event); return true; },
+        dispatched: [] };
     document.body = new FakeElement(document, "body");
     document.inner = new FakeElement(document, "div"); document.inner.className = "bpd-account-banner__inner";
     document.body.append(document.inner);
     const intervals = new Set();
-    const window = { fetch: fetcher, addEventListener() {}, setInterval(fn) { intervals.add(fn); return fn; }, clearInterval(id) { intervals.delete(id); },
+    const window = { fetch: fetcher, CustomEvent: class { constructor(type, init = {}) { this.type = type; Object.assign(this, init); } },
+        addEventListener() {}, setInterval(fn) { intervals.add(fn); return fn; }, clearInterval(id) { intervals.delete(id); },
         setTimeout(fn) { return fn; }, clearTimeout() {} };
     return { document, window, intervals };
 }
@@ -69,6 +72,27 @@ test("client normalization accepts only safe normalized fields and allowlisted r
     assert.equal(normalizeClientNotification(validNotice({ message: "Contact hidden@example.com" })), null);
     assert.equal(normalizeClientNotification(validNotice({ reviewAction: "javascript:alert(1)" })), null);
     assert.equal(normalizeClientNotification(validNotice({ source: "ocr", reviewAction: "ocr.review", reviewCode: "../../evil" })), null);
+});
+
+test("dashboard notification event exposes only display and allowlisted review fields and reports fetch failure", async () => {
+    let fail = false;
+    const fixture = fakePage(async () => fail
+        ? Response.json({ success: false }, { status: 503 })
+        : Response.json({ success: true, notifications: [validNotice({ source: "ocr", reviewAction: "ocr.review", reviewCode: "ABCD1234EFGH5678" })] }));
+    const controller = createNotificationController(fixture);
+    controller.mount();
+    controller.setAuthState({ authenticated: true, available: true });
+    await new Promise(resolve => setTimeout(resolve, 0));
+    const update = fixture.document.dispatched.find(event => event.type === "bpd:notifications-updated");
+    assert.equal(update.detail.signedIn, true);
+    assert.deepEqual(Object.keys(update.detail.notifications[0]).sort(), ["createdAt", "message", "reviewAction", "reviewCode", "title"]);
+    assert.equal(update.detail.notifications[0].reviewCode, "ABCD1234EFGH5678");
+    assert.equal("publicCode" in update.detail.notifications[0], false);
+
+    fail = true;
+    await controller.refresh(true);
+    const unavailable = fixture.document.dispatched.find(event => event.type === "bpd:notifications-unavailable");
+    assert.equal(unavailable.detail.signedIn, true);
 });
 
 test("drawer is gated by confirmed auth, fetches same-origin without account data and restores focus on Escape", async () => {

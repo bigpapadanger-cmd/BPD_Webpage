@@ -63,7 +63,7 @@ export const PAGE_ROUTE_INVENTORY = Object.freeze([
         "exists": true
       },
       {
-        "path": "/Framework/Shell/HTML/Sidebar/dashboard.html",
+        "path": "/Framework/Shell/HTML/Sidebar/mainmenu.html",
         "exists": true
       },
       {
@@ -103,7 +103,7 @@ export const PAGE_ROUTE_INVENTORY = Object.freeze([
         "exists": true
       },
       {
-        "path": "/Framework/Shell/HTML/Sidebar/dashboard.html",
+        "path": "/Framework/Shell/HTML/Sidebar/mainmenu.html",
         "exists": true
       },
       {
@@ -1356,6 +1356,46 @@ export const PAGE_ROUTE_INVENTORY = Object.freeze([
       },
       {
         "path": "/Global/Admin/TaskBoard/JS/index.js",
+        "exists": true
+      }
+    ]
+  },
+  {
+    "path": "/Admin/MatchManagement",
+    "lookupKey": "/admin/matchmanagement",
+    "canonicalPath": "/Admin/MatchManagement",
+    "routeType": "page",
+    "casePolicy": "human-insensitive",
+    "sourceFiles": [
+      "public/routes.js"
+    ],
+    "handler": "functions/[[path]].js",
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "authRequired": true,
+    "healthStatus": "registered",
+    "deepLinkSupported": true,
+    "targets": [
+      {
+        "path": "/Global/Admin/MatchManagement/HTML/index.html",
+        "exists": true
+      },
+      {
+        "path": "/Framework/Shell/HTML/Header/header.html",
+        "exists": true
+      },
+      {
+        "path": "/Framework/Shell/HTML/Sidebar/admin.html",
+        "exists": true
+      },
+      {
+        "path": "/Framework/Shell/HTML/Footer/footer.html",
+        "exists": true
+      },
+      {
+        "path": "/Global/Admin/MatchManagement/JS/index.js",
         "exists": true
       }
     ]

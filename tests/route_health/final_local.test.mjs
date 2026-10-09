@@ -28,10 +28,12 @@ test("security staging matches static/Function policies without enforcing Truste
     const policy = response.headers.get("Content-Security-Policy-Report-Only");
     assert.match(policy, /object-src 'none'/); assert.match(policy, /require-trusted-types-for 'script'/);
     assert.equal(response.headers.has("Content-Security-Policy"), false);
-    assert.equal(response.headers.get("Strict-Transport-Security"), "max-age=300");
+    assert.equal(response.headers.get("Strict-Transport-Security"), "max-age=31536000");
+    assert.equal(response.headers.get("Cross-Origin-Opener-Policy"), "same-origin-allow-popups");
     const staticHeaders = await readFile("public/_headers", "utf8");
     assert.ok(staticHeaders.includes(`Content-Security-Policy-Report-Only: ${policy}`));
-    assert.ok(staticHeaders.includes("Strict-Transport-Security: max-age=300"));
+    assert.ok(staticHeaders.includes("Strict-Transport-Security: max-age=31536000"));
+    assert.ok(staticHeaders.includes("Cross-Origin-Opener-Policy: same-origin-allow-popups"));
     assert.doesNotMatch(response.headers.get("Strict-Transport-Security"), /preload|includeSubDomains/);
     const local = await secure({ request: new Request("http://localhost/FAQ"), next: async () => new Response("page") });
     assert.equal(local.headers.has("Strict-Transport-Security"), false);

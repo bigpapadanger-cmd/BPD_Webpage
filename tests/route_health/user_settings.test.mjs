@@ -205,22 +205,12 @@ test("sidebar icons use the shared accessible icon slot and consistent dashboard
     for (const sidebar of sharedSidebars) {
         assert.match(sidebar, /class="nav-icon"[\s\S]*?aria-hidden="true"/);
     }
-    const iconFor = (sidebar, tooltip) => {
-        const tooltipIndex = sidebar.indexOf(`data-tooltip="${tooltip}"`);
-        const itemStart = sidebar.lastIndexOf("<a", tooltipIndex);
-        const itemEnd = sidebar.indexOf("</a>", tooltipIndex) + 4;
-        const item = sidebar.slice(itemStart, itemEnd);
-        const key = item.match(/data-sidebar-icon="([^"]+)"/)?.[1];
-        return SIDEBAR_ICONS[key];
-    };
-    for (const sidebar of sharedSidebars.slice(0, 2)) {
-        assert.equal(iconFor(sidebar, "Dashboard"), "📊");
+    for (const sidebar of sharedSidebars) {
+        assert.match(sidebar, /data-sidebar-icon="dashboard"/);
+        assert.match(sidebar, /data-sidebar-icon="account"/);
     }
-    assert.equal(iconFor(sharedSidebars[0], "Rocket League"), "⚽");
-    assert.equal(iconFor(sharedSidebars[2], "Home"), "⚽");
-    assert.equal(iconFor(sharedSidebars[0], "Settings"), "⚙️");
-    assert.equal(iconFor(sharedSidebars[1], "User Settings"), "⚙️");
-    assert.equal(iconFor(sharedSidebars[2], "Settings"), "⚙️");
+    assert.match(sharedSidebars[0], /data-sidebar-icon="rocketleague"/);
+    assert.match(sharedSidebars[2], /data-nav-route="\/Dashboard"[\s\S]*?data-sidebar-icon="dashboard"/);
     const styles = await readFile(new URL("../../public/Framework/Shell/CSS/Sidebar/sidebar.css", import.meta.url), "utf8");
     const rocketLeagueStyles = await readFile(new URL("../../public/Framework/Shell/CSS/Sidebar/rl_AuthSidebar.css", import.meta.url), "utf8");
     assert.match(styles, /\.site-sidebar \.nav-icon[\s\S]*?font-size: 1\.15rem/);

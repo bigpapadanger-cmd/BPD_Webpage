@@ -57,8 +57,7 @@ FOOTER SHELL
     color:
         #9299a8;
 
-    transition:
-        padding-left 0.25s ease;
+    transition: background-color 0.25s ease;
 }
 
 /* =========================================================
@@ -154,7 +153,7 @@ BRAND
 
 .footer-copyright {
     color:
-        #707787;
+        #aeb5c3;
 }
 
 /* =========================================================

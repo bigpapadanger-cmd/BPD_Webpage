@@ -163,7 +163,7 @@ SITE CONTENT
 ========================================================= */
 
 .site-content {
-    display: block;
+    display: flow-root;
 
     flex:
         1 1 auto;

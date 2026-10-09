@@ -1,4 +1,4 @@
-<main class="user-dashboard" aria-labelledby="dashboardTitle">
+<section class="user-dashboard" aria-labelledby="dashboardTitle">
     <header class="dashboard-hero">
         <div>
             <p class="dashboard-eyebrow">YOUR BPD SPACE</p>
@@ -25,6 +25,18 @@
         <a id="dashboardSignIn" class="dashboard-sign-in" href="/Login" data-router-link hidden>Sign in to manage your account <span aria-hidden="true">→</span></a>
     </section>
 
+    <section class="dashboard-updates" aria-labelledby="dashboardUpdatesTitle">
+        <div class="dashboard-section-heading">
+            <div>
+                <p class="dashboard-eyebrow">YOUR ACTIVITY</p>
+                <h2 id="dashboardUpdatesTitle">Updates for you</h2>
+            </div>
+            <a href="/Account" data-router-link class="dashboard-home-link">Account <span aria-hidden="true">→</span></a>
+        </div>
+        <p id="dashboardUpdatesStatus" class="dashboard-updates-status" role="status" aria-live="polite">Sign in to see updates for your account.</p>
+        <ul id="dashboardUpdatesList" class="dashboard-updates-list" aria-label="Recent account notifications"></ul>
+    </section>
+
     <section class="dashboard-shortcuts" aria-labelledby="dashboardShortcutsTitle">
         <div class="dashboard-section-heading">
             <div>
@@ -40,4 +52,4 @@
             <a class="dashboard-link-card" href="/Suggestions" data-router-link><span class="dashboard-link-icon" aria-hidden="true">💡</span><span><strong>Suggestions</strong><small>Ideas from the community</small></span><span class="dashboard-arrow" aria-hidden="true">↗</span></a>
         </nav>
     </section>
-</main>
+</section>

@@ -17,6 +17,21 @@ test("public main menu and personal dashboard use distinct content", async () =>
     assert.doesNotMatch(dashboard, /WELCOME TO|Future/);
     assert.match(dashboardModule, /getAuthState/);
     assert.match(dashboardModule, /hasActiveAccount/);
+    assert.match(dashboard, /dashboardUpdatesList/);
+    assert.match(dashboardModule, /bpd:notifications-updated/);
+    assert.match(dashboardModule, /bpd:notifications-refresh/);
+    assert.doesNotMatch(dashboardModule, /fetch\(/);
+});
+
+test("Admin Match Management resolves to a guarded placeholder page", async () => {
+    const route = ROUTES["/Admin/MatchManagement"];
+    const html = await readFile(new URL(`../../public${route.body}`, import.meta.url), "utf8");
+    const module = await readFile(new URL(`../../public${route.module}`, import.meta.url), "utf8");
+    assert.equal(route.requiresAuth, true);
+    assert.equal(route.sitemap, false);
+    assert.match(html, /This page has not been developed yet\./);
+    assert.match(module, /hasAdminAccess\(state\)/);
+    assert.match(module, /Admin access could not be verified\./);
 });
 
 test("Admin shortcut on the main menu stays hidden until server authorization", async () => {
