@@ -2,7 +2,7 @@
 
 import { ADMIN_PERMISSIONS, authorizeAdminPermission } from "../../services/admin/permissions.js";
 import { readJsonBody } from "../../services/http/json.js";
-import { getSystemStatus, performSystemStatusAction, updateMmrBuildConfiguration } from "../../services/admin/system_status.js";
+import { getSystemStatus, performSystemStatusAction, updateMmrBuildConfiguration, validateMmrBuildCandidate, promoteMmrBuildCandidate } from "../../services/admin/system_status.js";
 
 function json(body, status = 200, headers = {}) {
     return Response.json(body, { status, headers: { "Cache-Control": "no-store", ...headers } });
@@ -46,6 +46,10 @@ export async function onRequestPost({ request, env }) {
     try {
         const result = service === "mmr-api" && action === "validate-build"
             ? await updateMmrBuildConfiguration(env, parsed.data)
+            : service === "mmr-api" && action === "validate-build-candidate"
+                ? await validateMmrBuildCandidate(env, parsed.data)
+                : service === "mmr-api" && action === "promote-build-candidate"
+                    ? await promoteMmrBuildCandidate(env, parsed.data)
             : await performSystemStatusAction(env, service, action, parsed.data);
         console.info("ADMIN SYSTEM ACTION", { service, action, requestId, requestedAt: new Date(startedAt).toISOString(), completedAt: new Date().toISOString(), result: "success", durationMs: Date.now() - startedAt });
         return json(result);

@@ -22,7 +22,7 @@ const ACTIONS = {
     "ocr-queue": ["recheck"], "cloud-run-ocr": ["recheck"], "provider-runtime": ["recheck"], supabase: ["recheck", "test-rl-counters"],
     "discord-matchbot": ["recheck"], "discord-authz-bot": ["recheck"],
     "custom-match-runtime": ["recheck"], "discord-communications": ["recheck"],
-    "mmr-api": ["recheck", "refresh-eos", "reauthorize-account", "poll-authorization", "reconnect-psynet", "repair-session", "functional-test"]
+    "mmr-api": ["recheck", "refresh-eos", "reauthorize-account", "poll-authorization", "reconnect-psynet", "repair-session", "functional-test", "validate-build-candidate", "promote-build-candidate"]
 };
 const SERVICE_STATUS_PREFIX = "admin:service-status:";
 const SERVICE_GROUPS = {
@@ -397,6 +397,9 @@ function normalizeMmrHealth(payload, responseTimeMs, adminConfigured) {
         buildSource: healthState(components.buildConfiguration?.source || build.source),
         buildSecretConfigured: components.buildConfiguration?.buildSecretConfigured === true || build.buildSecretConfigured === true,
         buildStatus: healthState(components.buildConfiguration?.status || build.status) || "unknown",
+        protocolBuildIdMatches: (components.buildConfiguration?.derivedBuildId ?? build.currentBuildId) !== null && (components.buildConfiguration?.derivedBuildId ?? build.currentBuildId) !== undefined
+            ? String(components.buildConfiguration?.derivedBuildId ?? build.currentBuildId) === String(build.currentBuildId ?? components.buildConfiguration?.derivedBuildId)
+            : null,
         supportsBuildUpdate: adminConfigured,
         lastAuthAttemptAt: safeTimestamp(psynet.lastAuthAttemptAt),
         lastAuthSuccessAt: safeTimestamp(components.psynetAuthentication?.lastSuccessAt || psynet.lastAuthSuccessAt),
@@ -413,6 +416,11 @@ function normalizeMmrHealth(payload, responseTimeMs, adminConfigured) {
             versionMismatchDetectedAt: safeTimestamp(build.versionMismatchDetectedAt), lastFailureCode: healthCode(psynet.lastFailureCode),
             lastFailureStage: healthState(psynet.lastFailureStage), lastProviderCode: healthCode(psynet.lastProviderCode)
         },
+        routeUsage: traffic.routeUsage && typeof traffic.routeUsage === "object" ? Object.fromEntries(Object.entries(traffic.routeUsage).slice(0, 12).map(([path, value]) => [path, {
+            requestCount: count(value?.requestCount) || 0,
+            lastUsedAt: safeTimestamp(value?.lastUsedAt),
+            statusCategory: ["success", "client_error", "server_error"].includes(value?.statusCategory) ? value.statusCategory : "unknown"
+        }])) : null,
         mmrRequests: count(traffic.totalRequests) || 0, mmrSuccesses: count(traffic.successfulRequests) || 0,
         mmrFailures: count(traffic.failedRequests) || 0, emptyRequests: count(traffic.emptyRequests) || 0,
         rateLimitedRequests: count(traffic.rateLimitedRequests) || 0,
@@ -512,7 +520,7 @@ export async function performSystemStatusAction(env, service, action, input = {}
         }
         if (service === "mmr-api") {
             if (action === "functional-test") return await testMmrSkills(env, service, action, input);
-            return await runMmrAdminAction(env, service, action);
+            return await runMmrAdminAction(env, service, action, input);
         }
         let result;
         if (service === "pages") result = statusEntry("pages", "Pages Functions", "healthy", "Authenticated Pages API is responding.", { responseTimeMs: 0 });
@@ -589,6 +597,38 @@ export async function updateMmrBuildConfiguration(env, input) {
         validatedAt: safeText(payload?.validatedAt), reconnectSucceeded: payload?.reconnectSucceeded === true,
         reconnectCode: safeCode(payload?.reconnectCode, null)
     };
+}
+
+export async function validateMmrBuildCandidate(env, input) {
+    return await callMmrBuildConfiguration(env, "/admin/build-configuration/validate", input, "RL_BUILD_CANDIDATE_INVALID");
+}
+
+export async function promoteMmrBuildCandidate(env, input) {
+    const payload = await callMmrBuildConfiguration(env, "/admin/build-configuration/promote", input, "RL_BUILD_PROMOTION_INVALID");
+    await invalidateMmrStatus(env);
+    return payload;
+}
+
+async function callMmrBuildConfiguration(env, path, input, invalidCode) {
+    const endpoint = String(env?.MMR_API_URL || "").trim();
+    const adminKey = String(env?.MMR_ADMIN_API_KEY || "").trim();
+    if (!endpoint || !adminKey) throw actionError("RL_BUILD_UPDATE_NOT_CONFIGURED", 503);
+    const gameVersion = typeof input?.gameVersion === "string" ? input.gameVersion.trim() : "";
+    const featureSet = typeof input?.featureSet === "string" ? input.featureSet.trim() : "";
+    const buildSecret = typeof input?.buildSecret === "string" ? input.buildSecret.trim() : "";
+    const approvalToken = typeof input?.approvalToken === "string" ? input.approvalToken.trim() : "";
+    if (!/^\d{6}\.\d{1,8}\.\d{1,8}$/.test(gameVersion) || !/^[A-Za-z0-9_.-]{1,64}$/.test(featureSet) || buildSecret.length < 8 || buildSecret.length > 512 || (path.endsWith("/promote") && !approvalToken)) throw actionError(invalidCode, 400);
+    let response;
+    try {
+        response = await timedFetch(signal => fetch(new URL(path, endpoint), {
+            method: "POST", redirect: "manual", signal,
+            headers: { Authorization: `Bearer ${adminKey}`, Accept: "application/json", "Content-Type": "application/json" },
+            body: JSON.stringify({ gameVersion, featureSet, buildSecret, ...(approvalToken ? { approvalToken } : {}) })
+        }), ACTION_TIMEOUT_MS);
+    } catch (cause) { throw actionError(healthTimedOut(cause) ? "RL_BUILD_UPDATE_TIMEOUT" : "RL_BUILD_UPDATE_UNAVAILABLE", healthTimedOut(cause) ? 504 : 502); }
+    const payload = await readSmallJson(response).catch(() => ({}));
+    if (!response.ok) throw normalizedMmrError(response, payload, path.endsWith("/promote") ? "RL_BUILD_PROMOTION_REJECTED" : "RL_BUILD_VALIDATION_REJECTED");
+    return { success: true, ...payload };
 }
 
 function actionError(code, status = 503) { return Object.assign(new Error("Service action failed."), { code, status }); }
@@ -724,12 +764,14 @@ async function callMmr(env, path, keyName, { method = "POST", body, timeout = AC
     }
 }
 
-async function runMmrAdminAction(env, service, action) {
+async function runMmrAdminAction(env, service, action, input = {}) {
     if (action === "recheck") {
         const result = await isolatedHealth(service, "MMR API", () => checkMmrApi(env));
         await storeActionResult(env, result);
         return { success: true, service, action, result };
     }
+    if (action === "validate-build-candidate") return await validateMmrBuildCandidate(env, input);
+    if (action === "promote-build-candidate") return await promoteMmrBuildCandidate(env, input);
     const paths = {
         "refresh-eos": "/admin/refresh", "reauthorize-account": "/admin/bootstrap",
         "poll-authorization": "/admin/poll", "reconnect-psynet": "/admin/reconnect", "repair-session": "/admin/repair-session"

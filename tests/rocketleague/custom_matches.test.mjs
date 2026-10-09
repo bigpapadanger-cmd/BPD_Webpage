@@ -107,6 +107,21 @@ test("fixed transport uses service role and no redirect; never retries failed mu
     assert.equal(calls, 1);
     await assert.rejects(callCustomMatchRpc(env, "record_custom_match_provider_match", {}), { code: "CUSTOM_MATCH_INPUT_INVALID" });
 });
+test("new Supabase secret API keys use apikey only; legacy service-role JWT keeps bearer auth", async () => {
+    const headersSeen = [];
+    globalThis.fetch = async (_url, init) => {
+        headersSeen.push(init.headers);
+        return Response.json({ success: true, gameKey: "rocketleague", maxTeamCapacity: 16, defaultTeamCapacity: 4,
+            maxTotalParticipants: 32, defaultAllowJoinAfterStart: false, maxSpectatorCapacity: 8,
+            defaultAllowSpectators: false, defaultSpectatorCapacity: 4, modes: [] });
+    };
+    await callCustomMatchRpc({ ...env, SUPABASE_SERVICE_ROLE_KEY: "sb_secret_example_key" }, "limits", { p_game_key: "rocketleague" });
+    await callCustomMatchRpc({ ...env, SUPABASE_SERVICE_ROLE_KEY: "eyJlegacy-service-role-jwt" }, "limits", { p_game_key: "rocketleague" });
+    assert.equal(headersSeen[0].apikey, "sb_secret_example_key");
+    assert.equal(headersSeen[0].Authorization, undefined);
+    assert.equal(headersSeen[1].apikey, "eyJlegacy-service-role-jwt");
+    assert.equal(headersSeen[1].Authorization, "Bearer eyJlegacy-service-role-jwt");
+});
 test("missing service role, provider failures, oversized and malformed body fail closed", async () => {
     await assert.rejects(callCustomMatchRpc({ ...env, SUPABASE_SERVICE_ROLE_KEY: "" }, "detail", {}));
     for (const response of [Response.json({ message: "private" }, { status: 403 }), new Response("not json"), new Response("x", { headers: { "Content-Length": "999999" } })]) {

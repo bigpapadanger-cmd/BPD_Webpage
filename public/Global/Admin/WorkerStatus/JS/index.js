@@ -20,6 +20,7 @@ let lastDeploymentState = null;
 let operationPollTimer = null;
 let authorizationPollTimer = null;
 let authorizationActive = false;
+let buildApproval = null;
 let initializationGeneration = 0;
 
 const ACTION_LABELS = {
@@ -184,26 +185,48 @@ async function updateBuildConfiguration(form) {
     const gameVersion = form.elements.gameVersion.value.trim();
     const featureSet = form.elements.featureSet.value.trim();
     const buildSecret = form.elements.buildSecret.value;
-    form.elements.buildSecret.value = "";
     if (!gameVersion || !featureSet || !buildSecret || !window.confirm(`Validate Rocket League ${gameVersion} with Feature Set ${featureSet}? The current production configuration stays active if validation fails.`)) return;
     actionInFlight = true;
     startOperationPolling();
-    const button = form.querySelector("button");
+    const button = form.querySelector('[data-build-action="validate"]');
+    const promoteButton = form.querySelector('[data-build-action="promote"]');
     button.disabled = true;
     const message = document.getElementById("workerStatusMessage");
     try {
-        const payload = await postSystemAction("validate-build", { gameVersion, featureSet, buildSecret });
-        message.textContent = payload.reconnectSucceeded ? `Protocol validated as Build ID ${payload.buildId}; PsyNet reconnected.` : `Protocol validated as Build ID ${payload.buildId}; reconnect result: ${payload.reconnectCode || "not connected"}.`;
+        const payload = await postSystemAction("validate-build-candidate", { gameVersion, featureSet, buildSecret });
+        buildApproval = { token: payload.approvalToken, gameVersion, featureSet, expiresAt: payload.approvalExpiresAt || payload.expiresAt };
+        promoteButton.disabled = !buildApproval.token;
+        message.textContent = `Candidate validated as Build ID ${payload.buildId}; ready for explicit promotion.`;
         await loadStatus();
     } catch (error) {
         message.textContent = safeActionFailure(error, "Protocol validation failed; the current production configuration remains active");
         await loadStatus().catch(() => {});
     } finally {
-        form.elements.buildSecret.value = "";
         actionInFlight = false;
         stopOperationPolling();
         button.disabled = false;
     }
+}
+
+async function promoteBuildConfiguration(form) {
+    if (actionInFlight || authorizationActive || !buildApproval) return;
+    if (buildApproval.expiresAt && Date.parse(buildApproval.expiresAt) <= Date.now()) { buildApproval = null; return; }
+    if (!window.confirm("Promote this validated Rocket League protocol candidate and reconnect PsyNet?")) return;
+    const buildSecret = form.elements.buildSecret.value;
+    if (!buildSecret) return;
+    actionInFlight = true;
+    const button = form.querySelector('[data-build-action="promote"]');
+    button.disabled = true;
+    try {
+        const payload = await postSystemAction("promote-build-candidate", { ...buildApproval, approvalToken: buildApproval.token, buildSecret });
+        buildApproval = null;
+        form.elements.buildSecret.value = "";
+        button.disabled = true;
+        document.getElementById("workerStatusMessage").textContent = payload.reconnectSucceeded === true ? "Protocol promoted; PsyNet reconnected and readiness was checked." : `Protocol promoted; reconnect result: ${payload.reconnectCode || "unavailable"}.`;
+        await loadStatus();
+    } catch (error) {
+        document.getElementById("workerStatusMessage").textContent = safeActionFailure(error, "Protocol promotion failed; the active configuration was preserved");
+    } finally { actionInFlight = false; button.disabled = !buildApproval; }
 }
 
 async function runMmrFunctionalTest(form) {
@@ -453,9 +476,13 @@ function makeDetails(service) {
             service.gameVersion ? `Game version: ${service.gameVersion}` : null,
             service.currentBuildId ? `Current Build ID: ${service.currentBuildId}` : null,
             service.currentFeatureSet ? `Feature Set: ${service.currentFeatureSet}` : null,
+            `Derived Build ID match: ${service.protocolBuildIdMatches === true ? "yes" : service.protocolBuildIdMatches === false ? "no" : "unknown"}`,
             `Configuration generation: ${service.configurationGeneration || 0}`,
             service.buildSource ? `Protocol source: ${service.buildSource}` : null,
             `Build secret configured: ${service.buildSecretConfigured ? "yes" : "no"}`,
+            service.historical?.lastBuildValidationAt ? `Last protocol validation: ${readableTime(service.historical.lastBuildValidationAt)}${service.historical.lastBuildValidationResult ? ` · ${service.historical.lastBuildValidationResult}` : ""}` : null,
+            service.historical?.lastVersionCheckResult ? `Last version check: ${service.historical.lastVersionCheckResult}` : null,
+            service.historical?.lastFailureCode ? `Last protocol failure: ${service.historical.lastFailureCode}` : null,
             service.lastAuthAttemptAt ? `Last auth attempt: ${readableTime(service.lastAuthAttemptAt)}` : null,
             service.lastAuthSuccessAt ? `Last auth success: ${readableTime(service.lastAuthSuccessAt)}` : null,
             service.lastMmrRequestAt ? `Last MMR request: ${readableTime(service.lastMmrRequestAt)}` : null,
@@ -469,6 +496,19 @@ function makeDetails(service) {
         list.className = "worker-status-facts";
         for (const fact of mmrFacts) list.append(textElement("li", fact));
         content.append(list);
+        const diagnostics = document.createElement("details");
+        diagnostics.className = "system-diagnostics-group";
+        diagnostics.innerHTML = "<summary>Legacy Route Usage</summary>";
+        const usageList = document.createElement("ul");
+        usageList.className = "system-diagnostic-list";
+        const usage = service.routeUsage;
+        if (!usage) usageList.append(textElement("li", "Unavailable in this Worker isolate; this is not confirmed zero usage."));
+        else {
+            for (const [path, entry] of Object.entries(usage)) usageList.append(textElement("li", `${path}: ${entry.requestCount || 0} requests${entry.lastUsedAt ? ` · last ${readableTime(entry.lastUsedAt)}` : ""} · ${entry.statusCategory || "unknown"}`));
+            if (!Object.keys(usage).length) usageList.append(textElement("li", "No route use recorded in this Worker isolate; this is not confirmed zero usage."));
+        }
+        diagnostics.append(usageList);
+        content.append(diagnostics);
         const historical = service.historical || {};
         if (Object.values(historical).some(Boolean)) {
             const history = document.createElement("details");
@@ -489,9 +529,12 @@ function makeDetails(service) {
                 const version = document.createElement("input"); version.name = "gameVersion"; version.required = true; version.placeholder = "Game Version"; version.pattern = "\\d{6}\\.\\d{1,8}\\.\\d{1,8}"; version.value = service.gameVersion || "";
                 const feature = document.createElement("input"); feature.name = "featureSet"; feature.required = true; feature.placeholder = "Feature Set"; feature.value = service.currentFeatureSet || "";
                 const secret = document.createElement("input"); secret.name = "buildSecret"; secret.type = "password"; secret.required = true; secret.placeholder = "Build Secret"; secret.autocomplete = "new-password";
-                const update = textElement("button", "Validate Protocol"); update.type = "submit";
-                form.append(version, feature, secret, update);
+                const update = textElement("button", "Validate Candidate"); update.type = "submit"; update.dataset.buildAction = "validate";
+                const promote = textElement("button", "Promote Candidate"); promote.type = "button"; promote.disabled = true; promote.dataset.buildAction = "promote";
+                form.append(textElement("p", `Active: ${service.gameVersion || "unknown"} · ${service.currentFeatureSet || "unknown"}`), textElement("p", "Candidate:"), version, feature, secret, update, promote);
+                for (const field of [version, feature, secret]) field.addEventListener("input", () => { buildApproval = null; promote.disabled = true; });
                 form.addEventListener("submit", event => { event.preventDefault(); void updateBuildConfiguration(form); });
+                promote.addEventListener("click", () => { void promoteBuildConfiguration(form); });
                 operations.append(form);
             }
             if (controls.showFunctionalTest) {

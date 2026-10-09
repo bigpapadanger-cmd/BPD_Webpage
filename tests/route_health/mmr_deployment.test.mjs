@@ -118,7 +118,9 @@ test("Worker Status protocol form submits game version, feature set, and transie
     assert.match(source, /name = "featureSet"/);
     assert.match(source, /name = "buildSecret"/);
     assert.match(source, /secret\.type = "password"/);
-    assert.match(source, /postSystemAction\("validate-build", \{ gameVersion, featureSet, buildSecret \}\)/);
-    assert.match(source, /form\.elements\.buildSecret\.value = ""/);
+    assert.match(source, /postSystemAction\("validate-build-candidate", \{ gameVersion, featureSet, buildSecret \}\)/);
+    assert.match(source, /postSystemAction\("promote-build-candidate"/);
+    assert.match(source, /data-build-action/);
+    assert.match(source, /buildApproval = null/);
     assert.doesNotMatch(source, /localStorage|sessionStorage/);
 });

@@ -60,6 +60,8 @@ requests on removal/reinitialization, including routeLoad cache-busted imports.
 fixed read/create/action/round/vote/result RPC names. Provider ingestion is excluded.
 HTTPS configuration is validated; redirects are rejected. Shared transport bounds
 fetch, streaming body read, parsing and sanitization to 10 seconds and 256 KiB.
+New `sb_secret_` API keys are sent only in `apikey` (they are not JWTs); legacy
+`service_role` JWT keys continue to use both `apikey` and bearer authorization.
 No automatic mutation retries or assumed replacement versions/keys exist.
 
 ## Explicit gates / unresolved contracts

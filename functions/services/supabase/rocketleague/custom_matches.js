@@ -7,7 +7,7 @@ import { CustomMatchError, OPERATIONS, customMatchDomainError, sanitizeCustomMat
 export async function callCustomMatchRpc(env, operation, parameters) {
     if (!Object.hasOwn(OPERATIONS, operation)) throw new CustomMatchError("CUSTOM_MATCH_INPUT_INVALID", 400);
     let root;
-    const key = env?.SUPABASE_SERVICE_ROLE_KEY;
+    const key = typeof env?.SUPABASE_SERVICE_ROLE_KEY === "string" ? env.SUPABASE_SERVICE_ROLE_KEY.trim() : "";
     try {
         const url = new URL(env.SUPABASE_URL);
         if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash || !["/", "/rest/v1", "/rest/v1/"].includes(url.pathname)
@@ -16,9 +16,19 @@ export async function callCustomMatchRpc(env, operation, parameters) {
     } catch { throw new CustomMatchError(); }
     try {
         return await withUpstreamDeadline(async signal => {
+            const headers = {
+                apikey: key,
+                "Content-Type": "application/json",
+                Accept: "application/json",
+                "Content-Profile": "api",
+                "Accept-Profile": "api"
+            };
+            // New Supabase secret API keys are opaque API keys, not JWTs.
+            // Keep Authorization for legacy service_role JWT compatibility only.
+            if (!key.startsWith("sb_secret_")) headers.Authorization = `Bearer ${key}`;
             const response = await fetchBoundedResponse(`${root}/rest/v1/rpc/${OPERATIONS[operation]}`, {
                 method: "POST", redirect: "error", signal,
-                headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json", Accept: "application/json", "Content-Profile": "api", "Accept-Profile": "api" },
+                headers,
                 body: JSON.stringify(parameters)
             }, 256 * 1024);
             let raw;
