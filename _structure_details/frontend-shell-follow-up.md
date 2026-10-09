@@ -217,3 +217,15 @@ screen-reader usability and approved-ad consent/fill still need authorized live
 verification. No release or deployment was performed.
 
 Cloudflare reference: [Turnstile widget configurations](https://developers.cloudflare.com/turnstile/get-started/client-side-rendering/widget-configurations/), accessed 2026-10-09.
+
+## Follow-up: production notification transport error
+
+When a Cloudflare log reports `stage: event_list`, `fetch_type_error`, and no
+`upstreamStatus`, while Supabase API Gateway has no matching request, the
+failure happened before an HTTP response came back from Supabase. The original
+diagnostic cannot distinguish DNS, connection, TLS, redirect, or request-shape
+failures. The notification fetch now logs a closed-set `transportCauseClass`
+derived from recognized nested cause codes/messages. It never logs raw
+exception text, request headers, or URL/query values. Deploy this diagnostic
+update and reproduce one signed-in Dashboard load while streaming Cloudflare
+Pages Function logs; use the new category to select the next investigation.

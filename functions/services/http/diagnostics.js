@@ -26,6 +26,11 @@ export function createRequestDiagnostics({ label, operation, codes, timeoutCode 
     const gameMode = { 10: "1v1", 11: "2v2", 13: "3v3" }[playlistId];
     const playlist = gameMode ? { playlistId, gameMode, rowCount: null, snapshotStatus: null } : null;
     const transportErrorClasses = new Set(["invalid_url", "invalid_header", "request_construction", "abort", "aborted", "network_failure", "fetch_type_error", "unknown_transport"]);
+    const transportCauseClasses = new Set([
+        "dns_temporary_failure", "dns_host_not_found", "connection_refused", "connection_reset",
+        "connection_timeout", "tls_certificate_error", "tls_handshake_error", "redirect_rejected",
+        "invalid_url", "invalid_header", "network_fetch_rejected", "other_fetch_type_error"
+    ]);
     const exceptionNames = new Set(["TypeError", "AbortError", "DOMException", "Error", "RangeError"]);
     let context = { stage: "route", operation, rpc: null, upstreamStatus: null, code: null, timeout: false };
     return {
@@ -34,12 +39,13 @@ export function createRequestDiagnostics({ label, operation, codes, timeoutCode 
         rows(count) { if (playlist) playlist.rowCount = Number.isSafeInteger(count) && count >= 0 && count <= 20000 ? count : null; },
         snapshot(status) { if (playlist) playlist.snapshotStatus = ["not_started", "in_progress", "already_complete", "completed", "failed", "recording_failed"].includes(status) ? status : null; },
         markTimeout() { context.timeout = true; },
-        transportFailure(transportErrorClass, exceptionName = null) {
+        transportFailure(transportErrorClass, exceptionName = null, transportCauseClass = null) {
             if (!transportErrorClasses.has(transportErrorClass)) return;
             context = {
                 ...context,
                 [transportField]: transportErrorClass,
-                ...(exceptionNames.has(exceptionName) ? { exceptionName } : {})
+                ...(exceptionNames.has(exceptionName) ? { exceptionName } : {}),
+                ...(transportCauseClasses.has(transportCauseClass) ? { transportCauseClass } : {})
             };
         },
         upstream(status, code) {

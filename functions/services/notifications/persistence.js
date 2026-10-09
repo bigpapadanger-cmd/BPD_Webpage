@@ -81,9 +81,32 @@ function requestUrl(base, parameters = {}, table = TABLE, columns = COLUMNS) {
 function classifyFetchException(error) {
     const exceptionName = ["TypeError", "AbortError", "DOMException"].includes(error?.name) ? error.name : null;
     if (exceptionName === "AbortError" || exceptionName === "DOMException") return { transportClass: "abort", exceptionName };
-    if (exceptionName === "TypeError") return { transportClass: "fetch_type_error", exceptionName };
+    if (exceptionName === "TypeError") return { transportClass: "fetch_type_error", exceptionName, transportCauseClass: classifyFetchTypeErrorCause(error) };
     if (exceptionName === "Error") return { transportClass: "network_failure", exceptionName: null };
     return { transportClass: "unknown_transport", exceptionName: null };
+}
+
+// Log only a closed set of transport categories. Runtime messages and arbitrary
+// cause codes can include URLs or request details, so never emit them verbatim.
+function classifyFetchTypeErrorCause(error) {
+    const causes = [];
+    let current = error;
+    for (let depth = 0; current && depth < 4; depth++, current = current.cause) causes.push(current);
+    const codes = causes.map(cause => typeof cause.code === "string" ? cause.code.toUpperCase() : "");
+    if (codes.some(code => ["EAI_AGAIN", "EAI_FAIL"].includes(code))) return "dns_temporary_failure";
+    if (codes.some(code => ["ENOTFOUND", "EHOSTUNREACH"].includes(code))) return "dns_host_not_found";
+    if (codes.includes("ECONNREFUSED")) return "connection_refused";
+    if (["ECONNRESET", "EPIPE"].some(code => codes.includes(code))) return "connection_reset";
+    if (["ETIMEDOUT", "UND_ERR_CONNECT_TIMEOUT", "UND_ERR_HEADERS_TIMEOUT"].some(code => codes.includes(code))) return "connection_timeout";
+    if (["CERT_HAS_EXPIRED", "ERR_TLS_CERT_ALTNAME_INVALID", "UNABLE_TO_VERIFY_LEAF_SIGNATURE"].some(code => codes.includes(code))) return "tls_certificate_error";
+    if (["ERR_SSL_WRONG_VERSION_NUMBER", "ERR_TLS_HANDSHAKE_TIMEOUT", "ERR_SSL_TLSV1_ALERT_PROTOCOL_VERSION"].some(code => codes.includes(code))) return "tls_handshake_error";
+
+    const messages = causes.map(cause => typeof cause.message === "string" ? cause.message.toLowerCase() : "");
+    if (messages.some(message => message.includes("redirect"))) return "redirect_rejected";
+    if (messages.some(message => message.includes("invalid url"))) return "invalid_url";
+    if (messages.some(message => message.includes("header"))) return "invalid_header";
+    if (messages.some(message => message.includes("fetch failed") || message.includes("network"))) return "network_fetch_rejected";
+    return "other_fetch_type_error";
 }
 
 async function callTable(env, url, { method = "GET", body, prefer = null, signal, fetcher = fetch, diagnostics = null, stage }) {
@@ -110,7 +133,7 @@ async function callTable(env, url, { method = "GET", body, prefer = null, signal
             try { upstream = await fetcher(input, init); }
             catch (error) {
                 const transport = classifyFetchException(error);
-                diagnostics?.transportFailure(transport.transportClass, transport.exceptionName);
+                diagnostics?.transportFailure(transport.transportClass, transport.exceptionName, transport.transportCauseClass);
                 throw error;
             }
             diagnostics?.upstream(upstream.status);
