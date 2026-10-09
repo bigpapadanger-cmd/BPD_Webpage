@@ -14,7 +14,7 @@ const OCR_EVENT_TYPES = new Set(["review_required", "failed", "completed"]);
 const OCR_JOB_ID = /^[A-Z0-9]{16}$/;
 const OCR_PUBLIC_CODE = /^[A-Z0-9]{16}$/;
 const UPSTREAM_CODES = new Set(["42501", "42P01", "42703", "23505", "PGRST116", "PGRST204", "PGRST301",
-    "UPSTREAM_TIMEOUT", "UPSTREAM_UNAVAILABLE", "UPSTREAM_RESPONSE_TOO_LARGE", "UPSTREAM_RESPONSE_INVALID"]);
+    "UPSTREAM_TIMEOUT", "UPSTREAM_UNAVAILABLE", "UPSTREAM_REDIRECT", "UPSTREAM_RESPONSE_TOO_LARGE", "UPSTREAM_RESPONSE_INVALID"]);
 
 export class NotificationPersistenceError extends Error {
     constructor(code = "NOTIFICATIONS_UNAVAILABLE", status = 503) {
@@ -109,6 +109,19 @@ function classifyFetchTypeErrorCause(error) {
     return "other_fetch_type_error";
 }
 
+function classifyRedirectTarget(location, requestUrl) {
+    if (!location) return "missing_location";
+    let destination;
+    let source;
+    try {
+        destination = new URL(location, requestUrl);
+        source = new URL(requestUrl);
+    } catch { return "invalid_location"; }
+    if (destination.hostname === source.hostname) return destination.protocol === "https:" ? "https_same_host" : "http_same_host";
+    if (destination.hostname.endsWith(".supabase.co")) return "other_supabase_host";
+    return "external_host";
+}
+
 async function callTable(env, url, { method = "GET", body, prefer = null, signal, fetcher = fetch, diagnostics = null, stage }) {
     const { base, key } = configuration(env);
     diagnostics?.mark(stage);
@@ -116,7 +129,9 @@ async function callTable(env, url, { method = "GET", body, prefer = null, signal
     try {
         response = await fetchBoundedResponse(url || requestUrl(base), {
             method,
-            redirect: "error",
+            // Do not auto-follow: Supabase auth headers must never be sent
+            // to a redirect destination. Inspect and reject redirects below.
+            redirect: "manual",
             signal,
             headers: {
                 apikey: key,
@@ -145,6 +160,10 @@ async function callTable(env, url, { method = "GET", body, prefer = null, signal
         diagnostics?.upstream(undefined, code);
         if (code === "UPSTREAM_TIMEOUT") diagnostics?.markTimeout?.();
         fail();
+    }
+    if (response.status >= 300 && response.status <= 399) {
+        diagnostics?.redirectRejected(response.status, classifyRedirectTarget(response.headers.get("Location"), url || requestUrl(configuration(env).base)));
+        fail("UPSTREAM_REDIRECT");
     }
     diagnostics?.mark(`${stage}_decode`);
     let payload = null;

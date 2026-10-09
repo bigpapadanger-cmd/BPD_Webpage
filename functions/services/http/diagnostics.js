@@ -31,6 +31,7 @@ export function createRequestDiagnostics({ label, operation, codes, timeoutCode 
         "connection_timeout", "tls_certificate_error", "tls_handshake_error", "redirect_rejected",
         "invalid_url", "invalid_header", "network_fetch_rejected", "other_fetch_type_error"
     ]);
+    const redirectTargetClasses = new Set(["missing_location", "invalid_location", "https_same_host", "http_same_host", "other_supabase_host", "external_host"]);
     const exceptionNames = new Set(["TypeError", "AbortError", "DOMException", "Error", "RangeError"]);
     let context = { stage: "route", operation, rpc: null, upstreamStatus: null, code: null, timeout: false };
     return {
@@ -47,6 +48,10 @@ export function createRequestDiagnostics({ label, operation, codes, timeoutCode 
                 ...(exceptionNames.has(exceptionName) ? { exceptionName } : {}),
                 ...(transportCauseClasses.has(transportCauseClass) ? { transportCauseClass } : {})
             };
+        },
+        redirectRejected(status, targetClass) {
+            if (!Number.isInteger(status) || status < 300 || status > 399 || !redirectTargetClasses.has(targetClass)) return;
+            context = { ...context, upstreamStatus: status, transportCauseClass: "redirect_rejected", redirectTargetClass: targetClass };
         },
         upstream(status, code) {
             context.upstreamStatus = status === undefined ? context.upstreamStatus : Number.isInteger(status) && status >= 100 && status <= 599 ? status : null;

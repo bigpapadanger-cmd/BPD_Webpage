@@ -223,9 +223,12 @@ Cloudflare reference: [Turnstile widget configurations](https://developers.cloud
 When a Cloudflare log reports `stage: event_list`, `fetch_type_error`, and no
 `upstreamStatus`, while Supabase API Gateway has no matching request, the
 failure happened before an HTTP response came back from Supabase. The original
-diagnostic cannot distinguish DNS, connection, TLS, redirect, or request-shape
-failures. The notification fetch now logs a closed-set `transportCauseClass`
-derived from recognized nested cause codes/messages. It never logs raw
-exception text, request headers, or URL/query values. Deploy this diagnostic
-update and reproduce one signed-in Dashboard load while streaming Cloudflare
-Pages Function logs; use the new category to select the next investigation.
+diagnostic could not distinguish DNS, connection, TLS, redirect, or request-shape
+failures. Transport failures now log a closed-set `transportCauseClass` derived
+from recognized nested cause codes/messages. Upstream redirects are handled
+manually (never followed, so authorization headers are not forwarded), then
+rejected with their HTTP status and a closed-set `redirectTargetClass`. Neither
+path logs raw exception text, request headers, or URL/query values. Deploy this
+diagnostic update and reproduce one signed-in Dashboard load while streaming
+Cloudflare Pages Function logs; use the new category to select the next
+investigation.
