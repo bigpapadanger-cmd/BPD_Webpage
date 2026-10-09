@@ -34,6 +34,7 @@ ACCOUNT BANNER BASE
 ========================================================= */
 
 .account-banner {
+    min-height: calc(var(--account-banner-height, 48px) + 1px);
     position:
         relative;
 
@@ -84,6 +85,7 @@ INNER LAYOUT
 ========================================================= */
 
 .bpd-account-banner__inner {
+    position: relative;
     display:
         flex;
 
@@ -102,13 +104,7 @@ INNER LAYOUT
             48px
         );
 
-    padding:
-        7px
-        clamp(
-            12px,
-            2vw,
-            24px
-        );
+    padding: 7px calc(clamp(12px, 2vw, 24px) + 44px) 7px clamp(12px, 2vw, 24px);
 
     gap:
         16px;
@@ -1206,13 +1202,12 @@ SMALL VIEWPORT BASE
 ========================================================= */
 
 @media (max-width: 640px) {
+    .account-banner { min-height: 45px; }
     .bpd-account-banner__inner {
         min-height:
             44px;
 
-        padding:
-            6px
-            10px;
+        padding: 6px 54px 6px 10px;
 
         gap:
             8px;

@@ -45,6 +45,8 @@ test("Admin shortcut on the main menu stays hidden until server authorization", 
     assert.match(authorization, /peekAuthState\(\)/);
     assert.doesNotMatch(authorization, /fetch\(/);
     assert.match(authorization, /setAdminNavigationVisible\(item, true\)/);
+    const shellCss = await readFile(new URL("../../public/Framework/Shell/CSS/General/body.css", import.meta.url), "utf8");
+    assert.match(shellCss, /\[hidden\]:not\(\[hidden="until-found"\]\)\s*\{\s*display: none !important;/);
 });
 
 test("dashboard stylesheet is included only as scoped dashboard styling", async () => {

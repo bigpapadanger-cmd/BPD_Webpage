@@ -49,7 +49,7 @@ export function syncMobileSidebarDrawer({ focusOnOpen = false } = {}) {
         if (!wasOpen) setBackgroundInert(true);
         if (focusOnOpen || !sidebar.contains(document.activeElement)) toggle.focus();
     } else {
-        sidebar.removeAttribute("role");
+        sidebar.setAttribute("role", "complementary");
         sidebar.removeAttribute("aria-modal");
         if (wasOpen) setBackgroundInert(false);
     }

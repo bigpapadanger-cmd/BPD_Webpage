@@ -112,6 +112,7 @@
 }
 
 .dashboard-panel-heading p {
+    min-height: 2lh;
     margin: 4px 0 0;
     color: var(--dashboard-muted);
     font-size: .85rem;
@@ -127,6 +128,11 @@
 }
 
 .dashboard-meta-label { color: var(--dashboard-muted); }
+
+.dashboard-sign-in-slot {
+    min-height: calc(2lh + 14px);
+    font-size: .88rem;
+}
 
 .dashboard-sign-in {
     display: inline-flex;

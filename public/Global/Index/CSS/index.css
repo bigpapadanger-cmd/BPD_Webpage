@@ -121,6 +121,10 @@
     font-size: 18px;
     letter-spacing: 3px;
 }
+.home-page .admin-home-slot {
+    min-height: 16rem;
+}
+
 .home-page .content-area {
     width: min(1200px, calc(100% - 60px));
     margin: 0 auto;

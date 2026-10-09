@@ -27,10 +27,12 @@ Initialization Priority:
     INTERACTIVE / POST-PAINT
     - Load sidebar hover UI.
     - Initialize sidebar behavior.
-    - Check Admin navigation eligibility.
+    - Initialize hidden Admin navigation shortcuts.
     - Initialize submenu behavior.
 
     BACKGROUND
+    - After route readiness and window load: notifications, Admin access.
+    - After optional services: configured, near-viewport advertisement slots.
     - API connection monitor.
     - Persistent account banner.
     - OCR runtime maintenance.
@@ -73,18 +75,13 @@ import {
 let ocrRuntimePromise;
 const loadOcrRuntime = () => ocrRuntimePromise ||= import("./ocr_runtime.js").catch(error => { ocrRuntimePromise = null; throw error; });
 
-import {
-    loadSidebarHover,
-    initializeSidebar
-} from "../JS/Sidebar/sidebar.js";
+let sidebarModulePromise;
+const loadSidebarModule = () => sidebarModulePromise ||= import("./Sidebar/sidebar.js");
 
 import {
     initializeRouteModule
 } from "./initialization.js";
 
-import {
-    initializeApiConnectionMonitor
-} from "../../../scripts/apiConnection.js";
 
 import {
     APP_ASSET_ID
@@ -94,9 +91,6 @@ import {
     initializeAccountBanner
 } from "../../Banner/JS/account_banner.js";
 
-import {
-    initializeGlobalNotifications
-} from "./notifications.js";
 
 import {
     authorizeRoute
@@ -1680,6 +1674,7 @@ PAGE LOADING
 function setPageLoading(
     loading
 ) {
+    document.getElementById("siteContent")?.setAttribute("aria-busy", String(loading));
     document.body.dataset.pageLoading =
         String(
             loading
@@ -1727,6 +1722,8 @@ async function initializeLoadedSidebar(
     }
 
     try {
+        const { loadSidebarHover, initializeSidebar } = await loadSidebarModule();
+        initializeSidebar();
         await loadSidebarHover();
 
         if (
@@ -1737,7 +1734,6 @@ async function initializeLoadedSidebar(
             return;
         }
 
-        initializeSidebar();
 
         document.dispatchEvent(
             new CustomEvent(
@@ -2009,6 +2005,10 @@ function injectRouteFragments(
     ) {
         elements.header.innerHTML =
             fragments.headerHTML;
+        // Whitespace-only navigation must not allocate a padded empty row.
+        for (const navigation of elements.header.querySelectorAll(".header-navigation")) {
+            if (navigation.childElementCount === 0) navigation.remove();
+        }
     }
 
     if (
@@ -2084,6 +2084,7 @@ POST-NAVIGATION BACKGROUND WORK
 function schedulePostNavigationWork(
     currentNavigationId
 ) {
+    void startDeferredPageServices(currentNavigationId).catch(() => {});
     scheduleIdleTask(
         () => {
             if (
@@ -2098,6 +2099,32 @@ function schedulePostNavigationWork(
         },
         500
     );
+}
+
+let pageServicesReady = null;
+async function startDeferredPageServices(id) {
+    if (document.readyState !== "complete") await new Promise(resolve => window.addEventListener("load", resolve, { once: true }));
+    await new Promise(resolve => scheduleAfterPaint(() => scheduleIdleTask(resolve)));
+    if (!isCurrentNavigation(id)) return;
+    pageServicesReady ||= (async () => {
+        const auth = await import("../../Auth/auth.js");
+        auth.subscribeToAuthState(state => {
+            if (state.authenticated && state.active && !state.admin?.checked) {
+                scheduleIdleTask(() => { if (!document.body.classList.contains("page-loading")) void auth.loadDeferredAdminAccess(); });
+            }
+        });
+        const notifications = await import("./notifications.js");
+        await notifications.initializeGlobalNotifications();
+        const monitor = await import("../../../scripts/apiConnection.js");
+        void monitor.initializeApiConnectionMonitor();
+    })().catch(() => { pageServicesReady = null; });
+    await pageServicesReady;
+    if (!isCurrentNavigation(id)) return;
+    const auth = await import("../../Auth/auth.js");
+    await auth.loadDeferredAdminAccess();
+    if (!isCurrentNavigation(id)) return;
+    const ads = await import("../../../Global/Ads/JS/ads.js");
+    ads.initializePageAds();
 }
 
 /* =========================================================
@@ -2594,12 +2621,6 @@ STARTUP — BACKGROUND SERVICES
  * API connection monitoring is useful globally but does not
  * need to block the first route.
  */
-scheduleIdleTask(
-    () => {
-        void initializeApiConnectionMonitor();
-    },
-    1000
-);
 
 /*
  * Persistent account banner.
@@ -2611,7 +2632,6 @@ scheduleIdleTask(
 scheduleAfterPaint(
     () => {
         void initializeAccountBanner();
-        initializeGlobalNotifications();
     }
 );
 

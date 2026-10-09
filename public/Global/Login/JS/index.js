@@ -477,6 +477,7 @@ function loadTurnstileScript() {
                 resolve,
                 reject
             ) => {
+                let scriptTimer = null;
                 let script =
                     document.getElementById(
                         TURNSTILE_SCRIPT_ID
@@ -484,6 +485,7 @@ function loadTurnstileScript() {
 
                 const handleLoaded =
                     () => {
+                        window.clearTimeout(scriptTimer);
                         if (
                             window.turnstile
                             && typeof window.turnstile.render ===
@@ -505,12 +507,15 @@ function loadTurnstileScript() {
 
                 const handleError =
                     () => {
+                        window.clearTimeout(scriptTimer);
                         reject(
                             new Error(
                                 "TURNSTILE_SCRIPT_LOAD_FAILED"
                             )
                         );
                     };
+
+                scriptTimer = window.setTimeout(handleError, 12_000);
 
                 if (
                     script
@@ -578,6 +583,7 @@ function loadTurnstileScript() {
         )
             .catch(
                 error => {
+                    document.getElementById(TURNSTILE_SCRIPT_ID)?.remove();
                     turnstileLoadingPromise =
                         null;
 

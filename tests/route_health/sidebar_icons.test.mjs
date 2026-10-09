@@ -37,7 +37,7 @@ test("shared Rocket League sidebar links to the dashboard through existing SPA n
     assert.match(source, /function initializeCriticalSidebar\(\)\s*\{\s*initializeSidebarIcons\(document.getElementById\("sidebar"\)\)/);
 });
 
-test("sidebar icon rail stays compact and menus start closed with registered destinations", async () => {
+test("sidebar items keep the shared row height when collapsed and menus start closed", async () => {
     const { ROUTES } = await import("../../public/routes.js");
     for (const name of ["mainmenu", "admin", "rl_menu"]) {
         const html = await readFile(new URL(`../../public/Framework/Shell/HTML/Sidebar/${name}.html`, import.meta.url), "utf8");
@@ -51,6 +51,7 @@ test("sidebar icon rail stays compact and menus start closed with registered des
     assert.match(styles, /--sidebar-collapsed-width:\s*58px/);
     assert.match(styles, /--sidebar-icon-width:\s*46px/);
     assert.match(styles, /\.sidebar-navigation-bottom\s*\{\s*flex:\s*1 1 25%/);
-    assert.match(styles, /@media\s*\(min-width:\s*701px\)\s*\{\s*body\.sidebar-collapsed\s*\{\s*--sidebar-row-height:\s*24px/);
-    assert.match(styles, /body\.sidebar-collapsed \.site-sidebar \.nav-item\s*\{\s*flex-basis:\s*24px;\s*min-height:\s*24px/);
+    assert.doesNotMatch(styles, /body\.sidebar-collapsed\s*\{\s*--sidebar-row-height:\s*24px/);
+    assert.doesNotMatch(styles, /body\.sidebar-collapsed \.site-sidebar \.nav-item\s*\{\s*flex-basis:\s*24px/);
+    assert.match(styles, /\.site-sidebar \.nav-item[\s\S]*?min-height:\s*var\s*\(\s*--sidebar-row-height\s*\)/);
 });

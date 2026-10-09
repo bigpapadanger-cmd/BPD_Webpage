@@ -1,6 +1,8 @@
 "use strict";
 
 import { BPD_NOTIFICATIONS_URL } from "../../../scripts/apiRoutes.js";
+import { getNotificationReviewDestination } from "./notification_destinations.js";
+export { getNotificationReviewDestination } from "./notification_destinations.js";
 
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 const MIN_REFRESH_GAP_MS = 60 * 1000;
@@ -11,10 +13,6 @@ const OCR_PUBLIC_CODE = /^[A-Z0-9]{16}$/;
 const SOURCES = new Set(["ocr", "submission", "faq", "account", "profile"]);
 const SEVERITIES = new Set(["info", "notice", "warning", "error"]);
 const REVIEW_ACTIONS = new Set(["ocr.review", "submission.review", "faq.review", "account.status", "profile.complete", "provider.reauthorize"]);
-const REVIEW_DESTINATIONS = Object.freeze({
-    "profile.complete": "/RocketLeague/Profile",
-    "provider.reauthorize": "/Account?reauthorize=epic"
-});
 
 export function normalizeClientNotification(value) {
     if (!value || typeof value !== "object" || Array.isArray(value)) return null;
@@ -41,15 +39,6 @@ export function normalizeClientNotification(value) {
         reviewAction, createdAt, expiresAt, reviewCode });
 }
 
-export function getNotificationReviewDestination(reviewAction, reviewCode = null, origin = "https://bpd-gaming-network.com") {
-    if (reviewAction === "ocr.review" && OCR_PUBLIC_CODE.test(reviewCode || "")) {
-        const destination = new URL("/RocketLeague/SubmitMatchResults", origin);
-        destination.searchParams.set("jobId", reviewCode);
-        return `${destination.pathname}${destination.search}`;
-    }
-    return Object.hasOwn(REVIEW_DESTINATIONS, reviewAction) ? REVIEW_DESTINATIONS[reviewAction] : null;
-}
-
 function element(document, tag, className, text) {
     const node = document.createElement(tag);
     if (className) node.className = className;
@@ -66,6 +55,8 @@ export function createNotificationController({ document, window, fetcher = windo
     let inFlight = null;
     let intervalId = null;
     let signedIn = false;
+    let authScope = null;
+    let authGeneration = 0;
     let restoreFocus = null;
 
     function createShell() {
@@ -79,7 +70,7 @@ export function createNotificationController({ document, window, fetcher = windo
         trigger.setAttribute("aria-label", "Notifications");
         trigger.setAttribute("aria-controls", "globalNotificationDrawer");
         trigger.setAttribute("aria-expanded", "false");
-        const icon = element(document, "span", "global-notification-trigger__icon", "♢");
+        const icon = element(document, "span", "global-notification-trigger__icon", "🔔");
         icon.setAttribute("aria-hidden", "true");
         const label = element(document, "span", "global-notification-trigger__label", "Notifications");
         const count = element(document, "span", "global-notification-trigger__count");
@@ -87,7 +78,7 @@ export function createNotificationController({ document, window, fetcher = windo
         count.setAttribute("aria-hidden", "true");
         trigger.append(icon, label, count);
 
-        drawer = element(document, "aside", "global-notification-drawer");
+        drawer = element(document, "section", "global-notification-drawer");
         drawer.id = "globalNotificationDrawer";
         drawer.hidden = true;
         drawer.setAttribute("aria-label", "Notifications");
@@ -112,7 +103,14 @@ export function createNotificationController({ document, window, fetcher = windo
 
         trigger.addEventListener("click", () => drawer.hidden ? open() : closeDrawer());
         close.addEventListener("click", () => closeDrawer());
-        document.addEventListener("bpd:page-loaded", () => closeDrawer(false));
+        document.addEventListener("click", event => {
+            if (!drawer.hidden && !drawer.contains(event.target) && !trigger.contains(event.target)) closeDrawer(false);
+        });
+        document.addEventListener("bpd:page-loaded", () => {
+            closeDrawer(false);
+            const schedule = window.requestIdleCallback || (callback => window.setTimeout(callback, 100));
+            schedule(() => { void refresh(); });
+        });
         document.addEventListener("keydown", event => {
             if (event.key === "Escape" && drawer && !drawer.hidden) closeDrawer();
         });
@@ -125,7 +123,7 @@ export function createNotificationController({ document, window, fetcher = windo
     }
 
     function open() {
-        if (!drawer || !trigger) return;
+        if (!drawer || !trigger || trigger.disabled || !signedIn) return;
         restoreFocus = document.activeElement;
         drawer.hidden = false;
         drawer.dataset.open = "true";
@@ -191,9 +189,12 @@ export function createNotificationController({ document, window, fetcher = windo
     }
 
     async function refresh(force = false) {
-        if (!signedIn || document.visibilityState === "hidden") return;
+        if (!signedIn || document.visibilityState === "hidden" || document.body.classList.contains("page-loading")) return;
         if (inFlight) return inFlight;
         if (!force && Date.now() - lastFetchAt < MIN_REFRESH_GAP_MS) return;
+        const generation = authGeneration;
+        trigger.disabled = true;
+        status.textContent = "Loading notifications…";
         inFlight = (async () => {
             let timeoutId = null;
             try {
@@ -203,6 +204,7 @@ export function createNotificationController({ document, window, fetcher = windo
                     method: "GET", credentials: "same-origin", cache: "no-store",
                     headers: { Accept: "application/json" }, signal: controller.signal
                 });
+                if (generation !== authGeneration) return;
                 lastFetchAt = Date.now();
                 if ([401, 403].includes(response.status)) {
                     window.clearTimeout(timeoutId);
@@ -216,10 +218,12 @@ export function createNotificationController({ document, window, fetcher = windo
                 }
                 if (!response.ok) throw new Error("unavailable");
                 const body = await response.json();
+                if (generation !== authGeneration) return;
                 if (body?.success !== true || !Array.isArray(body.notifications)) throw new Error("invalid");
                 render(body.notifications);
                 window.clearTimeout(timeoutId);
             } catch {
+                if (generation !== authGeneration) return;
                 if (timeoutId !== null) window.clearTimeout(timeoutId);
                 if (drawer && !drawer.hidden) status.textContent = "Notifications are temporarily unavailable. Please try again.";
                 if (typeof window.CustomEvent === "function") {
@@ -227,9 +231,15 @@ export function createNotificationController({ document, window, fetcher = windo
                         detail: { signedIn }
                     }));
                 }
+            } finally {
+                if (timeoutId !== null) window.clearTimeout(timeoutId);
             }
         })();
-        try { await inFlight; } finally { inFlight = null; }
+        try { await inFlight; } finally {
+            inFlight = null;
+            trigger.disabled = !signedIn;
+            if (signedIn && generation !== authGeneration) void refresh(true);
+        }
     }
 
     async function handleAction(event) {
@@ -261,10 +271,23 @@ export function createNotificationController({ document, window, fetcher = windo
     }
 
     function setAuthState(state) {
-        signedIn = state?.authenticated === true && state?.available === true;
+        const nextSignedIn = state?.authenticated === true && state?.available === true;
+        const nextScope = state?.accountScope || null;
+        if (signedIn === nextSignedIn && authScope === nextScope && trigger) return;
+        authGeneration++;
+        signedIn = nextSignedIn;
+        authScope = nextScope;
+        lastFetchAt = 0;
         if (!trigger) createShell();
         if (!trigger) return;
         trigger.hidden = !signedIn;
+        trigger.disabled = !signedIn;
+        list.replaceChildren();
+        const count = document.getElementById("globalNotificationCount");
+        count.textContent = "";
+        count.hidden = true;
+        trigger.classList.remove("has-notifications");
+        status.textContent = signedIn ? "Loading notifications…" : "Sign in to view notifications.";
         if (intervalId !== null) window.clearInterval(intervalId);
         intervalId = null;
         if (!signedIn) {
@@ -281,13 +304,14 @@ export function createNotificationController({ document, window, fetcher = windo
         const { getAuthState, peekAuthState, subscribeToAuthState } = await import("../../Auth/auth.js");
         setAuthState(peekAuthState());
         subscribeToAuthState(setAuthState);
-        void getAuthState().then(setAuthState).catch(() => {});
+        setAuthState(await getAuthState());
+        await refresh();
     }, mount: createShell, setAuthState, refresh, open, close: closeDrawer };
 }
 
 let initialized = false;
-export function initializeGlobalNotifications() {
+export async function initializeGlobalNotifications() {
     if (initialized || typeof document === "undefined") return;
     initialized = true;
-    void createNotificationController({ document, window }).initialize().catch(() => {});
+    await createNotificationController({ document, window }).initialize();
 }

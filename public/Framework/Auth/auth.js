@@ -13,8 +13,8 @@ Purpose:
 
 Description:
     - Loads the global BPD session.
-    - Loads current Discord-backed Admin authorization for
-      authenticated active accounts.
+    - Loads optional Admin authorization after page readiness; Admin page
+      consumers wait for the same canonical check immediately.
     - Normalizes all public authentication state.
     - Keeps global account roles separate from Admin
       responsibility roles.
@@ -1565,11 +1565,8 @@ export async function refreshAuthState(
     }
 
     /*
-     * All callers share one complete refresh operation:
-     *
-     *     global session
-     *         +
-     *     Admin authorization when applicable
+     * All callers share the session refresh. Admin readiness is separate and
+     * remains unknown (fail-closed) until completeAdminAccess verifies it.
      */
     if (
         currentRequest
@@ -1612,23 +1609,7 @@ export async function refreshAuthState(
                     ) {
                         void recordAuthenticatedPageActivity();
 
-                        const adminState =
-                            await loadAdminAccessFromServer();
-
-                        nextState = {
-                            ...nextState,
-
-                            admin:
-                                adminState,
-
-                            /*
-                             * loadedAt represents completion
-                             * of the complete global client
-                             * authorization refresh.
-                             */
-                            loadedAt:
-                                Date.now()
-                        };
+                        // Session readiness is independent of optional staff access.
                     }
 
                     return setAuthState(
@@ -1678,6 +1659,7 @@ GET AUTH STATE
 export async function getAuthState(
     {
         force = false,
+        includeAdmin = /^\/admin(?:\/|$)/i.test(globalThis.location?.pathname || globalThis.window?.location?.pathname || ""),
         maxAge =
             DEFAULT_CACHE_TTL_MS
     } = {}
@@ -1688,14 +1670,14 @@ export async function getAuthState(
             maxAge
         )
     ) {
-        return cloneAuthState(
-            currentState
-        );
+        const state = cloneAuthState(currentState);
+        return includeAdmin ? completeAdminAccess(state) : state;
     }
 
-    return refreshAuthState({
+    const state = await refreshAuthState({
         force
     });
+    return includeAdmin ? completeAdminAccess(state) : state;
 }
 
 /* =========================================================
@@ -1706,6 +1688,27 @@ export function peekAuthState() {
     return cloneAuthState(
         currentState
     );
+}
+
+let deferredAdminRequest = null;
+export async function loadDeferredAdminAccess() {
+    return completeAdminAccess(await getAuthState({ includeAdmin: false }));
+}
+
+async function completeAdminAccess(state) {
+    if (!hasActiveAccount(state) || !state.accountScope || state.admin?.checked === true) return state;
+    if (deferredAdminRequest) return deferredAdminRequest;
+    const scope = state.accountScope;
+    const snapshot = currentState;
+    deferredAdminRequest = (async () => {
+        const admin = await loadAdminAccessFromServer();
+        if (currentState === snapshot && currentState.accountScope === scope && hasActiveAccount(currentState)) {
+            return setAuthState({ ...currentState, admin });
+        }
+        return cloneAuthState(currentState);
+    })();
+    try { return await deferredAdminRequest; }
+    finally { deferredAdminRequest = null; }
 }
 
 /* =========================================================
@@ -2555,13 +2558,8 @@ export function subscribeToAuthState(
 /* =========================================================
 NOTIFY AUTH CHANGED
 
-A forced refresh now refreshes BOTH:
-
-    global BPD session
-    Admin authorization
-
-Therefore login/provider changes automatically re-evaluate
-current Discord-backed Admin access.
+A forced refresh publishes the new session with unverified Admin state.
+The router schedules the canonical Admin recheck after page readiness.
 ========================================================= */
 
 export async function notifyAuthChanged() {

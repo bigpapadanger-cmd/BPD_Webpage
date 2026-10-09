@@ -42,7 +42,7 @@
                 <p>Theme, animation, and sidebar preferences are saved in this browser. They do not sync between devices.</p>
             </details>
         </div>
-        <div class="faq-list" id="faqPublished" aria-label="Published community answers"></div>
+        <div class="faq-list" id="faqPublished" role="group" aria-label="Published community answers"></div>
     </section>
 
     <section class="faq-suggestion" aria-labelledby="faqAskTitle">
@@ -53,7 +53,7 @@
             <textarea id="faqQuestion" maxlength="500" rows="3" required></textarea>
             <button id="faqCheck" type="button" disabled>Find possible answers</button>
             <button id="faqRetry" type="button">Reload answers</button>
-            <div id="faqMatches" class="faq-list" aria-label="Possible answers"></div>
+            <div id="faqMatches" class="faq-list" role="group" aria-label="Possible answers"></div>
             <button id="faqNone" type="button" hidden>None of these answer my question</button>
             <button id="faqSubmit" type="button" hidden disabled>Submit for Admin review</button>
         </form>

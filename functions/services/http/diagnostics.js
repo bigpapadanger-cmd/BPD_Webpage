@@ -20,13 +20,13 @@ export function sanitizeLogMetadata(fields, allowedCodes = []) {
 }
 
 // Request-local diagnostics: never accept a browser-provided ID or serialize errors.
-export function createRequestDiagnostics({ label, operation, codes, timeoutCode = null, playlistId = null }) {
+export function createRequestDiagnostics({ label, operation, codes, timeoutCode = null, playlistId = null, transportField = "transportErrorClass" }) {
     const debugId = crypto.randomUUID();
     const started = performance.now();
     const gameMode = { 10: "1v1", 11: "2v2", 13: "3v3" }[playlistId];
     const playlist = gameMode ? { playlistId, gameMode, rowCount: null, snapshotStatus: null } : null;
-    const transportErrorClasses = new Set(["invalid_url", "invalid_header", "request_construction", "aborted", "network_failure", "fetch_type_error", "unknown_transport"]);
-    const exceptionNames = new Set(["TypeError", "AbortError", "Error", "RangeError"]);
+    const transportErrorClasses = new Set(["invalid_url", "invalid_header", "request_construction", "abort", "aborted", "network_failure", "fetch_type_error", "unknown_transport"]);
+    const exceptionNames = new Set(["TypeError", "AbortError", "DOMException", "Error", "RangeError"]);
     let context = { stage: "route", operation, rpc: null, upstreamStatus: null, code: null, timeout: false };
     return {
         debugId,
@@ -38,7 +38,7 @@ export function createRequestDiagnostics({ label, operation, codes, timeoutCode 
             if (!transportErrorClasses.has(transportErrorClass)) return;
             context = {
                 ...context,
-                transportErrorClass,
+                [transportField]: transportErrorClass,
                 ...(exceptionNames.has(exceptionName) ? { exceptionName } : {})
             };
         },

@@ -12,7 +12,7 @@ import {
 } from "/scripts/verificationNotice.js";
 import {
     getNotificationReviewDestination
-} from "/Framework/Shell/JS/notifications.js";
+} from "/Framework/Shell/JS/notification_destinations.js";
 
 renderHeader({
     title: "Dashboard"

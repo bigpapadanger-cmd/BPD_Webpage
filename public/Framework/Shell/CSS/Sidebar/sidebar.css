@@ -1102,22 +1102,6 @@ SHORT VIEWPORTS
     }
 }
 
-/* Keep the collapsed desktop icon rail close to the icon's own height. */
-@media (min-width: 701px) {
-    body.sidebar-collapsed {
-        --sidebar-row-height: 24px;
-    }
-
-    body.sidebar-collapsed .site-sidebar .nav-item {
-        flex-basis: 24px;
-        min-height: 24px;
-    }
-
-    body.sidebar-collapsed .site-sidebar .nav-icon {
-        height: 24px;
-    }
-}
-
 /* =========================================================
 ACCESSIBILITY
 ========================================================= */
@@ -1146,6 +1130,11 @@ ACCESSIBILITY
 /* =========================================================
 AUTHORIZATION VISIBILITY
 ========================================================= */
+
+.site-sidebar .sidebar-admin-slot {
+    min-height: var(--sidebar-row-height);
+    flex: 0 0 var(--sidebar-row-height);
+}
 
 .site-sidebar .nav-item[hidden] {
     display: none !important;

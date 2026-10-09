@@ -11,7 +11,7 @@ const DIAGNOSTIC_CODES = new Set([
 ]);
 
 export function createNotificationDiagnostics(operation) {
-    return createRequestDiagnostics({ label: "[NOTIFICATIONS DIAGNOSTIC]", operation, codes: DIAGNOSTIC_CODES, timeoutCode: "UPSTREAM_TIMEOUT" });
+    return createRequestDiagnostics({ label: "[NOTIFICATIONS DIAGNOSTIC]", operation, codes: DIAGNOSTIC_CODES, timeoutCode: "UPSTREAM_TIMEOUT", transportField: "transportClass" });
 }
 
 export function notificationErrorResponse(error) {

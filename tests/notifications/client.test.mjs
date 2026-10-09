@@ -13,7 +13,11 @@ class FakeElement {
         this.ownerDocument = document; this.tagName = tagName.toUpperCase(); this.children = []; this.parentElement = null;
         this.attributes = new Map(); this.listeners = new Map(); this.dataset = {}; this.hidden = false; this.disabled = false;
         this.className = ""; this.textContent = ""; this._id = "";
-        this.classList = { toggle: (name, enabled) => { const set = new Set(this.className.split(/\s+/).filter(Boolean)); enabled ? set.add(name) : set.delete(name); this.className = [...set].join(" "); } };
+        this.classList = {
+            toggle: (name, enabled) => { const set = new Set(this.className.split(/\s+/).filter(Boolean)); enabled ? set.add(name) : set.delete(name); this.className = [...set].join(" "); },
+            contains: name => this.className.split(/\s+/).includes(name),
+            remove: name => this.classList.toggle(name, false)
+        };
     }
     set id(value) { this._id = value; if (value) this.ownerDocument.ids.set(value, this); }
     get id() { return this._id; }
@@ -57,6 +61,29 @@ function fakePage(fetcher) {
 }
 
 function fire(node, type, event = {}) { node.listeners.get(type)?.({ target: node, ...event }); }
+
+test("notifications wait during page loading, disable the bell while fetching, and discard signed-out results", async () => {
+    let release;
+    let calls = 0;
+    const fixture = fakePage(() => { calls++; return new Promise(resolve => { release = () => resolve(Response.json({ success: true, notifications: [validNotice()] })); }); });
+    fixture.document.body.className = "page-loading";
+    const controller = createNotificationController(fixture);
+    controller.mount();
+    controller.setAuthState({ authenticated: true, available: true, accountScope: "account-a" });
+    assert.equal(calls, 0);
+    fixture.document.body.className = "";
+    const pending = controller.refresh(true);
+    const trigger = fixture.document.getElementById("globalNotificationTrigger");
+    assert.equal(trigger.disabled, true);
+    controller.open();
+    assert.equal(fixture.document.getElementById("globalNotificationDrawer").hidden, true);
+    controller.setAuthState({ authenticated: false, available: true });
+    release();
+    await pending;
+    assert.equal(trigger.hidden, true);
+    assert.equal(fixture.document.getElementById("globalNotificationDrawer").children[2].children.length, 0);
+    assert.equal(fixture.document.dispatched.some(event => event.detail?.notifications?.length), false);
+});
 
 test("client normalization accepts only safe normalized fields and allowlisted review destinations", () => {
     const normalized = normalizeClientNotification(validNotice());

@@ -222,6 +222,7 @@ export async function loadSidebarHover() {
                 container.firstElementChild
             );
         }
+        initializeDeferredSidebar();
     }
     catch (
         error

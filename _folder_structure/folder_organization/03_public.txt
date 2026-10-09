@@ -62,7 +62,8 @@ public/Framework/
     +-- JS/
         +-- initialization.js       Shared shell initialization.
         +-- router.js               Auth-aware fragment/module route loader.
-        +-- notifications.js        Shared authenticated notification drawer and allowlisted review actions.
+        +-- notifications.js        Deferred authenticated bell/dropdown, with loading/empty/error states.
+        +-- notification_destinations.js    Small shared allowlist for notification review actions.
         +-- renderHeader.js         Header rendering.
         +-- ocr_runtime.js          Persistent OCR client runtime.
         +-- ocr_job_monitor.js      Job progress monitoring.
@@ -96,7 +97,7 @@ public/Global/
 |   +-- PageSettings/      CSS/index.css, HTML/index.html, JS/index.js
 |   +-- Suggestions/       CSS/index.css, HTML/index.html, JS/index.js
 |   +-- FAQ/               CSS/index.css, HTML/index.html, JS/index.js; BPD-authorized review, 30/page, all statuses, revision-aware actions
-+-- Ads/                 CSS/ads.css, HTML/ads.html, JS/ads.js
++-- Ads/                 CSS/ads.css, HTML/ads.html, JS/ads.js (deferred approved-unit loader; unconfigured placeholders make no ad requests)
 +-- Index/               CSS/index.css (main menu), CSS/dashboard.css,
 |                        HTML/home.html and JS/index.js (personal dashboard)
 +-- Login/               CSS/index.css, HTML/index.html, JS/index.js

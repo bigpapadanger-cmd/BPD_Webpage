@@ -26,6 +26,12 @@ ROUTE DISPLAY GATE
 ========================================================= */
 
 
+/* Author display rules must not expose controls marked hidden. Preserve the
+   separate until-found state, which browsers reveal during find-in-page. */
+[hidden]:not([hidden="until-found"]) {
+    display: none !important;
+}
+
 body.page-loading .site-content {
     opacity: 1;
 
@@ -36,9 +42,49 @@ body.page-loading .site-content {
     display: grid;
     align-content: start;
     gap: 18px;
-    min-height: min(42vh, 360px);
+    min-height: var(--app-content-height);
     padding: clamp(20px, 4vw, 48px);
     color: var(--text-color, #f3f4f6);
+}
+
+/* Persistent loading areas use the same geometry for pending, empty and
+   populated states. Larger result sets may grow naturally after this reserve. */
+:where(#dashboardUpdatesList, #suggestionsList, #faqPublished, #adminFaqList,
+       #minecraftModList, #arkModList, #minecraftAnnouncementList, #arkAnnouncementList,
+       #featuredPlayerCard, #playerSearchResults, #cmMatches, #umUsers, #umHistory,
+       #taskboardTaskList, #adminActivityList, #suggestionReviewList,
+       #rocketLeagueCareerStatsGrid, #rocketLeagueMmrProgression, #publicProfileRanks,
+       #publicProfileStats, #publicMmrHistoryGraph, .rl-leaderboards__table-wrap,
+       [data-shop-items]) {
+    min-height: 12rem;
+}
+
+body.page-loading :where(#dashboardUpdatesList, #suggestionsList, #faqPublished, #adminFaqList,
+       #featuredPlayerCard, #playerSearchResults, #cmMatches, #umUsers, #umHistory,
+       #taskboardTaskList, #adminActivityList, #rocketLeagueCareerStatsGrid,
+       #rocketLeagueMmrProgression, [data-shop-items]):empty {
+    border-radius: 12px;
+    background: linear-gradient(110deg, rgba(148, 163, 184, .04), rgba(148, 163, 184, .1), rgba(148, 163, 184, .04));
+}
+
+/* These pages reveal whole panels after a data/authorization check. Keep their
+   outer shell present; hidden protected children remain hidden. */
+:where(.public-profile-page, .rl-shop-card, .admin-page, .taskboard-page,
+       .worker-status-page, .account-page, .login-page) {
+    min-height: var(--app-content-height);
+}
+
+/* Ad placeholders keep their allocated height even when unfilled or blocked. */
+.site-content .ad-slot {
+    height: 90px;
+    min-height: 90px;
+    overflow: hidden;
+}
+
+@media (max-width: 700px) {
+    .site-content .ad-slot { height: 100px; min-height: 100px; }
+    :where(#dashboardUpdatesList, #suggestionsList, #featuredPlayerCard,
+           #rocketLeagueCareerStatsGrid, [data-shop-items]) { min-height: 18rem; }
 }
 
 .route-loading-shell p {

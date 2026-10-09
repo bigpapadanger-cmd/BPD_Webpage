@@ -28,11 +28,6 @@
         href="/Framework/Shell/CSS/Callers/master.css"
     >
    
-    <script
-        async
-        src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9161533706304827"
-        crossorigin="anonymous">
-    </script>
     <link
         rel="stylesheet"
         href="/Framework/Banner/CSS/account_banner.css"
@@ -45,7 +40,9 @@
         <div class="site-page">
             <div
                 id="accountBanner"
-                class="account-banner">
+                class="account-banner"
+                role="region"
+                aria-label="Account and notifications">
             </div>
             <header
                 id="header"
@@ -71,11 +68,12 @@
         aria-label="Close navigation"
         hidden>
     </button>
-    <aside
+    <div
         id="sidebar"
         class="site-sidebar"
+        role="complementary"
         aria-label="Site navigation">
-    </aside>
+    </div>
     </div>
 </body>
 </html>

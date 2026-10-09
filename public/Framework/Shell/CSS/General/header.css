@@ -36,6 +36,12 @@ body.sidebar-collapsed
     padding: 0;
 }
 
+/* Reserve title-row geometry even when the entry HTML contains whitespace. */
+.site-header:not([hidden]) {
+    display: block;
+    min-height: 76px;
+}
+
 .header-content {
     box-sizing: border-box;
     width: 98%;
@@ -251,6 +257,7 @@ OPTIONAL TABS
 }
 
 @media (max-width: 700px) {
+    .site-header:not([hidden]) { min-height: 64px; }
     .site-header {
         padding:
             8px

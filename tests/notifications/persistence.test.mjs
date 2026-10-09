@@ -4,8 +4,10 @@ import {
     acknowledgeNotificationState,
     getNotificationState,
     notificationIsVisible,
-    reconcileNotificationState
+    reconcileNotificationState,
+    listOcrNotificationEvents
 } from "../../functions/services/notifications/persistence.js";
+import { createNotificationDiagnostics } from "../../functions/services/notifications/http.js";
 
 const ACCOUNT_A = "11111111-1111-4111-8111-111111111111";
 const ACCOUNT_B = "22222222-2222-4222-8222-222222222222";
@@ -129,4 +131,49 @@ test("stalled upstream fetch is bounded and becomes a safe timeout failure", asy
     const promise = reconcileNotificationState(stalledEnv, ACCOUNT_A, "profile:incomplete", stalled);
     const bounded = Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error("test timeout")), 10_500))]);
     await assert.rejects(bounded, { code: "NOTIFICATIONS_UNAVAILABLE", status: 503 });
+});
+
+test("event table transport diagnostics classify pre-response failures without exception details", async () => {
+    const sensitive = `${env.SUPABASE_AUTH} ${ACCOUNT_A} https://database.example/rest/v1/notification_events?secret=query-cookie`;
+    const originalInfo = console.info;
+    const records = [];
+    console.info = (_label, record) => records.push(record);
+    try {
+        const diagnostics = createNotificationDiagnostics("list_notifications");
+        await assert.rejects(listOcrNotificationEvents(env, ACCOUNT_A, async () => { throw new TypeError(sensitive); }, diagnostics), {
+            code: "NOTIFICATIONS_UNAVAILABLE", status: 503
+        });
+        diagnostics.finish({ code: "NOTIFICATIONS_UNAVAILABLE" });
+        const record = records.at(-1);
+        assert.equal(record.stage, "event_list");
+        assert.equal(record.code, "UPSTREAM_UNAVAILABLE");
+        assert.equal(record.upstreamStatus, null);
+        assert.equal(record.timeout, false);
+        assert.equal(record.transportClass, "fetch_type_error");
+        assert.equal(record.exceptionName, "TypeError");
+        assert.doesNotMatch(JSON.stringify(record), new RegExp(sensitive.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+
+        const unknownDiagnostics = createNotificationDiagnostics("list_notifications");
+        const unknown = new Error(sensitive);
+        unknown.name = "CustomTransportError";
+        await assert.rejects(listOcrNotificationEvents(env, ACCOUNT_A, async () => { throw unknown; }, unknownDiagnostics));
+        unknownDiagnostics.finish({ code: "NOTIFICATIONS_UNAVAILABLE" });
+        assert.equal(records.at(-1).transportClass, "unknown_transport");
+        assert.equal("exceptionName" in records.at(-1), false);
+        assert.doesNotMatch(JSON.stringify(records.at(-1)), new RegExp(sensitive.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    } finally { console.info = originalInfo; }
+});
+
+test("event table HTTP rejection keeps upstream status and has no transport classification", async () => {
+    const originalInfo = console.info;
+    let record;
+    console.info = (_label, value) => { record = value; };
+    try {
+        const diagnostics = createNotificationDiagnostics("list_notifications");
+        await assert.rejects(listOcrNotificationEvents(env, ACCOUNT_A, async () => new Response("{}", { status: 503 }), diagnostics));
+        diagnostics.finish({ code: "NOTIFICATIONS_UNAVAILABLE" });
+        assert.equal(record.stage, "event_list_decode");
+        assert.equal(record.upstreamStatus, 503);
+        assert.equal("transportClass" in record, false);
+    } finally { console.info = originalInfo; }
 });

@@ -78,6 +78,14 @@ function requestUrl(base, parameters = {}, table = TABLE, columns = COLUMNS) {
     return url.toString();
 }
 
+function classifyFetchException(error) {
+    const exceptionName = ["TypeError", "AbortError", "DOMException"].includes(error?.name) ? error.name : null;
+    if (exceptionName === "AbortError" || exceptionName === "DOMException") return { transportClass: "abort", exceptionName };
+    if (exceptionName === "TypeError") return { transportClass: "fetch_type_error", exceptionName };
+    if (exceptionName === "Error") return { transportClass: "network_failure", exceptionName: null };
+    return { transportClass: "unknown_transport", exceptionName: null };
+}
+
 async function callTable(env, url, { method = "GET", body, prefer = null, signal, fetcher = fetch, diagnostics = null, stage }) {
     const { base, key } = configuration(env);
     diagnostics?.mark(stage);
@@ -98,7 +106,13 @@ async function callTable(env, url, { method = "GET", body, prefer = null, signal
             },
             ...(body === undefined ? {} : { body: JSON.stringify(body) })
         }, MAX_RESPONSE_BYTES, async (input, init) => {
-            const upstream = await fetcher(input, init);
+            let upstream;
+            try { upstream = await fetcher(input, init); }
+            catch (error) {
+                const transport = classifyFetchException(error);
+                diagnostics?.transportFailure(transport.transportClass, transport.exceptionName);
+                throw error;
+            }
             diagnostics?.upstream(upstream.status);
             return upstream;
         });
