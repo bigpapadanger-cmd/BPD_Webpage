@@ -139,15 +139,19 @@ test("Supabase failure diagnostics are bounded and never include credentials or 
             SUPABASE_URL: env.SUPABASE_URL,
             SUPABASE_SERVICE_ROLE_KEY: "test-build-secret-marker"
         }, "limits", { playerId: "private-player-marker" }));
+        globalThis.fetch = async () => { throw new Error("network detail must stay private"); };
+        await assert.rejects(callCustomMatchRpc(env, "limits", { playerId: "private-player-marker" }));
     } finally {
         console.warn = originalWarn;
     }
-    assert.equal(warnings.length, 1);
-    const diagnostic = JSON.stringify(warnings[0]);
-    assert.match(diagnostic, /custom_match_supabase_rpc_failure/);
-    assert.match(diagnostic, /upstream_response/);
-    assert.match(diagnostic, /401/);
-    assert.doesNotMatch(diagnostic, /test-build-secret-marker|private-player-marker|raw-provider-secret-marker|db\.example|SUPABASE_SERVICE_ROLE_KEY/);
+    assert.equal(warnings.length, 2);
+    const diagnostics = warnings.map(warning => JSON.stringify(warning));
+    assert.match(diagnostics[0], /custom_match_supabase_rpc_failure/);
+    assert.match(diagnostics[0], /upstream_response/);
+    assert.match(diagnostics[0], /401/);
+    assert.match(diagnostics[1], /UPSTREAM_UNAVAILABLE/);
+    assert.match(diagnostics[1], /request/);
+    assert.doesNotMatch(diagnostics.join(" "), /test-build-secret-marker|private-player-marker|raw-provider-secret-marker|network detail must stay private|db\.example|SUPABASE_SERVICE_ROLE_KEY/);
 });
 test("start and voting unavailable until their security authorities exist", async () => {
     globalThis.fetch = () => { throw new Error("must not fetch"); };

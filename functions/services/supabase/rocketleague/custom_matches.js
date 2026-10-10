@@ -8,7 +8,7 @@ const SAFE_UPSTREAM_CODES = new Set([
     "CUSTOM_MATCH_NOT_FOUND", "CUSTOM_MATCH_VERSION_CONFLICT", "CUSTOM_MATCH_CREDENTIALS_FORBIDDEN",
     "CUSTOM_MATCH_RUNTIME_REQUIRED", "CUSTOM_MATCH_CAPACITY_REACHED", "CUSTOM_MATCH_STATE_CONFLICT",
     "CUSTOM_MATCH_RATE_LIMITED", "CUSTOM_MATCH_ACCESS_DENIED", "UPSTREAM_TIMEOUT",
-    "UPSTREAM_UNAVAILABLE", "UPSTREAM_RESPONSE_TOO_LARGE", "UPSTREAM_RESPONSE_INVALID"
+    "UPSTREAM_UNAVAILABLE", "UPSTREAM_CONFIGURATION_INVALID", "UPSTREAM_RESPONSE_TOO_LARGE", "UPSTREAM_RESPONSE_INVALID"
 ]);
 
 function logRpcFailure(operation, stage, urlConfigured, keyConfigured, upstreamStatus, code) {
@@ -72,8 +72,9 @@ export async function callCustomMatchRpc(env, operation, parameters) {
             return sanitizeCustomMatchResponse(operation, raw);
         }, 10000);
     } catch (error) {
-        const code = error instanceof CustomMatchError ? error.code
-            : error?.code === "UPSTREAM_TIMEOUT" ? "CUSTOM_MATCH_TIMEOUT" : "CUSTOM_MATCH_UNAVAILABLE";
+        // Preserve the bounded internal transport category in logs while keeping
+        // the existing public error mapping unchanged.
+        const code = error instanceof CustomMatchError ? error.code : error?.code;
         logRpcFailure(operation, stage, true, true, upstreamStatus, code);
         if (error instanceof CustomMatchError) throw error;
         throw new CustomMatchError(error?.code === "UPSTREAM_TIMEOUT" ? "CUSTOM_MATCH_TIMEOUT" : "CUSTOM_MATCH_UNAVAILABLE", error?.code === "UPSTREAM_TIMEOUT" ? 504 : 503);
