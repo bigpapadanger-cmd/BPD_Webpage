@@ -47,6 +47,7 @@ export async function callCustomMatchRpc(env, operation, parameters) {
         return await withUpstreamDeadline(async signal => {
             const headers = {
                 apikey: key,
+                "User-Agent": "BPD-Server-Diagnostic/1.0",
                 "Content-Type": "application/json",
                 Accept: "application/json",
                 "Content-Profile": "api",

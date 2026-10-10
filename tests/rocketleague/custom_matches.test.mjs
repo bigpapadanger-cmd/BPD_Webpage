@@ -101,6 +101,7 @@ test("fixed transport uses service role and no redirect; never retries failed mu
     globalThis.fetch = async (url, init) => {
         calls++; assert.equal(url, "https://db.example/rest/v1/rpc/apply_custom_match_action"); assert.equal(init.headers.apikey, env.SUPABASE_SERVICE_ROLE_KEY);
         assert.equal(init.redirect, "error"); assert.equal(init.headers["Content-Profile"], "api");
+        assert.equal(init.headers["User-Agent"], "BPD-Server-Diagnostic/1.0");
         return Response.json({ success: false, code: "CUSTOM_MATCH_VERSION_CONFLICT", currentVersion: 99 });
     };
     await assert.rejects(callCustomMatchRpc(env, "action", {}), { code: "CUSTOM_MATCH_VERSION_CONFLICT" });
