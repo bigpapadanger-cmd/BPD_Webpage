@@ -1,4 +1,25 @@
-.rl-custom-page { width: min(1120px, calc(100% - 32px)); margin: 0 auto; padding: 28px 0 56px; color: #edf3ff; }
+.rl-custom-page { width: min(1120px, calc(100% - 32px)); margin: 0 auto; padding: 28px 0 56px; color: #edf3ff; position: relative; }
+.rl-custom-page .rl-feature-heading { padding: 12px 0 24px; }
+.rl-custom-page .rl-feature-heading h1 { font-size: clamp(2rem, 5vw, 3.25rem); letter-spacing: -.035em; }
+.rl-custom-page .cm-access { position: fixed; top: 88px; right: 20px; z-index: 100; max-width: min(360px, calc(100vw - 40px)); padding: 12px 18px; border: 1px solid #58ba98; border-radius: 12px; background: #102c29; box-shadow: 0 12px 32px #0006; animation: cm-enter .22s ease-out; }
+.rl-custom-page .cm-access p { margin: 0; color: #b8f2d8; }
+.rl-custom-page .cm-access button { margin-top: 8px; }
+.rl-custom-page :is(button,a) { transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease, background-color .18s ease; }
+.rl-custom-page :is(button,a):not(:disabled):hover { transform: translateY(-2px); border-color: #9ccaff; box-shadow: 0 0 18px #559cff40; }
+.rl-custom-page :is(button,a):not(:disabled):active { transform: translateY(0); }
+.rl-custom-page input:focus,.rl-custom-page select:focus { border-color: #90bdff; box-shadow: 0 0 0 3px #579aff20; }
+.rl-custom-page .cm-directory { min-height: 240px; margin-top: 20px; padding: 16px; border: 1px solid #344b68; border-radius: 14px; background: radial-gradient(ellipse at top, #1a304b55, #080f1b80); }
+.rl-custom-page .cm-directory .cm-cards { margin: 0; }
+.rl-custom-page .cm-empty { min-height: 200px; display: grid; place-items: center; text-align: center; padding: 20px; margin: 0; box-sizing: border-box; }
+.rl-custom-page #cmBrowseForm { align-items: flex-end; padding: 14px 0 0; }
+.rl-custom-page .cm-card { transition: border-color .18s ease, transform .18s ease; }
+.rl-custom-page .cm-card:hover { border-color: #6b9bd4; transform: translateY(-2px); }
+.rl-custom-page .cm-card p { margin: 8px 0; }
+.rl-custom-page .cm-dialog { box-sizing: border-box; }
+.rl-custom-page .cm-dialog[open] { animation: cm-enter .22s ease-out; }
+.rl-custom-page #cmCreateStatus { min-height: 1.5em; color: #ffc2cc; }
+@keyframes cm-enter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) { .rl-custom-page *, .rl-custom-page *::before, .rl-custom-page *::after { animation: none !important; transition: none !important; } .rl-custom-page :is(button,a,.cm-card):hover { transform: none; } }
 .rl-custom-page .cm-panel { margin: 12px 0; padding: clamp(16px, 2.5vw, 24px); border: 1px solid rgba(181,206,242,.2); border-radius: 14px; background: linear-gradient(145deg, #1b2b3e, #0d1624); }
 .rl-custom-page h2,.rl-custom-page h3 { margin: 0 0 14px; }
 .rl-custom-page p { line-height: 1.55; color: #bac8dd; }

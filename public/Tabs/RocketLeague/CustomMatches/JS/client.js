@@ -65,7 +65,7 @@ export async function requestCustomMatch(path, { method = "GET", body, signal, f
 
 export function createCustomMatchController({ call, publish, makeKey = () => crypto.randomUUID() }) {
     const state = { access: false, accessPending: true, accessMessage: "Checking Rocket League access…", limits: null,
-        matches: [], page: 1, hasMore: false, total: 0, filter: "", browsePending: false, browseMessage: "Loading public matches…",
+        matches: [], page: 1, hasMore: false, total: 0, filter: "open", browsePending: false, browseMessage: "Loading public matches…",
         selected: null, detail: null, detailPending: false, detailMessage: "", busy: false, retry: null, message: "", tone: "info",
         credentials: null, credentialsPending: false, credentialsMessage: "", runtimeStatus: "offline", runtimeMembers: [], voteTypes: {},
         rounds: [], roundsPending: false, roundsMessage: "", playerResults: [], resultPending: false, resultMessage: "", voteResults: {}, lastResultCode: "",

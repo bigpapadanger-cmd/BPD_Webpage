@@ -4,9 +4,9 @@
         <h1 id="rlCustomMatchesTitle">Find Custom Matches</h1>
         <p>Find a lobby, bring your team, and arrange a custom Rocket League match.</p>
     </header>
-    <section class="cm-panel cm-access" aria-label="Custom Match access">
+    <section class="cm-access" id="cmAccessBanner" aria-label="Custom Match access">
         <p id="cmAccessStatus" role="status">Checking Rocket League access…</p>
-        <div class="cm-actions"><button type="button" id="cmCheckAccess">Recheck access</button><a href="/RocketLeague" data-router-link>Player Hub</a></div>
+        <button type="button" id="cmCheckAccess" hidden>Recheck access</button>
     </section>
     <p class="cm-notice" id="cmNotice" role="status" aria-live="polite"></p>
     <button type="button" id="cmRetryMutation" hidden>Retry the same request</button>
@@ -15,11 +15,11 @@
         <div class="cm-section-heading"><div><h3>Public matches</h3><p class="cm-panel-help">Saved match listings are visible here. Live presence is checked after opening a match.</p></div><button type="button" id="cmRefreshBrowse">Refresh</button></div>
         <form id="cmBrowseForm" class="cm-actions"><label>Match state<select name="state"><option value="">All states</option><option value="open">Open</option><option value="lobby">Lobby</option><option value="pregame">Pregame</option><option value="active">Active</option><option value="results">Results</option><option value="archived">Archived</option></select></label><button>Apply filter</button></form>
         <p id="cmBrowseStatus" role="status">Loading public matches…</p>
-        <div id="cmMatches" class="cm-cards"></div>
+        <div class="cm-directory" aria-label="Public match listings"><div id="cmMatches" class="cm-cards"></div><p id="cmDirectoryEmpty" class="cm-empty" role="status">Loading public matches…</p></div>
         <nav class="cm-pagination" aria-label="Match pages"><button type="button" id="cmPrevious" disabled>Previous</button><span id="cmPageNumber">Page 1</span><button type="button" id="cmNext" disabled>Next</button></nav>
     </section>
     <dialog class="cm-dialog" id="cmCreateDialog" aria-labelledby="cmCreateTitle">
-        <div class="cm-dialog-header"><div><p class="cm-kicker">HOST SETUP</p><h2 id="cmCreateTitle">Create a match</h2></div><button type="button" class="cm-dialog-close" data-cmDialogClose aria-label="Close create match dialog">×</button></div>
+        <div class="cm-dialog-header"><div><p class="cm-kicker">HOST SETUP</p><h2 id="cmCreateTitle">Create a match</h2></div><button type="button" class="cm-dialog-close" data-cm-dialog-close aria-label="Close create match dialog">×</button></div>
         <p>The host creates the lobby manually in Rocket League. Private credentials are handled only after the match is created and remain protected by the existing authorization checks.</p>
         <form id="cmCreateForm">
             <fieldset id="cmCreateFields" disabled>
@@ -38,17 +38,19 @@
                 <label class="cm-check"><input name="allowSpectators" type="checkbox">Allow spectators</label>
                 <label>Spectator capacity<input name="spectatorCapacity" type="number" min="1" step="1" disabled></label>
                 <p id="cmLimitsNote">Loading configured limits…</p>
-                <div class="cm-form-actions"><button type="button" class="cm-button-secondary" data-cmDialogClose>Cancel</button><button type="submit" class="cm-button-primary">Create match</button></div>
             </fieldset>
+            <p id="cmCreateStatus" role="status" aria-live="polite"></p>
+            <div class="cm-form-actions"><button type="button" class="cm-button-secondary" data-cm-dialog-close>Cancel</button><button id="cmCreateSubmit" type="submit" class="cm-button-primary" disabled>Create match</button></div>
         </form>
         <button type="button" id="cmReloadLimits" class="cm-text-button">Reload modes / limits</button>
     </dialog>
     <dialog class="cm-dialog" id="cmJoinPrivateDialog" aria-labelledby="cmJoinPrivateTitle">
-        <div class="cm-dialog-header"><div><p class="cm-kicker">PRIVATE LOBBY</p><h2 id="cmJoinPrivateTitle">Join a private match</h2></div><button type="button" class="cm-dialog-close" data-cmDialogClose aria-label="Close private match dialog">×</button></div>
+        <div class="cm-dialog-header"><div><p class="cm-kicker">PRIVATE LOBBY</p><h2 id="cmJoinPrivateTitle">Join a private match</h2></div><button type="button" class="cm-dialog-close" data-cm-dialog-close aria-label="Close private match dialog">×</button></div>
         <p>Enter the match code shared by the host. You can view the match before joining; sign-in and Rocket League eligibility are required for protected actions.</p>
         <form id="cmJoinPrivateForm">
             <label>Match code<input name="matchCode" required pattern="CM[A-Za-z0-9]{8}" maxlength="10" autocomplete="off" placeholder="CM12345678"></label>
-            <div class="cm-form-actions"><button type="button" class="cm-button-secondary" data-cmDialogClose>Cancel</button><button type="submit" class="cm-button-primary">Open match</button></div>
+            <p id="cmPrivateStatus" role="status" aria-live="polite"></p>
+            <div class="cm-form-actions"><button type="button" class="cm-button-secondary" data-cm-dialog-close>Cancel</button><button type="submit" class="cm-button-primary">Open match</button></div>
         </form>
     </dialog>
     <section class="cm-panel" id="cmLobbyPanel" hidden aria-labelledby="cmLobbyTitle">

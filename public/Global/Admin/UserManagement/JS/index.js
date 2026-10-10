@@ -135,8 +135,8 @@ function updateDetails() {
 
 function section(title, entries) {
     const box = el("section", "um-section"); box.append(el("h3", "", title));
-    const dl = el("dl", "");
-    for (const [key, value] of entries) { const term = el("dt", "", key), description = el("dd", "", value === null || value === undefined || value === "" ? "Not recorded" : value); dl.append(term, description); }
+    const dl = el("dl", "um-kv");
+    for (const [key, value] of entries) { const term = el("dt", "", key), description = el("dd", "", value === null || value === undefined || value === "" ? "Not recorded" : typeof value === "boolean" ? value ? "Yes" : "No" : value); dl.append(term, description); }
     box.append(dl); return box;
 }
 
@@ -151,9 +151,21 @@ function renderDetail(detail) {
     grid.append(section("Presence", [["Rocket League presence", rl.presence?.state], ["Checked", date(rl.presence?.checkedAt)], ["MMR refreshed", date(rl.refresh?.mmrLastSuccessAt)], ["Career stats refreshed", date(rl.refresh?.careerStatsLastSuccessAt)]]));
     grid.append(section("Moderation", [["Suspended", detail.moderation.suspended ? "Yes" : "No"], ["Suspension reason", detail.moderation.suspension?.reason], ["Suspension ends", date(detail.moderation.suspension?.expiresAt)], ["Banned", detail.moderation.banned ? "Yes" : "No"], ["Ban reason", detail.moderation.ban?.reason], ["Removed", detail.moderation.removed ? "Yes" : "No"], ["History entries", detail.moderation.historyCount]]));
     grid.append(renderNotes(detail, permissions));
-    grid.append(section("History", state.detailHistory.length ? state.detailHistory.map(item => [date(item.occurredAt), `${item.eventType}${item.reason ? ` — ${item.reason}` : ""}`]) : [["Recent activity", "No history entries"]]));
+    const history = el("section", "um-section um-event-section"); history.append(el("h3", "", "Account activity"));
+    if (!state.detailHistory.length) history.append(el("p", "um-muted", "No history entries."));
+    else {
+        const events = el("ol", "um-event-list");
+        for (const item of state.detailHistory) {
+            const event = el("li", "um-event");
+            event.append(el("strong", "", item.eventType.replaceAll("_", " ")), el("time", "um-muted", date(item.occurredAt)));
+            if (item.reason) event.append(el("p", "", item.reason));
+            event.append(el("span", "um-muted", `By ${item.actorDisplayName || "System"}`)); events.append(event);
+        }
+        history.append(events);
+    }
+    grid.append(history);
     const actions = renderActions(detail, permissions);
-    const wrap = el("div", ""); wrap.append(grid, actions); return wrap;
+    const wrap = el("div", "um-account-detail"); wrap.append(actions, grid); return wrap;
 }
 
 function renderNotes(detail, permissions) {
@@ -176,12 +188,12 @@ function actionForm(action, fields, label, extra = {}) {
         wrapper.append(input); form.append(wrapper);
     });
     const submit = el("button", "um-button", label); submit.type = "submit"; submit.disabled = state.busy; form.append(submit);
-    if (extra.danger) form.dataset.confirm = extra.confirm || "Confirm this action?";
+    if (extra.danger) { form.dataset.confirm = extra.confirm || "Confirm this action?"; submit.dataset.danger = "true"; }
     form.addEventListener("submit", handleMutation); return form;
 }
 
 function renderActions(detail, permissions) {
-    const box = el("section", "um-section"); box.append(el("h3", "", "Account actions"));
+    const box = el("section", "um-section um-account-actions"); box.append(el("h3", "", "Account actions"), el("p", "um-muted", "Available controls depend on your permissions and this account’s current state. Changes require a reason and are recorded in history."));
     const actorRole = state.list?.permissions?.role;
     if (permissions.canSuspend && !detail.moderation.suspended && !detail.moderation.banned && !detail.moderation.removed)
             box.append(actionForm("suspend", [{ name: "durationDays", label: "Duration", type: "select", options: [3,7,14,21,30,60,90,180,360].map(day => [String(day), `${day} days`]) }, { name: "reason", label: "Reason", required: true }], "Suspend account", { danger: true, confirm: "Suspend this account for the selected duration?" }));
@@ -204,7 +216,18 @@ function renderActions(detail, permissions) {
         if (actorRole === "owner") roleOptions.push(["admin", "Admin"]);
         box.append(actionForm("set-role", [{ name: "role", label: "Management role", type: "select", options: roleOptions }, { name: "reason", label: "Reason", required: true }], "Update role", { danger: true, confirm: "Change this account's User Management role?" }));
     }
-    if (!box.querySelector("form")) box.append(el("p", "um-muted", "No management actions are available for this account."));
+    const controls = [...box.querySelectorAll("form")];
+    if (!controls.length) box.append(el("p", "um-muted", "No management actions are available for this account."));
+    else {
+        const grid = el("div", "um-action-grid");
+        for (const form of controls) {
+            const action = el("details", "um-action-choice");
+            action.append(el("summary", "", form.querySelector('button[type="submit"]').textContent));
+            if (form.dataset.action === "remove") action.append(el("p", "um-muted", "Soft removal disables access and retains records. This does not permanently delete the account."));
+            action.append(form); grid.append(action);
+        }
+        box.append(grid);
+    }
     return box;
 }
 function rlExists(detail) { return detail.rocketLeague?.exists === true; }
