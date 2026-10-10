@@ -6,6 +6,7 @@ PROJECT SETUP & DEVELOPMENT GUIDE
         - GitHub Pull Requests (GitHub)
         - GitHub Actions (GitHub)
 
+
     Git Installation Settings:
         Git:
             - Line Endings: Checkout Windows‑style, commit Unix‑style

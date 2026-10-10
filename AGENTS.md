@@ -8,7 +8,7 @@ Global Codex operating guidance is inherited separately. This file should descri
 
 Do not duplicate global coordination policy here unless a DomainData-specific rule requires an exception.
 
----
+----
 
 ## Repository Structure
 
