@@ -18,7 +18,7 @@
 
     "vars": {
         "DISCORD_COMMUNICATIONS_ENABLED": "true",
-        "CUSTOM_MATCH_RUNTIME_ENABLED": "false",
+        "CUSTOM_MATCH_RUNTIME_ENABLED": "true",
         "OCR_API_URL": "https://bpd-ocr-y5wgeempka-uc.a.run.app/api/ocr",
         "OCR_JOB_PROCESS_URL": "https://bpd-gaming-network.com/api/ocr/jobs/process_job",
         "OCR_JOB_PROGRESS_URL": "https://bpd-gaming-network.com/api/ocr/jobs/progress",
