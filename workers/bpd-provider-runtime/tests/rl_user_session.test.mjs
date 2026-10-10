@@ -35,18 +35,19 @@ async function assertion(changes = {}) {
     return `${input}.${b64(signature)}`;
 }
 
-async function call(object, operation, body) {
-    const response = await object.fetch(new Request(`https://internal/${operation}`, { method: "POST", body: JSON.stringify({ accountKey, ...body }) }));
+async function call(object, operation, body, key = accountKey) {
+    const response = await object.fetch(new Request(`https://internal/${operation}`, { method: "POST", body: JSON.stringify({ accountKey: key, ...body }) }));
     return { status: response.status, ...await response.json() };
 }
 
-async function fixture() {
+async function fixture(key = accountKey, identity = epicIdentityHash, shared = null, objects = null) {
     const storage = storageFixture();
-    const authority = new RlProbeSecurityAuthority({ storage: storageFixture() });
+    const authority = shared || new RlProbeSecurityAuthority({ storage: storageFixture() });
     const object = new UserRocketLeagueSession({ storage }, { ...env,
         RL_PROBE_SECURITY: { idFromName: name => name, get: () => authority } });
-    authority.env.RL_USER_SESSION = { idFromName: name => name, get: () => object };
-    assert.equal((await call(object, "bootstrap", { epicIdentityHash })).status, 200);
+    if (objects) objects.set(key, object);
+    authority.env.RL_USER_SESSION = { idFromName: name => name, get: name => objects?.get(name) || object };
+    assert.equal((await call(object, "bootstrap", { accountKey: key, epicIdentityHash: identity }, key)).status, 200);
     return { storage, object, authority };
 }
 
@@ -226,6 +227,120 @@ test("global bump invalidates prepared handoff and earlier assertions without to
     const newClaims = { securityEpoch: "2", generation: fresh.generation, iat, exp: iat + 60 };
     assert.equal((await call(object, "consume", { assertion: await assertion({ ...newClaims, generation: 0 }), credential: "temporary-test-credential" })).code, "RL_PROBE_GENERATION_REJECTED");
     assert.equal((await call(object, "consume", { assertion: await assertion(newClaims), credential: "temporary-test-credential" })).status, 200);
+});
+
+test("two account objects keep concurrent handoffs, expiry and lifecycle invalidation isolated", async () => {
+    const keyA = "c".repeat(64), keyB = "d".repeat(64);
+    const identityA = "e".repeat(64), identityB = "f".repeat(64);
+    const objects = new Map();
+    const authority = new RlProbeSecurityAuthority({ storage: storageFixture() });
+    const [a, b] = await Promise.all([
+        fixture(keyA, identityA, authority, objects),
+        fixture(keyB, identityB, authority, objects)
+    ]);
+    const callerSecret = "r".repeat(64);
+    const route = async (operation, body) => {
+        const response = await runtime.fetch(new Request(`https://internal/internal/rl-probe/${operation}`, {
+            method: "POST", headers: { Authorization: `Bearer ${callerSecret}` }, body: JSON.stringify(body)
+        }), { PROVIDER_RUNTIME_CALLER_SECRET: callerSecret, RL_PROBE_SECURITY_ENABLED: "true",
+            RL_USER_SESSION: { idFromName: name => name, get: name => objects.get(name) } });
+        return { status: response.status, ...await response.json() };
+    };
+    const inputA = { accountKey: keyA, epicIdentityHash: identityA, sessionHash: "1".repeat(64),
+        transactionHash: "2".repeat(64), stateHash: "3".repeat(64) };
+    const inputB = { accountKey: keyB, epicIdentityHash: identityB, sessionHash: "4".repeat(64),
+        transactionHash: "5".repeat(64), stateHash: "6".repeat(64) };
+    const [beganA, beganB] = await Promise.all([
+        route("begin", inputA), route("begin", inputB)
+    ]);
+    assert.equal(beganA.status, 200);
+    assert.equal(beganB.status, 200);
+    assert.notEqual(a.object, b.object);
+    assert.notEqual(a.storage, b.storage);
+    assert.equal((await a.storage.get("security")).accountKey, keyA);
+    assert.equal((await b.storage.get("security")).accountKey, keyB);
+
+    const [claimedA, claimedB] = await Promise.all([
+        route("claim", inputA), route("claim", inputB)
+    ]);
+    assert.equal(claimedA.status, 200);
+    assert.equal(claimedB.status, 200);
+    const credentialA = "account-a-temporary-credential";
+    const credentialB = "account-b-temporary-credential";
+    const assertionA = await assertion({ sub: keyA, epicIdentityHash: identityA,
+        credentialDigest: await credentialDigest(credentialA), jti: b64(crypto.getRandomValues(new Uint8Array(32))) });
+    const assertionB = await assertion({ sub: keyB, epicIdentityHash: identityB,
+        credentialDigest: await credentialDigest(credentialB), jti: b64(crypto.getRandomValues(new Uint8Array(32))) });
+
+    const crossAccount = await route("prepare", { accountKey: keyB, transactionHash: inputB.transactionHash,
+        assertion: assertionA, credential: credentialA });
+    assert.equal(crossAccount.code, "RL_PROBE_ASSERTION_REJECTED");
+    const crossCredential = await route("prepare", { accountKey: keyB, transactionHash: inputB.transactionHash,
+        assertion: assertionB, credential: credentialA });
+    assert.equal(crossCredential.code, "RL_PROBE_ASSERTION_REJECTED");
+    const [preparedA, preparedB] = await Promise.all([
+        route("prepare", { accountKey: keyA, transactionHash: inputA.transactionHash, assertion: assertionA, credential: credentialA }),
+        route("prepare", { accountKey: keyB, transactionHash: inputB.transactionHash, assertion: assertionB, credential: credentialB })
+    ]);
+    assert.equal(preparedA.status, 200, JSON.stringify(preparedA));
+    assert.equal(preparedB.status, 200, JSON.stringify(preparedB));
+    assert.notEqual(a.object.handoff?.credential, b.object.handoff?.credential);
+    for (const saved of [JSON.stringify(await a.storage.get("security")), JSON.stringify(await b.storage.get("security"))]) {
+        assert.equal(saved.includes(credentialA), false);
+        assert.equal(saved.includes(credentialB), false);
+    }
+    assert.equal((await route("consume", { accountKey: keyA, assertion: assertionA, credential: credentialA })).status, 200);
+    assert.equal((await route("consume", { accountKey: keyA, assertion: assertionA, credential: credentialA })).code, "RL_PROBE_REPLAY_REJECTED");
+    assert.notEqual(b.object.handoff, null);
+
+    // Expiring B must not clear A's in-memory handoff or durable state.
+    const stateB = await b.storage.get("security");
+    stateB.temporary.hardExpiresAt = Date.now() - 1;
+    await b.storage.put("security", stateB);
+    await b.object.alarm();
+    assert.equal(b.object.handoff, null);
+    assert.notEqual(a.object.handoff, null);
+    assert.equal((await route("execute", { accountKey: keyB, epicIdentityHash: identityB,
+        sessionHash: inputB.sessionHash, transactionHash: inputB.transactionHash })).code, "RL_PROBE_FRESH_REAUTH_REQUIRED");
+
+    // Logout/unlink/identity changes are scoped to the target account.
+    const stateBAfterExpiry = await b.storage.get("security");
+    for (const reason of ["logout", "epic_unlink", "identity_change"]) {
+        const invalidated = await route("invalidate", { accountKey: keyA, reason });
+        assert.equal(invalidated.status, 200);
+        assert.deepEqual(await b.storage.get("security"), stateBAfterExpiry);
+    }
+});
+
+test("global revocation reaches both registered account objects and clears both handoffs", async () => {
+    const keyA = "8".repeat(64), keyB = "9".repeat(64);
+    const identityA = "a".repeat(64), identityB = "b".repeat(64);
+    const objects = new Map();
+    const authority = new RlProbeSecurityAuthority({ storage: storageFixture() });
+    const [a, b] = await Promise.all([
+        fixture(keyA, identityA, authority, objects), fixture(keyB, identityB, authority, objects)
+    ]);
+    const txA = { accountKey: keyA, epicIdentityHash: identityA, sessionHash: "c".repeat(64),
+        transactionHash: "d".repeat(64), stateHash: "e".repeat(64) };
+    const txB = { accountKey: keyB, epicIdentityHash: identityB, sessionHash: "f".repeat(64),
+        transactionHash: "0".repeat(64), stateHash: "1".repeat(64) };
+    const credentialA = "global-revoke-a", credentialB = "global-revoke-b";
+    for (const [f, tx, key, identity, credential] of [[a, txA, keyA, identityA, credentialA], [b, txB, keyB, identityB, credentialB]]) {
+        assert.equal((await call(f.object, "begin", tx, key)).status, 200);
+        assert.equal((await call(f.object, "claim", tx, key)).status, 200);
+        const prepared = await call(f.object, "prepare", { transactionHash: tx.transactionHash,
+            assertion: await assertion({ sub: key, epicIdentityHash: identity, credentialDigest: await credentialDigest(credential),
+                jti: b64(crypto.getRandomValues(new Uint8Array(32))) }),
+            credential }, key);
+        assert.equal(prepared.status, 200, JSON.stringify(prepared));
+    }
+    const revoked = await authority.fetch(new Request("https://internal/bump", { method: "POST", body: "{}" }));
+    assert.equal(revoked.status, 200);
+    assert.equal((await revoked.json()).epoch, "2");
+    assert.equal(a.object.handoff, null);
+    assert.equal(b.object.handoff, null);
+    assert.ok((await a.storage.get("security")).generation >= 1);
+    assert.ok((await b.storage.get("security")).generation >= 1);
 });
 
 test("global authority serializes concurrent bumps monotonically and rejects malformed management input", async () => {
