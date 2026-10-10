@@ -7,7 +7,7 @@
   "placement": { "mode": "smart" },
   "vars": {
     "CUSTOM_MATCH_RUNTIME_ENABLED": "true",
-    "SUPABASE_URL": "https://xslrwamnfqgoziaczgsn.supabase.co"
+    "SUPABASE_URL": "https://xslrwamnfqgoziaczgsn.supabase.co/rest/v1/"
   },
   "durable_objects": { "bindings": [{ "name": "CUSTOM_MATCH_SESSIONS", "class_name": "CustomMatchSession" }] },
   "migrations": [{ "tag": "custom-match-session-v1", "new_sqlite_classes": ["CustomMatchSession"] }],
