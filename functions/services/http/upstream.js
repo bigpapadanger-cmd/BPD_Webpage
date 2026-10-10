@@ -5,6 +5,14 @@ function failure(code) {
     return Object.assign(new Error("Upstream service unavailable."), { code, status: 503 });
 }
 
+function fetchFailure(code, error, signal) {
+    const errorName = error?.name;
+    const transportErrorClass = signal?.aborted || errorName === "AbortError" ? "abort"
+        : errorName === "TypeError" ? "type_error"
+            : errorName === "Error" ? "error" : "other";
+    return Object.assign(failure(code), { transportErrorClass });
+}
+
 // The caller's complete operation (including parsing and validation) runs within
 // this deadline. Promise.race also bounds non-cooperative fetch/stream mocks.
 export async function withUpstreamDeadline(operation, timeoutMs = UPSTREAM_TIMEOUT_MS) {
@@ -87,7 +95,7 @@ export async function fetchBoundedResponse(input, init, maxBytes = UPSTREAM_MAX_
     if (signal.aborted) throw failure("UPSTREAM_TIMEOUT");
     let response;
     try { response = await fetcher(input, init); }
-    catch (error) { throw failure(signal.aborted || error?.name === "AbortError" ? "UPSTREAM_TIMEOUT" : "UPSTREAM_UNAVAILABLE"); }
+    catch (error) { throw fetchFailure(signal.aborted || error?.name === "AbortError" ? "UPSTREAM_TIMEOUT" : "UPSTREAM_UNAVAILABLE", error, signal); }
     const declared = Number(response.headers.get("Content-Length"));
     if (Number.isFinite(declared) && declared > maxBytes) {
         void response.body?.cancel().catch(() => {});
@@ -112,8 +120,9 @@ export async function fetchBoundedResponse(input, init, maxBytes = UPSTREAM_MAX_
         if (signal.aborted) throw failure("UPSTREAM_TIMEOUT");
     } catch (error) {
         cancel();
-        throw failure(signal.aborted ? "UPSTREAM_TIMEOUT"
-            : error?.code === "UPSTREAM_RESPONSE_TOO_LARGE" ? error.code : "UPSTREAM_RESPONSE_INVALID");
+        const code = signal.aborted ? "UPSTREAM_TIMEOUT"
+            : error?.code === "UPSTREAM_RESPONSE_TOO_LARGE" ? error.code : "UPSTREAM_RESPONSE_INVALID";
+        throw fetchFailure(code, error, signal);
     } finally {
         signal.removeEventListener("abort", cancel);
         reader?.releaseLock();

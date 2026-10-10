@@ -10,15 +10,38 @@ const SAFE_UPSTREAM_CODES = new Set([
     "CUSTOM_MATCH_RATE_LIMITED", "CUSTOM_MATCH_ACCESS_DENIED", "UPSTREAM_TIMEOUT",
     "UPSTREAM_UNAVAILABLE", "UPSTREAM_CONFIGURATION_INVALID", "UPSTREAM_RESPONSE_TOO_LARGE", "UPSTREAM_RESPONSE_INVALID"
 ]);
+const SAFE_TRANSPORT_CLASSES = new Set(["abort", "type_error", "error", "other"]);
+const EXPECTED_SUPABASE_HOST = "xslrwamnfqgoziaczgsn.supabase.co";
+const SAFE_PARAMETER_KEYS = new Set([
+    "p_game_key", "p_state", "p_page", "p_page_size", "p_match_code", "p_round_code",
+    "p_idempotency_key", "p_expected_version", "p_expected_match_version", "p_expected_round_version",
+    "p_actor_account_id", "p_admin_account_id", "p_action", "p_payload", "p_options", "p_vote",
+    "p_target_member_code", "p_reason", "p_result_code", "p_team_a_score", "p_team_b_score"
+]);
 
-function logRpcFailure(operation, stage, urlConfigured, keyConfigured, upstreamStatus, code) {
+function logRpcFailure({ operation, stage, rawUrl, urlValid, targetMatches, key, upstreamStatus, code, transportErrorClass, headers, parameters }) {
     try {
         console.warn("custom_match_supabase_rpc_failure", {
             operation,
             stage,
-            supabaseUrlConfigured: urlConfigured,
-            serviceRoleKeyConfigured: keyConfigured,
+            method: "POST",
+            endpointType: "supabase_rpc",
+            supabaseUrlConfigured: Boolean(rawUrl),
+            supabaseUrlValid: urlValid,
+            expectedProjectMatch: targetMatches,
+            serviceRoleKeyConfigured: Boolean(key),
+            serviceRoleKeyType: !key ? "missing" : key.startsWith("sb_secret_") ? "secret_api_key"
+                : key.startsWith("eyJ") ? "legacy_jwt" : "other",
+            requestHeaderState: {
+                apiKeyPresent: Boolean(headers?.apikey),
+                authorizationPresent: Boolean(headers?.Authorization),
+                explicitUserAgent: headers?.["User-Agent"] === "BPD-Server-Diagnostic/1.0",
+                contentTypePresent: headers?.["Content-Type"] === "application/json",
+                profileHeadersPresent: headers?.["Content-Profile"] === "api" && headers?.["Accept-Profile"] === "api"
+            },
+            parameterKeys: Object.keys(parameters ?? {}).filter(keyName => SAFE_PARAMETER_KEYS.has(keyName)).sort(),
             upstreamStatus,
+            transportErrorClass: SAFE_TRANSPORT_CLASSES.has(transportErrorClass) ? transportErrorClass : "not_applicable",
             code: SAFE_UPSTREAM_CODES.has(code) ? code : "CUSTOM_MATCH_UNAVAILABLE"
         });
     } catch {
@@ -32,13 +55,19 @@ export async function callCustomMatchRpc(env, operation, parameters) {
     let root;
     const rawUrl = typeof env?.SUPABASE_URL === "string" ? env.SUPABASE_URL.trim() : "";
     const key = typeof env?.SUPABASE_SERVICE_ROLE_KEY === "string" ? env.SUPABASE_SERVICE_ROLE_KEY.trim() : "";
+    let urlValid = false;
+    let targetMatches = false;
+    let requestHeaders = null;
     try {
         const url = new URL(rawUrl);
-        if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash || !["/", "/rest/v1", "/rest/v1/"].includes(url.pathname)
-            || typeof key !== "string" || !key.trim()) throw new Error();
+        if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash || !["/", "/rest/v1", "/rest/v1/"].includes(url.pathname)) throw new Error();
+        urlValid = true;
+        targetMatches = url.hostname === EXPECTED_SUPABASE_HOST;
+        if (!key) throw new Error();
         root = url.origin;
     } catch {
-        logRpcFailure(operation, "configuration", Boolean(rawUrl), Boolean(key), null, "CUSTOM_MATCH_UNAVAILABLE");
+        logRpcFailure({ operation, stage: "configuration", rawUrl, urlValid, targetMatches, key, upstreamStatus: null,
+            code: "CUSTOM_MATCH_UNAVAILABLE", transportErrorClass: null, headers: null, parameters });
         throw new CustomMatchError();
     }
     let stage = "request";
@@ -56,6 +85,7 @@ export async function callCustomMatchRpc(env, operation, parameters) {
             // New Supabase secret API keys are opaque API keys, not JWTs.
             // Keep Authorization for legacy service_role JWT compatibility only.
             if (!key.startsWith("sb_secret_")) headers.Authorization = `Bearer ${key}`;
+            requestHeaders = headers;
             const response = await fetchBoundedResponse(`${root}/rest/v1/rpc/${OPERATIONS[operation]}`, {
                 method: "POST", redirect: "error", signal,
                 headers,
@@ -76,7 +106,8 @@ export async function callCustomMatchRpc(env, operation, parameters) {
         // Preserve the bounded internal transport category in logs while keeping
         // the existing public error mapping unchanged.
         const code = error instanceof CustomMatchError ? error.code : error?.code;
-        logRpcFailure(operation, stage, true, true, upstreamStatus, code);
+        logRpcFailure({ operation, stage, rawUrl, urlValid, targetMatches, key, upstreamStatus, code,
+            transportErrorClass: error?.transportErrorClass, headers: requestHeaders, parameters });
         if (error instanceof CustomMatchError) throw error;
         throw new CustomMatchError(error?.code === "UPSTREAM_TIMEOUT" ? "CUSTOM_MATCH_TIMEOUT" : "CUSTOM_MATCH_UNAVAILABLE", error?.code === "UPSTREAM_TIMEOUT" ? 504 : 503);
     }
