@@ -89,7 +89,9 @@ export async function callCustomMatchRpc(env, operation, parameters) {
             if (!key.startsWith("sb_secret_")) headers.Authorization = `Bearer ${key}`;
             requestHeaders = headers;
             const response = await fetchBoundedResponse(`${root}/rest/v1/rpc/${OPERATIONS[operation]}`, {
-                method: "POST", redirect: "error", signal,
+                // Manual mode never follows a redirect (so credentials cannot be
+                // forwarded), but lets diagnostics observe a safe 3xx status.
+                method: "POST", redirect: "manual", signal,
                 headers,
                 body: JSON.stringify(parameters)
             }, 256 * 1024);

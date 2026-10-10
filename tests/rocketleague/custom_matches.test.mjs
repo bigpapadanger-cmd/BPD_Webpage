@@ -96,11 +96,11 @@ test("safe domain errors preserve conflicts without private version diagnostics"
     }
     assert.equal(customMatchDomainError({ message: "secret SQL token" }).message, "CUSTOM_MATCH_UNAVAILABLE");
 });
-test("fixed transport uses service role and no redirect; never retries failed mutations", async () => {
+test("fixed transport uses service role and never follows redirects or retries failed mutations", async () => {
     let calls = 0;
     globalThis.fetch = async (url, init) => {
         calls++; assert.equal(url, "https://db.example/rest/v1/rpc/apply_custom_match_action"); assert.equal(init.headers.apikey, env.SUPABASE_SERVICE_ROLE_KEY);
-        assert.equal(init.redirect, "error"); assert.equal(init.headers["Content-Profile"], "api");
+        assert.equal(init.redirect, "manual"); assert.equal(init.headers["Content-Profile"], "api");
         assert.equal(init.headers["User-Agent"], "BPD-Server-Diagnostic/1.0");
         return Response.json({ success: false, code: "CUSTOM_MATCH_VERSION_CONFLICT", currentVersion: 99 });
     };
@@ -162,6 +162,26 @@ test("Supabase failure diagnostics are bounded and never include credentials or 
     assert.match(diagnostics[1], /p_game_key/);
     assert.match(diagnostics[1], /transportCauseClass.*dns/);
     assert.doesNotMatch(diagnostics.join(" "), /test-build-secret-marker|private-player-marker|raw-provider-secret-marker|network detail must stay private|private resolver detail|ENOTFOUND|db\.example|SUPABASE_SERVICE_ROLE_KEY|rocketleague/);
+});
+test("Supabase redirects are not followed and their status is safely diagnosed", async () => {
+    let calls = 0;
+    const warnings = [];
+    const originalWarn = console.warn;
+    console.warn = (...args) => warnings.push(args);
+    globalThis.fetch = async (_url, init) => {
+        calls++;
+        assert.equal(init.redirect, "manual");
+        return Response.redirect("https://redirect-target.example/private", 302);
+    };
+    try {
+        await assert.rejects(callCustomMatchRpc(env, "limits", { p_game_key: "rocketleague" }));
+    } finally {
+        console.warn = originalWarn;
+    }
+    assert.equal(calls, 1);
+    const diagnostic = JSON.stringify(warnings);
+    assert.match(diagnostic, /302/);
+    assert.doesNotMatch(diagnostic, /redirect-target\.example|private|rocketleague/);
 });
 test("start and voting unavailable until their security authorities exist", async () => {
     globalThis.fetch = () => { throw new Error("must not fetch"); };
