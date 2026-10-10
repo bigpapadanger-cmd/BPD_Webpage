@@ -757,6 +757,13 @@ function setupActiveNavigation() {
                 exactMatch
                 || childMatch
             );
+            // Exact page links are hidden so the sidebar cannot navigate to
+            // the page that is already open. Parent menu controls remain
+            // visible and still indicate the active section.
+            item.classList.toggle(
+                "is-active-route-hidden",
+                exactMatch
+            );
             if (exactMatch) item.setAttribute("aria-current", "page");
             else item.removeAttribute("aria-current");
 

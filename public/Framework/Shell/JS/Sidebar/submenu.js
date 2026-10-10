@@ -10,6 +10,18 @@ function getMenu(button) {
     return submenuId ? document.getElementById(submenuId) : null;
 }
 
+function syncLowerExpansionState() {
+    const navigation = document.querySelector?.("#sidebar .sidebar-navigation");
+    if (!navigation) return;
+
+    const lowerMenuOpen = Boolean(
+        navigation.querySelector(
+            ".sidebar-navigation-bottom .sidebar-menu-toggle[aria-expanded=\"true\"]"
+        )
+    );
+    navigation.classList.toggle("sidebar-lower-expanded", lowerMenuOpen);
+}
+
 function closeSubmenu(button) {
     const submenu = getMenu(button);
     button.setAttribute("aria-expanded", "false");
@@ -54,6 +66,7 @@ function toggleSubmenu(button) {
     const opening = button.getAttribute("aria-expanded") !== "true";
     if (!opening) {
         closeSubmenu(button);
+        syncLowerExpansionState();
         restoreTemporarySidebarState(true);
         return;
     }
@@ -62,10 +75,12 @@ function toggleSubmenu(button) {
     expandTemporarilyForSubmenu();
     button.setAttribute("aria-expanded", "true");
     submenu.hidden = false;
+    syncLowerExpansionState();
 }
 
 export function closeSidebarSubmenus({ restoreSidebar = true } = {}) {
     document.querySelectorAll("#sidebar .sidebar-menu-toggle").forEach(closeSubmenu);
+    syncLowerExpansionState();
     restoreTemporarySidebarState(restoreSidebar);
 }
 
@@ -95,6 +110,8 @@ export function initializeSidebarSubmenus() {
         });
         button.dataset.submenuInitialized = "true";
     });
+
+    syncLowerExpansionState();
 
     if (!sidebar.dataset.submenuLinksInitialized) {
         sidebar.addEventListener("click", event => {

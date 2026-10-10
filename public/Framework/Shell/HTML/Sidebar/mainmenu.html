@@ -7,15 +7,15 @@
 <nav id="sidebarNavigation" class="sidebar-navigation" aria-label="Main navigation">
     <div class="sidebar-navigation-top">
         <a href="/" class="nav-item" data-router-link data-nav-route="/" data-tooltip="Main menu">
-            <span class="nav-icon" data-sidebar-icon="home" aria-hidden="true"></span><span class="nav-label">Main menu</span>
+            <span class="nav-icon" data-sidebar-icon="home" aria-hidden="true"></span><span class="nav-text"><span class="nav-label">Main menu</span></span>
         </a>
         <a href="/Dashboard" class="nav-item" data-router-link data-nav-route="/Dashboard" data-tooltip="Dashboard">
-            <span class="nav-icon" data-sidebar-icon="dashboard" aria-hidden="true"></span><span class="nav-label">Dashboard</span>
+            <span class="nav-icon" data-sidebar-icon="dashboard" aria-hidden="true"></span><span class="nav-text"><span class="nav-label">Dashboard</span></span>
         </a>
 
         <div class="sidebar-group sidebar-menu" data-sidebar-menu>
             <button class="nav-item sidebar-menu-toggle" type="button" aria-expanded="false" aria-controls="mainRocketLeagueMenu" data-tooltip="Rocket League">
-                <span class="nav-icon" data-sidebar-icon="rocketleague" aria-hidden="true"></span><span class="nav-label">Rocket League</span><span class="submenu-arrow" data-sidebar-icon="chevron" aria-hidden="true"></span>
+                <span class="nav-icon" data-sidebar-icon="rocketleague" aria-hidden="true"></span><span class="nav-text"><span class="nav-label">Rocket League</span></span><span class="submenu-arrow" data-sidebar-icon="chevron" aria-hidden="true"></span>
             </button>
             <div class="sidebar-submenu" id="mainRocketLeagueMenu" role="group" aria-label="Rocket League" hidden>
                 <a href="/RocketLeague" class="submenu-item" data-router-link data-nav-route="/RocketLeague">Overview</a>
@@ -28,7 +28,7 @@
 
         <div class="sidebar-group sidebar-menu" data-sidebar-menu>
             <button class="nav-item sidebar-menu-toggle" type="button" aria-expanded="false" aria-controls="mainMinecraftMenu" data-tooltip="Minecraft">
-                <span class="nav-icon" data-sidebar-icon="minecraft" aria-hidden="true"></span><span class="nav-label">Minecraft</span><span class="submenu-arrow" data-sidebar-icon="chevron" aria-hidden="true"></span>
+                <span class="nav-icon" data-sidebar-icon="minecraft" aria-hidden="true"></span><span class="nav-text"><span class="nav-label">Minecraft</span></span><span class="submenu-arrow" data-sidebar-icon="chevron" aria-hidden="true"></span>
             </button>
             <div class="sidebar-submenu" id="mainMinecraftMenu" role="group" aria-label="Minecraft" hidden>
                 <a href="/Minecraft" class="submenu-item" data-router-link data-nav-route="/Minecraft">Overview</a>
@@ -39,7 +39,7 @@
 
         <div class="sidebar-group sidebar-menu" data-sidebar-menu>
             <button class="nav-item sidebar-menu-toggle" type="button" aria-expanded="false" aria-controls="mainArkMenu" data-tooltip="ARK: Survival Ascended">
-                <span class="nav-icon" data-sidebar-icon="ark" aria-hidden="true"></span><span class="nav-label">ARK: Survival Ascended</span><span class="submenu-arrow" data-sidebar-icon="chevron" aria-hidden="true"></span>
+                <span class="nav-icon" data-sidebar-icon="ark" aria-hidden="true"></span><span class="nav-text"><span class="nav-label">ARK: Survival Ascended</span></span><span class="submenu-arrow" data-sidebar-icon="chevron" aria-hidden="true"></span>
             </button>
             <div class="sidebar-submenu" id="mainArkMenu" role="group" aria-label="ARK: Survival Ascended" hidden>
                 <a href="/Ark" class="submenu-item" data-router-link data-nav-route="/Ark">Overview</a>
@@ -50,23 +50,23 @@
     </div>
 
     <div class="sidebar-navigation-bottom">
+        <div class="sidebar-admin-slot">
+            <a id="adminNavItem" href="/Admin" class="nav-item" data-router-link data-nav-route="/Admin" data-tooltip="Admin" hidden>
+                <span class="nav-icon" data-sidebar-icon="admin" aria-hidden="true"></span><span class="nav-text"><span class="nav-label">Admin</span></span>
+            </a>
+        </div>
         <div class="sidebar-group sidebar-menu" data-sidebar-menu>
             <button class="nav-item sidebar-menu-toggle" type="button" aria-expanded="false" aria-controls="mainAccountMenu" data-tooltip="Account">
-                <span class="nav-icon" data-sidebar-icon="account" aria-hidden="true"></span><span class="nav-label">Account</span><span class="submenu-arrow" data-sidebar-icon="chevron" aria-hidden="true"></span>
+                <span class="nav-icon" data-sidebar-icon="account" aria-hidden="true"></span><span class="nav-text"><span class="nav-label">Account</span></span><span class="submenu-arrow" data-sidebar-icon="chevron" aria-hidden="true"></span>
             </button>
             <div class="sidebar-submenu" id="mainAccountMenu" role="group" aria-label="Account" hidden>
                 <a href="/Account" class="submenu-item" data-router-link data-nav-route="/Account">My Account</a>
                 <a href="/Settings" class="submenu-item" data-router-link data-nav-route="/Settings">Settings</a>
             </div>
         </div>
-        <div class="sidebar-admin-slot">
-        <a id="adminNavItem" href="/Admin" class="nav-item" data-router-link data-nav-route="/Admin" data-tooltip="Admin" hidden>
-            <span class="nav-icon" data-sidebar-icon="admin" aria-hidden="true"></span><span class="nav-label">Admin</span>
-        </a>
-        </div>
         <div class="sidebar-group sidebar-menu" data-sidebar-menu>
             <button class="nav-item sidebar-menu-toggle" type="button" aria-expanded="false" aria-controls="mainCommunityMenu" data-tooltip="Community and help">
-                <span class="nav-icon" data-sidebar-icon="community" aria-hidden="true"></span><span class="nav-label">Community &amp; help</span><span class="submenu-arrow" data-sidebar-icon="chevron" aria-hidden="true"></span>
+                <span class="nav-icon" data-sidebar-icon="community" aria-hidden="true"></span><span class="nav-text"><span class="nav-label">Community &amp; help</span></span><span class="submenu-arrow" data-sidebar-icon="chevron" aria-hidden="true"></span>
             </button>
             <div class="sidebar-submenu" id="mainCommunityMenu" role="group" aria-label="Community and help" hidden>
                 <a href="/Suggestions" class="submenu-item" data-router-link data-nav-route="/Suggestions">Suggestions</a>
@@ -75,7 +75,7 @@
         </div>
         <div class="sidebar-group sidebar-menu" data-sidebar-menu>
             <button class="nav-item sidebar-menu-toggle" type="button" aria-expanded="false" aria-controls="mainAboutMenu" data-tooltip="About and policies">
-                <span class="nav-icon" data-sidebar-icon="about" aria-hidden="true"></span><span class="nav-label">About &amp; policies</span><span class="submenu-arrow" data-sidebar-icon="chevron" aria-hidden="true"></span>
+                <span class="nav-icon" data-sidebar-icon="about" aria-hidden="true"></span><span class="nav-text"><span class="nav-label">About &amp; policies</span></span><span class="submenu-arrow" data-sidebar-icon="chevron" aria-hidden="true"></span>
             </button>
             <div class="sidebar-submenu" id="mainAboutMenu" role="group" aria-label="About and policies" hidden>
                 <a href="/About" class="submenu-item" data-router-link data-nav-route="/About">About us</a>

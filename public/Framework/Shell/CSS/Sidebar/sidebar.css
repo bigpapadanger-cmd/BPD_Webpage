@@ -1,168 +1,66 @@
 /* =========================================================
-BPD GAMING NETWORK
-RESPONSIVE ATTACHED SIDEBAR
+   BPD GAMING NETWORK — SHARED SIDEBAR
 
-File:
-    /Framework/Shell/CSS/sidebar.css
+   Mode switch:
+     body.sidebar-collapsed       = collapsed sidebar
+     body:not(.sidebar-collapsed) = expanded sidebar
 
-Purpose:
-    Provides the persistent floating sidebar with:
-    - shared body/sidebar vertical height
-    - attached toggle header
-    - animated expand/collapse width
-    - animated hamburger/X toggle icon
+   Both modes share --app-content-height. Only width, labels,
+   alignment, and visual presentation change between modes.
+========================================================= */
 
-Important:
-    - Only direct child spans of .sidebar-toggle are treated
-      as hamburger/X bars.
-    - Nested spans used by route-specific content are not
-      styled as toggle bars.
+/* =========================================================
+   1. SHARED TOKENS AND FRAME
 ========================================================= */
 
 :root {
-    /* =====================================================
-    SIDEBAR WIDTHS
-    ===================================================== */
-
-    --sidebar-width:
-        clamp(
-            220px,
-            16vw,
-            360px
-        );
-
+    --sidebar-width: clamp(220px, 16vw, 360px);
     --sidebar-collapsed-width: 58px;
-
-    /* =====================================================
-    SIDEBAR SPACING
-    ===================================================== */
-
-    --sidebar-edge-gap:
-        clamp(
-            6px,
-            1vw,
-            16px
-        );
-
-    --sidebar-content-gap:
-        clamp(
-            10px,
-            1.2vw,
-            20px
-        );
-
-    /* =====================================================
-    SIDEBAR ROWS
-    ===================================================== */
-
-    --sidebar-row-height:
-        clamp(
-            46px,
-            5vh,
-            54px
-        );
-
+    --sidebar-edge-gap: clamp(6px, 1vw, 16px);
+    --sidebar-content-gap: clamp(10px, 1.2vw, 20px);
+    --sidebar-row-height: clamp(46px, 5vh, 54px);
     --sidebar-icon-width: 46px;
+    --sidebar-toggle-height: var(--sidebar-collapsed-width);
+    --sidebar-toggle-button-size: clamp(30px, 2.2vw, 36px);
 
-    /* =====================================================
-    TOGGLE HEADER
-    ===================================================== */
-
-    --sidebar-toggle-height:
-        var(
-            --sidebar-collapsed-width
-        );
-
-    --sidebar-toggle-button-size:
-        clamp(
-            30px,
-            2.2vw,
-            36px
-        );
+    /* Keep the sidebar inside the same usable viewport rectangle in every mode. */
+    --sidebar-bottom-inset: max(var(--app-bottom-gap), env(safe-area-inset-bottom));
+    --sidebar-available-height: calc(
+        100vh - var(--app-top-offset) - var(--sidebar-bottom-inset)
+    );
 }
 
-/* =========================================================
-SIDEBAR CONTAINER
-========================================================= */
+@supports (height: 100dvh) {
+    :root {
+        --sidebar-available-height: calc(
+            100dvh - var(--app-top-offset) - var(--sidebar-bottom-inset)
+        );
+    }
+}
 
 .site-sidebar {
     position: fixed;
-
+    top: var(--app-top-offset);
+    bottom: auto;
+    left: var(--sidebar-edge-gap);
+    z-index: 100;
     display: grid;
     grid-template-rows: auto minmax(0, 1fr);
-
-    top:
-        var(
-            --app-top-offset
-        );
-
-    bottom:
-        max(
-            var(--app-bottom-gap),
-            env(safe-area-inset-bottom)
-        );
-
-    left:
-        var(
-            --sidebar-edge-gap
-        );
-
-    z-index: 100;
-
-    width:
-        var(
-            --sidebar-width
-        );
-
-    min-width:
-        var(
-            --sidebar-width
-        );
-
-    max-width:
-        var(
-            --sidebar-width
-        );
-
-    height: var(--app-content-height);
-
+    width: var(--sidebar-width);
+    min-width: var(--sidebar-width);
+    max-width: var(--sidebar-width);
+    height: var(--sidebar-available-height);
     min-height: 0;
-    max-height: none;
-
+    max-height: var(--sidebar-available-height);
     overflow: hidden;
-
     border: 0;
-
     background: transparent;
     box-shadow: none;
     transform: none;
-
 }
 
 .sidebar-backdrop {
     display: none;
-}
-
-/* =========================================================
-COLLAPSED WIDTH
-========================================================= */
-
-body.sidebar-collapsed
-.site-sidebar {
-    width:
-        var(
-            --sidebar-collapsed-width
-        );
-
-    min-width:
-        var(
-            --sidebar-collapsed-width
-        );
-
-    max-width:
-        var(
-            --sidebar-collapsed-width
-        );
 }
 
 .site-sidebar::before,
@@ -171,96 +69,37 @@ body.sidebar-collapsed
     content: none;
 }
 
-/* Rocket League keeps its toggle and navigation in one route fragment
- * wrapper; give that wrapper the same shell-owned two-row frame. */
 .site-sidebar > .sidebar-view {
     display: grid;
     grid-row: 1 / -1;
     grid-template-rows: auto minmax(0, 1fr);
-    min-height: 0;
     height: 100%;
+    min-height: 0;
 }
 
 /* =========================================================
-ATTACHED TOGGLE HEADER
+   2. SHARED TOGGLE HEADER
 ========================================================= */
 
 .sidebar-toggle-box {
     position: relative;
-
     z-index: 110;
-
     display: flex;
-
     align-items: center;
     justify-content: flex-start;
-
     width: 100%;
-
-    height:
-        var(
-            --sidebar-toggle-height
-        );
-
-    padding-left:
-        calc(
-            (
-                var(
-                    --sidebar-collapsed-width
-                )
-                -
-                var(
-                    --sidebar-toggle-button-size
-                )
-            )
-            / 2
-        );
-
-    border:
-        2px solid
-        #303541;
-
+    height: var(--sidebar-toggle-height);
+    padding-left: calc(
+        (var(--sidebar-collapsed-width) - var(--sidebar-toggle-button-size)) / 2
+    );
+    border: 2px solid #303541;
     border-bottom: 0;
-
-    border-radius:
-        clamp(
-            14px,
-            1.3vw,
-            18px
-        )
-        clamp(
-            14px,
-            1.3vw,
-            18px
-        )
-        0
-        0;
-
-    background:
-        linear-gradient(
-            180deg,
-            #000c24,
-            #00028f
-        );
-
+    border-radius: clamp(14px, 1.3vw, 18px) clamp(14px, 1.3vw, 18px) 0 0;
+    background: linear-gradient(180deg, #000c24, #00028f);
     box-shadow:
-        0 8px 24px
-            rgba(
-                0,
-                0,
-                0,
-                0.5
-            ),
-        0 0 14px
-            rgba(
-                139,
-                92,
-                246,
-                0.12
-            );
-
+        0 8px 24px rgba(0, 0, 0, 0.5),
+        0 0 14px rgba(139, 92, 246, 0.12);
     overflow: hidden;
-
     transition:
         width 0.33s ease,
         background 0.33s ease,
@@ -268,102 +107,24 @@ ATTACHED TOGGLE HEADER
         box-shadow 0.33s ease;
 }
 
-/* =========================================================
-TOGGLE HEADER EXPANDED VISUAL
-========================================================= */
-
-body:not(.sidebar-collapsed)
-.sidebar-toggle-box {
-    background:
-        linear-gradient(
-            180deg,
-            #11143d,
-            #00028f
-        );
-
-    border-color:
-        #3d4350;
-
-    box-shadow:
-        0 8px 24px
-            rgba(
-                0,
-                0,
-                0,
-                0.5
-            ),
-        0 0 18px
-            rgba(
-                139,
-                92,
-                246,
-                0.2
-            );
-}
-
-/* =========================================================
-TOGGLE BUTTON
-========================================================= */
-
 .sidebar-toggle {
     position: relative;
-
     display: flex;
-
     flex-direction: column;
-
     align-items: center;
     justify-content: center;
-
     gap: 4px;
-
-    width:
-        var(
-            --sidebar-toggle-button-size
-        );
-
-    height:
-        var(
-            --sidebar-toggle-button-size
-        );
-
+    width: var(--sidebar-toggle-button-size);
+    height: var(--sidebar-toggle-button-size);
     padding: 0;
-
     cursor: pointer;
-
-    border:
-        2px solid
-        #353b48;
-
+    border: 2px solid #353b48;
     border-radius: 9px;
-
-    background:
-        linear-gradient(
-            180deg,
-            #20242d,
-            #12151b
-        );
-
+    background: linear-gradient(180deg, #20242d, #12151b);
     box-shadow:
-        0 6px 18px
-            rgba(
-                0,
-                0,
-                0,
-                0.45
-            ),
-        0 0 8px
-            rgba(
-                139,
-                92,
-                246,
-                0.18
-            );
-
-    transform:
-        rotate(0deg)
-        scale(1);
-
+        0 6px 18px rgba(0, 0, 0, 0.45),
+        0 0 8px rgba(139, 92, 246, 0.18);
+    transform: rotate(0deg) scale(1);
     transition:
         transform 0.32s ease,
         border-color 0.25s ease,
@@ -371,38 +132,14 @@ TOGGLE BUTTON
         box-shadow 0.25s ease;
 }
 
-/* =========================================================
-TOGGLE ICON BARS
-
-Only the three direct child spans belong to the hamburger/X
-animation.
-
-This prevents nested spans from route-specific sidebar
-content from accidentally becoming toggle bars.
-========================================================= */
-
 .sidebar-toggle > span {
     display: block;
-
-    width:
-        clamp(
-            14px,
-            1.1vw,
-            17px
-        );
-
-    height: 2px;
-
     flex: 0 0 auto;
-
+    width: clamp(14px, 1.1vw, 17px);
+    height: 2px;
     border-radius: 999px;
-
-    background:
-        #ffffff;
-
-    transform-origin:
-        center;
-
+    background: #fff;
+    transform-origin: center;
     transition:
         transform 0.3s ease,
         opacity 0.2s ease,
@@ -410,317 +147,107 @@ content from accidentally becoming toggle bars.
 }
 
 /* =========================================================
-COLLAPSED ICON
-Hamburger
-========================================================= */
-
-body.sidebar-collapsed
-.sidebar-toggle
-> span:nth-child(1) {
-    transform:
-        translateY(0)
-        rotate(0deg);
-}
-
-body.sidebar-collapsed
-.sidebar-toggle
-> span:nth-child(2) {
-    opacity: 1;
-
-    transform:
-        scaleX(1);
-}
-
-body.sidebar-collapsed
-.sidebar-toggle
-> span:nth-child(3) {
-    transform:
-        translateY(0)
-        rotate(0deg);
-}
-
-/* =========================================================
-EXPANDED ICON
-Hamburger → X
-========================================================= */
-
-body:not(.sidebar-collapsed)
-.sidebar-toggle {
-    transform:
-        rotate(180deg);
-}
-
-body:not(.sidebar-collapsed)
-.sidebar-toggle
-> span:nth-child(1) {
-    transform:
-        translateY(6px)
-        rotate(45deg);
-}
-
-body:not(.sidebar-collapsed)
-.sidebar-toggle
-> span:nth-child(2) {
-    opacity: 0;
-
-    transform:
-        scaleX(0);
-}
-
-body:not(.sidebar-collapsed)
-.sidebar-toggle
-> span:nth-child(3) {
-    transform:
-        translateY(-6px)
-        rotate(-45deg);
-}
-
-/* =========================================================
-TOGGLE BUTTON EXPANDED VISUAL
-========================================================= */
-
-body:not(.sidebar-collapsed)
-.sidebar-toggle {
-    border-color:
-        #8b5cf6;
-
-    background:
-        linear-gradient(
-            180deg,
-            #2b1c48,
-            #171026
-        );
-
-    box-shadow:
-        0 7px 20px
-            rgba(
-                0,
-                0,
-                0,
-                0.5
-            ),
-        0 0 16px
-            rgba(
-                139,
-                92,
-                246,
-                0.55
-            );
-}
-
-/* =========================================================
-TOGGLE HOVER
-========================================================= */
-
-body.sidebar-collapsed
-.sidebar-toggle:hover {
-    transform:
-        translateY(-2px)
-        scale(1.05);
-
-    border-color:
-        #8b5cf6;
-
-    box-shadow:
-        0 8px 22px
-            rgba(
-                0,
-                0,
-                0,
-                0.5
-            ),
-        0 0 16px
-            rgba(
-                139,
-                92,
-                246,
-                0.7
-            );
-}
-
-body:not(.sidebar-collapsed)
-.sidebar-toggle:hover {
-    transform:
-        rotate(180deg)
-        translateY(2px)
-        scale(1.05);
-
-    border-color:
-        #a78bfa;
-
-    box-shadow:
-        0 8px 22px
-            rgba(
-                0,
-                0,
-                0,
-                0.5
-            ),
-        0 0 18px
-            rgba(
-                139,
-                92,
-                246,
-                0.8
-            );
-}
-
-.sidebar-toggle:active {
-    scale: 0.96;
-}
-
-/* =========================================================
-NAVIGATION BODY
+   3. SHARED NAVIGATION FRAME
 ========================================================= */
 
 .sidebar-navigation {
     position: relative;
-
-    display: flex;
-
-    flex-direction: column;
-    justify-content: flex-start;
-
+    display: grid;
+    grid-template-rows: minmax(0, 1fr) auto;
     gap: 2px;
-
     width: 100%;
-
     min-width: 0;
     min-height: 0;
-
-    padding:
-        clamp(
-            6px,
-            0.6vw,
-            10px
-        )
-        3px
-        clamp(
-            8px,
-            1vh,
-            12px
-        );
-
-    overflow-x: hidden;
-    overflow-y: auto;
-
-    overscroll-behavior:
-        contain;
-
-    border:
-        2px solid
-        #303541;
-
+    padding: clamp(6px, 0.6vw, 10px) 3px clamp(8px, 1vh, 12px);
+    overflow: hidden;
+    overscroll-behavior: contain;
+    border: 2px solid #303541;
     border-top: 0;
-
-    border-radius:
-        0
-        0
-        clamp(
-            14px,
-            1.3vw,
-            18px
-        )
-        clamp(
-            14px,
-            1.3vw,
-            18px
-        );
-
-    background:
-        linear-gradient(
-            180deg,
-            #000000 10%,
-            #01004e 100%
-        );
-
-    scrollbar-width:
-        thin;
-
-    scrollbar-color:
-        rgba(
-            139,
-            92,
-            246,
-            0.45
-        )
-        transparent;
-
+    border-radius: 0 0 clamp(14px, 1.3vw, 18px) clamp(14px, 1.3vw, 18px);
+    background: linear-gradient(180deg, #000 10%, #01004e 100%);
+    scrollbar-width: thin;
+    scrollbar-color: rgba(139, 92, 246, 0.45) transparent;
     transition:
         border-color 0.33s ease,
         background 0.33s ease,
         box-shadow 0.33s ease;
 }
 
-body:not(.sidebar-collapsed)
-.sidebar-navigation {
-    border-color:
-        #3d4350;
-
-    box-shadow:
-        0 10px 28px
-            rgba(
-                0,
-                0,
-                0,
-                0.32
-            );
-}
-
-/* =========================================================
-SCROLLBAR
-========================================================= */
-
 .sidebar-navigation::-webkit-scrollbar {
     width: 5px;
 }
 
 .sidebar-navigation::-webkit-scrollbar-track {
-    background:
-        transparent;
+    background: transparent;
 }
 
 .sidebar-navigation::-webkit-scrollbar-thumb {
-    border-radius:
-        999px;
-
-    background:
-        rgba(
-            139,
-            92,
-            246,
-            0.45
-        );
+    border-radius: 999px;
+    background: rgba(139, 92, 246, 0.45);
 }
-
-/* =========================================================
-NAVIGATION GROUPS
-========================================================= */
 
 .sidebar-navigation-top,
 .sidebar-navigation-bottom {
     display: flex;
-
     flex: 0 1 auto;
-
     flex-direction: column;
-
-    width: 100%;
-
-    min-width: 0;
-
     gap: 2px;
+    width: 100%;
+    min-width: 0;
     min-height: 0;
     overflow: visible;
 }
 
-.sidebar-navigation-bottom {
-    flex: 0 0 auto;
+.sidebar-navigation-top {
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(139, 92, 246, 0.45) transparent;
 }
 
-/* =========================================================
-NAVIGATION GROUPS AND DROPDOWNS
-========================================================= */
+.sidebar-navigation-top::-webkit-scrollbar {
+    width: 5px;
+}
+
+.sidebar-navigation-top::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.sidebar-navigation-top::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: rgba(139, 92, 246, 0.45);
+}
+
+.sidebar-navigation-bottom {
+    flex: 0 0 auto;
+    position: relative;
+    z-index: 2;
+    margin-top: auto;
+    padding-top: 8px;
+    border-top: 2px solid rgba(139, 92, 246, 0.62);
+    box-shadow: 0 -1px 0 rgba(255, 255, 255, 0.16);
+    background: linear-gradient(180deg, rgba(1, 0, 78, 0.98), #01004e 18%);
+}
+
+/* A lower disclosure grows after the upper flow instead of pushing upward.
+   The navigation remains the single scroll owner while it is open. */
+.sidebar-navigation.sidebar-lower-expanded {
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+}
+
+.sidebar-navigation.sidebar-lower-expanded .sidebar-navigation-top {
+    flex: 0 0 auto;
+    overflow: visible;
+}
+
+.sidebar-navigation.sidebar-lower-expanded .sidebar-navigation-bottom {
+    flex: 0 0 auto;
+    margin-top: 0;
+}
 
 .site-sidebar .sidebar-group,
 .site-sidebar .sidebar-menu {
@@ -739,6 +266,89 @@ NAVIGATION GROUPS AND DROPDOWNS
     letter-spacing: 0.08em;
     line-height: 1.25;
     text-transform: uppercase;
+}
+
+/* =========================================================
+   4. NAVIGATION ITEMS AND SUBMENUS
+========================================================= */
+
+.site-sidebar .nav-item {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    width: 100%;
+    min-width: 0;
+    min-height: var(--sidebar-row-height);
+    padding: 0;
+    overflow: visible;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: #aeb5c3;
+    font: inherit;
+    text-align: left;
+    text-decoration: none;
+    appearance: none;
+    cursor: pointer;
+    white-space: nowrap;
+    transition:
+        color 0.2s ease,
+        background 0.2s ease,
+        transform 0.2s ease;
+}
+
+.site-sidebar .nav-item:hover,
+.site-sidebar .nav-item:focus-visible,
+.site-sidebar .nav-item.active,
+.site-sidebar .nav-item[aria-current="page"] {
+    color: var(--bpd-hover-text-color, #fff);
+    background: #24202f;
+}
+
+.site-sidebar .nav-item:hover {
+    transform: translateX(2px);
+}
+
+.site-sidebar .nav-item:focus-visible {
+    outline: 2px solid #8b5cf6;
+    outline-offset: -2px;
+}
+
+.site-sidebar .nav-icon {
+    display: grid;
+    flex: 0 0 var(--sidebar-icon-width);
+    align-items: center;
+    justify-content: center;
+    width: var(--sidebar-icon-width);
+    min-width: var(--sidebar-icon-width);
+    height: var(--sidebar-row-height);
+    font-size: 1.15rem;
+    line-height: 1;
+    text-align: center;
+    transition: transform 0.25s ease;
+}
+
+.site-sidebar .nav-label {
+    display: flex;
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: none;
+    padding-right: 10px;
+    overflow: visible;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.2;
+    opacity: 1;
+    transform: translateX(0);
+    transition:
+        opacity 0.22s ease,
+        transform 0.28s ease;
+}
+
+.site-sidebar .nav-text {
+    display: flex;
+    flex: 1 1 auto;
+    min-width: 0;
 }
 
 .site-sidebar .sidebar-menu-toggle {
@@ -815,231 +425,144 @@ NAVIGATION GROUPS AND DROPDOWNS
 }
 
 @keyframes sidebar-submenu-in {
-    from { opacity: 0; transform: translateY(-3px); }
-    to { opacity: 1; transform: translateY(0); }
+    from {
+        opacity: 0;
+        transform: translateY(-3px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
-.sidebar-navigation-bottom {
-    margin-top: auto;
-
-    padding-top: 8px;
-
-    border-top:
-        1px solid
-        rgba(
-            255,
-            255,
-            255,
-            0.08
-        );
-}
-
-/* =========================================================
-NAVIGATION ITEM
-========================================================= */
-
-.site-sidebar .nav-item {
+.site-sidebar .sidebar-admin-slot {
     display: flex;
-
     flex: 0 0 auto;
-
-    align-items: center;
-
-    width: 100%;
-
+    flex-direction: column;
     min-width: 0;
+}
 
-    min-height:
-        var(
-            --sidebar-row-height
-        );
+.site-sidebar .nav-item[hidden] {
+    display: none !important;
+}
 
-    padding: 0;
+/* Do not offer a second link to the page already being viewed. The active
+   parent menu remains visible so the current section is still discoverable. */
+.site-sidebar a.nav-item.is-active-route-hidden,
+.site-sidebar a.submenu-item.is-active-route-hidden {
+    display: none !important;
+}
 
-    overflow: visible;
-
-    border: 0;
-
-    border-radius: 8px;
-
-    background:
-        transparent;
-
-    color:
-        #aeb5c3;
-
-    font:
-        inherit;
-
-    text-align:
-        left;
-
-    text-decoration:
-        none;
-
-    appearance:
-        none;
-
-    cursor:
-        pointer;
-
-    white-space:
-        nowrap;
-
-    transition:
-        color 0.2s ease,
-        background 0.2s ease,
-        transform 0.2s ease;
+.site-sidebar .nav-item[aria-current="page"],
+.site-sidebar .nav-item.active,
+.site-sidebar .sidebar-submenu .submenu-item[aria-current="page"] {
+    color: var(--site-accent);
+    border-color: var(--site-accent);
+    background-color: var(--site-accent-soft);
 }
 
 .site-sidebar .nav-item:hover,
-.site-sidebar .nav-item:focus-visible,
-.site-sidebar .nav-item.active,
-.site-sidebar .nav-item[aria-current="page"] {
-    color:
-        var(--bpd-hover-text-color, #ffffff);
-
-    background:
-        #24202f;
-}
-
-.site-sidebar .nav-item:hover {
-    transform:
-        translateX(2px);
-}
-
 .site-sidebar .nav-item:focus-visible {
-    outline:
-        2px solid
-        #8b5cf6;
-
-    outline-offset:
-        -2px;
+    color: var(--bpd-hover-text-color, #fff);
 }
 
 /* =========================================================
-NAVIGATION ICON
+   5. EXPANDED MODE
+
+   body:not(.sidebar-collapsed) is the expanded state.
 ========================================================= */
 
-.site-sidebar .nav-icon {
-    display: grid;
-
-    flex:
-        0 0
-        var(
-            --sidebar-icon-width
-        );
-
-    align-items: center;
-    justify-content: center;
-
-    width:
-        var(
-            --sidebar-icon-width
-        );
-
-    min-width:
-        var(
-            --sidebar-icon-width
-        );
-
-    height:
-        var(
-            --sidebar-row-height
-        );
-
-    font-size: 1.15rem;
-    line-height: 1;
-    text-align: center;
-
-    transition:
-        transform 0.25s ease;
+body:not(.sidebar-collapsed) .sidebar-toggle-box {
+    border-color: #3d4350;
+    background: linear-gradient(180deg, #11143d, #00028f);
+    box-shadow:
+        0 8px 24px rgba(0, 0, 0, 0.5),
+        0 0 18px rgba(139, 92, 246, 0.2);
 }
 
-body:not(.sidebar-collapsed)
-.site-sidebar
-.nav-item:hover
-.nav-icon {
-    transform:
-        scale(1.08);
+body:not(.sidebar-collapsed) .sidebar-toggle {
+    transform: rotate(180deg);
+    border-color: #8b5cf6;
+    background: linear-gradient(180deg, #2b1c48, #171026);
+    box-shadow:
+        0 7px 20px rgba(0, 0, 0, 0.5),
+        0 0 16px rgba(139, 92, 246, 0.55);
+}
+
+body:not(.sidebar-collapsed) .sidebar-toggle > span:nth-child(1) {
+    transform: translateY(6px) rotate(45deg);
+}
+
+body:not(.sidebar-collapsed) .sidebar-toggle > span:nth-child(2) {
+    opacity: 0;
+    transform: scaleX(0);
+}
+
+body:not(.sidebar-collapsed) .sidebar-toggle > span:nth-child(3) {
+    transform: translateY(-6px) rotate(-45deg);
+}
+
+body:not(.sidebar-collapsed) .sidebar-navigation {
+    border-color: #3d4350;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.32);
+}
+
+body:not(.sidebar-collapsed) .nav-item:hover .nav-icon {
+    transform: scale(1.08);
+}
+
+body:not(.sidebar-collapsed) .sidebar-toggle:hover {
+    transform: rotate(180deg) translateY(2px) scale(1.05);
+    border-color: #a78bfa;
+    box-shadow:
+        0 8px 22px rgba(0, 0, 0, 0.5),
+        0 0 18px rgba(139, 92, 246, 0.8);
 }
 
 /* =========================================================
-NAVIGATION LABEL
+   6. COLLAPSED MODE
+
+   body.sidebar-collapsed is the collapsed state.
 ========================================================= */
 
-.site-sidebar .nav-label {
-    display: flex;
-
-    flex:
-        1 1 auto;
-
-    min-width: 0;
-
-    max-width: none;
-
-    padding-right:
-        10px;
-
-    overflow:
-        visible;
-
-    white-space:
-        normal;
-
-    overflow-wrap:
-        anywhere;
-
-    line-height:
-        1.2;
-
-    opacity:
-        1;
-
-    transform:
-        translateX(0);
-
-    transition:
-        opacity 0.22s ease,
-        transform 0.28s ease;
+body.sidebar-collapsed .site-sidebar {
+    width: var(--sidebar-collapsed-width);
+    min-width: var(--sidebar-collapsed-width);
+    max-width: var(--sidebar-collapsed-width);
 }
 
-.site-sidebar .nav-text {
-    display: flex;
-    flex: 1 1 auto;
-    min-width: 0;
+body.sidebar-collapsed .sidebar-toggle > span:nth-child(1),
+body.sidebar-collapsed .sidebar-toggle > span:nth-child(3) {
+    transform: translateY(0) rotate(0deg);
 }
 
-/* =========================================================
-COLLAPSED LABEL
-========================================================= */
+body.sidebar-collapsed .sidebar-toggle > span:nth-child(2) {
+    opacity: 1;
+    transform: scaleX(1);
+}
+
+body.sidebar-collapsed .sidebar-toggle:hover {
+    transform: translateY(-2px) scale(1.05);
+    border-color: #8b5cf6;
+    box-shadow:
+        0 8px 22px rgba(0, 0, 0, 0.5),
+        0 0 16px rgba(139, 92, 246, 0.7);
+}
 
 body.sidebar-collapsed .site-sidebar .sidebar-group-label,
 body.sidebar-collapsed .site-sidebar .submenu-arrow {
     display: none;
 }
 
-body.sidebar-collapsed
-.site-sidebar
-.nav-label {
-    max-width:
-        0;
-
-    padding-right:
-        0;
-
-    opacity:
-        0;
-
-    transform:
-        translateX(-10px);
-
-    pointer-events:
-        none;
+body.sidebar-collapsed .site-sidebar .nav-label {
+    max-width: 0;
+    padding-right: 0;
+    opacity: 0;
+    transform: translateX(-10px);
+    pointer-events: none;
 }
 
-/* Keep collapsed navigation compact while the shared shell retains the
- * same viewport-sized frame and single scroll container as expanded mode. */
 body.sidebar-collapsed .site-sidebar .sidebar-navigation {
     padding-right: 0;
     padding-left: 0;
@@ -1047,8 +570,11 @@ body.sidebar-collapsed .site-sidebar .sidebar-navigation {
 
 body.sidebar-collapsed .site-sidebar .nav-item {
     justify-content: center;
+    height: var(--sidebar-row-height);
+    max-height: var(--sidebar-row-height);
 }
 
+/* Fixed icon slots prevent collapsed icons from overlapping. */
 body.sidebar-collapsed .site-sidebar .nav-icon {
     flex: 0 0 var(--sidebar-collapsed-width);
     width: var(--sidebar-collapsed-width);
@@ -1057,29 +583,15 @@ body.sidebar-collapsed .site-sidebar .nav-icon {
 }
 
 /* =========================================================
-VERY SMALL VIEWPORTS
+   7. RESPONSIVE AND ACCESSIBILITY RULES
 ========================================================= */
 
 @media (max-width: 700px) {
     :root {
-        --sidebar-width:
-            clamp(
-                210px,
-                68vw,
-                300px
-            );
-
+        --sidebar-width: clamp(210px, 68vw, 300px);
         --sidebar-collapsed-width: 56px;
-
-        --sidebar-edge-gap:
-            4px;
-
-        --sidebar-toggle-button-size:
-            clamp(
-                28px,
-                8vw,
-                34px
-            );
+        --sidebar-edge-gap: 4px;
+        --sidebar-toggle-button-size: clamp(28px, 8vw, 34px);
     }
 
     .sidebar-backdrop:not([hidden]) {
@@ -1098,29 +610,11 @@ VERY SMALL VIEWPORTS
     }
 }
 
-/* =========================================================
-SHORT VIEWPORTS
-========================================================= */
-
 @media (max-height: 600px) {
-    :root {
-        --sidebar-collapsed-width:
-            clamp(
-                56px,
-                10vh,
-                68px
-            );
-    }
-
     .site-sidebar .nav-item {
-        min-height:
-            36px;
+        min-height: 36px;
     }
 }
-
-/* =========================================================
-ACCESSIBILITY
-========================================================= */
 
 @media (prefers-reduced-motion: reduce) {
     .site-sidebar,
@@ -1134,8 +628,7 @@ ACCESSIBILITY
     .site-sidebar .submenu-arrow,
     .site-sidebar .submenu-item,
     .site-sidebar .sidebar-submenu {
-        transition:
-            none;
+        transition: none;
     }
 
     .site-sidebar .sidebar-submenu {
@@ -1143,28 +636,6 @@ ACCESSIBILITY
     }
 }
 
-/* =========================================================
-AUTHORIZATION VISIBILITY
-========================================================= */
-
-.site-sidebar .sidebar-admin-slot {
-    min-height: var(--sidebar-row-height);
-    flex: 0 0 var(--sidebar-row-height);
-}
-
-.site-sidebar .nav-item[hidden] {
-    display: none !important;
-}
-
-.site-sidebar .nav-item[aria-current="page"],
-.site-sidebar .nav-item.active,
-.site-sidebar .sidebar-submenu .submenu-item[aria-current="page"] {
-    color: var(--site-accent);
-    border-color: var(--site-accent);
-    background-color: var(--site-accent-soft);
-}
-
-.site-sidebar .nav-item:hover,
-.site-sidebar .nav-item:focus-visible {
-    color: var(--bpd-hover-text-color, #ffffff);
+.sidebar-toggle:active {
+    scale: 0.96;
 }

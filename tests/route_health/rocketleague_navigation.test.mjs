@@ -146,8 +146,11 @@ test("Home is exact-only and non-clickable on the hub; submenu active state foll
     const originalWindow = globalThis.window;
     function item(route, home = false) {
         const attributes = new Map([["href", route], ...(home ? [["data-nav-exact", ""], ["data-disable-on-active", ""]] : [])]);
-        return { dataset: { navRoute: route }, active: false,
-            classList: { toggle(name, value) { if (name === "active") this.owner.active = value; }, owner: null },
+        return { dataset: { navRoute: route }, active: false, hiddenActive: false,
+            classList: { toggle(name, value) {
+                if (name === "active") this.owner.active = value;
+                if (name === "is-active-route-hidden") this.owner.hiddenActive = value;
+            }, owner: null },
             hasAttribute: name => attributes.has(name), getAttribute: name => attributes.get(name),
             setAttribute: (name, value) => attributes.set(name, value), removeAttribute: name => attributes.delete(name) };
     }
@@ -165,6 +168,7 @@ test("Home is exact-only and non-clickable on the hub; submenu active state foll
                 search: selected.dataset.navRoute === "/Settings" ? "?context=rocketleague&returnTo=%2FRocketLeague%2FShop" : "" } };
             setupActiveNavigation();
             assert.deepEqual(items.filter(element => element.active), [selected]);
+            assert.deepEqual(items.filter(element => element.hiddenActive), [selected]);
             assert.equal(selected.getAttribute("aria-current"), "page");
             assert.equal(items[0].getAttribute("href"), selected === items[0] ? undefined : "/RocketLeague");
             assert.equal(new URL(items.at(-1).getAttribute("href"), "https://bpd-gaming-network.com").searchParams.get("returnTo"),

@@ -204,6 +204,12 @@ test("sidebar icons use the shared accessible icon slot and consistent dashboard
     const sharedSidebars = await Promise.all(["mainmenu.html", "admin.html", "rl_menu.html"].map(name => readFile(new URL(name, sidebarRoot), "utf8")));
     for (const sidebar of sharedSidebars) {
         assert.match(sidebar, /class="nav-icon"[\s\S]*?aria-hidden="true"/);
+        const navControls = [...sidebar.matchAll(/<(?:a|button)[^>]*class="nav-item[^"]*"[^>]*>[\s\S]*?<\/(?:a|button)>/g)];
+        assert.ok(navControls.length > 0);
+        for (const [, control] of navControls.entries()) {
+            assert.match(control[0], /class="nav-icon"/);
+            assert.match(control[0], /class="nav-text"[\s\S]*?class="nav-label"/);
+        }
     }
     for (const sidebar of sharedSidebars) {
         assert.match(sidebar, /data-sidebar-icon="dashboard"/);

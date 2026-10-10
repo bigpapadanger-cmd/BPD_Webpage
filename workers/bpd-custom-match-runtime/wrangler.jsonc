@@ -6,7 +6,7 @@
   "preview_urls": false,
   "placement": { "mode": "smart" },
   "vars": {
-    "CUSTOM_MATCH_RUNTIME_ENABLED": "false",
+    "CUSTOM_MATCH_RUNTIME_ENABLED": "true",
     "SUPABASE_URL": "https://xslrwamnfqgoziaczgsn.supabase.co"
   },
   "durable_objects": { "bindings": [{ "name": "CUSTOM_MATCH_SESSIONS", "class_name": "CustomMatchSession" }] },

@@ -957,7 +957,7 @@ function setupAdminActiveNavigation() {
 
     const navItems =
         document.querySelectorAll(
-            ".nav-item[data-nav-route]"
+            ".nav-item[data-nav-route], .submenu-item[data-nav-route]"
         );
 
     navItems.forEach(
@@ -982,6 +982,11 @@ function setupAdminActiveNavigation() {
             item.classList.toggle(
                 "active",
                 active
+            );
+
+            item.classList.toggle(
+                "is-active-route-hidden",
+                exactMatch
             );
 
             if (
