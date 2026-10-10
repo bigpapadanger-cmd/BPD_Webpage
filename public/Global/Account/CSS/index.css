@@ -1074,6 +1074,18 @@ ACCOUNT INFORMATION
         nowrap;
 }
 
+.account-information__value--role {
+    display: inline-flex;
+    align-items: center;
+    min-height: 30px;
+    padding: 4px 10px;
+    border: 1px solid rgba(139, 92, 246, 0.34);
+    border-radius: 999px;
+    background: rgba(139, 92, 246, 0.12);
+    color: #eee9ff;
+    font-weight: 700;
+}
+
 /* =========================================================
 LOADING STATE
 ========================================================= */
@@ -1161,6 +1173,27 @@ SMALL VIEWPORTS
         padding:
             0
             16px;
+    }
+}
+
+@media (max-width: 520px) {
+    .account-page {
+        padding: 16px 12px 28px;
+    }
+
+    .account-page__header {
+        margin-bottom: 18px;
+    }
+
+    .account-card__header,
+    .account-card__body {
+        padding: 16px;
+    }
+
+    .account-information__row {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 6px;
     }
 }
 

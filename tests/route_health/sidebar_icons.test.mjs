@@ -50,7 +50,9 @@ test("sidebar items keep the shared row height when collapsed and menus start cl
     const styles = await readFile(new URL("../../public/Framework/Shell/CSS/Sidebar/sidebar.css", import.meta.url), "utf8");
     assert.match(styles, /--sidebar-collapsed-width:\s*58px/);
     assert.match(styles, /--sidebar-icon-width:\s*46px/);
-    assert.match(styles, /\.sidebar-navigation-bottom\s*\{\s*flex:\s*1 1 25%/);
+    assert.match(styles, /\.site-sidebar\s*\{[\s\S]*?grid-template-rows:\s*auto\s+minmax\(0,\s*1fr\)/);
+    assert.match(styles, /\.sidebar-navigation\s*\{[\s\S]*?overflow-y:\s*auto/);
+    assert.match(styles, /\.sidebar-navigation-bottom\s*\{[\s\S]*?flex:\s*0 0 auto/);
     assert.doesNotMatch(styles, /body\.sidebar-collapsed\s*\{\s*--sidebar-row-height:\s*24px/);
     assert.doesNotMatch(styles, /body\.sidebar-collapsed \.site-sidebar \.nav-item\s*\{\s*flex-basis:\s*24px/);
     assert.match(styles, /\.site-sidebar \.nav-item[\s\S]*?min-height:\s*var\s*\(\s*--sidebar-row-height\s*\)/);

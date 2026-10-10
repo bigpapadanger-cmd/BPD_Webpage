@@ -348,11 +348,11 @@ Important:
                         <summary>Custom Match host recovery</summary>
                         <div class="admin-accordion-body">
                             <p>Use only for an abandoned host. Going offline alone does not transfer ownership. The database contract is verified; recovery still requires current Admin authorization.</p>
-                            <form>
+                            <form class="custom-match-recovery-form">
                                 <label>Match code<input name="matchCode" pattern="CM[A-Za-z0-9]{8}" required></label>
                                 <label>Target member code<input name="targetMemberCode" pattern="CMM[A-Za-z0-9]{8}" required></label>
                                 <label>Current match version<input name="expectedVersion" type="number" min="1" step="1" required></label>
-                                <label>Audit reason<textarea name="reason" maxlength="500" required></textarea></label>
+                                <label class="custom-match-recovery-reason">Audit reason<textarea name="reason" maxlength="500" required></textarea></label>
                                 <button name="submitRecovery" type="submit">Transfer host</button>
                             </form>
                             <p role="status" aria-live="polite"></p>

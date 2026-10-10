@@ -88,14 +88,18 @@ SIDEBAR CONTAINER
 .site-sidebar {
     position: fixed;
 
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+
     top:
         var(
             --app-top-offset
         );
 
     bottom:
-        var(
-            --app-bottom-gap
+        max(
+            var(--app-bottom-gap),
+            env(safe-area-inset-bottom)
         );
 
     left:
@@ -120,12 +124,30 @@ SIDEBAR CONTAINER
             --sidebar-width
         );
 
-    height: auto;
+    height:
+        calc(
+            100vh
+            - var(--app-top-offset)
+            - max(
+                var(--app-bottom-gap),
+                env(safe-area-inset-bottom)
+            )
+        );
+
+    height:
+        calc(
+            100dvh
+            - var(--app-top-offset)
+            - max(
+                var(--app-bottom-gap),
+                env(safe-area-inset-bottom)
+            )
+        );
 
     min-height: 0;
     max-height: none;
 
-    overflow: visible;
+    overflow: hidden;
 
     border: 0;
 
@@ -172,11 +194,7 @@ ATTACHED TOGGLE HEADER
 ========================================================= */
 
 .sidebar-toggle-box {
-    position: absolute;
-
-    top: 0;
-    right: 0;
-    left: 0;
+    position: relative;
 
     z-index: 110;
 
@@ -564,16 +582,7 @@ NAVIGATION BODY
 ========================================================= */
 
 .sidebar-navigation {
-    position: absolute;
-
-    top:
-        var(
-            --sidebar-toggle-height
-        );
-
-    right: 0;
-    bottom: 0;
-    left: 0;
+    position: relative;
 
     display: flex;
 
@@ -700,8 +709,7 @@ NAVIGATION GROUPS
 .sidebar-navigation-bottom {
     display: flex;
 
-    flex:
-        3 1 75%;
+    flex: 0 1 auto;
 
     flex-direction: column;
 
@@ -711,13 +719,11 @@ NAVIGATION GROUPS
 
     gap: 2px;
     min-height: 0;
-    overflow-x: hidden;
-    overflow-y: auto;
+    overflow: visible;
 }
 
 .sidebar-navigation-bottom {
-    flex: 1 1 25%;
-    min-height: 25%;
+    flex: 0 0 auto;
 }
 
 /* =========================================================
@@ -1038,6 +1044,23 @@ body.sidebar-collapsed
 
     pointer-events:
         none;
+}
+
+/* Keep collapsed navigation compact while the shared shell retains the
+ * same viewport-sized frame and single scroll container as expanded mode. */
+body.sidebar-collapsed .site-sidebar .sidebar-navigation {
+    padding-right: 0;
+    padding-left: 0;
+}
+
+body.sidebar-collapsed .site-sidebar .nav-item {
+    justify-content: center;
+}
+
+body.sidebar-collapsed .site-sidebar .nav-icon {
+    flex-basis: calc(var(--sidebar-collapsed-width) - 4px);
+    width: calc(var(--sidebar-collapsed-width) - 4px);
+    min-width: calc(var(--sidebar-collapsed-width) - 4px);
 }
 
 /* =========================================================

@@ -375,11 +375,7 @@ function getAccountRole(
             authState?.role
         );
 
-    if (
-        !role
-    ) {
-        return "Member";
-    }
+    if (!role) return "User";
 
     return (
         role.charAt(
