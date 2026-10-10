@@ -184,8 +184,7 @@ async function updateBuildConfiguration(form) {
     if (actionInFlight || authorizationActive) return;
     const gameVersion = form.elements.gameVersion.value.trim();
     const featureSet = form.elements.featureSet.value.trim();
-    const buildSecret = form.elements.buildSecret.value;
-    if (!gameVersion || !featureSet || !buildSecret || !window.confirm(`Validate Rocket League ${gameVersion} with Feature Set ${featureSet}? The current production configuration stays active if validation fails.`)) return;
+    if (!gameVersion || !featureSet || !window.confirm(`Validate Rocket League ${gameVersion} with Feature Set ${featureSet}? The current production configuration stays active if validation fails.`)) return;
     actionInFlight = true;
     startOperationPolling();
     const button = form.querySelector('[data-build-action="validate"]');
@@ -193,7 +192,7 @@ async function updateBuildConfiguration(form) {
     button.disabled = true;
     const message = document.getElementById("workerStatusMessage");
     try {
-        const payload = await postSystemAction("validate-build-candidate", { gameVersion, featureSet, buildSecret });
+        const payload = await postSystemAction("validate-build-candidate", { gameVersion, featureSet });
         buildApproval = { token: payload.approvalToken, gameVersion, featureSet, expiresAt: payload.approvalExpiresAt || payload.expiresAt };
         promoteButton.disabled = !buildApproval.token;
         message.textContent = `Candidate validated as Build ID ${payload.buildId}; ready for explicit promotion.`;
@@ -212,15 +211,12 @@ async function promoteBuildConfiguration(form) {
     if (actionInFlight || authorizationActive || !buildApproval) return;
     if (buildApproval.expiresAt && Date.parse(buildApproval.expiresAt) <= Date.now()) { buildApproval = null; return; }
     if (!window.confirm("Promote this validated Rocket League protocol candidate and reconnect PsyNet?")) return;
-    const buildSecret = form.elements.buildSecret.value;
-    if (!buildSecret) return;
     actionInFlight = true;
     const button = form.querySelector('[data-build-action="promote"]');
     button.disabled = true;
     try {
-        const payload = await postSystemAction("promote-build-candidate", { ...buildApproval, approvalToken: buildApproval.token, buildSecret });
+        const payload = await postSystemAction("promote-build-candidate", { ...buildApproval, approvalToken: buildApproval.token });
         buildApproval = null;
-        form.elements.buildSecret.value = "";
         button.disabled = true;
         document.getElementById("workerStatusMessage").textContent = payload.reconnectSucceeded === true ? "Protocol promoted; PsyNet reconnected and readiness was checked." : `Protocol promoted; reconnect result: ${payload.reconnectCode || "unavailable"}.`;
         await loadStatus();
@@ -492,13 +488,15 @@ function makeDetails(service) {
             service.nextScheduledVersionCheckAt ? `Next scheduled version check: ${readableTime(service.nextScheduledVersionCheckAt)}` : null,
             `MMR requests: ${service.mmrRequests || 0} total · ${service.mmrSuccesses || 0} succeeded · ${service.mmrFailures || 0} failed`
         ].filter(Boolean);
+        const protocolPanel = document.createElement("section"); protocolPanel.className = "mmr-panel mmr-protocol-panel";
+        protocolPanel.append(textElement("h4", "Protocol Status"), textElement("p", "Active runtime configuration and PsyNet session state.", "mmr-panel-help"));
         const list = document.createElement("ul");
-        list.className = "worker-status-facts";
+        list.className = "worker-status-facts mmr-protocol-facts";
         for (const fact of mmrFacts) list.append(textElement("li", fact));
-        content.append(list);
+        protocolPanel.append(list); content.append(protocolPanel);
         const diagnostics = document.createElement("details");
-        diagnostics.className = "system-diagnostics-group";
-        diagnostics.innerHTML = "<summary>Legacy Route Usage</summary>";
+        diagnostics.className = "system-diagnostics-group mmr-diagnostics-panel";
+        diagnostics.innerHTML = "<summary>Protocol Diagnostics &amp; Legacy Route Usage</summary>";
         const usageList = document.createElement("ul");
         usageList.className = "system-diagnostic-list";
         const usage = service.routeUsage;
@@ -523,35 +521,41 @@ function makeDetails(service) {
         const controls = getMmrControlModel(service, canDeployMmr);
         if (controls.showOperations) {
             const operations = document.createElement("section"); operations.className = "mmr-operations";
-            operations.append(textElement("h4", "MMR Operations"));
+            operations.append(textElement("h4", "MMR Operations"), textElement("p", "Validate protocol candidates before promoting them; Build ID and User-Agent are derived automatically and the Build Secret stays server-side.", "mmr-panel-help"));
             if (controls.showBuildUpdate) {
+                const buildPanel = document.createElement("section"); buildPanel.className = "mmr-panel mmr-build-panel";
+                buildPanel.append(textElement("h5", "Update Rocket League Build"));
                 const form = document.createElement("form"); form.className = "mmr-build-form"; form.autocomplete = "off";
                 const version = document.createElement("input"); version.name = "gameVersion"; version.required = true; version.placeholder = "Game Version"; version.pattern = "\\d{6}\\.\\d{1,8}\\.\\d{1,8}"; version.value = service.gameVersion || "";
                 const feature = document.createElement("input"); feature.name = "featureSet"; feature.required = true; feature.placeholder = "Feature Set"; feature.value = service.currentFeatureSet || "";
-                const secret = document.createElement("input"); secret.name = "buildSecret"; secret.type = "password"; secret.required = true; secret.placeholder = "Build Secret"; secret.autocomplete = "new-password";
+                version.id = "mmr-candidate-version"; feature.id = "mmr-candidate-feature";
+                form.append(textElement("label", "Candidate internal game version", "mmr-field-label"), version, textElement("label", "Candidate Feature Set", "mmr-field-label"), feature);
                 const update = textElement("button", "Validate Candidate"); update.type = "submit"; update.dataset.buildAction = "validate";
                 const promote = textElement("button", "Promote Candidate"); promote.type = "button"; promote.disabled = true; promote.dataset.buildAction = "promote";
-                form.append(textElement("p", `Active: ${service.gameVersion || "unknown"} · ${service.currentFeatureSet || "unknown"}`), textElement("p", "Candidate:"), version, feature, secret, update, promote);
-                for (const field of [version, feature, secret]) field.addEventListener("input", () => { buildApproval = null; promote.disabled = true; });
+                form.append(textElement("p", `Active configuration: ${service.gameVersion || "unknown"} · ${service.currentFeatureSet || "unknown"}`, "mmr-active-config"), update, promote);
+                for (const field of [version, feature]) field.addEventListener("input", () => { buildApproval = null; promote.disabled = true; });
                 form.addEventListener("submit", event => { event.preventDefault(); void updateBuildConfiguration(form); });
                 promote.addEventListener("click", () => { void promoteBuildConfiguration(form); });
-                operations.append(form);
+                buildPanel.append(form); operations.append(buildPanel);
             }
             if (controls.showFunctionalTest) {
+                const functionalPanel = document.createElement("details"); functionalPanel.className = "mmr-panel mmr-collapsible"; functionalPanel.open = false;
+                functionalPanel.append(textElement("summary", "MMR Functional Test"));
                 const form = document.createElement("form"); form.className = "mmr-functional-form"; form.autocomplete = "off";
-                form.append(textElement("h5", "MMR Functional Test"));
                 const player = document.createElement("input"); player.name = "playerId"; player.required = true; player.placeholder = "Epic|account-id|0"; player.pattern = "Epic\\|[A-Za-z0-9_-]{8,64}\\|0";
                 const run = textElement("button", "Run MMR Functional Test"); run.type = "submit";
                 const result = textElement("div", "", "mmr-functional-result"); result.dataset.mmrTestResult = "";
-                form.append(player, run, result);
+                form.append(textElement("label", "Authorized Rocket League player", "mmr-field-label"), player, textElement("p", "Use an authorized Epic identifier; results are shown only in this Admin session.", "mmr-panel-help"), run, result);
                 form.addEventListener("submit", event => { event.preventDefault(); void runMmrFunctionalTest(form); });
-                operations.append(form);
+                functionalPanel.append(form); operations.append(functionalPanel);
             }
             if (controls.showDeploy) {
+                const workerPanel = document.createElement("details"); workerPanel.className = "mmr-panel mmr-collapsible";
+                workerPanel.append(textElement("summary", "Worker Operations"));
                 const deploy = textElement("button", "Redeploy MMR Worker", "mmr-deploy-button"); deploy.type = "button"; deploy.id = "mmrDeployButton";
                 const deployment = textElement("ul", "", "worker-status-facts"); deployment.id = "mmrDeploymentState";
                 deploy.addEventListener("click", () => { void deployMmrWorker(deploy); });
-                operations.append(deploy, deployment);
+                workerPanel.append(deploy, deployment); operations.append(workerPanel);
             }
             content.append(operations);
         }

@@ -76,7 +76,7 @@ test("build update uses only the fixed protected MMR route and sanitizes the res
         const url = new URL(input); paths.push(url.pathname);
         assert.equal(url.pathname, "/admin/build-configuration");
         assert.equal(init.headers.Authorization, "Bearer admin-secret");
-        assert.deepEqual(JSON.parse(init.body), { gameVersion: "260918.75141.528314", featureSet: "PrimeUpdate60", buildSecret: "build-secret" });
+        assert.deepEqual(JSON.parse(init.body), { gameVersion: "260918.75141.528314", featureSet: "PrimeUpdate60" });
         return Response.json({ resultCode: "RL_BUILD_UPDATE_PROMOTED", buildId: "246758282", featureSet: "PrimeUpdate60", gameVersion: "260918.75141.528314", configurationGeneration: 2, validatedAt: "2026-09-29T12:00:00.000Z", reconnectSucceeded: true, PsyToken: "must-not-pass" });
     };
     try {
@@ -87,7 +87,6 @@ test("build update uses only the fixed protected MMR route and sanitizes the res
         assert.equal(JSON.stringify(result).includes("must-not-pass"), false);
         assert.equal(JSON.stringify(result).includes("build-secret"), false);
         await assert.rejects(updateMmrBuildConfiguration(env, { gameVersion: "bad", featureSet: "x", buildSecret: "build-secret" }), { code: "RL_BUILD_UPDATE_INVALID", status: 400 });
-        await assert.rejects(updateMmrBuildConfiguration(env, { gameVersion: "260918.75141.528314", featureSet: "PrimeUpdate60", buildSecret: "short" }), { code: "RL_BUILD_UPDATE_INVALID", status: 400 });
     } finally { globalThis.fetch = originalFetch; }
 });
 
@@ -116,9 +115,9 @@ test("Worker Status protocol form submits game version, feature set, and transie
     const source = await readFile(new URL("../../public/Global/Admin/WorkerStatus/JS/index.js", import.meta.url), "utf8");
     assert.match(source, /name = "gameVersion"/);
     assert.match(source, /name = "featureSet"/);
-    assert.match(source, /name = "buildSecret"/);
-    assert.match(source, /secret\.type = "password"/);
-    assert.match(source, /postSystemAction\("validate-build-candidate", \{ gameVersion, featureSet, buildSecret \}\)/);
+    assert.doesNotMatch(source, /name = "buildSecret"/);
+    assert.doesNotMatch(source, /name = "buildSecret"|buildSecret\.value|buildSecret,|buildSecret \}/);
+    assert.match(source, /postSystemAction\("validate-build-candidate", \{ gameVersion, featureSet \}\)/);
     assert.match(source, /postSystemAction\("promote-build-candidate"/);
     assert.match(source, /data-build-action/);
     assert.match(source, /buildApproval = null/);

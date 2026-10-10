@@ -385,14 +385,29 @@
     .worker-status *, .worker-status *::before, .worker-status *::after { transition-duration: .01ms !important; }
 }
 
-.mmr-operations { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid rgba(148, 163, 184, .18); }
-.mmr-build-form { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
-.mmr-build-form input { min-width: 12rem; padding: .55rem .7rem; }
+.mmr-operations { display: grid; gap: 12px; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid rgba(148, 163, 184, .18); }
+.mmr-panel { border: 1px solid rgba(148, 163, 184, .18); border-radius: 12px; padding: 14px; background: rgba(2, 6, 13, .38); }
+.mmr-panel h4, .mmr-panel h5 { margin: 0 0 6px; color: #e4eefb; }
+.mmr-panel-help, .mmr-active-config { margin: 0 0 10px; color: #aebed0; font-size: .82rem; line-height: 1.45; }
+.mmr-protocol-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 18px; }
+.mmr-build-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px; align-items: end; }
+.mmr-build-form input, .mmr-functional-form input { min-width: 0; width: 100%; box-sizing: border-box; padding: .62rem .7rem; border: 1px solid rgba(148, 163, 184, .38); border-radius: 7px; background: #111b29; color: #edf5ff; }
+.mmr-build-form input:focus, .mmr-functional-form input:focus { outline: 2px solid #79b9e8; outline-offset: 2px; border-color: #79b9e8; }
+.mmr-field-label { color: #dcecff; font-size: .8rem; font-weight: 650; }
+.mmr-build-form button, .mmr-functional-form button { min-height: 36px; }
+.mmr-build-form .mmr-active-config { grid-column: 1 / -1; }
+.mmr-collapsible > summary { color: #e4eefb; font-weight: 700; cursor: pointer; }
+.mmr-collapsible[open] > summary { margin-bottom: 10px; }
 .mmr-deploy-button { margin-top: 1rem; border-color: #c65b5b; color: #ffd8d8; }
 
 
-.mmr-functional-form { display: grid; gap: .55rem; margin-top: 1rem; }
+.mmr-functional-form { display: grid; gap: .55rem; margin-top: .5rem; }
 .mmr-functional-form h5 { margin: 0; color: #dcecff; font-size: .9rem; }
+
+@media (max-width: 620px) {
+    .mmr-protocol-facts, .mmr-build-form { grid-template-columns: minmax(0, 1fr); }
+    .mmr-build-form button, .mmr-functional-form button { width: 100%; }
+}
 .mmr-functional-form input { max-width: 30rem; padding: .55rem .7rem; }
 .mmr-functional-result { color: #aebed0; font-size: .82rem; }
 .worker-status-history { margin-top: .7rem; }

@@ -574,14 +574,13 @@ export async function updateMmrBuildConfiguration(env, input) {
     if (!endpoint || !adminKey) throw actionError("RL_BUILD_UPDATE_NOT_CONFIGURED", 503);
     const gameVersion = typeof input?.gameVersion === "string" ? input.gameVersion.trim() : "";
     const featureSet = typeof input?.featureSet === "string" ? input.featureSet.trim() : "";
-    const buildSecret = typeof input?.buildSecret === "string" ? input.buildSecret.trim() : "";
-    if (!/^\d{6}\.\d{1,8}\.\d{1,8}$/.test(gameVersion) || !/^[A-Za-z0-9_.-]{1,64}$/.test(featureSet) || buildSecret.length < 8 || buildSecret.length > 512) throw actionError("RL_BUILD_UPDATE_INVALID", 400);
+    if (!/^\d{6}\.\d{1,8}\.\d{1,8}$/.test(gameVersion) || !/^[A-Za-z0-9_.-]{1,64}$/.test(featureSet)) throw actionError("RL_BUILD_UPDATE_INVALID", 400);
     let response;
     try {
         response = await timedFetch(signal => fetch(new URL("/admin/build-configuration", endpoint), {
             method: "POST", redirect: "manual", signal,
             headers: { Authorization: `Bearer ${adminKey}`, Accept: "application/json", "Content-Type": "application/json" },
-            body: JSON.stringify({ gameVersion, featureSet, buildSecret })
+            body: JSON.stringify({ gameVersion, featureSet })
         }), ACTION_TIMEOUT_MS);
     } catch (cause) { throw actionError(healthTimedOut(cause) ? "RL_BUILD_UPDATE_TIMEOUT" : "RL_BUILD_UPDATE_UNAVAILABLE", healthTimedOut(cause) ? 504 : 502); }
     const payload = await readSmallJson(response).catch(() => ({}));
@@ -615,15 +614,14 @@ async function callMmrBuildConfiguration(env, path, input, invalidCode) {
     if (!endpoint || !adminKey) throw actionError("RL_BUILD_UPDATE_NOT_CONFIGURED", 503);
     const gameVersion = typeof input?.gameVersion === "string" ? input.gameVersion.trim() : "";
     const featureSet = typeof input?.featureSet === "string" ? input.featureSet.trim() : "";
-    const buildSecret = typeof input?.buildSecret === "string" ? input.buildSecret.trim() : "";
     const approvalToken = typeof input?.approvalToken === "string" ? input.approvalToken.trim() : "";
-    if (!/^\d{6}\.\d{1,8}\.\d{1,8}$/.test(gameVersion) || !/^[A-Za-z0-9_.-]{1,64}$/.test(featureSet) || buildSecret.length < 8 || buildSecret.length > 512 || (path.endsWith("/promote") && !approvalToken)) throw actionError(invalidCode, 400);
+    if (!/^\d{6}\.\d{1,8}\.\d{1,8}$/.test(gameVersion) || !/^[A-Za-z0-9_.-]{1,64}$/.test(featureSet) || (path.endsWith("/promote") && !approvalToken)) throw actionError(invalidCode, 400);
     let response;
     try {
         response = await timedFetch(signal => fetch(new URL(path, endpoint), {
             method: "POST", redirect: "manual", signal,
             headers: { Authorization: `Bearer ${adminKey}`, Accept: "application/json", "Content-Type": "application/json" },
-            body: JSON.stringify({ gameVersion, featureSet, buildSecret, ...(approvalToken ? { approvalToken } : {}) })
+            body: JSON.stringify({ gameVersion, featureSet, ...(approvalToken ? { approvalToken } : {}) })
         }), ACTION_TIMEOUT_MS);
     } catch (cause) { throw actionError(healthTimedOut(cause) ? "RL_BUILD_UPDATE_TIMEOUT" : "RL_BUILD_UPDATE_UNAVAILABLE", healthTimedOut(cause) ? 504 : 502); }
     const payload = await readSmallJson(response).catch(() => ({}));

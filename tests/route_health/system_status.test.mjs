@@ -347,9 +347,9 @@ test("Worker Status UI is event-driven and exposes current MMR operations", asyn
     assert.match(source, /"reconnect-psynet": "Reconnect PsyNet"/);
     assert.match(source, /"repair-session": "Repair Session"/);
     assert.match(source, /MMR Functional Test/);
-    assert.match(source, /name = "buildSecret"/);
-    assert.match(source, /secret\.type = "password"/);
-    assert.match(source, /form\.elements\.buildSecret\.value = ""/);
+    assert.doesNotMatch(source, /name = "buildSecret"/);
+    assert.doesNotMatch(source, /secret\.type = "password"/);
+    assert.doesNotMatch(source, /form\.elements\.buildSecret/);
     assert.match(source, /Historical diagnostics/);
     assert.match(source, /getMmrControlModel\(service, canDeployMmr\)/);
     assert.match(source, /Hourly MMR refresh/);
@@ -772,7 +772,7 @@ test("build validation sends current contract and never returns or caches the se
     const originalFetch = globalThis.fetch;
     globalThis.fetch = async (input, init) => {
         assert.equal(new URL(input).pathname, "/admin/build-configuration");
-        assert.deepEqual(JSON.parse(init.body), { gameVersion: "260918.75141.528314", featureSet: "PrimeUpdate60", buildSecret: "secret-value" });
+        assert.deepEqual(JSON.parse(init.body), { gameVersion: "260918.75141.528314", featureSet: "PrimeUpdate60" });
         return Response.json({ success: true, resultCode: "RL_BUILD_UPDATE_PROMOTED", buildId: "246758282", featureSet: "PrimeUpdate60", gameVersion: "260918.75141.528314", configurationGeneration: 2, validatedAt: "2026-10-01T00:00:00Z", reconnectSucceeded: true, buildSecret: "must-not-pass" });
     };
     try {
