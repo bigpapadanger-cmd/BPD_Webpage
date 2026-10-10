@@ -13,6 +13,19 @@ export async function initializePage() {
     root[disposeKey]?.();
     const lifetime = new AbortController();
     const get = id => root.querySelector(`#${id}`);
+    const showDialog = id => {
+        const dialog = get(id);
+        if (!dialog) return;
+        if (typeof dialog.showModal === "function") dialog.showModal();
+        else dialog.setAttribute("open", "");
+        dialog.querySelector("input,select,button:not([data-cmDialogClose])")?.focus({ preventScroll: true });
+    };
+    const closeDialog = id => {
+        const dialog = get(id);
+        if (!dialog) return;
+        if (typeof dialog.close === "function") dialog.close();
+        else dialog.removeAttribute("open");
+    };
     let controller, lastLimits = null, lastNotice = "", noticeTimer;
     const sectionKeys = new Map();
     // Preserve only editable non-credential controls within the same match.
@@ -42,6 +55,8 @@ export async function initializePage() {
             const locked = !state.access || state.accessPending || state.detailPending || state.busy || state.credentialsPending || Boolean(state.retry);
             get("cmAccessStatus").textContent = state.accessMessage;
             get("cmCheckAccess").disabled = state.accessPending || state.busy;
+            get("cmOpenCreate").disabled = state.busy;
+            get("cmOpenJoinPrivate").disabled = state.busy;
             get("cmCreateFields").disabled = locked || !state.limits || !state.limits.modes.some(mode => !mode.usesRounds && !mode.usesVoting);
             get("cmReloadLimits").disabled = state.busy;
             if (state.limits && state.limits !== lastLimits) {
@@ -112,6 +127,9 @@ export async function initializePage() {
     const run = operation => { void Promise.resolve().then(operation).catch(() => { if (root.isConnected && !lifetime.signal.aborted) { get("cmNotice").textContent = "Unable to complete that action. Refresh the match before trying again."; get("cmCreateFields").disabled = true; root.querySelectorAll("[data-protected]").forEach(node => { node.disabled = true; }); } }); };
     root.addEventListener("click", event => {
         const target = event.target.closest("button,a"); if (!target || target.disabled) return;
+        if (target.dataset.cmDialogClose !== undefined) { closeDialog(target.closest("dialog")?.id); return; }
+        if (target.id === "cmOpenCreate") { showDialog("cmCreateDialog"); return; }
+        if (target.id === "cmOpenJoinPrivate") { showDialog("cmJoinPrivateDialog"); return; }
         const open = target.dataset.cmOpen;
         if (open && isMatchCode(open)) {
             event.preventDefault();
@@ -158,13 +176,18 @@ export async function initializePage() {
     root.addEventListener("submit", event => {
         event.preventDefault(); const form = event.target;
         if (form.id === "cmBrowseForm") run(() => controller.browse(1, form.elements.state.value));
+        else if (form.id === "cmJoinPrivateForm") {
+            const code = form.elements.matchCode.value.trim().toUpperCase();
+            if (!isMatchCode(code)) { get("cmNotice").textContent = "Enter a valid private match code."; get("cmNotice").dataset.tone = "error"; return; }
+            run(async () => { await controller.detail(code); if (controller.state.detail?.match?.matchCode === code) closeDialog("cmJoinPrivateDialog"); });
+        }
         else if (form.id === "cmCreateForm") {
             if (get("cmCreateFields").disabled) return;
             const f = form.elements;
-            run(() => controller.create({ title: f.title.value.trim(), modeKey: f.modeKey.value, visibility: f.visibility.value, joinPolicy: f.joinPolicy.value,
+            run(async () => { await controller.create({ title: f.title.value.trim(), modeKey: f.modeKey.value, visibility: f.visibility.value, joinPolicy: f.joinPolicy.value,
                 teamACapacity: Number(f.teamACapacity.value), teamBCapacity: Number(f.teamBCapacity.value), allowJoinAfterStart: f.allowJoinAfterStart.checked,
                 allowSpectators: f.allowSpectators.checked, ...(f.allowSpectators.checked ? { spectatorCapacity: Number(f.spectatorCapacity.value) } : {}),
-                region: f.region.value.trim() || null, mapName: f.mapName.value.trim() || null }));
+                region: f.region.value.trim() || null, mapName: f.mapName.value.trim() || null }); if (controller.state.detail?.actor?.isHost) closeDialog("cmCreateDialog"); });
         } else if (form.dataset.cmCreateInvite) {
             const f = form.elements, payload = {};
             if (f.maxUses.value) payload.maxUses = Number(f.maxUses.value);

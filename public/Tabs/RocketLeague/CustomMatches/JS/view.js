@@ -30,12 +30,14 @@ export function renderBrowse(doc, container, matches) {
     container.replaceChildren();
     for (const match of matches) {
         const card = element(doc, "article", undefined, "cm-card");
-        card.append(element(doc, "h3", match.title), element(doc, "p", `${match.state} · ${match.modeKey} · ${match.joinPolicy.replaceAll("_", " ")}`),
+        const body = element(doc, "div", undefined, "cm-card-body");
+        body.append(element(doc, "h3", match.title), element(doc, "p", `${match.state} · ${match.modeKey} · ${match.joinPolicy.replaceAll("_", " ")}`),
             element(doc, "p", `Team A ${match.teamACount}/${match.teamACapacity} · Team B ${match.teamBCount}/${match.teamBCapacity}`), element(doc, "p", `Host: ${match.hostDisplayName}`));
         const link = element(doc, "a", "View match");
         link.href = `/RocketLeague/FindCustomMatches?match=${encodeURIComponent(match.matchCode)}`;
         link.dataset.cmOpen = match.matchCode;
-        card.append(link); container.append(card);
+        const actions = element(doc, "div", undefined, "cm-card-actions"); actions.append(link);
+        card.append(body, actions); container.append(card);
     }
 }
 export function renderLobby(doc, container, detail, { locked = false, limits = null, runtimeStatus = "offline", runtimeMembers = [] } = {}) {
