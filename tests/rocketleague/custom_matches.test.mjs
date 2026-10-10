@@ -140,7 +140,9 @@ test("Supabase failure diagnostics are bounded and never include credentials or 
             SUPABASE_URL: env.SUPABASE_URL,
             SUPABASE_SERVICE_ROLE_KEY: "test-build-secret-marker"
         }, "limits", { playerId: "private-player-marker" }));
-        globalThis.fetch = async () => { throw new TypeError("network detail must stay private"); };
+        globalThis.fetch = async () => {
+            throw new TypeError("network detail must stay private", { cause: Object.assign(new Error("private resolver detail"), { code: "ENOTFOUND" }) });
+        };
         await assert.rejects(callCustomMatchRpc({
             SUPABASE_URL: "https://xslrwamnfqgoziaczgsn.supabase.co/rest/v1/",
             SUPABASE_SERVICE_ROLE_KEY: "test-service-only"
@@ -158,7 +160,8 @@ test("Supabase failure diagnostics are bounded and never include credentials or 
     assert.match(diagnostics[1], /type_error/);
     assert.match(diagnostics[1], /expectedProjectMatch.*true/);
     assert.match(diagnostics[1], /p_game_key/);
-    assert.doesNotMatch(diagnostics.join(" "), /test-build-secret-marker|private-player-marker|raw-provider-secret-marker|network detail must stay private|db\.example|SUPABASE_SERVICE_ROLE_KEY|rocketleague/);
+    assert.match(diagnostics[1], /transportCauseClass.*dns/);
+    assert.doesNotMatch(diagnostics.join(" "), /test-build-secret-marker|private-player-marker|raw-provider-secret-marker|network detail must stay private|private resolver detail|ENOTFOUND|db\.example|SUPABASE_SERVICE_ROLE_KEY|rocketleague/);
 });
 test("start and voting unavailable until their security authorities exist", async () => {
     globalThis.fetch = () => { throw new Error("must not fetch"); };

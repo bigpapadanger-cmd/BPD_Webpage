@@ -11,6 +11,7 @@ const SAFE_UPSTREAM_CODES = new Set([
     "UPSTREAM_UNAVAILABLE", "UPSTREAM_CONFIGURATION_INVALID", "UPSTREAM_RESPONSE_TOO_LARGE", "UPSTREAM_RESPONSE_INVALID"
 ]);
 const SAFE_TRANSPORT_CLASSES = new Set(["abort", "type_error", "error", "other"]);
+const SAFE_TRANSPORT_CAUSES = new Set(["dns", "connection", "timeout", "tls", "other", "not_available"]);
 const EXPECTED_SUPABASE_HOST = "xslrwamnfqgoziaczgsn.supabase.co";
 const SAFE_PARAMETER_KEYS = new Set([
     "p_game_key", "p_state", "p_page", "p_page_size", "p_match_code", "p_round_code",
@@ -19,7 +20,7 @@ const SAFE_PARAMETER_KEYS = new Set([
     "p_target_member_code", "p_reason", "p_result_code", "p_team_a_score", "p_team_b_score"
 ]);
 
-function logRpcFailure({ operation, stage, rawUrl, urlValid, targetMatches, key, upstreamStatus, code, transportErrorClass, headers, parameters }) {
+function logRpcFailure({ operation, stage, rawUrl, urlValid, targetMatches, key, upstreamStatus, code, transportErrorClass, transportCauseClass, headers, parameters }) {
     try {
         console.warn("custom_match_supabase_rpc_failure", {
             operation,
@@ -42,6 +43,7 @@ function logRpcFailure({ operation, stage, rawUrl, urlValid, targetMatches, key,
             parameterKeys: Object.keys(parameters ?? {}).filter(keyName => SAFE_PARAMETER_KEYS.has(keyName)).sort(),
             upstreamStatus,
             transportErrorClass: SAFE_TRANSPORT_CLASSES.has(transportErrorClass) ? transportErrorClass : "not_applicable",
+            transportCauseClass: SAFE_TRANSPORT_CAUSES.has(transportCauseClass) ? transportCauseClass : "not_available",
             code: SAFE_UPSTREAM_CODES.has(code) ? code : "CUSTOM_MATCH_UNAVAILABLE"
         });
     } catch {
@@ -107,7 +109,8 @@ export async function callCustomMatchRpc(env, operation, parameters) {
         // the existing public error mapping unchanged.
         const code = error instanceof CustomMatchError ? error.code : error?.code;
         logRpcFailure({ operation, stage, rawUrl, urlValid, targetMatches, key, upstreamStatus, code,
-            transportErrorClass: error?.transportErrorClass, headers: requestHeaders, parameters });
+            transportErrorClass: error?.transportErrorClass, transportCauseClass: error?.transportCauseClass,
+            headers: requestHeaders, parameters });
         if (error instanceof CustomMatchError) throw error;
         throw new CustomMatchError(error?.code === "UPSTREAM_TIMEOUT" ? "CUSTOM_MATCH_TIMEOUT" : "CUSTOM_MATCH_UNAVAILABLE", error?.code === "UPSTREAM_TIMEOUT" ? 504 : 503);
     }

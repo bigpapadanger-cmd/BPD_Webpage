@@ -5,12 +5,21 @@ function failure(code) {
     return Object.assign(new Error("Upstream service unavailable."), { code, status: 503 });
 }
 
+function transportCauseClass(error) {
+    const causeCode = typeof error?.cause?.code === "string" ? error.cause.code : "";
+    if (["ENOTFOUND", "EAI_AGAIN", "EAI_FAIL"].includes(causeCode)) return "dns";
+    if (["ECONNREFUSED", "ECONNRESET", "EHOSTUNREACH", "ENETUNREACH", "EPIPE"].includes(causeCode)) return "connection";
+    if (["ETIMEDOUT", "UND_ERR_CONNECT_TIMEOUT", "UND_ERR_HEADERS_TIMEOUT"].includes(causeCode)) return "timeout";
+    if (["ERR_TLS_CERT_ALTNAME_INVALID", "ERR_TLS_CERT_SIGNATURE_ALGORITHM_UNSUPPORTED", "CERT_HAS_EXPIRED", "UNABLE_TO_VERIFY_LEAF_SIGNATURE"].includes(causeCode)) return "tls";
+    return error?.cause ? "other" : "not_available";
+}
+
 function fetchFailure(code, error, signal) {
     const errorName = error?.name;
     const transportErrorClass = signal?.aborted || errorName === "AbortError" ? "abort"
         : errorName === "TypeError" ? "type_error"
             : errorName === "Error" ? "error" : "other";
-    return Object.assign(failure(code), { transportErrorClass });
+    return Object.assign(failure(code), { transportErrorClass, transportCauseClass: transportCauseClass(error) });
 }
 
 // The caller's complete operation (including parsing and validation) runs within
