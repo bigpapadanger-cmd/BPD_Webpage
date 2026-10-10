@@ -326,6 +326,77 @@ ACCOUNT CARD
 }
 
 /* =========================================================
+DANGER ZONE
+========================================================= */
+
+.account-card--danger {
+    border-color: rgba(255, 90, 110, 0.2);
+}
+
+.account-card__title--danger {
+    color: #ffd6dc;
+}
+
+.account-danger {
+    padding: 20px;
+    border-bottom: 1px solid rgba(255, 90, 110, 0.12);
+}
+
+.account-danger:last-child {
+    border-bottom: 0;
+}
+
+.account-danger__content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+}
+
+.account-danger__details {
+    min-width: 0;
+}
+
+.account-danger__title {
+    margin: 0;
+    color: #f4f5f8;
+    font-size: 0.96rem;
+    font-weight: 700;
+}
+
+.account-danger__description {
+    max-width: 760px;
+    margin: 7px 0 0;
+    color: #aeb5c3;
+    font-size: 0.82rem;
+    line-height: 1.5;
+}
+
+.account-danger__actions {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 8px;
+}
+
+.account-button--danger {
+    border-color: rgba(255, 90, 110, 0.4);
+    background: rgba(255, 90, 110, 0.08);
+    color: #ffd6dc;
+}
+
+.account-button--danger:hover:not(:disabled),
+.account-button--danger:focus-visible:not(:disabled) {
+    border-color: rgba(255, 90, 110, 0.7);
+    background: rgba(255, 90, 110, 0.16);
+}
+
+.account-button--danger:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+}
+
+/* =========================================================
 PROFILE FORM
 ========================================================= */
 
@@ -1194,6 +1265,21 @@ SMALL VIEWPORTS
         align-items: flex-start;
         flex-direction: column;
         gap: 6px;
+    }
+
+    .account-danger {
+        padding: 16px;
+    }
+
+    .account-danger__content {
+        align-items: stretch;
+        flex-direction: column;
+        gap: 14px;
+    }
+
+    .account-danger__actions,
+    .account-danger__actions .account-button {
+        width: 100%;
     }
 }
 

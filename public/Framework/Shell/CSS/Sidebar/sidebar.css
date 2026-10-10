@@ -189,6 +189,16 @@ body.sidebar-collapsed
     content: none;
 }
 
+/* Rocket League keeps its toggle and navigation in one route fragment
+ * wrapper; give that wrapper the same shell-owned two-row frame. */
+.site-sidebar > .sidebar-view {
+    display: grid;
+    grid-row: 1 / -1;
+    grid-template-rows: auto minmax(0, 1fr);
+    min-height: 0;
+    height: 100%;
+}
+
 /* =========================================================
 ATTACHED TOGGLE HEADER
 ========================================================= */
@@ -1058,9 +1068,9 @@ body.sidebar-collapsed .site-sidebar .nav-item {
 }
 
 body.sidebar-collapsed .site-sidebar .nav-icon {
-    flex-basis: calc(var(--sidebar-collapsed-width) - 4px);
-    width: calc(var(--sidebar-collapsed-width) - 4px);
-    min-width: calc(var(--sidebar-collapsed-width) - 4px);
+    flex-basis: 100%;
+    width: 100%;
+    min-width: 100%;
 }
 
 /* =========================================================
