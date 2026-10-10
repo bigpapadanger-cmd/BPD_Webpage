@@ -2,9 +2,10 @@ import assert from "node:assert/strict";
 import { readFile, readdir } from "node:fs/promises";
 import test from "node:test";
 
-import { getSystemStatus, performSystemStatusAction, runScheduledAdminHealthChecks, updateMmrBuildConfiguration } from "../../functions/services/admin/system_status.js";
+import { getMmrProtocolDiagnostics, getSystemStatus, performSystemStatusAction, runScheduledAdminHealthChecks, updateMmrBuildConfiguration } from "../../functions/services/admin/system_status.js";
 import { getPermissionsForDiscordRoles, ADMIN_PERMISSIONS } from "../../functions/services/admin/permissions.js";
 import { onRequestGet, onRequestPost } from "../../functions/api/admin/system-status.js";
+import { onRequestGet as onMmrProtocolGet } from "../../functions/api/admin/system-status/mmr-protocol.js";
 import { getMmrControlModel } from "../../public/Global/Admin/WorkerStatus/JS/mmr_controls.js";
 import { ROCKET_LEAGUE_CAPABILITIES, ROCKET_LEAGUE_CAPABILITY_CATEGORIES } from "../../public/Global/Admin/WorkerStatus/JS/rocket_league_capabilities.js";
 import customRuntime from "../../workers/bpd-custom-match-runtime/src/index.js";
@@ -208,6 +209,36 @@ test("system health cache includes protected MMR readiness without starting MMR 
         assert.equal(calls.mmr, 1);
         assert.equal(JSON.stringify(first).includes("lookup-key"), false);
     } finally { restore(); }
+});
+
+test("MMR protocol diagnostics proxy uses Admin authorization and allowlists source fields", async () => {
+    const { env } = createEnv();
+    let observed;
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async (input, init = {}) => {
+        const url = new URL(input);
+        observed = { pathname: url.pathname, authorization: init.headers?.Authorization };
+        return Response.json({
+            effectiveSecretSource: "runtime_persisted", runtimeSecretConfigured: true,
+            cloudflareSecretConfigured: true, secretSourcesMatch: false,
+            buildSecret: "should-not-cross-boundary", token: "should-not-cross-boundary"
+        });
+    };
+    try {
+        const result = await getMmrProtocolDiagnostics(env);
+        assert.deepEqual(result, {
+            effectiveSecretSource: "runtime_persisted", runtimeSecretConfigured: true,
+            cloudflareSecretConfigured: true, secretSourcesMatch: false
+        });
+        assert.deepEqual(observed, { pathname: "/admin/protocol", authorization: "Bearer admin-key" });
+        assert.doesNotMatch(JSON.stringify(result), /should-not-cross-boundary/);
+    } finally { globalThis.fetch = originalFetch; }
+});
+
+test("MMR protocol diagnostics route requires the existing Admin permission", async () => {
+    const response = await onMmrProtocolGet({ request: new Request("https://site.example.test/api/admin/system-status/mmr-protocol"), env: {} });
+    assert.equal(response.status, 503);
+    assert.deepEqual(await response.json(), { success: false, error: "AUTHORIZATION_UNAVAILABLE" });
 });
 
 test("provider runtime health uses the private Service Binding and exposes only its safe contract", async () => {

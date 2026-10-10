@@ -499,6 +499,16 @@ function makeDetails(service) {
         diagnostics.innerHTML = "<summary>Protocol Diagnostics &amp; Legacy Route Usage</summary>";
         const usageList = document.createElement("ul");
         usageList.className = "system-diagnostic-list";
+        const protocolDiagnostics = service.protocolDiagnostics;
+        if (!protocolDiagnostics) usageList.append(textElement("li", "Secret-source diagnostics unavailable; no source conclusion was made."));
+        else {
+            usageList.append(
+                textElement("li", `effectiveSecretSource: ${protocolDiagnostics.effectiveSecretSource || "unknown"}`),
+                textElement("li", `runtimeSecretConfigured: ${protocolDiagnostics.runtimeSecretConfigured === true ? "true" : "false"}`),
+                textElement("li", `cloudflareSecretConfigured: ${protocolDiagnostics.cloudflareSecretConfigured === true ? "true" : "false"}`),
+                textElement("li", `secretSourcesMatch: ${typeof protocolDiagnostics.secretSourcesMatch === "boolean" ? protocolDiagnostics.secretSourcesMatch : "unknown"}`)
+            );
+        }
         const usage = service.routeUsage;
         if (!usage) usageList.append(textElement("li", "Unavailable in this Worker isolate; this is not confirmed zero usage."));
         else {
@@ -653,8 +663,17 @@ async function loadRouteDiagnostics() {
 async function loadStatus() {
     if (requestInFlight) return requestInFlight;
     requestInFlight = (async () => {
-        const { response, payload } = await boundedJson("/api/admin/system-status", { credentials: "same-origin", cache: "no-store", headers: { Accept: "application/json" } });
+        const [{ response, payload }, protocolResponse] = await Promise.all([
+            boundedJson("/api/admin/system-status", { credentials: "same-origin", cache: "no-store", headers: { Accept: "application/json" } }),
+            fetch("/api/admin/system-status/mmr-protocol", { credentials: "same-origin", cache: "no-store", headers: { Accept: "application/json" } }).catch(() => null)
+        ]);
         if (!response.ok || payload.success !== true || !Array.isArray(payload.services)) throw new Error("Status unavailable");
+        const protocolPayload = protocolResponse?.ok ? await protocolResponse.json().catch(() => null) : null;
+        const protocolDiagnostics = protocolPayload?.success === true ? protocolPayload.protocolDiagnostics : null;
+        if (protocolDiagnostics) {
+            const mmrService = payload.services.find(service => service.id === "mmr-api");
+            if (mmrService) mmrService.protocolDiagnostics = protocolDiagnostics;
+        }
         const groups = document.getElementById("workerStatusGroups");
         const previousGroups = new Map([...groups.querySelectorAll(".worker-status-group")].map(group => [group.dataset.status, { open: group.open, count: Number(group.dataset.count) || 0 }]));
         const statusNames = { healthy: "Healthy", degraded: "Degraded", unavailable: "Unavailable", disabled: "Disabled", unknown: "Unknown" };

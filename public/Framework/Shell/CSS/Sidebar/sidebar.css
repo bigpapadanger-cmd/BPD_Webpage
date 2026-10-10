@@ -124,25 +124,7 @@ SIDEBAR CONTAINER
             --sidebar-width
         );
 
-    height:
-        calc(
-            100vh
-            - var(--app-top-offset)
-            - max(
-                var(--app-bottom-gap),
-                env(safe-area-inset-bottom)
-            )
-        );
-
-    height:
-        calc(
-            100dvh
-            - var(--app-top-offset)
-            - max(
-                var(--app-bottom-gap),
-                env(safe-area-inset-bottom)
-            )
-        );
+    height: var(--app-content-height);
 
     min-height: 0;
     max-height: none;
@@ -1068,9 +1050,10 @@ body.sidebar-collapsed .site-sidebar .nav-item {
 }
 
 body.sidebar-collapsed .site-sidebar .nav-icon {
-    flex-basis: 100%;
-    width: 100%;
-    min-width: 100%;
+    flex: 0 0 var(--sidebar-collapsed-width);
+    width: var(--sidebar-collapsed-width);
+    min-width: var(--sidebar-collapsed-width);
+    height: var(--sidebar-row-height);
 }
 
 /* =========================================================

@@ -430,6 +430,30 @@ function normalizeMmrHealth(payload, responseTimeMs, adminConfigured) {
 
 function safeBuildValue(value, pattern) { return typeof value === "string" && pattern.test(value) ? value : null; }
 
+function normalizeMmrProtocolDiagnostics(payload) {
+    const effectiveSecretSource = ["runtime_persisted", "cloudflare_fallback", "missing"].includes(payload?.effectiveSecretSource)
+        ? payload.effectiveSecretSource
+        : "unknown";
+    return {
+        effectiveSecretSource,
+        runtimeSecretConfigured: payload?.runtimeSecretConfigured === true,
+        cloudflareSecretConfigured: payload?.cloudflareSecretConfigured === true,
+        secretSourcesMatch: typeof payload?.secretSourcesMatch === "boolean" ? payload.secretSourcesMatch : null
+    };
+}
+
+async function readMmrProtocolDiagnostics(endpoint, adminKey) {
+    if (!adminKey) return null;
+    try {
+        const response = await timedFetch(signal => fetch(new URL("/admin/protocol", endpoint), {
+            method: "GET", redirect: "manual", signal,
+            headers: { Authorization: `Bearer ${adminKey}`, Accept: "application/json" }
+        }));
+        if (!response.ok) return null;
+        return normalizeMmrProtocolDiagnostics(await readSmallJson(response, 4096));
+    } catch { return null; }
+}
+
 async function checkMmrApi(env) {
     const endpoint = String(env?.MMR_API_URL || "").trim();
     const apiKey = String(env?.MMR_API_KEY || "").trim();
@@ -446,6 +470,13 @@ async function checkMmrApi(env) {
     } catch (error) {
         return statusEntry("mmr-api", "MMR API", healthTimedOut(error) ? "down" : "unknown", healthTimedOut(error) ? "Readiness check timed out." : "Readiness check failed.", { actions: ["recheck"], responseTimeMs: Date.now() - startedAt, supportsBuildUpdate: adminConfigured });
     }
+}
+
+export async function getMmrProtocolDiagnostics(env) {
+    const endpoint = String(env?.MMR_API_URL || "").trim();
+    const adminKey = String(env?.MMR_ADMIN_API_KEY || "").trim();
+    if (!endpoint || !adminKey) return null;
+    return await readMmrProtocolDiagnostics(endpoint, adminKey);
 }
 
 async function runChecks(env) {

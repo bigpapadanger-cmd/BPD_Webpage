@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-10T00:58:40.738Z",
+  "generatedAt": "2026-10-10T01:25:15.852Z",
   "policy": {
     "humanPagePaths": "case-insensitive lookup; canonical TitleCase path",
     "apiAndAssetPaths": "exact-case; never normalized by the human-page router",
@@ -1765,6 +1765,22 @@
       "methods": [
         "GET",
         "POST"
+      ],
+      "authRequired": "handler-defined",
+      "healthStatus": "valid",
+      "deepLinkSupported": false
+    },
+    {
+      "path": "/api/admin/system-status/mmr-protocol",
+      "lookupKey": null,
+      "routeType": "api",
+      "casePolicy": "exact",
+      "sourceFiles": [
+        "functions/api/admin/system-status/mmr-protocol.js"
+      ],
+      "handler": "functions/api/admin/system-status/mmr-protocol.js",
+      "methods": [
+        "GET"
       ],
       "authRequired": "handler-defined",
       "healthStatus": "valid",
