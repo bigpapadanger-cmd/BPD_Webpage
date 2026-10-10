@@ -1,7 +1,7 @@
 {
     "name": "bpd-webpage",
 
-    "compatibility_date": "2026-09-16",
+    "compatibility_date": "2026-10-10",
 
     "pages_build_output_dir": "./.wrangler/public-build",
 

@@ -81,7 +81,8 @@ not raw UUIDs. Do not rotate the account-key derivation secret as ordinary
 signing-key rotation: doing so changes object addressing and requires a separate
 revocation/migration plan.
 
-Future configuration, **not provisioned or enabled by this pass**:
+Future configuration, **not provisioned or enabled by this pass**
+
 
 - Pages secret `RL_PROBE_ACCOUNT_KEY_SECRET`: stable opaque-key derivation,
   64–256 characters, no whitespace.
