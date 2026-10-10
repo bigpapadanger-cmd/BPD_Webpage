@@ -129,6 +129,26 @@ test("missing service role, provider failures, oversized and malformed body fail
         await assert.rejects(callCustomMatchRpc(env, "detail", {}), error => !/private|test-service/.test(error.message));
     }
 });
+test("Supabase failure diagnostics are bounded and never include credentials or payloads", async () => {
+    const warnings = [];
+    const originalWarn = console.warn;
+    console.warn = (...args) => warnings.push(args);
+    globalThis.fetch = async () => Response.json({ message: "raw-provider-secret-marker" }, { status: 401 });
+    try {
+        await assert.rejects(callCustomMatchRpc({
+            SUPABASE_URL: env.SUPABASE_URL,
+            SUPABASE_SERVICE_ROLE_KEY: "test-build-secret-marker"
+        }, "limits", { playerId: "private-player-marker" }));
+    } finally {
+        console.warn = originalWarn;
+    }
+    assert.equal(warnings.length, 1);
+    const diagnostic = JSON.stringify(warnings[0]);
+    assert.match(diagnostic, /custom_match_supabase_rpc_failure/);
+    assert.match(diagnostic, /upstream_response/);
+    assert.match(diagnostic, /401/);
+    assert.doesNotMatch(diagnostic, /test-build-secret-marker|private-player-marker|raw-provider-secret-marker|db\.example|SUPABASE_SERVICE_ROLE_KEY/);
+});
 test("start and voting unavailable until their security authorities exist", async () => {
     globalThis.fetch = () => { throw new Error("must not fetch"); };
     await assert.rejects(executeCustomMatchOperation(new Request("https://site.example"), env, "action", { ...versioned, action: "start", payload: {} }), { code: "CUSTOM_MATCH_RUNTIME_REQUIRED" });
