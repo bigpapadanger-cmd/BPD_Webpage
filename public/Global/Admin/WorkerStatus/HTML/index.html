@@ -23,6 +23,14 @@
         </div>
     </details>
     <p id="rlForceRefreshMessage" role="status" aria-live="polite" hidden></p>
+    <details id="rlStagingIsolationPanel" class="rl-staging-isolation" hidden>
+        <summary>Temporary Rocket League session isolation test <span class="admin-accordion-meta">Staging only · synthetic identities</span></summary>
+        <div class="admin-accordion-body">
+            <p>This test uses two fixed synthetic identities and the isolated staging Worker. It does not use Epic credentials or contact PsyNet. It performs a staging-wide revocation as its final security check.</p>
+            <button id="rlStagingIsolationRun" type="button">Run staging isolation test</button>
+            <p id="rlStagingIsolationResult" role="status" aria-live="polite"></p>
+        </div>
+    </details>
     <details id="rocketLeagueForceRefresh" class="rl-force-refresh" data-admin-accordion hidden>
         <summary><span id="rlForceRefreshTitle">Force Rocket League Refresh</span><span class="admin-accordion-meta">Manual provider request</span></summary>
         <div class="admin-accordion-body">

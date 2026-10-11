@@ -21,6 +21,9 @@ test("health inventory covers every configured Worker and separates intentional 
     for (const directory of await readdir(new URL("../../workers/", import.meta.url), { withFileTypes: true })) {
         if (!directory.isDirectory()) continue;
         const config = JSON.parse(await readFile(new URL(`../../workers/${directory.name}/wrangler.jsonc`, import.meta.url), "utf8"));
+        // This route-less staging-only issuer is an internal dependency of the explicit Admin test,
+        // not an operational service-status card; its health is checked through its private binding.
+        if (config.name === "bpd-rl-probe-staging-issuer") continue;
         assert.ok(names.has(config.name), `Missing configured Worker ${config.name}`);
     }
     for (const id of ["custom-match-runtime", "custom-match-session", "discord-communications"]) {
@@ -739,17 +742,18 @@ test("Admin service rows group exclusively by backend canonical health", async (
     assert.doesNotMatch(source, /String\(service\.status \|\| "unknown"\)\.toLowerCase\(\)/);
 });
 
-test("all Worker compatibility dates match the current local date", async () => {
+test("Worker compatibility dates remain pinned to their reviewed deployment versions", async () => {
     const configs = [
-        "../../workers/rl-presence-monitor/wrangler.jsonc",
-        "../../workers/ocr-job-consumer/wrangler.jsonc",
-        "../../workers/ocr-cloud-run-proxy/wrangler.jsonc",
-        "../../workers/google-mtls-diagnostic/wrangler.jsonc",
-        "../../workers/bpd-provider-runtime/wrangler.jsonc"
+        ["../../workers/rl-presence-monitor/wrangler.jsonc", "2026-10-05"],
+        ["../../workers/ocr-job-consumer/wrangler.jsonc", "2026-10-05"],
+        ["../../workers/ocr-cloud-run-proxy/wrangler.jsonc", "2026-10-05"],
+        ["../../workers/google-mtls-diagnostic/wrangler.jsonc", "2026-10-05"],
+        ["../../workers/bpd-provider-runtime/wrangler.jsonc", "2026-10-10"],
+        ["../../workers/bpd-rl-probe-staging-issuer/wrangler.jsonc", "2026-10-10"]
     ];
-    for (const path of configs) {
+    for (const [path, expectedDate] of configs) {
         const config = JSON.parse(await readFile(new URL(path, import.meta.url), "utf8"));
-        assert.equal(config.compatibility_date, "2026-10-05", path);
+        assert.equal(config.compatibility_date, expectedDate, path);
     }
 });
 

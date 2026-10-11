@@ -1699,6 +1699,23 @@ export const API_ROUTE_INVENTORY = Object.freeze([
     "deepLinkSupported": false
   },
   {
+    "path": "/api/admin/rocketleague/staging-isolation-test",
+    "lookupKey": null,
+    "routeType": "api",
+    "casePolicy": "exact",
+    "sourceFiles": [
+      "functions/api/admin/rocketleague/staging-isolation-test.js"
+    ],
+    "handler": "functions/api/admin/rocketleague/staging-isolation-test.js",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "authRequired": "handler-defined",
+    "healthStatus": "valid",
+    "deepLinkSupported": false
+  },
+  {
     "path": "/api/admin/suggestions/:suggestionId/review",
     "lookupKey": null,
     "routeType": "api",

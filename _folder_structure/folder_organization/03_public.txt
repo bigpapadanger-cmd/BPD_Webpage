@@ -87,7 +87,7 @@ public/Global/
 |   +-- MatchManagement/ CSS/index.css, HTML/index.html, JS/index.js (authenticated not-developed placeholder)
 |   +-- UserManagement/  CSS/index.css, HTML/index.html, JS/index.js; browser API requests use apiFetch
 |   +-- Shared/          CSS/accordion.css, JS/accordion.js and modal_focus.js; native disclosures, ARIA synchronization and nested modal focus/inert ownership
-|   +-- WorkerStatus/    CSS/index.css, HTML/index.html, JS/index.js, JS/mmr_controls.js, JS/rocket_league_capabilities.js; Admin-only Rocket League force refresh
+|   +-- WorkerStatus/    CSS/index.css, HTML/index.html, JS/index.js, JS/mmr_controls.js, JS/rocket_league_capabilities.js; Admin-only Rocket League force refresh and gate-hidden staging isolation panel
 |   +-- TaskBoard/
 |       +-- CSS/index.css, overlay.css
 |       +-- HTML/index.html, create_task.html, task_confirm.html,

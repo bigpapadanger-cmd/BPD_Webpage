@@ -78,6 +78,39 @@
     transition: background-color .15s ease, border-color .15s ease, transform .15s ease;
 }
 
+.worker-status .rl-staging-isolation {
+    margin-top: 16px;
+    border: 1px solid rgba(251, 191, 36, .35);
+    border-radius: 14px;
+    background: rgba(120, 76, 12, .12);
+}
+
+.worker-status .rl-staging-isolation > summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 14px;
+    align-items: center;
+    padding: 14px 16px;
+    color: #f7e7bb;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.worker-status .rl-staging-isolation .admin-accordion-body {
+    padding: 0 16px 16px;
+}
+
+.worker-status .rl-staging-isolation button:focus-visible,
+.worker-status .rl-staging-isolation summary:focus-visible {
+    outline: 3px solid #fbbf24;
+    outline-offset: 3px;
+}
+
+.worker-status .rl-staging-isolation button:disabled {
+    cursor: wait;
+    opacity: .65;
+}
+
 .worker-status button:hover:not(:disabled),
 .worker-status button:focus-visible {
     border-color: rgba(125, 211, 252, .62);

@@ -19,6 +19,7 @@
     "vars": {
         "DISCORD_COMMUNICATIONS_ENABLED": "true",
         "CUSTOM_MATCH_RUNTIME_ENABLED": "true",
+        "RL_PROBE_STAGING_TEST_ENABLED": "false",
         "OCR_API_URL": "https://bpd-ocr-y5wgeempka-uc.a.run.app/api/ocr",
         "OCR_JOB_PROCESS_URL": "https://bpd-gaming-network.com/api/ocr/jobs/process_job",
         "OCR_JOB_PROGRESS_URL": "https://bpd-gaming-network.com/api/ocr/jobs/progress",
@@ -77,6 +78,14 @@
         {
             "binding": "PROVIDER_RUNTIME",
             "service": "bpd-provider-runtime"
+        },
+        {
+            "binding": "RL_PROBE_STAGING_RUNTIME",
+            "service": "bpd-provider-runtime-staging"
+        },
+        {
+            "binding": "RL_PROBE_STAGING_ISSUER",
+            "service": "bpd-rl-probe-staging-issuer"
         },
         {
             "binding": "CUSTOM_MATCH_RUNTIME",

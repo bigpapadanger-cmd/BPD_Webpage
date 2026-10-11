@@ -35,6 +35,10 @@ workers/
 |   +-- src/discord_linked_role_nonce.js Separate transactional Linked Roles nonce DO; short-lived replay state only.
 |   +-- tests/discord.test.mjs Inventory completeness, sharding, validation, provider errors, and privacy tests.
 |   +-- tests/discord_nonce.test.mjs Atomic races, replay, expiry, binding mismatch and private dispatch tests.
++-- bpd-rl-probe-staging-issuer/
+|   +-- wrangler.jsonc       Private route-less staging assertion issuer; disabled by default.
+|   +-- src/index.js         Fixed synthetic slots; private signing and HMAC material stays in this Worker.
+|   +-- README.md            Staging trust boundary and secret placement.
 +-- bpd-discord-communications/
 |   +-- wrangler.jsonc       Private Service Binding Worker; disabled by default; Friday New York summary schedule.
 |   +-- src/index.js         Signed delivery/interaction operations and read-only signed /internal/health.

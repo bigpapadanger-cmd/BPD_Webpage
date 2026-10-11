@@ -51,6 +51,7 @@ functions/
 |   +-- admin/user-management/index.js, history.js, [targetAccountId].js
 |       +-- [targetAccountId]/actions.js, notes.js
 |   +-- admin/rocketleague/force-refresh.js, compatibility-probe.js (Admin-only; execution disabled)
+|   +-- admin/rocketleague/staging-isolation-test.js (temporary Admin-only fixed synthetic test; disabled by default)
 |   +-- notifications/index.js, [publicCode]/acknowledge.js (authenticated notification state API)
 |   +-- curseforge/mods.js
 |   +-- suggestions/index.js, [suggestionId]/vote.js

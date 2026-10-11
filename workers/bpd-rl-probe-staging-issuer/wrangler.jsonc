@@ -1,0 +1,15 @@
+{
+  "name": "bpd-rl-probe-staging-issuer",
+  "main": "src/index.js",
+  "compatibility_date": "2026-10-10",
+  "workers_dev": false,
+  "preview_urls": false,
+  "vars": {
+    "RL_PROBE_STAGING_ISSUER_ENABLED": "false",
+    "RL_PROBE_ISSUER": "bpd-provider-runtime-staging",
+    "RL_PROBE_KEY_VERSION": "staging-v1"
+  },
+  "observability": {
+    "logs": { "enabled": false, "invocation_logs": false, "persist": false }
+  }
+}

@@ -22,6 +22,7 @@ let authorizationPollTimer = null;
 let authorizationActive = false;
 let buildApproval = null;
 let initializationGeneration = 0;
+let stagingIsolationInFlight = false;
 
 const ACTION_LABELS = {
     recheck: "Recheck", "refresh-eos": "Refresh EOS", "reauthorize-account": "Reauthorize Account",
@@ -782,6 +783,7 @@ export async function initializePage() {
         if (generation !== initializationGeneration) return;
         if (!hasAdminPermission(REQUIRED_PERMISSION, auth)) { finishVerificationNotice(message, "You do not have permission to view worker status."); return; }
         if (content) content.hidden = false;
+        await initializeStagingIsolationPanel();
         canDeployMmr = hasAdminPermission(DEPLOY_PERMISSION, auth);
         canForceRocketLeagueRefresh = hasAdminPermission(RL_FORCE_REFRESH_PERMISSION, auth);
         const forceRefreshPanel = document.getElementById("rocketLeagueForceRefresh");
@@ -798,4 +800,44 @@ export async function initializePage() {
         await Promise.all([loadStatus(), loadRouteDiagnostics()]);
         await loadDeploymentStatus();
     } catch { finishVerificationNotice(message, "Status is unavailable. Please retry later."); }
+}
+
+async function initializeStagingIsolationPanel() {
+    const panel = document.getElementById("rlStagingIsolationPanel");
+    const button = document.getElementById("rlStagingIsolationRun");
+    const result = document.getElementById("rlStagingIsolationResult");
+    if (!panel || !button || !result) return;
+    panel.hidden = true;
+    button.onclick = null;
+    try {
+        const response = await fetch("/api/admin/rocketleague/staging-isolation-test", {
+            credentials: "same-origin", cache: "no-store", headers: { Accept: "application/json" }
+        });
+        const payload = await response.json();
+        if (!response.ok || payload.success !== true || payload.enabled !== true) return;
+        panel.hidden = false;
+        button.onclick = async () => {
+            if (stagingIsolationInFlight) return;
+            const confirmed = window.confirm("Run the staging-only test for two fixed synthetic identities? It will test concurrent handoffs, replay and account isolation, then globally revoke staging probe sessions. No Epic or PsyNet requests will be made.");
+            if (!confirmed) return;
+            stagingIsolationInFlight = true;
+            button.disabled = true;
+            result.textContent = "Running isolated staging checks…";
+            try {
+                const run = await fetch("/api/admin/rocketleague/staging-isolation-test", {
+                    method: "POST", credentials: "same-origin", cache: "no-store",
+                    headers: { "Content-Type": "application/json", Accept: "application/json" },
+                    body: JSON.stringify({ confirmation: "RUN_STAGING_ISOLATION_TEST" })
+                });
+                const outcome = await run.json();
+                if (!run.ok || outcome.success !== true) throw new Error(outcome.code || "STAGING_TEST_FAILED");
+                result.textContent = `Complete. Concurrent one-time use: ${outcome.concurrentHandoff === true ? "passed" : "failed"}; replay denial: ${outcome.replayDenied === true ? "passed" : "failed"}; cross-account rejection: ${outcome.crossAccountRejected === true ? "passed" : "failed"}; independent invalidation: ${outcome.independentInvalidation === true ? "passed" : "failed"}; global revocation: ${outcome.globalRevocation === true ? "passed" : "failed"}.`;
+            } catch (error) {
+                result.textContent = `Test did not complete (${/^[A-Z0-9_]+$/u.test(error?.message) ? error.message : "STAGING_TEST_UNAVAILABLE"}). Check protected Worker diagnostics before retrying.`;
+            } finally {
+                stagingIsolationInFlight = false;
+                button.disabled = false;
+            }
+        };
+    } catch { /* Absent, disabled or unreachable staging setup keeps the temporary panel hidden. */ }
 }
