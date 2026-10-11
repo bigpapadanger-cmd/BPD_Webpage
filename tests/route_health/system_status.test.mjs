@@ -742,19 +742,27 @@ test("Admin service rows group exclusively by backend canonical health", async (
     assert.doesNotMatch(source, /String\(service\.status \|\| "unknown"\)\.toLowerCase\(\)/);
 });
 
-test("Worker compatibility dates remain pinned to their reviewed deployment versions", async () => {
+test("Wrangler compatibility dates match the reviewed baseline with the staging issuer exception", async () => {
     const configs = [
-        ["../../workers/rl-presence-monitor/wrangler.jsonc", "2026-10-05"],
-        ["../../workers/ocr-job-consumer/wrangler.jsonc", "2026-10-05"],
-        ["../../workers/ocr-cloud-run-proxy/wrangler.jsonc", "2026-10-05"],
-        ["../../workers/google-mtls-diagnostic/wrangler.jsonc", "2026-10-05"],
+        ["../../workers/rl-presence-monitor/wrangler.jsonc", "2026-10-10"],
+        ["../../workers/ocr-job-consumer/wrangler.jsonc", "2026-10-10"],
+        ["../../workers/ocr-cloud-run-proxy/wrangler.jsonc", "2026-10-10"],
+        ["../../workers/google-mtls-diagnostic/wrangler.jsonc", "2026-10-10"],
+        ["../../workers/bpd-discord-communications/wrangler.jsonc", "2026-10-10"],
+        ["../../workers/bpd-custom-match-runtime/wrangler.jsonc", "2026-10-10"],
         ["../../workers/bpd-provider-runtime/wrangler.jsonc", "2026-10-10"],
-        ["../../workers/bpd-rl-probe-staging-issuer/wrangler.jsonc", "2026-10-10"]
+        ["../../workers/bpd-provider-runtime/wrangler.staging.jsonc", "2026-10-10"],
+        ["../../workers/bpd-rl-probe-staging-issuer/wrangler.jsonc", "2026-10-11"]
     ];
     for (const [path, expectedDate] of configs) {
         const config = JSON.parse(await readFile(new URL(path, import.meta.url), "utf8"));
         assert.equal(config.compatibility_date, expectedDate, path);
     }
+    const pages = JSON.parse(await readFile(new URL("../../wrangler.jsonc", import.meta.url), "utf8"));
+    assert.equal(pages.compatibility_date, "2026-10-10", "Pages JSONC");
+    const pagesToml = await readFile(new URL("../../wrangler.toml", import.meta.url), "utf8");
+    assert.match(pagesToml, /^compatibility_date = "2026-10-10"$/mu, "Pages default TOML");
+    assert.match(pagesToml, /^\[env\.production\][\s\S]*?^compatibility_date = "2026-10-10"$/mu, "Pages production TOML");
 });
 
 test("service action allowlist rejects arbitrary service/action combinations", async () => {

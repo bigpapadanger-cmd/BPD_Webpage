@@ -40,3 +40,5 @@ AGENTS
 # GitHub source, and deployment inputs.
 /Notes/supabase/suggestions/
 /functions/services/supabase/suggestions/sql/
+
+bpd-rl-staging-jwks.json
