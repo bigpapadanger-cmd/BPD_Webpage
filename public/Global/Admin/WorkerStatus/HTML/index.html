@@ -27,7 +27,10 @@
         <summary>Temporary Rocket League session isolation test <span class="admin-accordion-meta">Staging only · synthetic identities</span></summary>
         <div class="admin-accordion-body">
             <p>This test uses two fixed synthetic identities and the isolated staging Worker. It does not use Epic credentials or contact PsyNet. It performs a staging-wide revocation as its final security check.</p>
-            <button id="rlStagingIsolationRun" type="button">Run staging isolation test</button>
+            <p>Check staging connectivity without creating sessions or issuing assertions.</p>
+            <button id="rlStagingConnectivityCheck" type="button">Check staging connectivity</button>
+            <p id="rlStagingConnectivityResult" role="status" aria-live="polite"></p>
+            <button id="rlStagingIsolationRun" type="button" hidden>Run staging isolation test</button>
             <p id="rlStagingIsolationResult" role="status" aria-live="polite"></p>
         </div>
     </details>

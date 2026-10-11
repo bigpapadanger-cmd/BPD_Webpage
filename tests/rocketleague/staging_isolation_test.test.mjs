@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
-import { isLiveAdminHost, isSameOriginRequest, onRequestGet, onRequestPost, runStagingIsolationTest } from "../../functions/api/admin/rocketleague/staging-isolation-test.js";
+import { checkStagingConnectivity, isLiveAdminHost, isSafeHealthRead, isSameOriginRequest, onRequestGet, onRequestPost, runStagingIsolationTest } from "../../functions/api/admin/rocketleague/staging-isolation-test.js";
 import runtime from "../../workers/bpd-provider-runtime/src/index.js";
 import { RlProbeSecurityAuthority } from "../../workers/bpd-provider-runtime/src/rl_probe_authority.js";
 import { UserRocketLeagueSession } from "../../workers/bpd-provider-runtime/src/rl_user_session.js";
@@ -95,6 +95,55 @@ test("missing test gate fails closed without contacting either Worker binding", 
     pageEnv.RL_PROBE_STAGING_ISSUER.fetch = async () => { calls += 1; throw new Error("must not call"); };
     await assert.rejects(runStagingIsolationTest(pageEnv), /STAGING_TEST_DISABLED/u);
     assert.equal(calls, 0);
+});
+
+test("health check authenticates both staging bindings while all execution gates remain disabled", async () => {
+    const { pageEnv, workerEnv, issuerEnv, sessions } = await stagingFixture({ enabled: false });
+    workerEnv.RL_PROBE_SECURITY_ENABLED = "false";
+    issuerEnv.RL_PROBE_STAGING_ISSUER_ENABLED = "false";
+    const requests = [];
+    for (const name of ["RL_PROBE_STAGING_RUNTIME", "RL_PROBE_STAGING_ISSUER"]) {
+        const service = pageEnv[name];
+        const fetch = service.fetch;
+        service.fetch = request => {
+            requests.push({ binding: name, method: request.method, path: new URL(request.url).pathname,
+                hasAuthorization: request.headers.has("Authorization") });
+            return fetch(request);
+        };
+    }
+    const result = await checkStagingConnectivity(pageEnv);
+    assert.deepEqual(result, { success: true, runtime: "authenticated", issuer: "authenticated" });
+    assert.deepEqual(requests.map(({ binding, method, path, hasAuthorization }) => ({ binding, method, path, hasAuthorization })), [
+        { binding: "RL_PROBE_STAGING_RUNTIME", method: "GET", path: "/internal/health", hasAuthorization: true },
+        { binding: "RL_PROBE_STAGING_ISSUER", method: "GET", path: "/internal/health", hasAuthorization: true }
+    ]);
+    assert.equal(sessions.size, 0);
+    assert.equal(workerEnv.RL_PROBE_SECURITY_ENABLED, "false");
+    assert.equal(issuerEnv.RL_PROBE_STAGING_ISSUER_ENABLED, "false");
+});
+
+test("health check sanitizes caller-auth failures and does not call a binding with invalid credentials", async () => {
+    const { pageEnv } = await stagingFixture({ enabled: false });
+    pageEnv.RL_PROBE_STAGING_RUNTIME_CALLER_SECRET = "wrong-secret".padEnd(64, "x");
+    let runtimeCalls = 0;
+    const runtimeFetch = pageEnv.RL_PROBE_STAGING_RUNTIME.fetch;
+    pageEnv.RL_PROBE_STAGING_RUNTIME.fetch = request => { runtimeCalls += 1; return runtimeFetch(request); };
+    const result = await checkStagingConnectivity(pageEnv);
+    assert.deepEqual(result, { success: true, runtime: "unavailable", issuer: "authenticated" });
+    assert.equal(runtimeCalls, 1);
+    assert.equal(JSON.stringify(result).includes("wrong-secret"), false);
+});
+
+test("health read rejects cross-site requests and mismatched Origins", () => {
+    assert.equal(isSafeHealthRead(new Request("https://bpd-gaming-network.com/health", {
+        headers: { Origin: "https://bpd-gaming-network.com", "Sec-Fetch-Site": "same-origin" }
+    })), true);
+    assert.equal(isSafeHealthRead(new Request("https://bpd-gaming-network.com/health", {
+        headers: { Origin: "https://attacker.example", "Sec-Fetch-Site": "cross-site" }
+    })), false);
+    assert.equal(isSafeHealthRead(new Request("https://bpd-gaming-network.com/health", {
+        headers: { "Sec-Fetch-Site": "cross-site" }
+    })), false);
 });
 
 test("Cloudflare config isolates the staging binding and keeps every new gate off", async () => {

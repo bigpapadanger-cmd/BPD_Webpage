@@ -806,16 +806,33 @@ async function initializeStagingIsolationPanel() {
     const panel = document.getElementById("rlStagingIsolationPanel");
     const button = document.getElementById("rlStagingIsolationRun");
     const result = document.getElementById("rlStagingIsolationResult");
-    if (!panel || !button || !result) return;
-    panel.hidden = true;
+    const healthButton = document.getElementById("rlStagingConnectivityCheck");
+    const healthResult = document.getElementById("rlStagingConnectivityResult");
+    if (!panel || !button || !result || !healthButton || !healthResult) return;
+    panel.hidden = false;
+    button.hidden = true;
     button.onclick = null;
+    healthButton.onclick = async () => {
+        healthButton.disabled = true;
+        healthResult.textContent = "Checking staging Worker authentication…";
+        try {
+            const response = await fetch("/api/admin/rocketleague/staging-isolation-test?health=1", {
+                credentials: "same-origin", cache: "no-store", headers: { Accept: "application/json" }
+            });
+            const payload = await response.json();
+            if (!response.ok || payload.success !== true) throw new Error("STAGING_HEALTH_UNAVAILABLE");
+            healthResult.textContent = `Runtime: ${payload.runtime === "authenticated" ? "connected and authenticated" : "unavailable"}. Issuer: ${payload.issuer === "authenticated" ? "connected and authenticated" : "unavailable"}. No assertions or sessions were created.`;
+        } catch {
+            healthResult.textContent = "Staging health check unavailable. No assertions or sessions were created.";
+        } finally { healthButton.disabled = false; }
+    };
     try {
         const response = await fetch("/api/admin/rocketleague/staging-isolation-test", {
             credentials: "same-origin", cache: "no-store", headers: { Accept: "application/json" }
         });
         const payload = await response.json();
         if (!response.ok || payload.success !== true || payload.enabled !== true) return;
-        panel.hidden = false;
+        button.hidden = false;
         button.onclick = async () => {
             if (stagingIsolationInFlight) return;
             const confirmed = window.confirm("Run the staging-only test for two fixed synthetic identities? It will test concurrent handoffs, replay and account isolation, then globally revoke staging probe sessions. No Epic or PsyNet requests will be made.");
@@ -839,5 +856,5 @@ async function initializeStagingIsolationPanel() {
                 button.disabled = false;
             }
         };
-    } catch { /* Absent, disabled or unreachable staging setup keeps the temporary panel hidden. */ }
+    } catch { /* Keep the health check visible; the synthetic test remains hidden unless readiness succeeds. */ }
 }

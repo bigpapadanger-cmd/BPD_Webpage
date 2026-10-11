@@ -18,6 +18,12 @@ export function isSameOriginRequest(request) {
         && request.headers.get("sec-fetch-site") !== "cross-site";
 }
 
+export function isSafeHealthRead(request) {
+    const origin = request.headers.get("origin");
+    return request.headers.get("sec-fetch-site") !== "cross-site"
+        && (!origin || origin === new URL(request.url).origin);
+}
+
 export function isLiveAdminHost(request) {
     const url = new URL(request.url);
     return url.protocol === "https:" && url.hostname.toLowerCase() === "bpd-gaming-network.com";
@@ -71,6 +77,23 @@ async function readiness(env) {
         return runtime.ok && runtime.payload?.success === true && issuer.ok && issuer.payload?.success === true
             && issuer.payload?.enabled === true;
     } catch { return false; }
+}
+
+async function authenticatedHealth(service, url, secret) {
+    try {
+        const response = await callService(service, url, secret);
+        return response.ok && response.payload?.success === true ? "authenticated" : "unavailable";
+    } catch { return "unavailable"; }
+}
+
+export async function checkStagingConnectivity(env) {
+    const [runtime, issuer] = await Promise.all([
+        authenticatedHealth(env.RL_PROBE_STAGING_RUNTIME,
+            "https://provider-runtime-staging.internal/internal/health", env.RL_PROBE_STAGING_RUNTIME_CALLER_SECRET),
+        authenticatedHealth(env.RL_PROBE_STAGING_ISSUER,
+            "https://rl-probe-issuer.internal/internal/health", env.RL_PROBE_STAGING_ISSUER_CALLER_SECRET)
+    ]);
+    return { success: true, runtime, issuer };
 }
 
 function assertResult(condition) {
@@ -200,6 +223,10 @@ export async function onRequestGet({ request, env }) {
     const denied = await authorize(request, env);
     if (denied) return denied;
     if (!isLiveAdminHost(request)) return json({ success: false, code: "NOT_FOUND" }, 404);
+    if (new URL(request.url).searchParams.get("health") === "1") {
+        if (!isSafeHealthRead(request)) return json({ success: false, code: "ORIGIN_REQUIRED" }, 403);
+        return json(await checkStagingConnectivity(env));
+    }
     const enabled = await readiness(env);
     return json({ success: true, enabled, code: enabled ? "STAGING_TEST_READY" : "STAGING_TEST_DISABLED" });
 }
