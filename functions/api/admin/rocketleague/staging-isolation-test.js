@@ -98,7 +98,7 @@ async function runtimeHealth(service, url, secret) {
             signal: controller.signal
         }));
         if (response.status === 401 || response.status === 403) {
-            return { status: "unavailable", failureCode: "AUTH_REJECTED" };
+            return { status: "unavailable", failureCode: `RUNTIME_HTTP_${response.status}` };
         }
         if (!response.ok) {
             return { status: "unavailable", failureCode: response.status === 404 ? "INVALID_RESPONSE" : "RUNTIME_ERROR" };

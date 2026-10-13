@@ -129,7 +129,7 @@ test("health check reports only an HTTP-confirmed caller-auth rejection", async 
     const runtimeFetch = pageEnv.RL_PROBE_STAGING_RUNTIME.fetch;
     pageEnv.RL_PROBE_STAGING_RUNTIME.fetch = request => { runtimeCalls += 1; return runtimeFetch(request); };
     const result = await checkStagingConnectivity(pageEnv);
-    assert.deepEqual(result, { success: true, runtime: "unavailable", runtimeFailureCode: "AUTH_REJECTED", issuer: "authenticated" });
+    assert.deepEqual(result, { success: true, runtime: "unavailable", runtimeFailureCode: "RUNTIME_HTTP_401", issuer: "authenticated" });
     assert.equal(runtimeCalls, 1);
     assert.equal(JSON.stringify(result).includes("wrong-secret"), false);
 });
@@ -137,8 +137,8 @@ test("health check reports only an HTTP-confirmed caller-auth rejection", async 
 test("Runtime health reports only confirmed authentication rejection and sanitized failure categories", async () => {
     const cases = [
         { name: "missing binding", configure: env => { env.RL_PROBE_STAGING_RUNTIME = undefined; }, expected: "BINDING_UNAVAILABLE" },
-        { name: "HTTP 401", configure: env => { env.RL_PROBE_STAGING_RUNTIME.fetch = async () => new Response("private body", { status: 401 }); }, expected: "AUTH_REJECTED" },
-        { name: "HTTP 403", configure: env => { env.RL_PROBE_STAGING_RUNTIME.fetch = async () => new Response("private body", { status: 403 }); }, expected: "AUTH_REJECTED" },
+        { name: "HTTP 401", configure: env => { env.RL_PROBE_STAGING_RUNTIME.fetch = async () => new Response("private body", { status: 401 }); }, expected: "RUNTIME_HTTP_401" },
+        { name: "HTTP 403", configure: env => { env.RL_PROBE_STAGING_RUNTIME.fetch = async () => new Response("private body", { status: 403 }); }, expected: "RUNTIME_HTTP_403" },
         { name: "missing health route", configure: env => { env.RL_PROBE_STAGING_RUNTIME.fetch = async () => new Response("private body", { status: 404 }); }, expected: "INVALID_RESPONSE" },
         { name: "malformed health payload", configure: env => { env.RL_PROBE_STAGING_RUNTIME.fetch = async () => new Response("private body", { status: 200 }); }, expected: "INVALID_RESPONSE" },
         { name: "upstream HTTP failure", configure: env => { env.RL_PROBE_STAGING_RUNTIME.fetch = async () => new Response("private body", { status: 503 }); }, expected: "RUNTIME_ERROR" },
@@ -167,7 +167,8 @@ test("non-auth HTTP failures are never classified as authentication rejection", 
     pageEnv.RL_PROBE_STAGING_RUNTIME.fetch = async () => new Response("private body", { status: 500 });
     const result = await checkStagingConnectivity(pageEnv);
     assert.equal(result.runtimeFailureCode, "RUNTIME_ERROR");
-    assert.notEqual(result.runtimeFailureCode, "AUTH_REJECTED");
+    assert.notEqual(result.runtimeFailureCode, "RUNTIME_HTTP_401");
+    assert.notEqual(result.runtimeFailureCode, "RUNTIME_HTTP_403");
 });
 
 test("health read rejects cross-site requests and mismatched Origins", () => {
