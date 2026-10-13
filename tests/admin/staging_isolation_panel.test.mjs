@@ -23,6 +23,10 @@ test("panel is initialized only after Admin permission and posts an explicit sam
     assert.ok(permissionCheck >= 0 && panelInitialization > permissionCheck);
     assert.match(js, /\/api\/admin\/rocketleague\/staging-isolation-test/u);
     assert.match(js, /staging-isolation-test\?health=1/u);
+    assert.match(js, /payload\.runtimeFailureCode/u);
+    for (const code of ["AUTH_REJECTED", "BINDING_UNAVAILABLE", "TIMEOUT", "INVALID_RESPONSE", "RUNTIME_ERROR"]) {
+        assert.match(js, new RegExp(code, "u"));
+    }
     assert.match(js, /No assertions or sessions were created/u);
     assert.match(js, /button\.hidden = true/u);
     assert.match(js, /button\.hidden = false/u);

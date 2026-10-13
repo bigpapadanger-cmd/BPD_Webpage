@@ -86,14 +86,43 @@ async function authenticatedHealth(service, url, secret) {
     } catch { return "unavailable"; }
 }
 
+async function runtimeHealth(service, url, secret) {
+    if (!service?.fetch) return { status: "unavailable", failureCode: "BINDING_UNAVAILABLE" };
+    if (!validSecret(secret)) return { status: "unavailable", failureCode: "RUNTIME_ERROR" };
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 3000);
+    try {
+        const response = await service.fetch(new Request(url, {
+            method: "GET",
+            headers: { Authorization: `Bearer ${secret}` },
+            signal: controller.signal
+        }));
+        if (response.status === 401 || response.status === 403) {
+            return { status: "unavailable", failureCode: "AUTH_REJECTED" };
+        }
+        if (!response.ok) {
+            return { status: "unavailable", failureCode: response.status === 404 ? "INVALID_RESPONSE" : "RUNTIME_ERROR" };
+        }
+        const text = await response.text();
+        if (text.length > 8192) return { status: "unavailable", failureCode: "INVALID_RESPONSE" };
+        let payload;
+        try { payload = JSON.parse(text); } catch { return { status: "unavailable", failureCode: "INVALID_RESPONSE" }; }
+        return payload?.success === true
+            ? { status: "authenticated" }
+            : { status: "unavailable", failureCode: "INVALID_RESPONSE" };
+    } catch (error) {
+        return { status: "unavailable", failureCode: controller.signal.aborted ? "TIMEOUT" : "RUNTIME_ERROR" };
+    } finally { clearTimeout(timer); }
+}
+
 export async function checkStagingConnectivity(env) {
     const [runtime, issuer] = await Promise.all([
-        authenticatedHealth(env.RL_PROBE_STAGING_RUNTIME,
+        runtimeHealth(env.RL_PROBE_STAGING_RUNTIME,
             "https://provider-runtime-staging.internal/internal/health", env.RL_PROBE_STAGING_RUNTIME_CALLER_SECRET),
         authenticatedHealth(env.RL_PROBE_STAGING_ISSUER,
             "https://rl-probe-issuer.internal/internal/health", env.RL_PROBE_STAGING_ISSUER_CALLER_SECRET)
     ]);
-    return { success: true, runtime, issuer };
+    return { success: true, runtime: runtime.status, ...(runtime.failureCode ? { runtimeFailureCode: runtime.failureCode } : {}), issuer };
 }
 
 function assertResult(condition) {
