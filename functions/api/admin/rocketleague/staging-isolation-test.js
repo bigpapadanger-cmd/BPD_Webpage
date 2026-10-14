@@ -2,6 +2,9 @@ import { ADMIN_PERMISSIONS, authorizeAdminPermission } from "../../../services/a
 
 const TEST_GATE = "RL_PROBE_STAGING_TEST_ENABLED";
 const CONFIRMATION = "RUN_STAGING_ISOLATION_TEST";
+const CALLER_CHECK_HEADER = "x-bpd-staging-caller-check";
+const CALLER_NONCE_HEADER = "x-bpd-staging-caller-nonce";
+const CALLER_PROOF_PURPOSE = "bpd-provider-runtime-staging-caller-check-v1\0";
 const hashPattern = /^[a-f0-9]{64}$/u;
 const safeFailureCodes = new Set(["STAGING_TEST_DISABLED", "STAGING_TEST_UNAVAILABLE", "STAGING_CLEANUP_INCOMPLETE", "STAGING_ISOLATION_ASSERTION_FAILED"]);
 
@@ -11,6 +14,33 @@ function json(body, status = 200) {
 
 function validSecret(value) {
     return typeof value === "string" && value.length >= 64 && value.length <= 256 && value.trim() === value && !/\s/u.test(value);
+}
+
+function encodeBase64Url(bytes) {
+    let binary = "";
+    for (const byte of bytes) binary += String.fromCharCode(byte);
+    return btoa(binary).replace(/\+/gu, "-").replace(/\//gu, "_").replace(/=+$/gu, "");
+}
+
+function decodeBase64Url32(value) {
+    if (typeof value !== "string" || !/^[A-Za-z0-9_-]{43}$/u.test(value)) return null;
+    try {
+        const decoded = atob(value.replace(/-/gu, "+").replace(/_/gu, "/") + "=");
+        return decoded.length === 32 ? Uint8Array.from(decoded, character => character.charCodeAt(0)) : null;
+    } catch { return null; }
+}
+
+async function verifyRuntimeCallerProof(payload, secret, nonce) {
+    if (payload?.code !== "INTERNAL_AUTH_REQUIRED") return "unavailable";
+    const proof = decodeBase64Url32(payload.callerCheckProof);
+    if (!proof) return "unavailable";
+    try {
+        const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret),
+            { name: "HMAC", hash: "SHA-256" }, false, ["verify"]);
+        const matches = await crypto.subtle.verify("HMAC", key, proof,
+            new TextEncoder().encode(`${CALLER_PROOF_PURPOSE}${nonce}`));
+        return matches ? "match" : "mismatch";
+    } catch { return "unavailable"; }
 }
 
 export function isSameOriginRequest(request) {
@@ -87,31 +117,47 @@ async function authenticatedHealth(service, url, secret) {
 }
 
 async function runtimeHealth(service, url, secret) {
-    if (!service?.fetch) return { status: "unavailable", failureCode: "BINDING_UNAVAILABLE" };
-    if (!validSecret(secret)) return { status: "unavailable", failureCode: "RUNTIME_ERROR" };
+    if (!service?.fetch) return { status: "unavailable", credentialStatus: "unavailable", failureCode: "BINDING_UNAVAILABLE" };
+    if (!validSecret(secret)) return { status: "unavailable", credentialStatus: "unavailable", failureCode: "RUNTIME_ERROR" };
+    const nonce = encodeBase64Url(crypto.getRandomValues(new Uint8Array(32)));
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 3000);
     try {
         const response = await service.fetch(new Request(url, {
             method: "GET",
-            headers: { Authorization: `Bearer ${secret}` },
+            headers: {
+                Authorization: `Bearer ${secret}`,
+                [CALLER_CHECK_HEADER]: "v1",
+                [CALLER_NONCE_HEADER]: nonce
+            },
             signal: controller.signal
         }));
-        if (response.status === 401 || response.status === 403) {
-            return { status: "unavailable", failureCode: `RUNTIME_HTTP_${response.status}` };
+        if (response.status === 401) {
+            const text = await response.text();
+            if (text.length > 8192) return { status: "unavailable", credentialStatus: "unavailable", failureCode: "RUNTIME_HTTP_401" };
+            let payload;
+            try { payload = JSON.parse(text); } catch { payload = null; }
+            return {
+                status: "unavailable",
+                credentialStatus: await verifyRuntimeCallerProof(payload, secret, nonce),
+                failureCode: "RUNTIME_HTTP_401"
+            };
+        }
+        if (response.status === 403) {
+            return { status: "unavailable", credentialStatus: "unavailable", failureCode: "RUNTIME_HTTP_403" };
         }
         if (!response.ok) {
-            return { status: "unavailable", failureCode: response.status === 404 ? "INVALID_RESPONSE" : "RUNTIME_ERROR" };
+            return { status: "unavailable", credentialStatus: "unavailable", failureCode: response.status === 404 ? "INVALID_RESPONSE" : "RUNTIME_ERROR" };
         }
         const text = await response.text();
-        if (text.length > 8192) return { status: "unavailable", failureCode: "INVALID_RESPONSE" };
+        if (text.length > 8192) return { status: "unavailable", credentialStatus: "unavailable", failureCode: "INVALID_RESPONSE" };
         let payload;
-        try { payload = JSON.parse(text); } catch { return { status: "unavailable", failureCode: "INVALID_RESPONSE" }; }
+        try { payload = JSON.parse(text); } catch { return { status: "unavailable", credentialStatus: "unavailable", failureCode: "INVALID_RESPONSE" }; }
         return payload?.success === true
-            ? { status: "authenticated" }
-            : { status: "unavailable", failureCode: "INVALID_RESPONSE" };
+            ? { status: "authenticated", credentialStatus: "match" }
+            : { status: "unavailable", credentialStatus: "unavailable", failureCode: "INVALID_RESPONSE" };
     } catch (error) {
-        return { status: "unavailable", failureCode: controller.signal.aborted ? "TIMEOUT" : "RUNTIME_ERROR" };
+        return { status: "unavailable", credentialStatus: "unavailable", failureCode: controller.signal.aborted ? "TIMEOUT" : "RUNTIME_ERROR" };
     } finally { clearTimeout(timer); }
 }
 
@@ -122,7 +168,13 @@ export async function checkStagingConnectivity(env) {
         authenticatedHealth(env.RL_PROBE_STAGING_ISSUER,
             "https://rl-probe-issuer.internal/internal/health", env.RL_PROBE_STAGING_ISSUER_CALLER_SECRET)
     ]);
-    return { success: true, runtime: runtime.status, ...(runtime.failureCode ? { runtimeFailureCode: runtime.failureCode } : {}), issuer };
+    return {
+        success: true,
+        runtime: runtime.status,
+        runtimeCallerCredential: runtime.credentialStatus,
+        ...(runtime.failureCode ? { runtimeFailureCode: runtime.failureCode } : {}),
+        issuer
+    };
 }
 
 function assertResult(condition) {

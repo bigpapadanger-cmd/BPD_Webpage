@@ -24,6 +24,9 @@ test("panel is initialized only after Admin permission and posts an explicit sam
     assert.match(js, /\/api\/admin\/rocketleague\/staging-isolation-test/u);
     assert.match(js, /staging-isolation-test\?health=1/u);
     assert.match(js, /payload\.runtimeFailureCode/u);
+    assert.match(js, /payload\.runtimeCallerCredential/u);
+    assert.match(js, /\["match", "mismatch", "unavailable"\]/u);
+    assert.match(js, /Runtime caller credential:/u);
     for (const code of ["RUNTIME_HTTP_401", "RUNTIME_HTTP_403", "BINDING_UNAVAILABLE", "TIMEOUT", "INVALID_RESPONSE", "RUNTIME_ERROR"]) {
         assert.match(js, new RegExp(code, "u"));
     }

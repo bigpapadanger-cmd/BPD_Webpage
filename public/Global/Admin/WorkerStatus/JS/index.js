@@ -824,7 +824,9 @@ async function initializeStagingIsolationPanel() {
             const runtimeStatus = payload.runtime === "authenticated"
                 ? "connected and authenticated"
                 : `unavailable${["RUNTIME_HTTP_401", "RUNTIME_HTTP_403", "BINDING_UNAVAILABLE", "TIMEOUT", "INVALID_RESPONSE", "RUNTIME_ERROR"].includes(payload.runtimeFailureCode) ? ` (${payload.runtimeFailureCode})` : ""}`;
-            healthResult.textContent = `Runtime: ${runtimeStatus}. Issuer: ${payload.issuer === "authenticated" ? "connected and authenticated" : "unavailable"}. No assertions or sessions were created.`;
+            const callerCredential = ["match", "mismatch", "unavailable"].includes(payload.runtimeCallerCredential)
+                ? payload.runtimeCallerCredential : "unavailable";
+            healthResult.textContent = `Runtime: ${runtimeStatus}. Runtime caller credential: ${callerCredential}. Issuer: ${payload.issuer === "authenticated" ? "connected and authenticated" : "unavailable"}. No assertions or sessions were created.`;
         } catch {
             healthResult.textContent = "Staging health check unavailable. No assertions or sessions were created.";
         } finally { healthButton.disabled = false; }

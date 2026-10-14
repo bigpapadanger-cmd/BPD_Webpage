@@ -107,31 +107,66 @@ test("health check authenticates both staging bindings while all execution gates
         const fetch = service.fetch;
         service.fetch = request => {
             requests.push({ binding: name, method: request.method, path: new URL(request.url).pathname,
-                hasAuthorization: request.headers.has("Authorization") });
+                hasAuthorization: request.headers.has("Authorization"),
+                callerCheck: request.headers.get("X-BPD-Staging-Caller-Check"),
+                nonce: request.headers.get("X-BPD-Staging-Caller-Nonce") });
             return fetch(request);
         };
     }
     const result = await checkStagingConnectivity(pageEnv);
-    assert.deepEqual(result, { success: true, runtime: "authenticated", issuer: "authenticated" });
-    assert.deepEqual(requests.map(({ binding, method, path, hasAuthorization }) => ({ binding, method, path, hasAuthorization })), [
-        { binding: "RL_PROBE_STAGING_RUNTIME", method: "GET", path: "/internal/health", hasAuthorization: true },
-        { binding: "RL_PROBE_STAGING_ISSUER", method: "GET", path: "/internal/health", hasAuthorization: true }
+    assert.deepEqual(result, { success: true, runtime: "authenticated", runtimeCallerCredential: "match", issuer: "authenticated" });
+    assert.deepEqual(requests.map(({ binding, method, path, hasAuthorization, callerCheck, nonce }) => ({
+        binding, method, path, hasAuthorization, callerCheck, hasFreshNonce: /^[A-Za-z0-9_-]{43}$/u.test(nonce || "")
+    })), [
+        { binding: "RL_PROBE_STAGING_RUNTIME", method: "GET", path: "/internal/health", hasAuthorization: true,
+            callerCheck: "v1", hasFreshNonce: true },
+        { binding: "RL_PROBE_STAGING_ISSUER", method: "GET", path: "/internal/health", hasAuthorization: true,
+            callerCheck: null, hasFreshNonce: false }
     ]);
     assert.equal(sessions.size, 0);
     assert.equal(workerEnv.RL_PROBE_SECURITY_ENABLED, "false");
     assert.equal(issuerEnv.RL_PROBE_STAGING_ISSUER_ENABLED, "false");
 });
 
-test("health check reports only an HTTP-confirmed caller-auth rejection", async () => {
-    const { pageEnv } = await stagingFixture({ enabled: false });
+test("health check verifies a mismatched caller credential without returning its proof or nonce", async () => {
+    const { pageEnv, workerEnv, issuerEnv, sessions } = await stagingFixture({ enabled: false });
+    workerEnv.RL_PROBE_SECURITY_ENABLED = "false";
+    issuerEnv.RL_PROBE_STAGING_ISSUER_ENABLED = "false";
     pageEnv.RL_PROBE_STAGING_RUNTIME_CALLER_SECRET = "wrong-secret".padEnd(64, "x");
-    let runtimeCalls = 0;
+    const requests = [];
     const runtimeFetch = pageEnv.RL_PROBE_STAGING_RUNTIME.fetch;
-    pageEnv.RL_PROBE_STAGING_RUNTIME.fetch = request => { runtimeCalls += 1; return runtimeFetch(request); };
+    pageEnv.RL_PROBE_STAGING_RUNTIME.fetch = request => { requests.push(request); return runtimeFetch(request); };
     const result = await checkStagingConnectivity(pageEnv);
-    assert.deepEqual(result, { success: true, runtime: "unavailable", runtimeFailureCode: "RUNTIME_HTTP_401", issuer: "authenticated" });
-    assert.equal(runtimeCalls, 1);
+    assert.deepEqual(result, {
+        success: true, runtime: "unavailable", runtimeCallerCredential: "mismatch",
+        runtimeFailureCode: "RUNTIME_HTTP_401", issuer: "authenticated"
+    });
+    assert.equal(requests.length, 1);
+    assert.equal(requests[0].headers.get("Authorization"), `Bearer ${pageEnv.RL_PROBE_STAGING_RUNTIME_CALLER_SECRET}`);
+    assert.match(requests[0].headers.get("X-BPD-Staging-Caller-Nonce"), /^[A-Za-z0-9_-]{43}$/u);
+    assert.equal(requests[0].headers.get("X-BPD-Staging-Caller-Check"), "v1");
     assert.equal(JSON.stringify(result).includes("wrong-secret"), false);
+    assert.doesNotMatch(JSON.stringify(result), /callerCheckProof|nonce|signature|proof/u);
+    assert.equal(pageEnv.RL_PROBE_STAGING_TEST_ENABLED, "false");
+    assert.equal(workerEnv.RL_PROBE_SECURITY_ENABLED, "false");
+    assert.equal(issuerEnv.RL_PROBE_STAGING_ISSUER_ENABLED, "false");
+    assert.equal(sessions.size, 0);
+});
+
+test("malformed or missing Runtime proof stays unavailable and is never copied into the Admin response", async () => {
+    for (const proof of [undefined, "not-a-proof"]) {
+        const { pageEnv, workerEnv, issuerEnv, sessions } = await stagingFixture({ enabled: false });
+        workerEnv.RL_PROBE_SECURITY_ENABLED = "false";
+        issuerEnv.RL_PROBE_STAGING_ISSUER_ENABLED = "false";
+        pageEnv.RL_PROBE_STAGING_RUNTIME.fetch = async () => Response.json({
+            success: false, code: "INTERNAL_AUTH_REQUIRED", ...(proof ? { callerCheckProof: proof } : {})
+        }, { status: 401 });
+        const result = await checkStagingConnectivity(pageEnv);
+        assert.equal(result.runtimeCallerCredential, "unavailable");
+        assert.equal(result.runtimeFailureCode, "RUNTIME_HTTP_401");
+        assert.doesNotMatch(JSON.stringify(result), /callerCheckProof|proof|nonce|signature/u);
+        assert.equal(sessions.size, 0);
+    }
 });
 
 test("Runtime health reports only confirmed authentication rejection and sanitized failure categories", async () => {
@@ -155,6 +190,7 @@ test("Runtime health reports only confirmed authentication rejection and sanitiz
         assert.deepEqual(result, {
             success: true,
             runtime: "unavailable",
+            runtimeCallerCredential: "unavailable",
             runtimeFailureCode: scenario.expected,
             issuer: "authenticated"
         }, scenario.name);

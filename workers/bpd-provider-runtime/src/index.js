@@ -12,6 +12,11 @@ const REQUEST_TIMEOUT_MS = 10000;
 const REQUEST_CLEANUP_TIMEOUT_MS = 1000;
 const CALLER_SECRET_MIN_LENGTH = 64;
 const CALLER_SECRET_MAX_LENGTH = 256;
+const STAGING_RUNTIME_ID = "bpd-provider-runtime-staging";
+const STAGING_RUNTIME_HOST = "provider-runtime-staging.internal";
+const STAGING_CALLER_CHECK_HEADER = "x-bpd-staging-caller-check";
+const STAGING_CALLER_NONCE_HEADER = "x-bpd-staging-caller-nonce";
+const STAGING_CALLER_PROOF_PURPOSE = "bpd-provider-runtime-staging-caller-check-v1\0";
 const MEMBERSHIP_CONCURRENCY = 3;
 const SNOWFLAKE = /^\d{16,22}$/u;
 
@@ -38,6 +43,36 @@ function validCallerSecret(secret) {
         && secret.length <= CALLER_SECRET_MAX_LENGTH
         && secret.trim() === secret
         && !/\s/u.test(secret);
+}
+
+function isBase64Url32(value) {
+    if (typeof value !== "string" || !/^[A-Za-z0-9_-]{43}$/u.test(value)) return false;
+    try {
+        const decoded = atob(value.replace(/-/gu, "+").replace(/_/gu, "/") + "=");
+        return decoded.length === 32;
+    } catch { return false; }
+}
+
+function encodeBase64Url(bytes) {
+    let binary = "";
+    for (const byte of bytes) binary += String.fromCharCode(byte);
+    return btoa(binary).replace(/\+/gu, "-").replace(/\//gu, "_").replace(/=+$/gu, "");
+}
+
+async function createStagingCallerProof(secret, nonce) {
+    const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret),
+        { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+    const signature = await crypto.subtle.sign("HMAC", key,
+        new TextEncoder().encode(`${STAGING_CALLER_PROOF_PURPOSE}${nonce}`));
+    return encodeBase64Url(new Uint8Array(signature));
+}
+
+function isStagingCallerCheck(request, env) {
+    const url = new URL(request.url);
+    return env?.RL_PROBE_ISSUER === STAGING_RUNTIME_ID
+        && url.hostname === STAGING_RUNTIME_HOST
+        && request.headers.get(STAGING_CALLER_CHECK_HEADER) === "v1"
+        && isBase64Url32(request.headers.get(STAGING_CALLER_NONCE_HEADER));
 }
 
 function authorizationFailure(request, env) {
@@ -355,8 +390,19 @@ export default {
         }
         if (url.pathname === "/internal/health") {
             if (request.method !== "GET") return json({ success: false, code: "METHOD_NOT_ALLOWED" }, 405);
-            const auth = authorizationResponse(request, env);
-            if (auth) return auth;
+            const authFailure = authorizationFailure(request, env);
+            if (authFailure) {
+                if (authFailure === "caller" && isStagingCallerCheck(request, env)) {
+                    try {
+                        const proof = await createStagingCallerProof(env.PROVIDER_RUNTIME_CALLER_SECRET,
+                            request.headers.get(STAGING_CALLER_NONCE_HEADER));
+                        return json({ success: false, code: "INTERNAL_AUTH_REQUIRED", callerCheckProof: proof }, 401);
+                    } catch {
+                        return json({ success: false, code: "INTERNAL_AUTH_REQUIRED" }, 401);
+                    }
+                }
+                return authorizationResponse(request, env);
+            }
             return json({ success: true, service: "bpd-provider-runtime", status: "ok", timestamp: new Date().toISOString() });
         }
         if (url.pathname === "/internal/discord/bot-health") {
