@@ -5,7 +5,7 @@
   "workers_dev": false,
   "preview_urls": false,
   "vars": {
-    "RL_PROBE_STAGING_ISSUER_ENABLED": "true",
+    "RL_PROBE_STAGING_ISSUER_ENABLED": "false",
     "RL_PROBE_ISSUER": "bpd-provider-runtime-staging",
     "RL_PROBE_KEY_VERSION": "staging-v1"
   },
