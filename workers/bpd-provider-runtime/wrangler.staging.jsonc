@@ -27,9 +27,9 @@
   ],
   "observability": {
     "logs": {
-      "enabled": false,
-      "invocation_logs": false,
-      "persist": false
+      "enabled": true,
+      "invocation_logs": true,
+      "persist": true
     }
   }
 }

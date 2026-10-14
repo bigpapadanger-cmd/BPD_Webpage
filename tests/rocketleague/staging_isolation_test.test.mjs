@@ -229,6 +229,12 @@ test("Cloudflare config isolates the staging binding and keeps every new gate of
     assert.equal(services.get("RL_PROBE_STAGING_ISSUER"), "bpd-rl-probe-staging-issuer");
     assert.equal(pages.vars.RL_PROBE_STAGING_TEST_ENABLED, "false");
     assert.equal(runtime.vars.RL_PROBE_SECURITY_ENABLED, "false");
+    assert.deepEqual(runtime.observability.logs, { enabled: true, invocation_logs: true, persist: true });
+    assert.deepEqual(runtime.durable_objects.bindings.map(({ name, class_name }) => ({ name, class_name })), [
+        { name: "RL_USER_SESSION", class_name: "UserRocketLeagueSession" },
+        { name: "RL_PROBE_SECURITY", class_name: "RlProbeSecurityAuthority" },
+        { name: "DISCORD_LINKED_ROLE_NONCE", class_name: "DiscordLinkedRoleNonceAuthority" }
+    ]);
     assert.equal(issuerConfig.vars.RL_PROBE_STAGING_ISSUER_ENABLED, "false");
     assert.equal(issuerConfig.workers_dev, false);
     assert.equal("durable_objects" in issuerConfig, false);
