@@ -17,6 +17,12 @@ const STAGING_RUNTIME_HOST = "provider-runtime-staging.internal";
 const STAGING_CALLER_CHECK_HEADER = "x-bpd-staging-caller-check";
 const STAGING_CALLER_NONCE_HEADER = "x-bpd-staging-caller-nonce";
 const STAGING_CALLER_PROOF_PURPOSE = "bpd-provider-runtime-staging-caller-check-v1\0";
+const STAGING_REVOCATION_CHECK_HEADER = "x-bpd-staging-revocation-check";
+const STAGING_REVOCATION_PROOF_PURPOSE = "bpd-provider-runtime-staging-revocation-check-v1\0";
+const SIGNING_CHECK_PATH = "/internal/rl-probe/key-correspondence/verify";
+const SIGNING_CHECK_PURPOSE = "bpd.rl.staging.signing-key-correspondence.v1";
+const SIGNING_CHECK_DOMAIN = "BPD-RL-STAGING-KEY-CORRESPONDENCE\0";
+const SIGNING_CHECK_TTL_SECONDS = 30;
 const MEMBERSHIP_CONCURRENCY = 3;
 const SNOWFLAKE = /^\d{16,22}$/u;
 
@@ -49,7 +55,7 @@ function isBase64Url32(value) {
     if (typeof value !== "string" || !/^[A-Za-z0-9_-]{43}$/u.test(value)) return false;
     try {
         const decoded = atob(value.replace(/-/gu, "+").replace(/_/gu, "/") + "=");
-        return decoded.length === 32;
+        return decoded.length === 32 && encodeBase64Url(Uint8Array.from(decoded, character => character.charCodeAt(0))) === value;
     } catch { return false; }
 }
 
@@ -57,6 +63,47 @@ function encodeBase64Url(bytes) {
     let binary = "";
     for (const byte of bytes) binary += String.fromCharCode(byte);
     return btoa(binary).replace(/\+/gu, "-").replace(/\//gu, "_").replace(/=+$/gu, "");
+}
+
+function decodeBase64Url64(value) {
+    if (typeof value !== "string" || !/^[A-Za-z0-9_-]{86}$/u.test(value)) return null;
+    try {
+        const binary = atob(value.replace(/-/gu, "+").replace(/_/gu, "/") + "==");
+        const decoded = Uint8Array.from(binary, character => character.charCodeAt(0));
+        return decoded.length === 64 && encodeBase64Url(decoded) === value ? decoded : null;
+    } catch { return null; }
+}
+
+function isValidSigningCheck(body, env) {
+    const now = Math.floor(Date.now() / 1000);
+    return hasExactKeys(body, ["algorithm", "issuer", "keyVersion", "purpose", "nonce", "issuedAt", "expiresAt", "signature"])
+        && body.algorithm === "ES256"
+        && body.issuer === STAGING_RUNTIME_ID && env.RL_PROBE_ISSUER === STAGING_RUNTIME_ID
+        && body.keyVersion === "staging-v1" && env.RL_PROBE_KEY_VERSION === body.keyVersion
+        && body.purpose === SIGNING_CHECK_PURPOSE
+        && isBase64Url32(body.nonce)
+        && Number.isSafeInteger(body.issuedAt) && Number.isSafeInteger(body.expiresAt)
+        && body.expiresAt - body.issuedAt === SIGNING_CHECK_TTL_SECONDS
+        && body.issuedAt <= now + 5 && body.expiresAt > now
+        && decodeBase64Url64(body.signature) !== null;
+}
+
+function signingCheckMessage(challenge) {
+    return new TextEncoder().encode(`${SIGNING_CHECK_DOMAIN}${challenge.algorithm}\0${challenge.issuer}\0${challenge.keyVersion}\0${challenge.purpose}\0${challenge.nonce}\0${challenge.issuedAt}\0${challenge.expiresAt}`);
+}
+
+async function verifySigningKeyCheck(body, env) {
+    if (!isValidSigningCheck(body, env)) return null;
+    let jwk;
+    try { jwk = JSON.parse(env.RL_PROBE_VERIFY_JWK); } catch { return null; }
+    if (typeof env.RL_PROBE_VERIFY_JWK !== "string" || env.RL_PROBE_VERIFY_JWK.length > 4096
+        || jwk?.kty !== "EC" || jwk?.crv !== "P-256" || Object.hasOwn(jwk, "d")
+        || typeof jwk.x !== "string" || typeof jwk.y !== "string") return null;
+    try {
+        const key = await crypto.subtle.importKey("jwk", jwk, { name: "ECDSA", namedCurve: "P-256" }, false, ["verify"]);
+        return await crypto.subtle.verify({ name: "ECDSA", hash: "SHA-256" }, key,
+            decodeBase64Url64(body.signature), signingCheckMessage(body));
+    } catch { return null; }
 }
 
 async function createStagingCallerProof(secret, nonce) {
@@ -67,11 +114,30 @@ async function createStagingCallerProof(secret, nonce) {
     return encodeBase64Url(new Uint8Array(signature));
 }
 
+async function createStagingRevocationProof(secret, nonce) {
+    if (!validCallerSecret(secret) || !isBase64Url32(nonce)) throw new Error("invalid challenge");
+    const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret),
+        { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+    const signature = await crypto.subtle.sign("HMAC", key,
+        new TextEncoder().encode(`${STAGING_REVOCATION_PROOF_PURPOSE}${nonce}`));
+    return encodeBase64Url(new Uint8Array(signature));
+}
+
 function isStagingCallerCheck(request, env) {
     const url = new URL(request.url);
     return env?.RL_PROBE_ISSUER === STAGING_RUNTIME_ID
         && url.hostname === STAGING_RUNTIME_HOST
         && request.headers.get(STAGING_CALLER_CHECK_HEADER) === "v1"
+        && isBase64Url32(request.headers.get(STAGING_CALLER_NONCE_HEADER));
+}
+
+function isStagingRevocationCheck(request, env) {
+    const url = new URL(request.url);
+    return env?.RL_PROBE_ISSUER === STAGING_RUNTIME_ID
+        && url.hostname === STAGING_RUNTIME_HOST
+        && url.search === ""
+        && request.headers.get(STAGING_CALLER_CHECK_HEADER) === "v1"
+        && request.headers.get(STAGING_REVOCATION_CHECK_HEADER) === "v1"
         && isBase64Url32(request.headers.get(STAGING_CALLER_NONCE_HEADER));
 }
 
@@ -376,6 +442,20 @@ export default {
             const id = env.RL_PROBE_SECURITY.idFromName("global-revocation-authority-v1");
             return env.RL_PROBE_SECURITY.get(id).fetch(new Request(`https://rl-security.internal/${bump ? "bump" : "read"}`, { method: "POST", body: "{}" }));
         }
+        if (url.pathname === SIGNING_CHECK_PATH) {
+            const auth = authorizationResponse(request, env);
+            if (auth) return auth;
+            if (request.method !== "POST") return json({ success: false, code: "METHOD_NOT_ALLOWED" }, 405);
+            if (url.hostname !== STAGING_RUNTIME_HOST || url.search !== ""
+                || env.RL_PROBE_ISSUER !== STAGING_RUNTIME_ID || env.RL_PROBE_KEY_VERSION !== "staging-v1") {
+                return json({ success: false, code: "NOT_FOUND" }, 404);
+            }
+            const body = await parseBody(request);
+            if (!isValidSigningCheck(body, env)) return json({ success: false, code: "REQUEST_SCHEMA_INVALID" }, 400);
+            const keyMatches = await verifySigningKeyCheck(body, env);
+            if (keyMatches === null) return safeFailure("KEY_VERIFICATION_UNAVAILABLE");
+            return json({ success: true, keyMatches });
+        }
         if (["bootstrap", "invalidate", "consume", "begin", "claim", "prepare", "execute"].some(operation => url.pathname === `/internal/rl-probe/${operation}`)) {
             const auth = authorizationResponse(request, env);
             if (auth) return auth;
@@ -402,6 +482,19 @@ export default {
                     }
                 }
                 return authorizationResponse(request, env);
+            }
+            if (request.headers.has(STAGING_REVOCATION_CHECK_HEADER)) {
+                if (!isStagingRevocationCheck(request, env)) {
+                    return json({ success: false, code: "STAGING_CHALLENGE_INVALID" }, 400);
+                }
+                try {
+                    const proof = await createStagingRevocationProof(env.RL_PROBE_REVOCATION_SECRET,
+                        request.headers.get(STAGING_CALLER_NONCE_HEADER));
+                    return json({ success: true, service: "bpd-provider-runtime", status: "ok",
+                        timestamp: new Date().toISOString(), revocationCredentialProof: proof });
+                } catch {
+                    return json({ success: false, code: "STAGING_CHALLENGE_UNAVAILABLE" }, 503);
+                }
             }
             return json({ success: true, service: "bpd-provider-runtime", status: "ok", timestamp: new Date().toISOString() });
         }

@@ -95,3 +95,56 @@ test("issuer refuses arbitrary identity fields, malformed issuance context, quer
     }), env);
     assert.equal(cookie.status, 400);
 });
+
+test("signing-key diagnostic is authenticated, short-lived, purpose-bound, and distinct from assertions", async () => {
+    const now = Math.floor(Date.now() / 1000);
+    const challenge = {
+        algorithm: "ES256", issuer: env.RL_PROBE_ISSUER, keyVersion: env.RL_PROBE_KEY_VERSION,
+        purpose: "bpd.rl.staging.signing-key-correspondence.v1",
+        nonce: Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString("base64url"),
+        issuedAt: now, expiresAt: now + 30
+    };
+    const request = new Request("https://rl-probe-issuer.internal/internal/signing-key-check", {
+        method: "POST", headers: { Authorization: `Bearer ${secret}`, "Content-Type": "application/json" },
+        body: JSON.stringify(challenge)
+    });
+    const response = await issuer.fetch(request, { ...env, RL_PROBE_STAGING_ISSUER_ENABLED: "false" });
+    const payload = await response.json();
+    assert.equal(response.status, 200);
+    assert.deepEqual(Object.keys(payload).sort(), ["signature", "success"]);
+    const key = await crypto.subtle.importKey("jwk", publicJwk, { name: "ECDSA", namedCurve: "P-256" }, false, ["verify"]);
+    const message = new TextEncoder().encode(`BPD-RL-STAGING-KEY-CORRESPONDENCE\0${challenge.algorithm}\0${challenge.issuer}\0${challenge.keyVersion}\0${challenge.purpose}\0${challenge.nonce}\0${challenge.issuedAt}\0${challenge.expiresAt}`);
+    assert.equal(await crypto.subtle.verify({ name: "ECDSA", hash: "SHA-256" }, key, decode(payload.signature), message), true);
+    assert.equal(payload.signature.split(".").length, 1);
+    const unauthorized = await issuer.fetch(new Request("https://rl-probe-issuer.internal/internal/signing-key-check", {
+        method: "POST", headers: { Authorization: "Bearer wrong", "Content-Type": "application/json" }, body: JSON.stringify(challenge)
+    }), env);
+    assert.equal(unauthorized.status, 401);
+});
+
+test("signing-key diagnostic rejects malformed, expired, wrong-version, and wrong-purpose challenges", async () => {
+    const now = Math.floor(Date.now() / 1000);
+    const challenge = {
+        algorithm: "ES256", issuer: env.RL_PROBE_ISSUER, keyVersion: env.RL_PROBE_KEY_VERSION,
+        purpose: "bpd.rl.staging.signing-key-correspondence.v1",
+        nonce: Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString("base64url"),
+        issuedAt: now, expiresAt: now + 30
+    };
+    for (const altered of [
+        { ...challenge, purpose: "rl.compatibility.probe" },
+        { ...challenge, algorithm: "none" },
+        { ...challenge, keyVersion: "old-key" },
+        { ...challenge, issuer: "production-worker" },
+        { ...challenge, nonce: "x".repeat(42) },
+        { ...challenge, nonce: "A".repeat(42) + "B" },
+        { ...challenge, issuedAt: now - 60, expiresAt: now - 30 },
+        { ...challenge, expiresAt: now + 31 }
+    ]) {
+        const response = await issuer.fetch(new Request("https://rl-probe-issuer.internal/internal/signing-key-check", {
+            method: "POST", headers: { Authorization: `Bearer ${secret}`, "Content-Type": "application/json" },
+            body: JSON.stringify(altered)
+        }), env);
+        assert.equal(response.status, 400);
+        assert.deepEqual(await response.json(), { success: false, code: "REQUEST_SCHEMA_INVALID" });
+    }
+});

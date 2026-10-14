@@ -84,9 +84,9 @@ revocation/migration plan.
 Future configuration, **not provisioned or enabled by this pass**
 
 
-- Pages secret `RL_PROBE_ACCOUNT_KEY_SECRET`: stable opaque-key derivation,
-  64–256 characters, no whitespace.
-- Pages secret `RL_PROBE_SIGNING_JWK`: private P-256 JWK; never in this Worker.
+- Issuer Worker secret `RL_PROBE_ACCOUNT_KEY_SECRET`: stable opaque-key derivation,
+  64–256 characters, no whitespace; never configure it on Pages or the Runtime.
+- `RL_PROBE_SIGNING_JWK` is a private P-256 JWK held exclusively by `bpd-rl-probe-staging-issuer`. It must never be configured on Pages or this Runtime; the Runtime receives only the public `RL_PROBE_VERIFY_JWK`.
 - Runtime normal var `RL_PROBE_VERIFY_JWK`: public P-256 JWK only; private `d`
   material is rejected.
 - Matching normal vars `RL_PROBE_ISSUER` and `RL_PROBE_KEY_VERSION`.

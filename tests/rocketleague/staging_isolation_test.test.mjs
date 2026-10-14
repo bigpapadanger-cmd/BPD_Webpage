@@ -18,15 +18,22 @@ function storageFixture() {
     };
 }
 
-async function stagingFixture({ enabled = true } = {}) {
+async function stagingFixture({ enabled = true, mismatchSigningKey = false } = {}) {
     const keyPair = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]);
     const privateJwk = await crypto.subtle.exportKey("jwk", keyPair.privateKey);
     const publicJwk = await crypto.subtle.exportKey("jwk", keyPair.publicKey);
     delete publicJwk.d;
+    let runtimePublicJwk = publicJwk;
+    if (mismatchSigningKey) {
+        const otherPair = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]);
+        runtimePublicJwk = await crypto.subtle.exportKey("jwk", otherPair.publicKey);
+        delete runtimePublicJwk.d;
+    }
     const runtimeSecret = "runtime-staging-test-secret-".padEnd(64, "r");
     const revokeSecret = "revocation-staging-test-secret-".padEnd(64, "v");
     const issuerSecret = "issuer-staging-test-secret-".padEnd(64, "i");
     const sessions = new Map();
+    const objectAccess = { sessions: 0, security: 0 };
     const authority = new RlProbeSecurityAuthority({ storage: storageFixture() });
     const workerEnv = {
         PROVIDER_RUNTIME_CALLER_SECRET: runtimeSecret,
@@ -34,9 +41,10 @@ async function stagingFixture({ enabled = true } = {}) {
         RL_PROBE_SECURITY_ENABLED: "true",
         RL_PROBE_ISSUER: "bpd-provider-runtime-staging",
         RL_PROBE_KEY_VERSION: "staging-v1",
-        RL_PROBE_VERIFY_JWK: JSON.stringify(publicJwk),
-        RL_PROBE_SECURITY: { idFromName: name => name, get: () => authority },
+        RL_PROBE_VERIFY_JWK: JSON.stringify(runtimePublicJwk),
+        RL_PROBE_SECURITY: { idFromName: name => name, get: () => { objectAccess.security += 1; return authority; } },
         RL_USER_SESSION: { idFromName: name => name, get: name => {
+            objectAccess.sessions += 1;
             if (!sessions.has(name)) sessions.set(name, new UserRocketLeagueSession({ storage: storageFixture() }, workerEnv));
             return sessions.get(name);
         } }
@@ -59,7 +67,7 @@ async function stagingFixture({ enabled = true } = {}) {
         RL_PROBE_STAGING_ISSUER: { fetch: request => issuer.fetch(request, issuerEnv) },
         PROVIDER_RUNTIME: { fetch: async () => { throw new Error("production binding must not be called"); } }
     };
-    return { pageEnv, workerEnv, issuerEnv, sessions };
+    return { pageEnv, workerEnv, issuerEnv, sessions, objectAccess, publicJwk };
 }
 
 test("staging isolation route exercises two synthetic accounts against the real Worker handlers", async () => {
@@ -98,7 +106,7 @@ test("missing test gate fails closed without contacting either Worker binding", 
 });
 
 test("health check authenticates both staging bindings while all execution gates remain disabled", async () => {
-    const { pageEnv, workerEnv, issuerEnv, sessions } = await stagingFixture({ enabled: false });
+    const { pageEnv, workerEnv, issuerEnv, sessions, objectAccess } = await stagingFixture({ enabled: false });
     workerEnv.RL_PROBE_SECURITY_ENABLED = "false";
     issuerEnv.RL_PROBE_STAGING_ISSUER_ENABLED = "false";
     const requests = [];
@@ -109,21 +117,61 @@ test("health check authenticates both staging bindings while all execution gates
             requests.push({ binding: name, method: request.method, path: new URL(request.url).pathname,
                 hasAuthorization: request.headers.has("Authorization"),
                 callerCheck: request.headers.get("X-BPD-Staging-Caller-Check"),
+                revocationCheck: request.headers.get("X-BPD-Staging-Revocation-Check"),
                 nonce: request.headers.get("X-BPD-Staging-Caller-Nonce") });
             return fetch(request);
         };
     }
     const result = await checkStagingConnectivity(pageEnv);
-    assert.deepEqual(result, { success: true, runtime: "authenticated", runtimeCallerCredential: "match", issuer: "authenticated" });
-    assert.deepEqual(requests.map(({ binding, method, path, hasAuthorization, callerCheck, nonce }) => ({
-        binding, method, path, hasAuthorization, callerCheck, hasFreshNonce: /^[A-Za-z0-9_-]{43}$/u.test(nonce || "")
+    assert.deepEqual(result, { success: true, runtime: "authenticated", runtimeCallerCredential: "match",
+        runtimeRevocationCredential: "match", signingKeyCorrespondence: "match", issuer: "authenticated" });
+    assert.deepEqual(requests.map(({ binding, method, path, hasAuthorization, callerCheck, revocationCheck, nonce }) => ({
+        binding, method, path, hasAuthorization, callerCheck, revocationCheck, hasFreshNonce: /^[A-Za-z0-9_-]{43}$/u.test(nonce || "")
     })), [
         { binding: "RL_PROBE_STAGING_RUNTIME", method: "GET", path: "/internal/health", hasAuthorization: true,
-            callerCheck: "v1", hasFreshNonce: true },
+            callerCheck: "v1", revocationCheck: "v1", hasFreshNonce: true },
         { binding: "RL_PROBE_STAGING_ISSUER", method: "GET", path: "/internal/health", hasAuthorization: true,
-            callerCheck: null, hasFreshNonce: false }
+            callerCheck: null, revocationCheck: null, hasFreshNonce: false },
+        { binding: "RL_PROBE_STAGING_ISSUER", method: "POST", path: "/internal/signing-key-check", hasAuthorization: true,
+            callerCheck: null, revocationCheck: null, hasFreshNonce: false },
+        { binding: "RL_PROBE_STAGING_RUNTIME", method: "POST", path: "/internal/rl-probe/key-correspondence/verify", hasAuthorization: true,
+            callerCheck: null, revocationCheck: null, hasFreshNonce: false }
     ]);
     assert.equal(sessions.size, 0);
+    assert.deepEqual(objectAccess, { sessions: 0, security: 0 });
+    assert.equal(workerEnv.RL_PROBE_SECURITY_ENABLED, "false");
+    assert.equal(issuerEnv.RL_PROBE_STAGING_ISSUER_ENABLED, "false");
+    assert.doesNotMatch(JSON.stringify(result), /signature|nonce/u);
+});
+
+test("revocation credential mismatch is sanitized and health check never accesses Durable Objects", async () => {
+    const { pageEnv, workerEnv, issuerEnv, objectAccess } = await stagingFixture({ enabled: false });
+    workerEnv.RL_PROBE_SECURITY_ENABLED = "false";
+    issuerEnv.RL_PROBE_STAGING_ISSUER_ENABLED = "false";
+    pageEnv.RL_PROBE_STAGING_REVOCATION_SECRET = "different-revocation-secret-".padEnd(64, "d");
+    const result = await checkStagingConnectivity(pageEnv);
+    assert.deepEqual(result, { success: true, runtime: "authenticated", runtimeCallerCredential: "match",
+        runtimeRevocationCredential: "mismatch", signingKeyCorrespondence: "match", issuer: "authenticated" });
+    assert.deepEqual(objectAccess, { sessions: 0, security: 0 });
+    assert.doesNotMatch(JSON.stringify(result), /proof|nonce|signature|secret/u);
+    assert.equal(pageEnv.RL_PROBE_STAGING_TEST_ENABLED, "false");
+    assert.equal(workerEnv.RL_PROBE_SECURITY_ENABLED, "false");
+    assert.equal(issuerEnv.RL_PROBE_STAGING_ISSUER_ENABLED, "false");
+});
+
+test("Admin health exposes only mismatch or unavailable for signing-key correspondence", async () => {
+    const { pageEnv, workerEnv, issuerEnv, objectAccess } = await stagingFixture({ enabled: false, mismatchSigningKey: true });
+    workerEnv.RL_PROBE_SECURITY_ENABLED = "false";
+    issuerEnv.RL_PROBE_STAGING_ISSUER_ENABLED = "false";
+    const mismatch = await checkStagingConnectivity(pageEnv);
+    assert.equal(mismatch.signingKeyCorrespondence, "mismatch");
+    assert.deepEqual(objectAccess, { sessions: 0, security: 0 });
+    assert.doesNotMatch(JSON.stringify(mismatch), /signature|nonce|proof|private|JWK/u);
+
+    pageEnv.RL_PROBE_STAGING_ISSUER.fetch = async () => Response.json({ success: true, signature: "malformed" });
+    const unavailable = await checkStagingConnectivity(pageEnv);
+    assert.equal(unavailable.signingKeyCorrespondence, "unavailable");
+    assert.doesNotMatch(JSON.stringify(unavailable), /malformed|signature|nonce|proof/u);
     assert.equal(workerEnv.RL_PROBE_SECURITY_ENABLED, "false");
     assert.equal(issuerEnv.RL_PROBE_STAGING_ISSUER_ENABLED, "false");
 });
@@ -139,9 +187,10 @@ test("health check verifies a mismatched caller credential without returning its
     const result = await checkStagingConnectivity(pageEnv);
     assert.deepEqual(result, {
         success: true, runtime: "unavailable", runtimeCallerCredential: "mismatch",
+        runtimeRevocationCredential: "unavailable", signingKeyCorrespondence: "unavailable",
         runtimeFailureCode: "RUNTIME_HTTP_401", issuer: "authenticated"
     });
-    assert.equal(requests.length, 1);
+    assert.equal(requests.length, 2);
     assert.equal(requests[0].headers.get("Authorization"), `Bearer ${pageEnv.RL_PROBE_STAGING_RUNTIME_CALLER_SECRET}`);
     assert.match(requests[0].headers.get("X-BPD-Staging-Caller-Nonce"), /^[A-Za-z0-9_-]{43}$/u);
     assert.equal(requests[0].headers.get("X-BPD-Staging-Caller-Check"), "v1");
@@ -163,6 +212,7 @@ test("malformed or missing Runtime proof stays unavailable and is never copied i
         }, { status: 401 });
         const result = await checkStagingConnectivity(pageEnv);
         assert.equal(result.runtimeCallerCredential, "unavailable");
+        assert.equal(result.runtimeRevocationCredential, "unavailable");
         assert.equal(result.runtimeFailureCode, "RUNTIME_HTTP_401");
         assert.doesNotMatch(JSON.stringify(result), /callerCheckProof|proof|nonce|signature/u);
         assert.equal(sessions.size, 0);
@@ -191,6 +241,8 @@ test("Runtime health reports only confirmed authentication rejection and sanitiz
             success: true,
             runtime: "unavailable",
             runtimeCallerCredential: "unavailable",
+            runtimeRevocationCredential: "unavailable",
+            signingKeyCorrespondence: "unavailable",
             runtimeFailureCode: scenario.expected,
             issuer: "authenticated"
         }, scenario.name);

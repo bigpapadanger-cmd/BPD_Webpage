@@ -5,6 +5,10 @@ const CONFIRMATION = "RUN_STAGING_ISOLATION_TEST";
 const CALLER_CHECK_HEADER = "x-bpd-staging-caller-check";
 const CALLER_NONCE_HEADER = "x-bpd-staging-caller-nonce";
 const CALLER_PROOF_PURPOSE = "bpd-provider-runtime-staging-caller-check-v1\0";
+const REVOCATION_CHECK_HEADER = "x-bpd-staging-revocation-check";
+const REVOCATION_PROOF_PURPOSE = "bpd-provider-runtime-staging-revocation-check-v1\0";
+const SIGNING_CHECK_PURPOSE = "bpd.rl.staging.signing-key-correspondence.v1";
+const SIGNING_CHECK_TTL_SECONDS = 30;
 const hashPattern = /^[a-f0-9]{64}$/u;
 const safeFailureCodes = new Set(["STAGING_TEST_DISABLED", "STAGING_TEST_UNAVAILABLE", "STAGING_CLEANUP_INCOMPLETE", "STAGING_ISOLATION_ASSERTION_FAILED"]);
 
@@ -20,6 +24,15 @@ function encodeBase64Url(bytes) {
     let binary = "";
     for (const byte of bytes) binary += String.fromCharCode(byte);
     return btoa(binary).replace(/\+/gu, "-").replace(/\//gu, "_").replace(/=+$/gu, "");
+}
+
+function isBase64Url64(value) {
+    if (typeof value !== "string" || !/^[A-Za-z0-9_-]{86}$/u.test(value)) return false;
+    try {
+        const decoded = Uint8Array.from(atob(value.replace(/-/gu, "+").replace(/_/gu, "/") + "=="), character => character.charCodeAt(0));
+        return decoded.length === 64 && encodeBase64Url(decoded) === value;
+    }
+    catch { return false; }
 }
 
 function decodeBase64Url32(value) {
@@ -39,6 +52,19 @@ async function verifyRuntimeCallerProof(payload, secret, nonce) {
             { name: "HMAC", hash: "SHA-256" }, false, ["verify"]);
         const matches = await crypto.subtle.verify("HMAC", key, proof,
             new TextEncoder().encode(`${CALLER_PROOF_PURPOSE}${nonce}`));
+        return matches ? "match" : "mismatch";
+    } catch { return "unavailable"; }
+}
+
+async function verifyRuntimeRevocationProof(payload, secret, nonce) {
+    if (payload?.success !== true || payload.service !== "bpd-provider-runtime" || payload.status !== "ok") return "unavailable";
+    const proof = decodeBase64Url32(payload.revocationCredentialProof);
+    if (!proof || !validSecret(secret)) return "unavailable";
+    try {
+        const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret),
+            { name: "HMAC", hash: "SHA-256" }, false, ["verify"]);
+        const matches = await crypto.subtle.verify("HMAC", key, proof,
+            new TextEncoder().encode(`${REVOCATION_PROOF_PURPOSE}${nonce}`));
         return matches ? "match" : "mismatch";
     } catch { return "unavailable"; }
 }
@@ -116,9 +142,9 @@ async function authenticatedHealth(service, url, secret) {
     } catch { return "unavailable"; }
 }
 
-async function runtimeHealth(service, url, secret) {
-    if (!service?.fetch) return { status: "unavailable", credentialStatus: "unavailable", failureCode: "BINDING_UNAVAILABLE" };
-    if (!validSecret(secret)) return { status: "unavailable", credentialStatus: "unavailable", failureCode: "RUNTIME_ERROR" };
+async function runtimeHealth(service, url, secret, revocationSecret) {
+    if (!service?.fetch) return { status: "unavailable", credentialStatus: "unavailable", revocationCredential: "unavailable", failureCode: "BINDING_UNAVAILABLE" };
+    if (!validSecret(secret)) return { status: "unavailable", credentialStatus: "unavailable", revocationCredential: "unavailable", failureCode: "RUNTIME_ERROR" };
     const nonce = encodeBase64Url(crypto.getRandomValues(new Uint8Array(32)));
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 3000);
@@ -128,7 +154,8 @@ async function runtimeHealth(service, url, secret) {
             headers: {
                 Authorization: `Bearer ${secret}`,
                 [CALLER_CHECK_HEADER]: "v1",
-                [CALLER_NONCE_HEADER]: nonce
+                [CALLER_NONCE_HEADER]: nonce,
+                [REVOCATION_CHECK_HEADER]: "v1"
             },
             signal: controller.signal
         }));
@@ -140,41 +167,75 @@ async function runtimeHealth(service, url, secret) {
             return {
                 status: "unavailable",
                 credentialStatus: await verifyRuntimeCallerProof(payload, secret, nonce),
+                revocationCredential: "unavailable",
                 failureCode: "RUNTIME_HTTP_401"
             };
         }
         if (response.status === 403) {
-            return { status: "unavailable", credentialStatus: "unavailable", failureCode: "RUNTIME_HTTP_403" };
+            return { status: "unavailable", credentialStatus: "unavailable", revocationCredential: "unavailable", failureCode: "RUNTIME_HTTP_403" };
         }
         if (!response.ok) {
-            return { status: "unavailable", credentialStatus: "unavailable", failureCode: response.status === 404 ? "INVALID_RESPONSE" : "RUNTIME_ERROR" };
+            return { status: "unavailable", credentialStatus: "unavailable", revocationCredential: "unavailable", failureCode: response.status === 404 ? "INVALID_RESPONSE" : "RUNTIME_ERROR" };
         }
         const text = await response.text();
-        if (text.length > 8192) return { status: "unavailable", credentialStatus: "unavailable", failureCode: "INVALID_RESPONSE" };
+        if (text.length > 8192) return { status: "unavailable", credentialStatus: "unavailable", revocationCredential: "unavailable", failureCode: "INVALID_RESPONSE" };
         let payload;
-        try { payload = JSON.parse(text); } catch { return { status: "unavailable", credentialStatus: "unavailable", failureCode: "INVALID_RESPONSE" }; }
+        try { payload = JSON.parse(text); } catch { return { status: "unavailable", credentialStatus: "unavailable", revocationCredential: "unavailable", failureCode: "INVALID_RESPONSE" }; }
         return payload?.success === true
-            ? { status: "authenticated", credentialStatus: "match" }
-            : { status: "unavailable", credentialStatus: "unavailable", failureCode: "INVALID_RESPONSE" };
+            ? { status: "authenticated", credentialStatus: "match",
+                revocationCredential: await verifyRuntimeRevocationProof(payload, revocationSecret, nonce) }
+            : { status: "unavailable", credentialStatus: "unavailable", revocationCredential: "unavailable", failureCode: "INVALID_RESPONSE" };
     } catch (error) {
-        return { status: "unavailable", credentialStatus: "unavailable", failureCode: controller.signal.aborted ? "TIMEOUT" : "RUNTIME_ERROR" };
+        return { status: "unavailable", credentialStatus: "unavailable", revocationCredential: "unavailable", failureCode: controller.signal.aborted ? "TIMEOUT" : "RUNTIME_ERROR" };
     } finally { clearTimeout(timer); }
 }
 
 export async function checkStagingConnectivity(env) {
     const [runtime, issuer] = await Promise.all([
         runtimeHealth(env.RL_PROBE_STAGING_RUNTIME,
-            "https://provider-runtime-staging.internal/internal/health", env.RL_PROBE_STAGING_RUNTIME_CALLER_SECRET),
+            "https://provider-runtime-staging.internal/internal/health", env.RL_PROBE_STAGING_RUNTIME_CALLER_SECRET,
+            env.RL_PROBE_STAGING_REVOCATION_SECRET),
         authenticatedHealth(env.RL_PROBE_STAGING_ISSUER,
             "https://rl-probe-issuer.internal/internal/health", env.RL_PROBE_STAGING_ISSUER_CALLER_SECRET)
     ]);
+    const signingKeyCorrespondence = await checkStagingSigningKeyCorrespondence(env);
     return {
         success: true,
         runtime: runtime.status,
         runtimeCallerCredential: runtime.credentialStatus,
+        runtimeRevocationCredential: runtime.revocationCredential,
+        signingKeyCorrespondence,
         ...(runtime.failureCode ? { runtimeFailureCode: runtime.failureCode } : {}),
         issuer
     };
+}
+
+async function checkStagingSigningKeyCorrespondence(env) {
+    if (!env.RL_PROBE_STAGING_RUNTIME?.fetch || !env.RL_PROBE_STAGING_ISSUER?.fetch
+        || !validSecret(env.RL_PROBE_STAGING_RUNTIME_CALLER_SECRET)
+        || !validSecret(env.RL_PROBE_STAGING_ISSUER_CALLER_SECRET)) return "unavailable";
+    const now = Math.floor(Date.now() / 1000);
+    const challenge = {
+        algorithm: "ES256",
+        issuer: "bpd-provider-runtime-staging",
+        keyVersion: "staging-v1",
+        purpose: SIGNING_CHECK_PURPOSE,
+        nonce: encodeBase64Url(crypto.getRandomValues(new Uint8Array(32))),
+        issuedAt: now,
+        expiresAt: now + SIGNING_CHECK_TTL_SECONDS
+    };
+    try {
+        const issuerResponse = await issuerCall(env, "signing-key-check", challenge);
+        if (!issuerResponse.ok || issuerResponse.payload?.success !== true
+            || Object.keys(issuerResponse.payload).length !== 2
+            || !isBase64Url64(issuerResponse.payload.signature)) return "unavailable";
+        const runtimeResponse = await runtimeCall(env, "key-correspondence/verify",
+            { ...challenge, signature: issuerResponse.payload.signature });
+        if (!runtimeResponse.ok || runtimeResponse.payload?.success !== true
+            || Object.keys(runtimeResponse.payload).length !== 2
+            || typeof runtimeResponse.payload.keyMatches !== "boolean") return "unavailable";
+        return runtimeResponse.payload.keyMatches ? "match" : "mismatch";
+    } catch { return "unavailable"; }
 }
 
 function assertResult(condition) {

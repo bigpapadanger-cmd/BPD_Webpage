@@ -5,6 +5,10 @@ const SLOTS = Object.freeze({
 });
 const AUDIENCE = "bpd-provider-runtime/rl-compatibility-probe";
 const ACTION = "rl.compatibility.probe";
+const SIGNING_CHECK_PATH = "/internal/signing-key-check";
+const SIGNING_CHECK_PURPOSE = "bpd.rl.staging.signing-key-correspondence.v1";
+const SIGNING_CHECK_DOMAIN = "BPD-RL-STAGING-KEY-CORRESPONDENCE\0";
+const SIGNING_CHECK_TTL_SECONDS = 30;
 
 function json(body, status = 200) {
     return Response.json(body, { status, headers: { "Cache-Control": "no-store", Pragma: "no-cache" } });
@@ -62,6 +66,43 @@ function base64url(bytes) {
 }
 
 function encodeJson(value) { return base64url(new TextEncoder().encode(JSON.stringify(value))); }
+
+function validSigningCheckChallenge(body, env) {
+    const now = Math.floor(Date.now() / 1000);
+    let nonceBytes = null;
+    if (typeof body?.nonce === "string" && /^[A-Za-z0-9_-]{43}$/u.test(body.nonce)) {
+        try {
+            nonceBytes = atob(body.nonce.replace(/-/gu, "+").replace(/_/gu, "/") + "=");
+            if (nonceBytes.length !== 32 || base64url(Uint8Array.from(nonceBytes, character => character.charCodeAt(0))) !== body.nonce) nonceBytes = null;
+        } catch { nonceBytes = null; }
+    }
+    return exactKeys(body, ["algorithm", "issuer", "keyVersion", "purpose", "nonce", "issuedAt", "expiresAt"])
+        && body.algorithm === "ES256"
+        && body.issuer === "bpd-provider-runtime-staging"
+        && env.RL_PROBE_ISSUER === body.issuer
+        && body.keyVersion === "staging-v1"
+        && env.RL_PROBE_KEY_VERSION === body.keyVersion
+        && body.purpose === SIGNING_CHECK_PURPOSE
+        && nonceBytes?.length === 32
+        && Number.isSafeInteger(body.issuedAt) && Number.isSafeInteger(body.expiresAt)
+        && body.expiresAt - body.issuedAt === SIGNING_CHECK_TTL_SECONDS
+        && body.issuedAt <= now + 5 && body.expiresAt > now;
+}
+
+function signingCheckMessage(challenge) {
+    return new TextEncoder().encode(`${SIGNING_CHECK_DOMAIN}${challenge.algorithm}\0${challenge.issuer}\0${challenge.keyVersion}\0${challenge.purpose}\0${challenge.nonce}\0${challenge.issuedAt}\0${challenge.expiresAt}`);
+}
+
+async function signSigningKeyCheck(env, challenge) {
+    if (!validSigningCheckChallenge(challenge, env)) throw new Error("challenge");
+    let jwk;
+    try { jwk = JSON.parse(env.RL_PROBE_SIGNING_JWK); } catch { throw new Error("configuration"); }
+    if (jwk?.kty !== "EC" || jwk?.crv !== "P-256" || typeof jwk.d !== "string"
+        || typeof jwk.x !== "string" || typeof jwk.y !== "string") throw new Error("configuration");
+    const key = await crypto.subtle.importKey("jwk", jwk, { name: "ECDSA", namedCurve: "P-256" }, false, ["sign"]);
+    const signature = await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, key, signingCheckMessage(challenge));
+    return base64url(signature);
+}
 
 async function signAssertion(env, { slot, generation, invalidatedBefore, securityEpoch }) {
     if (!Number.isSafeInteger(generation) || generation < 0 || !Number.isSafeInteger(invalidatedBefore) || invalidatedBefore < 0
@@ -128,6 +169,15 @@ export default {
             if (enabled(env) && !configurationReady(env)) return json({ success: false, enabled: false, code: "ISSUER_CONFIGURATION_REQUIRED" }, 503);
             return json({ success: true, enabled: enabled(env), service: "bpd-rl-probe-staging-issuer" });
         }
+        if (url.pathname === SIGNING_CHECK_PATH && request.method === "POST") {
+            if (url.hostname !== "rl-probe-issuer.internal"
+                || env.RL_PROBE_ISSUER !== "bpd-provider-runtime-staging"
+                || env.RL_PROBE_KEY_VERSION !== "staging-v1") return json({ success: false, code: "NOT_FOUND" }, 404);
+            const body = await readBody(request);
+            if (!validSigningCheckChallenge(body, env)) return json({ success: false, code: "REQUEST_SCHEMA_INVALID" }, 400);
+            try { return json({ success: true, signature: await signSigningKeyCheck(env, body) }); }
+            catch { return json({ success: false, code: "SIGNING_CHECK_UNAVAILABLE" }, 503); }
+        }
         if (url.pathname === "/internal/identity" && request.method === "POST") {
             if (!enabled(env) || !configurationReady(env)) return json({ success: false, code: "ISSUER_DISABLED" }, 503);
             const body = await readBody(request);
@@ -151,4 +201,4 @@ export default {
     }
 };
 
-export { SLOTS, deriveAccountKey, identity, signAssertion };
+export { SLOTS, deriveAccountKey, identity, signAssertion, signSigningKeyCheck };
